@@ -126,8 +126,17 @@ html, body {
 .ctrl-btn svg { width: 20px; height: 20px; flex-shrink: 0; fill: currentColor; }
 .ctrl-btn:hover { color: var(--text-primary); background: var(--hover-subtle); border-color: var(--border-subtle); }
 .ctrl-btn:active { transform: scale(0.95); }
-.ctrl-btn.accent { color: var(--text-primary); }
-.ctrl-btn.accent:hover { color: var(--text-primary); background: var(--hover-medium); border-color: var(--border-highlight); }
+.ctrl-btn.accent {
+  color: var(--bg-primary);
+  background: var(--text-primary);
+  border-color: var(--text-primary);
+}
+.ctrl-btn.accent:hover {
+  color: var(--bg-primary);
+  background: var(--text-primary);
+  border-color: var(--text-primary);
+  box-shadow: 0 0 12px rgba(255,255,255,0.3);
+}
 
 #source-label { font-size: 0.72rem; color: var(--text-muted); }
 .audio-source { border-left: 1px solid var(--border-subtle); padding-left: 8px; }
