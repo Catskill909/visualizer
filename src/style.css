@@ -127,15 +127,12 @@ html, body {
 .ctrl-btn:hover { color: var(--text-primary); background: var(--hover-subtle); border-color: var(--border-subtle); }
 .ctrl-btn:active { transform: scale(0.95); }
 .ctrl-btn.accent {
-  color: var(--bg-primary);
-  background: var(--text-primary);
-  border-color: var(--text-primary);
+  color: var(--text-primary);
 }
 .ctrl-btn.accent:hover {
-  color: var(--bg-primary);
-  background: var(--text-primary);
-  border-color: var(--text-primary);
-  box-shadow: 0 0 12px rgba(255,255,255,0.3);
+  color: var(--text-primary);
+  background: var(--hover-subtle);
+  border-color: var(--border-subtle);
 }
 
 #source-label { font-size: 0.72rem; color: var(--text-muted); }

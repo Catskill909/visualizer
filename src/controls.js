@@ -8,6 +8,7 @@ export class ControlPanel {
     this.hideDelay = 3000;
     this.drawerOpen = false;
     this.toastTimer = null;
+    this.randomMode = false;
 
     // DOM refs
     this.els = {
@@ -72,9 +73,15 @@ export class ControlPanel {
     });
 
     els.btnRandom.addEventListener('click', () => {
-      const name = engine.randomPreset();
-      this.updatePresetName(name);
-      this.showToast('🔀 ' + this.truncate(name, 50));
+      this.randomMode = !this.randomMode;
+      els.btnRandom.classList.toggle('accent', this.randomMode);
+      if (this.randomMode) {
+        const name = engine.randomPreset();
+        this.updatePresetName(name);
+        this.showToast('🔀 Random: ON - ' + this.truncate(name, 50));
+      } else {
+        this.showToast('🔀 Random: OFF');
+      }
     });
 
     // --- Source switch ---
@@ -378,9 +385,15 @@ export class ControlPanel {
       case 'r':
       case 'R':
         {
-          const name = this.engine.randomPreset();
-          this.updatePresetName(name);
-          this.showToast('🔀 ' + this.truncate(name, 50));
+          this.randomMode = !this.randomMode;
+          this.els.btnRandom.classList.toggle('accent', this.randomMode);
+          if (this.randomMode) {
+            const name = this.engine.randomPreset();
+            this.updatePresetName(name);
+            this.showToast('🔀 Random: ON - ' + this.truncate(name, 50));
+          } else {
+            this.showToast('🔀 Random: OFF');
+          }
         }
         break;
       case 'f':
