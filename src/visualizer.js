@@ -49,8 +49,8 @@ export class VisualizerEngine {
     this.autoCycleTimer = null;
     
     // Performance controls
-    this.energyMultiplier = 1.5;
-    this.baseSensitivity = 8.0;
+    this.energyMultiplier = 1.0;
+    this.baseSensitivity = 1.0;
     this.agcEnabled = true;
     this.kickLockEnabled = false;
     this.boostActive = false;
@@ -79,23 +79,17 @@ export class VisualizerEngine {
     this.kickFilter.frequency.value = 150; // Focus on bass
     this.kickFilter.Q.value = 1.0;
 
-    // 3. Main Gain Node
+    // 3. Main Gain Node (AGC + Energy)
     this.visualizerGainNode = this.audioContext.createGain();
     this.visualizerGainNode.gain.value = this.baseSensitivity;
 
-    // 4. Output Analyser (Drives Butterchurn)
-    this.outputAnalyser = this.audioContext.createAnalyser();
-    this.outputAnalyser.fftSize = 1024;
-
-    // Default routing: Analyser (Input) -> visualizerGainNode -> outputAnalyser
+    // Default routing: Analyser (Input) -> visualizerGainNode -> Butterchurn
     this.analyser.connect(this.visualizerGainNode);
-    this.visualizerGainNode.connect(this.outputAnalyser);
 
-    // Create a "Silent Force" path to keep the graph active in browsers
-    // We connect to destination with 0 volume so it's active but silent.
+    // Silent tap to keep the graph active across browsers
     this.silentForce = this.audioContext.createGain();
-    this.silentForce.gain.value = 0.000001; 
-    this.outputAnalyser.connect(this.silentForce);
+    this.silentForce.gain.value = 0.000001;
+    this.visualizerGainNode.connect(this.silentForce);
     this.silentForce.connect(this.audioContext.destination);
 
     // Load presets from all available packs
@@ -142,8 +136,7 @@ export class VisualizerEngine {
       width, height, pixelRatio: window.devicePixelRatio || 1,
     });
 
-    // CRITICAL: Butterchurn requires an AnalyserNode, not a GainNode!
-    this.visualizer.connectAudio(this.outputAnalyser);
+    this.visualizer.connectAudio(this.visualizerGainNode);
     this.randomPreset();
     this.startRenderLoop(); // Force start the loop immediately
     return this;
@@ -171,7 +164,7 @@ export class VisualizerEngine {
       this.startAutoCycle();
       
       // Force engine re-sync
-      if (this.visualizer) this.visualizer.connectAudio(this.outputAnalyser);
+      if (this.visualizer) this.visualizer.connectAudio(this.visualizerGainNode);
       
       return true;
     } catch (err) {
@@ -188,11 +181,11 @@ export class VisualizerEngine {
       this.audioElement.crossOrigin = 'anonymous';
       this.audioElement.src = URL.createObjectURL(file);
       const source = this.audioContext.createMediaElementSource(this.audioElement);
+      // Path for Hearing: Source -> VolumeGain -> Destination
       this.volumeGainNode = this.audioContext.createGain();
       source.connect(this.volumeGainNode);
       this.volumeGainNode.connect(this.audioContext.destination);
       
-      // Connect to the head of our internal chain
       source.connect(this.analyser);
       
       this.currentSource = source;
@@ -201,8 +194,11 @@ export class VisualizerEngine {
       this.startAutoCycle();
 
       // Force engine re-sync
-      if (this.visualizer) this.visualizer.connectAudio(this.outputAnalyser);
+      if (this.visualizer) {
+        this.visualizer.connectAudio(this.visualizerGainNode);
+      }
 
+      console.log('[MilkScreen] File source connected to engine and destination');
       return this.audioElement;
     } catch (err) {
       console.error('Error loading audio file:', err);
@@ -365,49 +361,35 @@ export class VisualizerEngine {
       this._audioConfirmed = true;
     }
 
-    this.lastPeak = this.lastPeak * 0.95 + peak * 0.05; // Smoothing
+    this.lastPeak = this.lastPeak * 0.95 + peak * 0.05;
 
-    // Avoid division by zero
-    const currentPeak = Math.max(this.lastPeak, 0.01);
-    
-    // Target gain to bring peaks to ~0.7 intensity
-    // Butterchurn usually needs a boost, so we target 0.7 but with a 10.0 base factor
-    let targetGain = (0.7 / currentPeak) * 10.0; 
-    
-    // Clamp to sane levels (prevent ear-piercing silent noise boost)
-    targetGain = Math.min(Math.max(targetGain, 1.0), 40.0);    
-    
-    // Apply energy slider on top of AGC for fine tuning
+    // Normalize to ~0.5 peak, preserving dynamics so Butterchurn can detect beats
+    const currentPeak = Math.max(this.lastPeak, 0.05);
+    let targetGain = 0.5 / currentPeak;
+    targetGain = Math.min(Math.max(targetGain, 0.5), 3.0);
+
     targetGain *= this.energyMultiplier;
     if (this.boostActive) targetGain *= 2.0;
 
-    // Use a faster attack (0.1) for snappier response
     this.visualizerGainNode.gain.setTargetAtTime(targetGain, this.audioContext.currentTime, 0.1);
 
-    // Update hype level for UI (0-1)
-    // Scale it based on the RAW peak so the meter is "alive"
-    this.hypeLevel = Math.min((peak * this.energyMultiplier) / 1.0, 1.2);
+    this.hypeLevel = Math.min(peak * this.energyMultiplier, 1.2);
   }
 
   toggleKickLock() {
     this.kickLockEnabled = !this.kickLockEnabled;
-    
-    // Update routing
+
     if (this.currentSource) {
-      this.currentSource.disconnect();
-      
+      try { this.currentSource.disconnect(this.analyser); } catch (e) { /* ignore */ }
+      try { this.currentSource.disconnect(this.kickFilter); } catch (e) { /* ignore */ }
+      try { this.kickFilter.disconnect(); } catch (e) { /* ignore */ }
+
       if (this.kickLockEnabled) {
-        // Path: Source -> KickFilter -> Analyser -> visualizerGainNode -> outputAnalyser
         this.currentSource.connect(this.kickFilter);
         this.kickFilter.connect(this.analyser);
       } else {
-        // Path: Source -> Analyser -> visualizerGainNode -> outputAnalyser
         this.currentSource.connect(this.analyser);
       }
-      
-      // Ensure the rest of the chain is intact
-      this.analyser.connect(this.visualizerGainNode);
-      this.visualizerGainNode.connect(this.outputAnalyser);
     }
     return this.kickLockEnabled;
   }
