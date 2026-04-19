@@ -93,6 +93,14 @@
         <div id="audio-tuning-panel" class="popover hidden">
           <div class="popover-header">
             <h4>Audio Performance</h4>
+            <div class="vu-meter-container">
+              <div id="vu-meter-bar" class="vu-meter-bar"></div>
+              <div class="vu-meter-labels">
+                <span>QUIET</span>
+                <span id="signal-status" class="signal-status">NO SIGNAL</span>
+                <span>HYPE</span>
+              </div>
+            </div>
           </div>
           <div class="popover-content">
             <div class="tuning-group">
@@ -186,6 +194,26 @@
 
   <!-- ============== NOTIFICATION TOAST ============== -->
   <div id="toast" class="hidden"></div>
+
+  <!-- ============== PERMISSION ERROR MODAL ============== -->
+  <div id="permission-error" class="hidden">
+    <div class="permission-card">
+      <div class="permission-icon">🚫</div>
+      <h3>Microphone Denied</h3>
+      <p>The visualizer needs microphone access to react to your music. Make sure you are using <strong>localhost</strong> or <strong>HTTPS</strong>.</p>
+      
+      <div class="permission-steps">
+        <ol>
+          <li>Click the <strong>Lock icon</strong> 🔒 in the address bar.</li>
+          <li>Find <strong>Microphone</strong> and toggle it <strong>ON</strong>.</li>
+          <li>Refresh this page.</li>
+        </ol>
+      </div>
+
+      <button id="btn-retry-permission" class="primary-btn" type="button">Try Again</button>
+      <button id="btn-close-permission" class="text-btn" type="button">Close</button>
+    </div>
+  </div>
 
   <!-- ============== KEYBOARD GUIDE MODAL ============== -->
   <div id="keyboard-guide" class="hidden">

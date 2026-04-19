@@ -12,6 +12,7 @@ export class ControlPanel {
     this.guideOpen = false;
     this.favorites = this.loadFavorites();
     this.currentTab = 'all'; // 'all' or 'favorites'
+    this.vuAnimId = null;
 
     // DOM refs
     this.els = {
@@ -45,6 +46,8 @@ export class ControlPanel {
       toggleAgc: document.getElementById('toggle-agc'),
       toggleKicklock: document.getElementById('toggle-kicklock'),
       btnBoost: document.getElementById('btn-boost'),
+      vuMeterBar: document.getElementById('vu-meter-bar'),
+      signalStatus: document.getElementById('signal-status'),
       keyboardGuide: document.getElementById('keyboard-guide'),
       btnCloseGuide: document.getElementById('btn-close-guide'),
       flashOverlay: document.getElementById('flash-overlay'),
@@ -58,6 +61,9 @@ export class ControlPanel {
       iconPause: document.getElementById('icon-pause'),
       audioVolume: document.getElementById('audio-volume'),
       toast: document.getElementById('toast'),
+      permissionError: document.getElementById('permission-error'),
+      btnRetryPermission: document.getElementById('btn-retry-permission'),
+      btnClosePermission: document.getElementById('btn-close-permission'),
     };
 
     this.bindEvents();
@@ -65,6 +71,8 @@ export class ControlPanel {
 
   bindEvents() {
     const { els, engine } = this;
+
+    this.initPermissionRetry();
 
     // --- Start screen & Audio loading ---
     els.btnMic.addEventListener('click', () => this.startWithMic());
@@ -262,7 +270,8 @@ export class ControlPanel {
       this.showToast('🎤 Microphone connected');
       await this.populateDeviceList();
     } catch (err) {
-      this.showToast('❌ Microphone access denied');
+      console.error('Mic error:', err);
+      this.showPermissionError();
     }
   }
 
@@ -292,7 +301,7 @@ export class ControlPanel {
       this.showToast('🎤 Switched to microphone');
       await this.populateDeviceList();
     } catch (err) {
-      this.showToast('❌ Microphone access denied');
+      this.showPermissionError();
     }
   }
 
@@ -317,6 +326,29 @@ export class ControlPanel {
       console.error('Error enumerating devices:', err);
       this.els.deviceSelect.classList.add('hidden');
     }
+  }
+
+  showPermissionError() {
+    this.els.permissionError.classList.remove('hidden');
+  }
+
+  hidePermissionError() {
+    this.els.permissionError.classList.add('hidden');
+  }
+
+  initPermissionRetry() {
+    this.els.btnRetryPermission.addEventListener('click', () => {
+      this.hidePermissionError();
+      if (this.engine.currentSourceType === 'mic' || this.els.startScreen.classList.contains('hidden')) {
+        this.switchToMic();
+      } else {
+        this.startWithMic();
+      }
+    });
+
+    this.els.btnClosePermission.addEventListener('click', () => {
+      this.hidePermissionError();
+    });
   }
 
   // ===================== AUDIO PLAYER =====================
@@ -414,11 +446,46 @@ export class ControlPanel {
     if (!isHidden) {
       if (this.drawerOpen) this.closeDrawer();
       if (this.guideOpen) this.closeGuide();
+      this.startVULoop();
+    } else {
+      this.stopVULoop();
     }
   }
 
   closeTuningPanel() {
     this.els.audioTuningPanel.classList.add('hidden');
+    this.stopVULoop();
+  }
+
+  startVULoop() {
+    if (this.vuAnimId) return;
+    const loop = () => {
+      this.updateVUMeter();
+      this.vuAnimId = requestAnimationFrame(loop);
+    };
+    this.vuAnimId = requestAnimationFrame(loop);
+  }
+
+  stopVULoop() {
+    if (this.vuAnimId) {
+      cancelAnimationFrame(this.vuAnimId);
+      this.vuAnimId = null;
+    }
+  }
+
+  updateVUMeter() {
+    const level = this.engine.hypeLevel || 0;
+    const width = Math.min(level * 100, 100);
+    this.els.vuMeterBar.style.width = width + '%';
+
+    // Update status text
+    if (level > 0.01) {
+      this.els.signalStatus.textContent = 'SIGNAL DETECTED';
+      this.els.signalStatus.classList.add('active');
+    } else {
+      this.els.signalStatus.textContent = 'NO SIGNAL';
+      this.els.signalStatus.classList.remove('active');
+    }
   }
 
   populatePresetList(filter = '') {
