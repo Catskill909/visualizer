@@ -107,11 +107,16 @@ export class VisualizerEngine {
     return this;
   }
 
-  async connectMicrophone() {
+  async connectMicrophone(deviceId = null) {
     try {
       if (this.audioContext.state === 'suspended') await this.audioContext.resume();
       this.disconnectSource();
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      const constraints = {
+        audio: deviceId ? { deviceId: { exact: deviceId } } : true
+      };
+      
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       const source = this.audioContext.createMediaStreamSource(stream);
       this._micStream = stream;
       this.currentSource = source;

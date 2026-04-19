@@ -104,7 +104,7 @@ html, body {
   box-shadow: var(--shadow-soft); pointer-events: auto;
 }
 
-.preset-info { flex: 1; min-width: 0; overflow: hidden; }
+.preset-info { flex: 1; min-width: 0; }
 
 .preset-label {
   display: block; font-size: 0.82rem; font-weight: 500; color: var(--text-secondary);
@@ -137,6 +137,38 @@ html, body {
   background: rgba(255,255,255,0.12);
   border-color: var(--text-primary);
   filter: drop-shadow(0 0 10px rgba(255,255,255,0.7));
+}
+
+.ctrl-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-family: var(--font);
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  outline: none;
+  max-width: 150px;
+}
+
+.ctrl-select:hover {
+  color: var(--text-primary);
+  background: var(--hover-subtle);
+  border-color: var(--border-subtle);
+}
+
+.ctrl-select:focus {
+  border-color: var(--border-highlight);
+}
+
+.ctrl-select option {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
 }
 
 #source-label { font-size: 0.72rem; color: var(--text-muted); }
@@ -200,6 +232,19 @@ html, body {
 #preset-search::placeholder { color: var(--text-muted); }
 #preset-search:focus { border-color: var(--border-highlight); box-shadow: 0 0 0 2px rgba(255,255,255,0.1); }
 
+/* Drawer Tabs */
+.drawer-tabs {
+  display: flex; gap: 4px; padding: 0 20px 12px;
+}
+.drawer-tab {
+  flex: 1; padding: 6px; background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-xl);
+  color: var(--text-secondary); font-family: var(--font); font-size: 0.75rem; font-weight: 500;
+  cursor: pointer; transition: all var(--transition-fast); text-align: center;
+}
+.drawer-tab:hover { background: var(--hover-subtle); color: var(--text-primary); }
+.drawer-tab.active { background: var(--text-primary); color: var(--bg-primary); border-color: var(--text-primary); }
+
 .drawer-count { padding: 0 20px 8px; font-size: 0.72rem; color: var(--text-muted); }
 
 .drawer-list {
@@ -212,16 +257,35 @@ html, body {
 .drawer-list::-webkit-scrollbar-thumb { background: var(--bg-elevated); border-radius: 3px; }
 
 .drawer-list li {
+  display: flex; align-items: center; justify-content: space-between;
   padding: 9px 12px; font-size: 0.8rem; color: var(--text-secondary); border-radius: var(--radius-sm);
-  cursor: pointer; transition: all var(--transition-fast); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  cursor: pointer; transition: all var(--transition-fast);
 }
 
+.preset-name-text { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.preset-heart {
+  flex-shrink: 0; width: 16px; height: 16px; margin-left: 8px;
+  opacity: 0; transform: scale(0.8); transition: all var(--transition-fast);
+  color: var(--text-muted);
+}
+.preset-heart svg { width: 100%; height: 100%; fill: currentColor; }
+
 .drawer-list li:hover { background: var(--hover-subtle); color: var(--text-primary); }
+.drawer-list li:hover .preset-heart { opacity: 0.5; transform: scale(1); }
+.drawer-list li:hover .preset-heart:hover { color: #ff3b3b; opacity: 1; transform: scale(1.1); }
+
+.drawer-list li.is-favorite .preset-heart { opacity: 1; transform: scale(1); color: #ff3b3b; }
 
 .drawer-list li.active {
   background: var(--hover-medium); color: var(--text-primary);
   border-left: 2px solid var(--text-primary); padding-left: 10px;
 }
+
+/* Heart Button in Control Bar */
+.heart-btn { padding: 6px; }
+.heart-btn.is-favorite .icon-heart-outline { display: none; }
+.heart-btn.is-favorite .icon-heart-filled { display: block !important; color: #ff3b3b; filter: drop-shadow(0 0 6px rgba(255, 59, 59, 0.4)); }
 
 /* TOAST */
 #toast {
@@ -241,6 +305,50 @@ html, body {
 @keyframes logoPulse {
   0%, 100% { transform: scale(1); filter: drop-shadow(0 0 8px rgba(255,255,255,0.2)); }
   50% { transform: scale(1.05); filter: drop-shadow(0 0 16px rgba(255,255,255,0.4)); }
+}
+
+/* TOOLTIPS (Custom CSS Tooltips) */
+[data-tooltip] {
+  position: relative;
+}
+
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  padding: 6px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font-size: 0.72rem;
+  font-family: var(--font);
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  box-shadow: var(--shadow-soft);
+  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
+  z-index: 100;
+}
+
+/* Specific tooltip position for close drawer to keep it in screen */
+#btn-close-drawer[data-tooltip]::after {
+  left: auto;
+  right: 0;
+  transform: translateX(0) translateY(4px);
+}
+#btn-close-drawer[data-tooltip]:hover::after {
+  transform: translateX(0) translateY(0);
+}
+
+[data-tooltip]:hover::after {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
 }
 
 /* RESPONSIVE */

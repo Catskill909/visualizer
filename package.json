@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "sirv dist --host --port 8080 --single"
   },
   "devDependencies": {
     "vite": "^8.0.4"
@@ -15,6 +16,7 @@
     "butterchurn": "^2.6.7",
     "butterchurn-presets": "^2.4.7",
     "butterchurn-presets-baron": "^1.5.1",
-    "butterchurn-presets-weekly": "^0.0.4"
+    "butterchurn-presets-weekly": "^0.0.4",
+    "sirv-cli": "^3.0.1"
   }
 }

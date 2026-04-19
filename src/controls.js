@@ -9,6 +9,8 @@ export class ControlPanel {
     this.drawerOpen = false;
     this.toastTimer = null;
     this.randomMode = false;
+    this.favorites = this.loadFavorites();
+    this.currentTab = 'all'; // 'all' or 'favorites'
 
     // DOM refs
     this.els = {
@@ -23,6 +25,7 @@ export class ControlPanel {
       btnPresets: document.getElementById('btn-presets'),
       btnFullscreen: document.getElementById('btn-fullscreen'),
       btnMic: document.getElementById('btn-mic'),
+      deviceSelect: document.getElementById('device-select'),
       btnFile: document.getElementById('btn-file'),
       btnLoadFile: document.getElementById('btn-load-file'),
       fileInput: document.getElementById('file-input'),
@@ -31,6 +34,9 @@ export class ControlPanel {
       presetList: document.getElementById('preset-list'),
       presetCount: document.getElementById('preset-count'),
       btnCloseDrawer: document.getElementById('btn-close-drawer'),
+      tabAll: document.getElementById('tab-all'),
+      tabFavorites: document.getElementById('tab-favorites'),
+      btnFavorite: document.getElementById('btn-favorite'),
       audioPlayer: document.getElementById('audio-player'),
       audioFilename: document.getElementById('audio-filename'),
       audioTime: document.getElementById('audio-time'),
@@ -93,11 +99,39 @@ export class ControlPanel {
       }
     });
 
+    els.deviceSelect.addEventListener('change', async (e) => {
+      try {
+        await engine.connectMicrophone(e.target.value);
+        this.showToast('🎤 Switched input device');
+      } catch (err) {
+        this.showToast('❌ Error switching device');
+      }
+    });
+
     // --- Preset drawer ---
     els.btnPresets.addEventListener('click', () => this.toggleDrawer());
     els.btnCloseDrawer.addEventListener('click', () => this.closeDrawer());
-
     els.presetSearch.addEventListener('input', () => this.filterPresets());
+
+    els.tabAll.addEventListener('click', () => {
+      this.currentTab = 'all';
+      els.tabAll.classList.add('active');
+      els.tabFavorites.classList.remove('active');
+      this.filterPresets();
+    });
+
+    els.tabFavorites.addEventListener('click', () => {
+      this.currentTab = 'favorites';
+      els.tabFavorites.classList.add('active');
+      els.tabAll.classList.remove('active');
+      this.filterPresets();
+    });
+
+    // --- Favorite toggle (control bar) ---
+    els.btnFavorite.addEventListener('click', () => {
+      const currentPreset = engine.getCurrentPresetName();
+      if (currentPreset) this.toggleFavorite(currentPreset);
+    });
 
     // --- Fullscreen ---
     els.btnFullscreen.addEventListener('click', () => this.toggleFullscreen());
@@ -134,6 +168,42 @@ export class ControlPanel {
     });
   }
 
+  // ===================== FAVORITES =====================
+
+  loadFavorites() {
+    try {
+      const stored = localStorage.getItem('milkscreen_favorites');
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch (e) {
+      return new Set();
+    }
+  }
+
+  saveFavorites() {
+    localStorage.setItem('milkscreen_favorites', JSON.stringify(Array.from(this.favorites)));
+  }
+
+  toggleFavorite(name) {
+    if (this.favorites.has(name)) {
+      this.favorites.delete(name);
+      this.showToast('💔 Removed from Favorites');
+    } else {
+      this.favorites.add(name);
+      this.showToast('❤️ Added to Favorites');
+    }
+    this.saveFavorites();
+
+    // Update active UI state if the toggled preset is the currently playing one
+    if (name === this.engine.getCurrentPresetName()) {
+      this.els.btnFavorite.classList.toggle('is-favorite', this.favorites.has(name));
+    }
+
+    // Refresh drawer if it's open so hearts update
+    if (this.drawerOpen) {
+      this.filterPresets();
+    }
+  }
+
   // ===================== START FLOWS =====================
 
   async startWithMic() {
@@ -146,6 +216,7 @@ export class ControlPanel {
       this.updatePresetName(this.engine.getCurrentPresetName());
       this.showControls();
       this.showToast('🎤 Microphone connected');
+      await this.populateDeviceList();
     } catch (err) {
       this.showToast('❌ Microphone access denied');
     }
@@ -175,8 +246,32 @@ export class ControlPanel {
       this.els.sourceLabel.textContent = 'Mic';
       this.els.audioPlayer.classList.add('hidden');
       this.showToast('🎤 Switched to microphone');
+      await this.populateDeviceList();
     } catch (err) {
       this.showToast('❌ Microphone access denied');
+    }
+  }
+
+  async populateDeviceList() {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const audioInputs = devices.filter(device => device.kind === 'audioinput');
+      
+      this.els.deviceSelect.innerHTML = '';
+      if (audioInputs.length > 0) {
+        audioInputs.forEach(device => {
+          const option = document.createElement('option');
+          option.value = device.deviceId;
+          option.text = device.label || `Microphone ${this.els.deviceSelect.length + 1}`;
+          this.els.deviceSelect.appendChild(option);
+        });
+        this.els.deviceSelect.classList.remove('hidden');
+      } else {
+        this.els.deviceSelect.classList.add('hidden');
+      }
+    } catch (err) {
+      console.error('Error enumerating devices:', err);
+      this.els.deviceSelect.classList.add('hidden');
     }
   }
 
@@ -257,9 +352,15 @@ export class ControlPanel {
     const currentName = engine.getCurrentPresetName();
     const lowerFilter = filter.toLowerCase();
 
-    const filtered = filter
-      ? names.filter(n => n.toLowerCase().includes(lowerFilter))
+    // 1. Filter by Tab (All vs Favorites)
+    let filtered = this.currentTab === 'favorites' 
+      ? names.filter(n => this.favorites.has(n))
       : names;
+
+    // 2. Filter by Search Text
+    filtered = filter
+      ? filtered.filter(n => n.toLowerCase().includes(lowerFilter))
+      : filtered;
 
     els.presetCount.textContent = filtered.length;
     els.presetList.innerHTML = '';
@@ -271,8 +372,27 @@ export class ControlPanel {
     for (let i = 0; i < limit; i++) {
       const name = filtered[i];
       const li = document.createElement('li');
-      li.textContent = name;
-      li.title = name;
+
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'preset-name-text';
+      nameSpan.textContent = name;
+      li.appendChild(nameSpan);
+
+      const heartSpan = document.createElement('span');
+      heartSpan.className = 'preset-heart';
+      heartSpan.setAttribute('data-tooltip', 'Toggle Favorite');
+      heartSpan.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>';
+      
+      heartSpan.addEventListener('click', (e) => {
+        e.stopPropagation(); // Don't trigger the preset load click
+        this.toggleFavorite(name);
+      });
+      
+      li.appendChild(heartSpan);
+
+      if (this.favorites.has(name)) {
+        li.classList.add('is-favorite');
+      }
 
       if (name === currentName) {
         li.classList.add('active');
@@ -311,6 +431,10 @@ export class ControlPanel {
 
   updatePresetName(name) {
     this.els.presetName.textContent = name || 'No preset loaded';
+    
+    const isFav = this.favorites.has(name);
+    this.els.btnFavorite.classList.toggle('is-favorite', isFav);
+    this.els.btnFavorite.setAttribute('data-tooltip', isFav ? 'Remove from Favorites (S)' : 'Add to Favorites (S)');
   }
 
   showControls() {
@@ -394,6 +518,13 @@ export class ControlPanel {
           } else {
             this.showToast('🔀 Random: OFF');
           }
+        }
+        break;
+      case 's':
+      case 'S':
+        {
+          const currentPreset = this.engine.getCurrentPresetName();
+          if (currentPreset) this.toggleFavorite(currentPreset);
         }
         break;
       case 'f':

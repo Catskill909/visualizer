@@ -2,7 +2,6 @@
  * MilkScreen — Entry Point
  * Wires up the VisualizerEngine and ControlPanel
  */
-import './style.css';
 import { VisualizerEngine } from './visualizer.js';
 import { ControlPanel } from './controls.js';
 

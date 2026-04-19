@@ -5,10 +5,11 @@ A modern browser-based MilkDrop music visualizer powered by [Butterchurn](https:
 ## Features
 
 - **100 curated MilkDrop presets** — the best-of collection from the Butterchurn library
-- **Dual audio input** — microphone capture or local audio file playback (MP3, WAV, FLAC)
+- **Dual audio input** — live audio capture or local audio file playback (MP3, WAV, FLAC)
+- **Live device selection** — native support for selecting USB DJ controllers, external sound cards, and specific microphones via the control bar
 - **Split audio routing** — volume control and visualizer sensitivity are independent; the visualizer receives a 5× gain-boosted signal for maximum beat reactivity without affecting speaker volume
 - **Auto-cycling presets** — random preset rotation every 30 seconds
-- **Preset browser** — searchable drawer with all 100 presets, accessible via UI or keyboard
+- **Preset browser** — searchable drawer with over 1,100 presets (including community packs), accessible via UI or keyboard
 - **Auto-hiding controls** — glassmorphic control bar fades after 3 seconds of inactivity
 - **Fullscreen mode** — native browser fullscreen support
 - **Responsive design** — works on desktop and mobile viewports
@@ -75,7 +76,7 @@ Core engine wrapping Butterchurn. Manages audio context, source connections, pre
 | Method | Description |
 |--------|-------------|
 | `init(canvas)` | Initialize WebGL visualizer on a canvas element |
-| `connectMicrophone()` | Connect browser mic as audio source |
+| `connectMicrophone(deviceId)` | Connect browser mic or specific USB/audio device as source |
 | `connectAudioFile(file)` | Connect a File object as audio source |
 | `disconnectSource()` | Stop and clean up current audio source |
 | `loadPreset(name, blendTime)` | Load a preset by name with blend transition |
@@ -118,6 +119,19 @@ npm run dev
 npm run build
 # → Output in dist/
 ```
+
+## Deployment (Coolify)
+
+This app is optimized for ultra-lightweight deployment via **Coolify**. Two methods are supported:
+
+### 1. Dockerfile + Nginx (Recommended)
+The repository includes a multi-stage `Dockerfile` that builds the Vite app and serves it using `nginx:alpine` (along with a custom `nginx.conf`).
+- **Resource Footprint:** Extremely small (< 5MB RAM idle, ~0% CPU).
+- **Setup in Coolify:** Select **Docker** as your Build Pack. Coolify will automatically detect the Dockerfile.
+
+### 2. Nixpacks + sirv-cli
+If you prefer a Node.js-based static server, the project includes `sirv-cli` as a dependency and a configured `start` script.
+- **Setup in Coolify:** Leave Build Pack as **Nixpacks**. Coolify will run `npm install`, `npm run build`, and `npm run start`.
 
 ## Dependencies
 
