@@ -1,9 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="MilkScreen — A modern browser-based MilkDrop music visualizer powered by Butterchurn WebGL" />
+  <meta name="description"
+    content="MilkScreen — A modern browser-based MilkDrop music visualizer powered by Butterchurn WebGL" />
   <title>DiscoCast — Old Skool Visualizer</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -11,6 +13,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/src/style.css" />
 </head>
+
 <body style="background-color: #000; color: #fff; margin: 0; overflow: hidden;">
 
   <!-- Visualizer Canvas (fullscreen, behind everything) -->
@@ -23,8 +26,10 @@
   <div id="start-screen">
     <div class="start-card">
       <div class="start-logo">
-        <img src="/logo.png" alt="DiscoCast Logo" class="custom-logo" style="width: 200px; height: 200px; object-fit: contain; margin-bottom: 16px;" />
-        <p class="start-subtitle" style="font-size: 1.1rem; letter-spacing: 0.05em; text-transform: uppercase;">Old Skool Visualizer</p>
+        <img src="/logo.png" alt="DiscoCast Logo" class="custom-logo"
+          style="width: 200px; height: 200px; object-fit: contain; margin-bottom: 16px;" />
+        <p class="start-subtitle" style="font-size: 1.1rem; letter-spacing: 0.05em; text-transform: uppercase;">Old
+          Skool Visualizer</p>
       </div>
 
       <div class="start-sources">
@@ -55,8 +60,14 @@
       <!-- Preset Name -->
       <div class="control-section preset-info">
         <button id="btn-favorite" class="ctrl-btn heart-btn" data-tooltip="Add to Favorites (S)" type="button">
-          <svg class="icon-heart-outline" viewBox="0 0 24 24" fill="currentColor"><path d="M12.1 18.55L12 18.65L11.89 18.55C7.14 14.24 4 11.39 4 8.5C4 6.5 5.5 5 7.5 5C9.04 5 10.54 6 11.07 7.36H12.93C13.46 6 14.96 5 16.5 5C18.5 5 20 6.5 20 8.5C20 11.39 16.86 14.24 12.1 18.55ZM16.5 3C14.76 3 13.09 3.81 12 5.08C10.91 3.81 9.24 3 7.5 3C4.42 3 2 5.41 2 8.5C2 12.27 5.4 15.36 10.55 20.03L12 21.35L13.45 20.03C18.6 15.36 22 12.27 22 8.5C22 5.41 19.58 3 16.5 3Z"/></svg>
-          <svg class="icon-heart-filled hidden" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+          <svg class="icon-heart-outline" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M12.1 18.55L12 18.65L11.89 18.55C7.14 14.24 4 11.39 4 8.5C4 6.5 5.5 5 7.5 5C9.04 5 10.54 6 11.07 7.36H12.93C13.46 6 14.96 5 16.5 5C18.5 5 20 6.5 20 8.5C20 11.39 16.86 14.24 12.1 18.55ZM16.5 3C14.76 3 13.09 3.81 12 5.08C10.91 3.81 9.24 3 7.5 3C4.42 3 2 5.41 2 8.5C2 12.27 5.4 15.36 10.55 20.03L12 21.35L13.45 20.03C18.6 15.36 22 12.27 22 8.5C22 5.41 19.58 3 16.5 3Z" />
+          </svg>
+          <svg class="icon-heart-filled hidden" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+          </svg>
         </button>
         <span class="preset-label" id="preset-name">Loading preset...</span>
       </div>
@@ -64,17 +75,24 @@
       <!-- Transport Controls -->
       <div class="control-section transport">
         <button id="btn-prev" class="ctrl-btn" data-tooltip="Previous Preset (←)" type="button">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
+          </svg>
         </button>
         <button id="btn-next" class="ctrl-btn" data-tooltip="Next Preset (→)" type="button">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
+          </svg>
         </button>
       </div>
 
       <!-- Cycle Controls -->
       <div class="control-section" style="position: relative;">
         <button id="btn-cycle" class="ctrl-btn" data-tooltip="Preset Cycling (R)" type="button">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z" />
+          </svg>
           <span id="cycle-status-dot" class="status-dot"></span>
         </button>
 
@@ -117,11 +135,16 @@
       <!-- Audio Source -->
       <div class="control-section audio-source">
         <button id="btn-use-mic" class="ctrl-btn" data-tooltip="Use live audio input" type="button">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z" />
+          </svg>
           <span>Live</span>
         </button>
         <button id="btn-use-file" class="ctrl-btn" data-tooltip="Load an audio file" type="button">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+          </svg>
           <span>File</span>
         </button>
         <select id="device-select" class="ctrl-select hidden"></select>
@@ -130,7 +153,10 @@
       <!-- Audio Tuning Toggle -->
       <div class="control-section" style="position: relative;">
         <button id="btn-audio-tuning" class="ctrl-btn" data-tooltip="Audio Tuning (T)" type="button">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z" />
+          </svg>
         </button>
 
         <!-- Audio Tuning Popover -->
@@ -154,7 +180,7 @@
                 <input type="range" id="tuning-energy" min="0.2" max="5.0" step="0.1" value="1.5" />
               </div>
             </div>
-            
+
             <div class="tuning-row">
               <div class="toggle-group">
                 <label for="toggle-agc">Auto-Gain (AGC)</label>
@@ -176,21 +202,28 @@
       <!-- Preset Drawer Toggle -->
       <div class="control-section">
         <button id="btn-presets" class="ctrl-btn" data-tooltip="Browse Presets (P)" type="button">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z" />
+          </svg>
         </button>
       </div>
 
       <!-- Help / Guide -->
       <div class="control-section">
         <button id="btn-help" class="ctrl-btn" data-tooltip="Keyboard Shortcuts (?)" type="button">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z" />
+          </svg>
         </button>
       </div>
 
       <!-- Fullscreen -->
       <div class="control-section">
         <button id="btn-fullscreen" class="ctrl-btn" data-tooltip="Fullscreen (F)" type="button">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" />
+          </svg>
         </button>
       </div>
     </div>
@@ -204,8 +237,12 @@
       <input type="range" id="audio-seek" class="seek-bar" min="0" max="100" value="0" step="0.1" />
       <div class="player-controls">
         <button id="btn-play-pause" class="ctrl-btn" data-tooltip="Play/Pause (Space)" type="button">
-          <svg id="icon-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-          <svg id="icon-pause" viewBox="0 0 24 24" fill="currentColor" class="hidden"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+          <svg id="icon-play" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M8 5v14l11-7z" />
+          </svg>
+          <svg id="icon-pause" viewBox="0 0 24 24" fill="currentColor" class="hidden">
+            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+          </svg>
         </button>
         <input type="range" id="audio-volume" class="volume-bar" min="0" max="1" value="0.8" step="0.01" />
       </div>
@@ -217,7 +254,10 @@
     <div class="drawer-header">
       <h3>Presets</h3>
       <button id="btn-close-drawer" class="ctrl-btn" data-tooltip="Close (Esc)" type="button">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path
+            d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+        </svg>
       </button>
     </div>
     <div class="drawer-search">
@@ -241,8 +281,9 @@
     <div class="permission-card">
       <div class="permission-icon">🚫</div>
       <h3>Microphone Denied</h3>
-      <p>The visualizer needs microphone access to react to your music. Make sure you are using <strong>localhost</strong> or <strong>HTTPS</strong>.</p>
-      
+      <p>The visualizer needs microphone access to react to your music. Make sure you are using
+        <strong>localhost</strong> or <strong>HTTPS</strong>.</p>
+
       <div class="permission-steps">
         <ol>
           <li>Click the <strong>Lock icon</strong> 🔒 in the address bar.</li>
@@ -261,10 +302,13 @@
     <div class="guide-header">
       <h3>Keyboard Shortcuts</h3>
       <button id="btn-close-guide" class="ctrl-btn" type="button">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path
+            d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+        </svg>
       </button>
     </div>
-    
+
     <div class="guide-content">
       <div class="guide-col">
         <div class="guide-section">
@@ -300,4 +344,5 @@
 
   <script type="module" src="/src/main.js"></script>
 </body>
+
 </html>
