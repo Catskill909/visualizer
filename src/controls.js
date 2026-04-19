@@ -181,7 +181,7 @@ export class ControlPanel {
 
     // --- Audio Tuning ---
     els.btnAudioTuning.addEventListener('click', () => this.toggleTuningPanel());
-    
+
     els.tuningEnergy.addEventListener('input', (e) => {
       engine.setEnergy(parseFloat(e.target.value));
     });
@@ -200,7 +200,7 @@ export class ControlPanel {
       engine.setBoost(true);
       els.btnBoost.classList.add('active');
     });
-    
+
     window.addEventListener('mouseup', () => {
       engine.setBoost(false);
       els.btnBoost.classList.remove('active');
@@ -383,7 +383,7 @@ export class ControlPanel {
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
       const audioInputs = devices.filter(device => device.kind === 'audioinput');
-      
+
       this.els.deviceSelect.innerHTML = '';
       if (audioInputs.length > 0) {
         audioInputs.forEach(device => {
@@ -570,7 +570,7 @@ export class ControlPanel {
     const lowerFilter = filter.toLowerCase();
 
     // 1. Filter by Tab (All vs Favorites)
-    let filtered = this.currentTab === 'favorites' 
+    let filtered = this.currentTab === 'favorites'
       ? names.filter(n => this.favorites.has(n))
       : names;
 
@@ -599,12 +599,12 @@ export class ControlPanel {
       heartSpan.className = 'preset-heart';
       heartSpan.setAttribute('data-tooltip', 'Toggle Favorite');
       heartSpan.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>';
-      
+
       heartSpan.addEventListener('click', (e) => {
         e.stopPropagation(); // Don't trigger the preset load click
         this.toggleFavorite(name);
       });
-      
+
       li.appendChild(heartSpan);
 
       if (this.favorites.has(name)) {
@@ -648,7 +648,7 @@ export class ControlPanel {
 
   updatePresetName(name) {
     this.els.presetName.textContent = name || 'No preset loaded';
-    
+
     const isFav = this.favorites.has(name);
     this.els.btnFavorite.classList.toggle('is-favorite', isFav);
     this.els.btnFavorite.setAttribute('data-tooltip', isFav ? 'Remove from Favorites (S)' : 'Add to Favorites (S)');
@@ -695,9 +695,13 @@ export class ControlPanel {
   handleKeyboard(e) {
     // Don't handle if typing in search
     if (e.target.tagName === 'INPUT') return;
-    
+
     // Ignore repeating keys for Hype controls to avoid jank
     if (e.repeat && ['v', 'V', 'b', 'B', 'a', 'A', 'k', 'K'].includes(e.key)) return;
+
+    // Performance/hype keys that should fire silently without revealing the UI
+    const SILENT_KEYS = new Set(['v', 'V', 'b', 'B', 'i', 'I', 'h', 'H', 'Shift']);
+    const silent = SILENT_KEYS.has(e.key);
 
     switch (e.key) {
       case 'Shift':
@@ -797,12 +801,13 @@ export class ControlPanel {
         break;
     }
 
-    this.showControls();
+    // Only reveal the UI for navigation/control keys, not silent performance keys
+    if (!silent) this.showControls();
   }
 
   handleKeyUp(e) {
     if (e.target.tagName === 'INPUT') return;
-    
+
     switch (e.key) {
       case 'Shift':
         this.engine.setBoost(false);
