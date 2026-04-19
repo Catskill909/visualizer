@@ -399,6 +399,131 @@ kbd {
   transform: translateX(-50%) translateY(0);
 }
 
+/* AUDIO TUNING PANEL (Popover) */
+.popover {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  right: 0;
+  transform: translateY(10px);
+  width: 260px;
+  background: var(--bg-glass);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+  z-index: 100;
+  transition: all var(--transition-normal);
+  padding: 16px;
+  animation: slideInUp 0.3s ease;
+  pointer-events: auto;
+}
+
+.popover.hidden {
+  opacity: 0;
+  pointer-events: none !important;
+  transform: translateY(20px);
+}
+
+.popover-header {
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 8px;
+}
+
+.popover-header h4 {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.tuning-group {
+  margin-bottom: 20px;
+}
+
+.tuning-group label {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.slider-with-icon {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.slider-with-icon span {
+  font-size: 0.9rem;
+}
+
+.slider-with-icon input {
+  flex: 1;
+}
+
+.tuning-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.toggle-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.toggle-group label {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.toggle-group input[type="checkbox"] {
+  width: 16px; height: 16px;
+  cursor: pointer;
+  accent-color: var(--text-primary);
+}
+
+.boost-btn {
+  width: 100%;
+  padding: 12px;
+  background: var(--text-primary);
+  color: var(--bg-primary);
+  border: none;
+  border-radius: var(--radius-md);
+  font-family: var(--font);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.boost-btn:hover {
+  transform: scale(1.02);
+  filter: brightness(0.9);
+}
+
+.boost-btn:active {
+  transform: scale(0.98);
+}
+
+.boost-btn.active {
+  background: #ff3b3b;
+  color: #fff;
+  box-shadow: 0 0 20px rgba(255, 59, 59, 0.4);
+}
+
+@keyframes slideInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(10px); }
+}
+
 /* RESPONSIVE */
 @media (max-width: 600px) {
   .start-card { padding: 32px 24px; }

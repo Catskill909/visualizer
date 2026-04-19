@@ -46,17 +46,44 @@ export class VisualizerEngine {
     this.volumeGainNode = null;
     this.visualizerGainNode = null;
     this.animFrameId = null;
-    this.autoCycleEnabled = true;
-    this.autoCycleInterval = 30000;
     this.autoCycleTimer = null;
+    
+    // Performance controls
+    this.energyMultiplier = 1.5;
+    this.baseSensitivity = 5.0;
+    this.agcEnabled = true;
+    this.kickLockEnabled = false;
+    this.boostActive = false;
+    
+    // Audio nodes
+    this.analyser = null;
+    this.kickFilter = null;
+    this.agcDataArray = null;
+    this.lastPeak = 0.5;
   }
 
   init(canvas) {
     this.canvas = canvas;
     this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
+    // 1. Analyser for AGC
+    this.analyser = this.audioContext.createAnalyser();
+    this.analyser.fftSize = 256;
+    this.agcDataArray = new Uint8Array(this.analyser.frequencyBinCount);
+
+    // 2. Kick Lock Filter (Lowpass)
+    this.kickFilter = this.audioContext.createBiquadFilter();
+    this.kickFilter.type = 'lowpass';
+    this.kickFilter.frequency.value = 150; // Focus on bass
+    this.kickFilter.Q.value = 1.0;
+
+    // 3. Main Gain Node
     this.visualizerGainNode = this.audioContext.createGain();
-    this.visualizerGainNode.gain.value = 5.0; // Hardcoded high sensitivity
+    this.visualizerGainNode.gain.value = this.baseSensitivity;
+
+    // Default routing: Analyser -> visualizerGainNode
+    // We will dynamically insert the kickFilter when enabled.
+    this.analyser.connect(this.visualizerGainNode);
 
     // Load presets from all available packs
     this.presets = {};
@@ -121,7 +148,10 @@ export class VisualizerEngine {
       this._micStream = stream;
       this.currentSource = source;
       this.currentSourceType = 'mic';
-      source.connect(this.visualizerGainNode);
+      
+      // Connect to the head of our internal chain
+      source.connect(this.analyser);
+      
       this.startRenderLoop();
       this.startAutoCycle();
       return true;
@@ -142,7 +172,10 @@ export class VisualizerEngine {
       this.volumeGainNode = this.audioContext.createGain();
       source.connect(this.volumeGainNode);
       this.volumeGainNode.connect(this.audioContext.destination);
-      source.connect(this.visualizerGainNode);
+      
+      // Connect to the head of our internal chain
+      source.connect(this.analyser);
+      
       this.currentSource = source;
       this.currentSourceType = 'file';
       this.startRenderLoop();
@@ -231,6 +264,17 @@ export class VisualizerEngine {
     this.isRunning = true;
     const render = () => {
       if (!this.isRunning) return;
+
+      // --- Performance Logic ---
+      if (this.agcEnabled) {
+        this.updateAGC();
+      } else {
+        // Reset to manual energy + base
+        const targetGain = this.baseSensitivity * this.energyMultiplier * (this.boostActive ? 2.0 : 1.0);
+        // Smoothly transition gain
+        this.visualizerGainNode.gain.setTargetAtTime(targetGain, this.audioContext.currentTime, 0.1);
+      }
+
       this.visualizer.render();
       this.animFrameId = requestAnimationFrame(render);
     };
@@ -258,7 +302,71 @@ export class VisualizerEngine {
   resetAutoCycle() { if (this.autoCycleEnabled) this.startAutoCycle(); }
 
   setVolume(value) { if (this.volumeGainNode) this.volumeGainNode.gain.value = value; }
-  setSensitivity(value) { if (this.visualizerGainNode) this.visualizerGainNode.gain.value = value; }
+  
+  // --- PERFORMANCE CONTROL METHODS ---
+
+  setEnergy(value) {
+    this.energyMultiplier = value;
+  }
+
+  toggleAGC() {
+    this.agcEnabled = !this.agcEnabled;
+    return this.agcEnabled;
+  }
+
+  updateAGC() {
+    this.analyser.getByteFrequencyData(this.agcDataArray);
+    let max = 0;
+    for (let i = 0; i < this.agcDataArray.length; i++) {
+      if (this.agcDataArray[i] > max) max = this.agcDataArray[i];
+    }
+    
+    // max is 0-255. We want a target normalized peak of around 180-200.
+    const normalized = max / 255;
+    this.lastPeak = this.lastPeak * 0.95 + normalized * 0.05; // Smoothing
+
+    // Avoid division by zero
+    const peak = Math.max(this.lastPeak, 0.01);
+    
+    // Target gain to bring peaks to ~0.7 intensity
+    let targetGain = (0.7 / peak) * 4.0; // 4.0 is a base scaling factor for butterchurn
+    
+    // Constrain gain to sane levels (e.g. 1x to 15x)
+    targetGain = Math.min(Math.max(targetGain, 1.0), 15.0);
+    
+    // Apply energy slider on top of AGC for fine tuning
+    targetGain *= this.energyMultiplier;
+    if (this.boostActive) targetGain *= 2.0;
+
+    this.visualizerGainNode.gain.setTargetAtTime(targetGain, this.audioContext.currentTime, 0.2);
+  }
+
+  toggleKickLock() {
+    this.kickLockEnabled = !this.kickLockEnabled;
+    
+    // Update routing
+    if (this.currentSource) {
+      this.currentSource.disconnect(this.analyser);
+      this.analyser.disconnect();
+      this.kickFilter.disconnect();
+
+      if (this.kickLockEnabled) {
+        // Source -> Filter -> Analyser -> Gain
+        this.currentSource.connect(this.kickFilter);
+        this.kickFilter.connect(this.analyser);
+        this.analyser.connect(this.visualizerGainNode);
+      } else {
+        // Source -> Analyser -> Gain
+        this.currentSource.connect(this.analyser);
+        this.analyser.connect(this.visualizerGainNode);
+      }
+    }
+    return this.kickLockEnabled;
+  }
+
+  setBoost(active) {
+    this.boostActive = active;
+  }
 
   destroy() {
     this.stopRenderLoop();

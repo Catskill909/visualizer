@@ -83,6 +83,44 @@
         <select id="device-select" class="ctrl-select hidden"></select>
       </div>
 
+      <!-- Audio Tuning Toggle -->
+      <div class="control-section" style="position: relative;">
+        <button id="btn-audio-tuning" class="ctrl-btn" data-tooltip="Audio Tuning (T)" type="button">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>
+        </button>
+
+        <!-- Audio Tuning Popover -->
+        <div id="audio-tuning-panel" class="popover hidden">
+          <div class="popover-header">
+            <h4>Audio Performance</h4>
+          </div>
+          <div class="popover-content">
+            <div class="tuning-group">
+              <label>Visual Energy</label>
+              <div class="slider-with-icon">
+                <span>⚡</span>
+                <input type="range" id="tuning-energy" min="0.2" max="5.0" step="0.1" value="1.5" />
+              </div>
+            </div>
+            
+            <div class="tuning-row">
+              <div class="toggle-group">
+                <label for="toggle-agc">Auto-Gain (AGC)</label>
+                <input type="checkbox" id="toggle-agc" checked />
+              </div>
+              <div class="toggle-group">
+                <label for="toggle-kicklock">Kick Lock</label>
+                <input type="checkbox" id="toggle-kicklock" />
+              </div>
+            </div>
+
+            <button id="btn-boost" class="boost-btn">
+              MAX BOOST
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Preset Drawer Toggle -->
       <div class="control-section">
         <button id="btn-presets" class="ctrl-btn" data-tooltip="Browse Presets (P)" type="button">
@@ -165,6 +203,14 @@
         <div class="guide-row"><kbd>B</kbd> <span>Blackout</span></div>
         <div class="guide-row"><kbd>I</kbd> <span>Invert Colors</span></div>
         <div class="guide-row"><kbd>H</kbd> <span>Hide UI Instantly</span></div>
+        <div class="guide-row"><kbd>Shift</kbd> <span>Hold for Energy Boost</span></div>
+      </div>
+      
+      <div class="guide-section">
+        <h4>Audio Performance</h4>
+        <div class="guide-row"><kbd>A</kbd> <span>Toggle Auto-Gain (AGC)</span></div>
+        <div class="guide-row"><kbd>K</kbd> <span>Toggle Kick-Lock Mode</span></div>
+        <div class="guide-row"><kbd>T</kbd> <span>Open Tuning Panel</span></div>
       </div>
       
       <div class="guide-section">

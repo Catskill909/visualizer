@@ -5,11 +5,13 @@ A modern browser-based MilkDrop music visualizer powered by [Butterchurn](https:
 ## Features
 
 - **100 curated MilkDrop presets** — the best-of collection from the Butterchurn library
+- **Advanced Audio Performance Suite** — real-time control over visual intensity via a glassmorphic popover
+- **Auto-Gain Control (AGC)** — dynamic normalization ensuring consistent visual "hype" regardless of input volume (ON by default)
+- **Kick-Lock Mode** — isolated frequency analysis (low-pass 150Hz) to lock visuals exclusively to the kick drum and bassline
+- **Live Performance "Hype" Keys** — instant keyboard triggers for strobe, blackout, and color inversion
 - **Dual audio input** — live audio capture or local audio file playback (MP3, WAV, FLAC)
-- **Live device selection** — native support for selecting USB DJ controllers, external sound cards, and specific microphones via the control bar
-- **Split audio routing** — volume control and visualizer sensitivity are independent; the visualizer receives a 5× gain-boosted signal for maximum beat reactivity without affecting speaker volume
-- **Auto-cycling presets** — random preset rotation every 30 seconds
-- **Preset browser** — searchable drawer with over 1,100 presets (including community packs), accessible via UI or keyboard
+- **Live device selection** — native support for selecting USB DJ controllers, external sound cards, and specific microphones
+- **Preset browser** — searchable drawer with over 1,100 presets (including community packs)
 - **Auto-hiding controls** — glassmorphic control bar fades after 3 seconds of inactivity
 - **Fullscreen mode** — native browser fullscreen support
 - **Responsive design** — works on desktop and mobile viewports
@@ -86,7 +88,10 @@ Core engine wrapping Butterchurn. Manages audio context, source connections, pre
 | `getCurrentPresetName()` | Returns the active preset name |
 | `setSize(w, h)` | Resize the visualizer canvas |
 | `setVolume(value)` | Set speaker volume (0–1) |
-| `setSensitivity(value)` | Set visualizer input gain multiplier |
+| `setEnergy(value)` | Set manual energy multiplier (0.2–5.0) |
+| `toggleAGC()` | Toggle dynamic Auto-Gain Control |
+| `toggleKickLock()` | Toggle bass-frequency isolation filter |
+| `setBoost(active)` | Momentary 2× intensity override |
 | `destroy()` | Full cleanup — stops render, audio, timers |
 
 #### `ControlPanel` (`src/controls.js`)
@@ -97,13 +102,21 @@ UI controller binding all DOM events, keyboard shortcuts, auto-hide behavior, pr
 
 | Key | Action |
 |-----|--------|
-| `Space` | Play/Pause (file mode) or Next Preset (mic mode) |
+| `Space` | Play/Pause (file) or Next Preset (mic) |
+| `V` | **Strobe** (White Flash) |
+| `B` | **Blackout** (Cut to Black) |
+| `I` | **Invert Colors** |
+| `H` | **Hide UI** instantly |
+| `Shift` | **Hold for MAX Boost** |
+| `A` | Toggle Auto-Gain (AGC) |
+| `K` | Toggle Kick-Lock |
+| `T` | Open Audio Tuning Panel |
 | `→` | Next preset |
 | `←` | Previous preset |
-| `R` | Random preset |
+| `R` | Random preset toggle |
 | `P` | Toggle preset drawer |
 | `F` | Toggle fullscreen |
-| `Esc` | Close preset drawer |
+| `Esc` | Close drawers / popovers |
 
 ## Quick Start
 

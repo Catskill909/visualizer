@@ -39,6 +39,12 @@ export class ControlPanel {
       tabFavorites: document.getElementById('tab-favorites'),
       btnFavorite: document.getElementById('btn-favorite'),
       btnHelp: document.getElementById('btn-help'),
+      btnAudioTuning: document.getElementById('btn-audio-tuning'),
+      audioTuningPanel: document.getElementById('audio-tuning-panel'),
+      tuningEnergy: document.getElementById('tuning-energy'),
+      toggleAgc: document.getElementById('toggle-agc'),
+      toggleKicklock: document.getElementById('toggle-kicklock'),
+      btnBoost: document.getElementById('btn-boost'),
       keyboardGuide: document.getElementById('keyboard-guide'),
       btnCloseGuide: document.getElementById('btn-close-guide'),
       flashOverlay: document.getElementById('flash-overlay'),
@@ -145,6 +151,33 @@ export class ControlPanel {
     // --- Guide Modal ---
     els.btnHelp.addEventListener('click', () => this.toggleGuide());
     els.btnCloseGuide.addEventListener('click', () => this.closeGuide());
+
+    // --- Audio Tuning ---
+    els.btnAudioTuning.addEventListener('click', () => this.toggleTuningPanel());
+    
+    els.tuningEnergy.addEventListener('input', (e) => {
+      engine.setEnergy(parseFloat(e.target.value));
+    });
+
+    els.toggleAgc.addEventListener('change', (e) => {
+      const active = engine.toggleAGC();
+      this.showToast(active ? '🔄 Auto-Gain ON' : '🔄 Auto-Gain OFF');
+    });
+
+    els.toggleKicklock.addEventListener('change', (e) => {
+      const active = engine.toggleKickLock();
+      this.showToast(active ? '🥁 Kick Lock ON' : '🥁 Kick Lock OFF');
+    });
+
+    els.btnBoost.addEventListener('mousedown', () => {
+      engine.setBoost(true);
+      els.btnBoost.classList.add('active');
+    });
+    
+    window.addEventListener('mouseup', () => {
+      engine.setBoost(false);
+      els.btnBoost.classList.remove('active');
+    });
 
     // --- Audio player controls ---
     els.btnPlayPause.addEventListener('click', () => this.togglePlayPause());
@@ -374,6 +407,20 @@ export class ControlPanel {
     this.els.keyboardGuide.classList.add('hidden');
   }
 
+  // ===================== TUNING PANEL =====================
+
+  toggleTuningPanel() {
+    const isHidden = this.els.audioTuningPanel.classList.toggle('hidden');
+    if (!isHidden) {
+      if (this.drawerOpen) this.closeDrawer();
+      if (this.guideOpen) this.closeGuide();
+    }
+  }
+
+  closeTuningPanel() {
+    this.els.audioTuningPanel.classList.add('hidden');
+  }
+
   populatePresetList(filter = '') {
     const { els, engine } = this;
     const names = engine.getPresetNames();
@@ -508,9 +555,25 @@ export class ControlPanel {
     if (e.target.tagName === 'INPUT') return;
     
     // Ignore repeating keys for Hype controls to avoid jank
-    if (e.repeat && ['v', 'V', 'b', 'B'].includes(e.key)) return;
+    if (e.repeat && ['v', 'V', 'b', 'B', 'a', 'A', 'k', 'K'].includes(e.key)) return;
 
     switch (e.key) {
+      case 'Shift':
+        this.engine.setBoost(true);
+        this.els.btnBoost.classList.add('active');
+        break;
+      case 'a':
+      case 'A':
+        this.els.toggleAgc.click();
+        break;
+      case 'k':
+      case 'K':
+        this.els.toggleKicklock.click();
+        break;
+      case 't':
+      case 'T':
+        this.toggleTuningPanel();
+        break;
       case ' ':
         e.preventDefault();
         if (this.engine.currentSourceType === 'file') {
@@ -604,6 +667,10 @@ export class ControlPanel {
     if (e.target.tagName === 'INPUT') return;
     
     switch (e.key) {
+      case 'Shift':
+        this.engine.setBoost(false);
+        this.els.btnBoost.classList.remove('active');
+        break;
       case 'v':
       case 'V':
         this.els.flashOverlay.classList.remove('flash-white');
