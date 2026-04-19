@@ -408,7 +408,7 @@ body.force-hide-ui #toast {
 /* KEYBOARD GUIDE MODAL */
 #keyboard-guide {
   position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 150;
-  width: 90%; max-width: 480px; padding: 24px; background: var(--bg-glass);
+  width: 90%; max-width: 700px; padding: 24px; background: var(--bg-glass);
   border: 1px solid var(--border-subtle); border-radius: var(--radius-xl);
   box-shadow: var(--shadow-soft); pointer-events: auto; animation: scaleIn 0.2s ease;
 }
@@ -416,7 +416,8 @@ body.force-hide-ui #toast {
 .guide-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
 .guide-header h3 { font-size: 1.1rem; font-weight: 500; color: var(--text-primary); }
 
-.guide-content { display: flex; flex-direction: column; gap: 20px; }
+.guide-content { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
+.guide-col { display: flex; flex-direction: column; gap: 20px; }
 .guide-section h4 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 12px; font-weight: 600; }
 
 .guide-row {
