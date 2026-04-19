@@ -47,6 +47,9 @@ export class VisualizerEngine {
     this.visualizerGainNode = null;
     this.animFrameId = null;
     this.autoCycleTimer = null;
+    this.autoCycleEnabled = true;
+    this.autoCycleInterval = 30000;
+    this.randomCycleOrder = true;
     
     // Performance controls
     this.energyMultiplier = 1.0;
@@ -320,8 +323,8 @@ export class VisualizerEngine {
     this.stopAutoCycle();
     if (!this.autoCycleEnabled) return;
     this.autoCycleTimer = setInterval(() => {
-      this.randomPreset(3.0);
-      window.dispatchEvent(new CustomEvent('presetChanged', { detail: { name: this.getCurrentPresetName() } }));
+      const name = this.randomCycleOrder ? this.randomPreset(3.0) : this.nextPreset(3.0);
+      window.dispatchEvent(new CustomEvent('presetChanged', { detail: { name, auto: true } }));
     }, this.autoCycleInterval);
   }
 
@@ -330,6 +333,22 @@ export class VisualizerEngine {
   }
 
   resetAutoCycle() { if (this.autoCycleEnabled) this.startAutoCycle(); }
+
+  setAutoCycle(enabled) {
+    this.autoCycleEnabled = !!enabled;
+    if (this.autoCycleEnabled) this.startAutoCycle();
+    else this.stopAutoCycle();
+    return this.autoCycleEnabled;
+  }
+
+  setAutoCycleInterval(ms) {
+    this.autoCycleInterval = Math.max(1000, ms);
+    if (this.autoCycleEnabled) this.startAutoCycle();
+  }
+
+  setRandomCycleOrder(enabled) {
+    this.randomCycleOrder = !!enabled;
+  }
 
   setVolume(value) { if (this.volumeGainNode) this.volumeGainNode.gain.value = value; }
   

@@ -8,8 +8,8 @@ export class ControlPanel {
     this.hideDelay = 3000;
     this.drawerOpen = false;
     this.toastTimer = null;
-    this.randomMode = false;
     this.guideOpen = false;
+    this.cycleOpen = false;
     this.favorites = this.loadFavorites();
     this.currentTab = 'all'; // 'all' or 'favorites'
     this.vuAnimId = null;
@@ -21,15 +21,22 @@ export class ControlPanel {
       presetName: document.getElementById('preset-name'),
       btnPrev: document.getElementById('btn-prev'),
       btnNext: document.getElementById('btn-next'),
-      btnRandom: document.getElementById('btn-random'),
-      btnSwitchSource: document.getElementById('btn-switch-source'),
-      sourceLabel: document.getElementById('source-label'),
+      btnCycle: document.getElementById('btn-cycle'),
+      cyclePanel: document.getElementById('cycle-panel'),
+      cycleStatusDot: document.getElementById('cycle-status-dot'),
+      cycleHint: document.getElementById('cycle-hint'),
+      toggleCycle: document.getElementById('toggle-cycle'),
+      toggleCycleRandom: document.getElementById('toggle-cycle-random'),
+      cycleInterval: document.getElementById('cycle-interval'),
+      cycleIntervalLabel: document.getElementById('cycle-interval-label'),
+      btnCycleNext: document.getElementById('btn-cycle-next'),
+      btnUseMic: document.getElementById('btn-use-mic'),
+      btnUseFile: document.getElementById('btn-use-file'),
       btnPresets: document.getElementById('btn-presets'),
       btnFullscreen: document.getElementById('btn-fullscreen'),
       btnMic: document.getElementById('btn-mic'),
       deviceSelect: document.getElementById('device-select'),
       btnFile: document.getElementById('btn-file'),
-      btnLoadFile: document.getElementById('btn-load-file'),
       fileInput: document.getElementById('file-input'),
       presetDrawer: document.getElementById('preset-drawer'),
       presetSearch: document.getElementById('preset-search'),
@@ -76,13 +83,13 @@ export class ControlPanel {
 
     // --- Start screen & Audio loading ---
     els.btnMic.addEventListener('click', () => this.startWithMic());
-    
+
     const triggerFilePicker = () => els.fileInput.click();
     els.btnFile.addEventListener('click', triggerFilePicker);
-    els.btnLoadFile.addEventListener('click', triggerFilePicker);
 
     els.fileInput.addEventListener('change', (e) => {
       if (e.target.files.length > 0) this.handleFileSelection(e.target.files[0]);
+      e.target.value = '';
     });
 
     // --- Transport ---
@@ -98,26 +105,38 @@ export class ControlPanel {
       this.showToast('⏭ ' + this.truncate(name, 50));
     });
 
-    els.btnRandom.addEventListener('click', () => {
-      this.randomMode = !this.randomMode;
-      els.btnRandom.classList.toggle('accent', this.randomMode);
-      if (this.randomMode) {
-        const name = engine.randomPreset();
-        this.updatePresetName(name);
-        this.showToast('🔀 Random: ON - ' + this.truncate(name, 50));
-      } else {
-        this.showToast('🔀 Random: OFF');
-      }
+    // --- Cycle popover ---
+    els.btnCycle.addEventListener('click', () => this.toggleCyclePanel());
+
+    els.toggleCycle.addEventListener('change', (e) => {
+      engine.setAutoCycle(e.target.checked);
+      this.updateCycleUI();
+      this.showToast(e.target.checked ? '🔁 Auto-cycle ON' : '⏸ Auto-cycle OFF');
     });
 
-    // --- Source switch ---
-    els.btnSwitchSource.addEventListener('click', () => {
-      if (engine.currentSourceType === 'mic') {
-        triggerFilePicker();
-      } else {
-        this.switchToMic();
-      }
+    els.toggleCycleRandom.addEventListener('change', (e) => {
+      engine.setRandomCycleOrder(e.target.checked);
+      this.showToast(e.target.checked ? '🎲 Random order' : '➡ Sequential order');
     });
+
+    els.cycleInterval.addEventListener('input', (e) => {
+      const secs = parseInt(e.target.value, 10);
+      els.cycleIntervalLabel.textContent = secs + 's';
+      engine.setAutoCycleInterval(secs * 1000);
+      this.updateCycleUI();
+    });
+
+    els.btnCycleNext.addEventListener('click', () => {
+      const name = engine.randomCycleOrder ? engine.randomPreset() : engine.nextPreset();
+      this.updatePresetName(name);
+      this.showToast('⏭ ' + this.truncate(name, 50));
+    });
+
+    // --- Source switch (always-visible explicit buttons) ---
+    els.btnUseMic.addEventListener('click', () => {
+      if (engine.currentSourceType !== 'mic') this.switchToMic();
+    });
+    els.btnUseFile.addEventListener('click', triggerFilePicker);
 
     els.deviceSelect.addEventListener('change', async (e) => {
       try {
@@ -218,6 +237,9 @@ export class ControlPanel {
     window.addEventListener('presetChanged', (e) => {
       this.updatePresetName(e.detail.name);
     });
+
+    // Sync cycle UI to engine defaults
+    this.syncCyclePanel();
   }
 
   // ===================== FAVORITES =====================
@@ -263,8 +285,8 @@ export class ControlPanel {
       await this.engine.connectMicrophone();
       this.els.startScreen.classList.add('hidden');
       this.els.controlBar.classList.remove('hidden');
-      this.els.sourceLabel.textContent = 'Mic';
       this.els.audioPlayer.classList.add('hidden');
+      this.updateSourceButtons();
       this.updatePresetName(this.engine.getCurrentPresetName());
       this.showControls();
       this.showToast('🎤 Microphone connected');
@@ -280,8 +302,9 @@ export class ControlPanel {
       const audioEl = await this.engine.connectAudioFile(file);
       this.els.startScreen.classList.add('hidden');
       this.els.controlBar.classList.remove('hidden');
-      this.els.sourceLabel.textContent = 'File';
+      this.els.deviceSelect.classList.add('hidden');
       this.setupAudioPlayer(audioEl, file.name);
+      this.updateSourceButtons();
       this.updatePresetName(this.engine.getCurrentPresetName());
       this.showControls();
 
@@ -296,13 +319,64 @@ export class ControlPanel {
   async switchToMic() {
     try {
       await this.engine.connectMicrophone();
-      this.els.sourceLabel.textContent = 'Mic';
       this.els.audioPlayer.classList.add('hidden');
+      this.updateSourceButtons();
       this.showToast('🎤 Switched to microphone');
       await this.populateDeviceList();
     } catch (err) {
       this.showPermissionError();
     }
+  }
+
+  toggleCyclePanel() {
+    const isHidden = this.els.cyclePanel.classList.toggle('hidden');
+    this.cycleOpen = !isHidden;
+    if (this.cycleOpen) {
+      if (this.drawerOpen) this.closeDrawer();
+      if (this.guideOpen) this.closeGuide();
+      this.els.audioTuningPanel.classList.add('hidden');
+      this.syncCyclePanel();
+    }
+  }
+
+  closeCyclePanel() {
+    this.els.cyclePanel.classList.add('hidden');
+    this.cycleOpen = false;
+  }
+
+  syncCyclePanel() {
+    const { engine, els } = this;
+    els.toggleCycle.checked = engine.autoCycleEnabled;
+    els.toggleCycleRandom.checked = engine.randomCycleOrder;
+    const secs = Math.round(engine.autoCycleInterval / 1000);
+    els.cycleInterval.value = secs;
+    els.cycleIntervalLabel.textContent = secs + 's';
+    this.updateCycleUI();
+  }
+
+  updateCycleUI() {
+    const { engine, els } = this;
+    els.btnCycle.classList.toggle('accent', engine.autoCycleEnabled);
+    els.cycleStatusDot.classList.toggle('active', engine.autoCycleEnabled);
+    const secs = Math.round(engine.autoCycleInterval / 1000);
+    els.cycleHint.textContent = engine.autoCycleEnabled
+      ? `Auto-cycling every ${secs}s`
+      : 'Paused — click a toggle or key to resume';
+  }
+
+  quickToggleCycle() {
+    const now = !this.engine.autoCycleEnabled;
+    this.engine.setAutoCycle(now);
+    this.els.toggleCycle.checked = now;
+    this.updateCycleUI();
+    this.showToast(now ? `🔁 Auto-cycle ON (${Math.round(this.engine.autoCycleInterval / 1000)}s)` : '⏸ Auto-cycle OFF');
+  }
+
+  updateSourceButtons() {
+    const type = this.engine.currentSourceType;
+    this.els.btnUseMic.classList.toggle('accent', type === 'mic');
+    this.els.btnUseFile.classList.toggle('accent', type === 'file');
+    if (type !== 'mic') this.els.deviceSelect.classList.add('hidden');
   }
 
   async populateDeviceList() {
@@ -446,6 +520,7 @@ export class ControlPanel {
     if (!isHidden) {
       if (this.drawerOpen) this.closeDrawer();
       if (this.guideOpen) this.closeGuide();
+      if (this.cycleOpen) this.closeCyclePanel();
       this.startVULoop();
     } else {
       this.stopVULoop();
@@ -694,17 +769,11 @@ export class ControlPanel {
         break;
       case 'r':
       case 'R':
-        {
-          this.randomMode = !this.randomMode;
-          this.els.btnRandom.classList.toggle('accent', this.randomMode);
-          if (this.randomMode) {
-            const name = this.engine.randomPreset();
-            this.updatePresetName(name);
-            this.showToast('🔀 Random: ON - ' + this.truncate(name, 50));
-          } else {
-            this.showToast('🔀 Random: OFF');
-          }
-        }
+        this.quickToggleCycle();
+        break;
+      case 'c':
+      case 'C':
+        this.toggleCyclePanel();
         break;
       case 's':
       case 'S':
@@ -724,6 +793,7 @@ export class ControlPanel {
       case 'Escape':
         if (this.drawerOpen) this.closeDrawer();
         if (this.guideOpen) this.closeGuide();
+        if (this.cycleOpen) this.closeCyclePanel();
         break;
     }
 

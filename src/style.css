@@ -284,8 +284,13 @@ body.force-hide-ui #toast {
   color: var(--text-primary);
 }
 
-#source-label { font-size: 0.72rem; color: var(--text-muted); }
-.audio-source { border-left: 1px solid var(--border-subtle); padding-left: 8px; }
+.audio-source {
+  border-left: 1px solid var(--border-subtle);
+  border-right: 1px solid var(--border-subtle);
+  padding-left: 8px;
+  padding-right: 8px;
+  gap: 4px;
+}
 
 /* AUDIO PLAYER */
 #audio-player {
@@ -533,6 +538,40 @@ kbd {
   margin-bottom: 12px;
 }
 
+.popover-hint {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  margin: 0 0 4px;
+  font-weight: 500;
+}
+
+.tuning-group label .value-readout {
+  float: right;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.status-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  opacity: 0.4;
+  transition: all var(--transition-fast);
+}
+
+.status-dot.active {
+  background: #00ff88;
+  opacity: 1;
+  box-shadow: 0 0 6px rgba(0, 255, 136, 0.8);
+}
+
+.ctrl-btn { position: relative; }
+
 .vu-meter-container {
   width: 100%;
   height: 14px;
@@ -669,7 +708,7 @@ kbd {
   .preset-info { display: none; }
   .ctrl-btn { padding: 6px; }
   .ctrl-btn svg { width: 18px; height: 18px; }
-  #source-label { display: none; }
+  .audio-source span { display: none; }
   #preset-drawer { width: 100vw; max-width: 100vw; }
   .volume-bar { width: 50px; }
 }
