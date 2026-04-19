@@ -8,6 +8,13 @@ import butterchurnPresetsExtra from 'butterchurn-presets/lib/butterchurnPresetsE
 import butterchurnPresetsExtra2 from 'butterchurn-presets/lib/butterchurnPresetsExtra2.min.js';
 import butterchurnPresetsMD1 from 'butterchurn-presets/lib/butterchurnPresetsMD1.min.js';
 
+// Baron pack: bypass the package's runtime `await import()` loop (which would cause
+// 762 sequential network requests). Vite inlines every JSON into a single static chunk.
+const baronModules = import.meta.glob(
+  '/node_modules/butterchurn-presets-baron/dist/presets/*.json',
+  { eager: true }
+);
+
 
 /**
  * Resolve a CJS/UMD module wrapped by Vite's ESM interop.
@@ -115,6 +122,22 @@ export class VisualizerEngine {
       } catch (e) {
         console.warn(`[MilkScreen] Failed to load ${pack.label}:`, e.message);
       }
+    }
+
+    // Baron pack — derive preset name from the JSON filename, unwrap ESM default export.
+    try {
+      let baronCount = 0;
+      for (const [path, mod] of Object.entries(baronModules)) {
+        const name = decodeURIComponent(path.split('/').pop().replace(/\.json$/, ''));
+        const preset = mod && mod.default ? mod.default : mod;
+        if (preset && typeof preset === 'object' && (preset.shapes || preset.waves || preset.baseVals)) {
+          this.presets[name] = preset;
+          baronCount++;
+        }
+      }
+      console.log(`[MilkScreen] Baron: +${baronCount} presets`);
+    } catch (e) {
+      console.warn('[MilkScreen] Failed to load Baron pack:', e.message);
     }
 
 

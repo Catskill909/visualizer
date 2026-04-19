@@ -1,10 +1,10 @@
 # More Presets — Research & Options
 
+> **Status (2026-04-19):** Phase 1 shipped. App now loads **1,144 unique presets** from all four `butterchurn-presets` sub-packs (Base/Extra/Extra2/MD1 = 395 unique) plus the Baron community pack (762 files, 13 name overlaps). See "Implementation notes" at the bottom of this doc.
+
 ## Background
 
-MilkScreen currently runs **100 presets** from the default `butterchurn-presets` base pack. Everything is stable. The previous attempt to expand using `butterchurn-presets-weekly` failed because that package only contains **S3 URLs** (strings pointing to remote JSON files), not actual preset data.
-
-This document outlines every verified option for expanding the preset count, with format compatibility confirmed for each.
+This document outlines every verified option for expanding the preset count, with format compatibility confirmed for each. The previous attempt to expand using `butterchurn-presets-weekly` failed because that package only contains **S3 URLs** (strings pointing to remote JSON files), not actual preset data.
 
 ---
 
@@ -256,3 +256,36 @@ optimizeDeps: {
 - Run `npm run dev` and confirm console shows `[MilkScreen] Loaded ~1100 presets`
 - Cycle through several presets to confirm they render
 - Run `npm run build` to confirm production bundle compiles
+
+---
+
+## Implementation notes (what actually shipped)
+
+### Final count
+**1,144 unique presets.** Breakdown: 395 from the four official `butterchurn-presets` sub-packs + 762 from Baron − 13 overlapping names (later packs win).
+
+### The `import.meta.glob` detour
+The naïve integration of Baron (`import { getPresets } from 'butterchurn-presets-baron'`) fails at scale because Baron's `dist/index.js` contains 762 top-level `await import('./presets/<name>.json')` statements. Each dynamic import becomes a separate code-split chunk at build time, and the sequential awaits translate into **762 sequential HTTP round-trips at startup** — roughly 30+ seconds even on a fast connection.
+
+Fix: bypass the package's entry point entirely and use Vite's `import.meta.glob` in `src/visualizer.js`:
+
+```js
+const baronModules = import.meta.glob(
+  '/node_modules/butterchurn-presets-baron/dist/presets/*.json',
+  { eager: true }
+);
+```
+
+Combined with a `manualChunks` rule in `vite.config.js` that groups everything matching `butterchurn-presets-baron/dist/presets/` into a single `baron-presets` chunk, the net result is one additional JS file (~3.2 MB raw, ~320 KB gzipped) loaded once at app start. The `butterchurn-presets-baron` package is kept as a dependency only for the filesystem access; nothing imports its `index.js`.
+
+### Option 4 revisit (research 2026-04-19)
+A second GitHub-wide search found one new candidate not in this doc's original list: [`monochrome-music/butterchurn-presets-converted`](https://github.com/monochrome-music/butterchurn-presets-converted) — 9,670 pre-converted JSON presets. Rejected for Phase 1 because:
+- No license declared (legally ambiguous for redistribution)
+- Zero stars, single contributor, created 2026-03-26 (no social proof / longevity signal)
+- `_conversion_errors.json` in the tree suggests an unknown number of duds
+- Not on npm — would need a git submodule or build-time fetch
+- 100–400 MB raw footprint forces lazy-loading infrastructure
+
+Revisit if it gains a license and a community — otherwise skip.
+
+No other qualifying packs exist on npm or GitHub as of this date. Every other search hit was a converter tool (`milkdrop-preset-converter`, `milkdrop-eel-parser`, etc.), a consumer app, or a different engine (MilkDrop3/projectm/raw `.milk` source).

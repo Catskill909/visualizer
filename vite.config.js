@@ -13,5 +13,17 @@ export default defineConfig({
       include: [/butterchurn/, /node_modules/],
       transformMixedEsModules: true,
     },
+    chunkSizeWarningLimit: 5000,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // Collapse the 762 individually-imported baron JSONs into one chunk,
+          // otherwise startup does 762 sequential network round-trips.
+          if (id.includes('butterchurn-presets-baron/dist/presets/')) {
+            return 'baron-presets';
+          }
+        },
+      },
+    },
   },
 });

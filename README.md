@@ -4,14 +4,14 @@ A modern browser-based MilkDrop music visualizer powered by [Butterchurn](https:
 
 ## Features
 
-- **100 curated MilkDrop presets** — the best-of collection from the Butterchurn library
+- **1,144 bundled MilkDrop presets** — official Butterchurn packs (Base, Extra, Extra2, MD1) + the community-curated Baron pack, all statically bundled (no network calls)
 - **Advanced Audio Performance Suite** — real-time control over visual intensity via a glassmorphic popover
 - **Auto-Gain Control (AGC)** — dynamic normalization ensuring consistent visual "hype" regardless of input volume (ON by default)
 - **Kick-Lock Mode** — isolated frequency analysis (low-pass 150Hz) to lock visuals exclusively to the kick drum and bassline
 - **Live Performance "Hype" Keys** — instant keyboard triggers for strobe, blackout, and color inversion
 - **Dual audio input** — live audio capture or local audio file playback (MP3, WAV, FLAC)
 - **Live device selection** — native support for selecting USB DJ controllers, external sound cards, and specific microphones
-- **Preset browser** — searchable drawer with over 1,100 presets (including community packs)
+- **Preset browser** — searchable drawer over the full 1,144-preset library with favorites/tabs
 - **Auto-hiding controls** — glassmorphic control bar fades after 3 seconds of inactivity
 - **Fullscreen mode** — native browser fullscreen support
 - **Responsive design** — works on desktop and mobile viewports
@@ -151,10 +151,14 @@ If you prefer a Node.js-based static server, the project includes `sirv-cli` as 
 | Package | Version | Purpose |
 |---------|---------|---------|
 | `butterchurn` | ^2.6.7 | MilkDrop WebGL visualizer engine |
-| `butterchurn-presets` | ^2.4.7 | 100 curated MilkDrop presets (bundled) |
+| `butterchurn-presets` | ^2.4.7 | 395 unique presets across Base/Extra/Extra2/MD1 sub-packs (bundled) |
+| `butterchurn-presets-baron` | ^1.5.1 | 762 community-curated presets (bundled via `import.meta.glob`) |
 | `vite` | ^8.0.4 | Dev server and build tool |
 
-> **Note**: `butterchurn-presets-weekly` is installed but unused — it only contains remote S3 URLs, not bundled preset data. The app uses `butterchurn-presets` which embeds all 100 presets locally.
+> **Notes**:
+> - `butterchurn-presets-weekly` is installed but **unused** — it only contains remote S3 URLs, not preset data.
+> - The Baron pack ships each preset as a separate JSON file loaded via top-level `await import()`. We bypass that runtime loop with Vite's `import.meta.glob({ eager: true })` and collapse all 762 files into a single build-time chunk (see [vite.config.js](vite.config.js) `manualChunks` rule). Without this, startup would issue 762 sequential network requests.
+> - Final merge yields **1,144 unique presets** (13 name overlaps between the official packs and Baron; later packs override).
 
 ## Integration Notes (DiscoCast Silent Disco)
 
