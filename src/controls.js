@@ -9,6 +9,7 @@ export class ControlPanel {
     this.drawerOpen = false;
     this.toastTimer = null;
     this.randomMode = false;
+    this.guideOpen = false;
     this.favorites = this.loadFavorites();
     this.currentTab = 'all'; // 'all' or 'favorites'
 
@@ -37,6 +38,11 @@ export class ControlPanel {
       tabAll: document.getElementById('tab-all'),
       tabFavorites: document.getElementById('tab-favorites'),
       btnFavorite: document.getElementById('btn-favorite'),
+      btnHelp: document.getElementById('btn-help'),
+      keyboardGuide: document.getElementById('keyboard-guide'),
+      btnCloseGuide: document.getElementById('btn-close-guide'),
+      flashOverlay: document.getElementById('flash-overlay'),
+      canvas: document.getElementById('visualizer-canvas'),
       audioPlayer: document.getElementById('audio-player'),
       audioFilename: document.getElementById('audio-filename'),
       audioTime: document.getElementById('audio-time'),
@@ -136,6 +142,10 @@ export class ControlPanel {
     // --- Fullscreen ---
     els.btnFullscreen.addEventListener('click', () => this.toggleFullscreen());
 
+    // --- Guide Modal ---
+    els.btnHelp.addEventListener('click', () => this.toggleGuide());
+    els.btnCloseGuide.addEventListener('click', () => this.closeGuide());
+
     // --- Audio player controls ---
     els.btnPlayPause.addEventListener('click', () => this.togglePlayPause());
 
@@ -156,6 +166,7 @@ export class ControlPanel {
 
     // --- Keyboard shortcuts ---
     document.addEventListener('keydown', (e) => this.handleKeyboard(e));
+    document.addEventListener('keyup', (e) => this.handleKeyUp(e));
 
     // --- Window resize ---
     window.addEventListener('resize', () => {
@@ -346,6 +357,23 @@ export class ControlPanel {
     this.els.presetDrawer.classList.add('hidden');
   }
 
+  // ===================== GUIDE MODAL =====================
+
+  toggleGuide() {
+    this.guideOpen ? this.closeGuide() : this.openGuide();
+  }
+
+  openGuide() {
+    this.guideOpen = true;
+    this.els.keyboardGuide.classList.remove('hidden');
+    if (this.drawerOpen) this.closeDrawer();
+  }
+
+  closeGuide() {
+    this.guideOpen = false;
+    this.els.keyboardGuide.classList.add('hidden');
+  }
+
   populatePresetList(filter = '') {
     const { els, engine } = this;
     const names = engine.getPresetNames();
@@ -478,6 +506,9 @@ export class ControlPanel {
   handleKeyboard(e) {
     // Don't handle if typing in search
     if (e.target.tagName === 'INPUT') return;
+    
+    // Ignore repeating keys for Hype controls to avoid jank
+    if (e.repeat && ['v', 'V', 'b', 'B'].includes(e.key)) return;
 
     switch (e.key) {
       case ' ':
@@ -489,6 +520,31 @@ export class ControlPanel {
           this.updatePresetName(name);
           this.showToast('⏭ ' + this.truncate(name, 50));
         }
+        break;
+      case 'v':
+      case 'V':
+        e.preventDefault();
+        this.els.flashOverlay.classList.add('flash-white');
+        break;
+      case 'b':
+      case 'B':
+        e.preventDefault();
+        this.els.flashOverlay.classList.add('flash-black');
+        break;
+      case 'i':
+      case 'I':
+        e.preventDefault();
+        this.els.canvas.classList.toggle('invert-colors');
+        break;
+      case 'h':
+      case 'H':
+        e.preventDefault();
+        document.body.classList.toggle('force-hide-ui');
+        break;
+      case '?':
+      case '/':
+        e.preventDefault();
+        this.toggleGuide();
         break;
       case 'ArrowRight':
         e.preventDefault();
@@ -537,9 +593,25 @@ export class ControlPanel {
         break;
       case 'Escape':
         if (this.drawerOpen) this.closeDrawer();
+        if (this.guideOpen) this.closeGuide();
         break;
     }
 
     this.showControls();
+  }
+
+  handleKeyUp(e) {
+    if (e.target.tagName === 'INPUT') return;
+    
+    switch (e.key) {
+      case 'v':
+      case 'V':
+        this.els.flashOverlay.classList.remove('flash-white');
+        break;
+      case 'b':
+      case 'B':
+        this.els.flashOverlay.classList.remove('flash-black');
+        break;
+    }
   }
 }

@@ -40,9 +40,28 @@ html, body {
 
 #visualizer-canvas {
   position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0; background: var(--bg-primary);
+  transition: filter 0.1s ease;
 }
 
+#visualizer-canvas.invert-colors { filter: invert(1); }
+
+/* Flash Overlay */
+#flash-overlay {
+  position: fixed; inset: 0; z-index: 10; pointer-events: none; opacity: 0;
+  transition: opacity 0.05s ease, background 0.05s ease;
+}
+#flash-overlay.flash-white { opacity: 1; background: #ffffff; }
+#flash-overlay.flash-black { opacity: 1; background: #000000; }
+
 .hidden { display: none !important; }
+
+/* Force UI Hide */
+body.force-hide-ui #control-bar, 
+body.force-hide-ui #preset-drawer, 
+body.force-hide-ui #keyboard-guide, 
+body.force-hide-ui #toast {
+  opacity: 0 !important; pointer-events: none !important;
+}
 
 /* START SCREEN */
 #start-screen {
@@ -287,6 +306,34 @@ html, body {
 .heart-btn.is-favorite .icon-heart-outline { display: none; }
 .heart-btn.is-favorite .icon-heart-filled { display: block !important; color: #ff3b3b; filter: drop-shadow(0 0 6px rgba(255, 59, 59, 0.4)); }
 
+/* KEYBOARD GUIDE MODAL */
+#keyboard-guide {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 150;
+  width: 90%; max-width: 480px; padding: 24px; background: var(--bg-glass);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-soft); pointer-events: auto; animation: scaleIn 0.2s ease;
+}
+
+.guide-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.guide-header h3 { font-size: 1.1rem; font-weight: 500; color: var(--text-primary); }
+
+.guide-content { display: flex; flex-direction: column; gap: 20px; }
+.guide-section h4 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 12px; font-weight: 600; }
+
+.guide-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 0; border-bottom: 1px solid var(--hover-subtle);
+  font-size: 0.85rem; color: var(--text-secondary);
+}
+.guide-row:last-child { border-bottom: none; }
+
+kbd {
+  display: inline-block; padding: 3px 8px; font-size: 0.75rem; font-family: monospace;
+  background: var(--bg-elevated); color: var(--text-primary);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
+  box-shadow: 0 2px 0 rgba(255,255,255,0.1); font-weight: 600;
+}
+
 /* TOAST */
 #toast {
   position: fixed; top: 24px; left: 50%; transform: translateX(-50%) translateY(-10px); z-index: 200;
@@ -300,6 +347,7 @@ html, body {
 
 /* ANIMATIONS */
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scaleIn { from { opacity: 0; transform: translate(-50%, -48%) scale(0.96); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
 @keyframes logoPulse {

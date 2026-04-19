@@ -16,6 +16,9 @@
   <!-- Visualizer Canvas (fullscreen, behind everything) -->
   <canvas id="visualizer-canvas"></canvas>
 
+  <!-- Flash/Strobe Overlay (sits above canvas, below UI) -->
+  <div id="flash-overlay"></div>
+
   <!-- ============== START SCREEN ============== -->
   <div id="start-screen">
     <div class="start-card">
@@ -87,6 +90,13 @@
         </button>
       </div>
 
+      <!-- Help / Guide -->
+      <div class="control-section">
+        <button id="btn-help" class="ctrl-btn" data-tooltip="Keyboard Shortcuts (?)" type="button">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg>
+        </button>
+      </div>
+
       <!-- Fullscreen -->
       <div class="control-section">
         <button id="btn-fullscreen" class="ctrl-btn" data-tooltip="Fullscreen (F)" type="button">
@@ -138,6 +148,37 @@
 
   <!-- ============== NOTIFICATION TOAST ============== -->
   <div id="toast" class="hidden"></div>
+
+  <!-- ============== KEYBOARD GUIDE MODAL ============== -->
+  <div id="keyboard-guide" class="hidden">
+    <div class="guide-header">
+      <h3>Keyboard Shortcuts</h3>
+      <button id="btn-close-guide" class="ctrl-btn" type="button">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+      </button>
+    </div>
+    
+    <div class="guide-content">
+      <div class="guide-section">
+        <h4>Performance "Hype" Keys</h4>
+        <div class="guide-row"><kbd>V</kbd> <span>Strobe Flash</span></div>
+        <div class="guide-row"><kbd>B</kbd> <span>Blackout</span></div>
+        <div class="guide-row"><kbd>I</kbd> <span>Invert Colors</span></div>
+        <div class="guide-row"><kbd>H</kbd> <span>Hide UI Instantly</span></div>
+      </div>
+      
+      <div class="guide-section">
+        <h4>Navigation & Controls</h4>
+        <div class="guide-row"><kbd>←</kbd> / <kbd>→</kbd> <span>Previous / Next Preset</span></div>
+        <div class="guide-row"><kbd>R</kbd> <span>Toggle Random Mode</span></div>
+        <div class="guide-row"><kbd>S</kbd> <span>Toggle Favorite</span></div>
+        <div class="guide-row"><kbd>P</kbd> <span>Open Presets Drawer</span></div>
+        <div class="guide-row"><kbd>?</kbd> / <kbd>/</kbd> <span>Toggle This Guide</span></div>
+        <div class="guide-row"><kbd>F</kbd> <span>Fullscreen</span></div>
+        <div class="guide-row"><kbd>Esc</kbd> <span>Close Drawers/Menus</span></div>
+      </div>
+    </div>
+  </div>
 
   <script type="module" src="/src/main.js"></script>
 </body>
