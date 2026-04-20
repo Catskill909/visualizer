@@ -10,6 +10,8 @@ export class ControlPanel {
     this.toastTimer = null;
     this.guideOpen = false;
     this.cycleOpen = false;
+    this.tuningOpen = false;
+    this.hoveringControls = false;
     this.favorites = this.loadFavorites();
     this.currentTab = 'all'; // 'all' or 'favorites'
     this.vuAnimId = null;
@@ -52,7 +54,6 @@ export class ControlPanel {
       tuningEnergy: document.getElementById('tuning-energy'),
       toggleAgc: document.getElementById('toggle-agc'),
       toggleKicklock: document.getElementById('toggle-kicklock'),
-      btnBoost: document.getElementById('btn-boost'),
       vuMeterBar: document.getElementById('vu-meter-bar'),
       signalStatus: document.getElementById('signal-status'),
       keyboardGuide: document.getElementById('keyboard-guide'),
@@ -196,16 +197,6 @@ export class ControlPanel {
       this.showToast(active ? '🥁 Kick Lock ON' : '🥁 Kick Lock OFF');
     });
 
-    els.btnBoost.addEventListener('mousedown', () => {
-      engine.setBoost(true);
-      els.btnBoost.classList.add('active');
-    });
-
-    window.addEventListener('mouseup', () => {
-      engine.setBoost(false);
-      els.btnBoost.classList.remove('active');
-    });
-
     // --- Audio player controls ---
     els.btnPlayPause.addEventListener('click', () => this.togglePlayPause());
 
@@ -223,6 +214,31 @@ export class ControlPanel {
     // --- Auto-hide controls ---
     document.addEventListener('mousemove', () => this.showControls());
     document.addEventListener('touchstart', () => this.showControls(), { passive: true });
+
+    // Keep controls visible while hovered or while a popover is open
+    els.controlBar.addEventListener('mouseenter', () => {
+      this.hoveringControls = true;
+      clearTimeout(this.hideTimer);
+      els.controlBar.classList.remove('auto-hidden');
+    });
+    els.controlBar.addEventListener('mouseleave', () => {
+      this.hoveringControls = false;
+      this.showControls();
+    });
+
+    // Click outside popovers closes them
+    document.addEventListener('pointerdown', (e) => {
+      if (this.cycleOpen
+          && !els.cyclePanel.contains(e.target)
+          && !els.btnCycle.contains(e.target)) {
+        this.closeCyclePanel();
+      }
+      if (this.tuningOpen
+          && !els.audioTuningPanel.contains(e.target)
+          && !els.btnAudioTuning.contains(e.target)) {
+        this.closeTuningPanel();
+      }
+    });
 
     // --- Keyboard shortcuts ---
     document.addEventListener('keydown', (e) => this.handleKeyboard(e));
@@ -342,6 +358,7 @@ export class ControlPanel {
   closeCyclePanel() {
     this.els.cyclePanel.classList.add('hidden');
     this.cycleOpen = false;
+    this.showControls();
   }
 
   syncCyclePanel() {
@@ -517,6 +534,7 @@ export class ControlPanel {
 
   toggleTuningPanel() {
     const isHidden = this.els.audioTuningPanel.classList.toggle('hidden');
+    this.tuningOpen = !isHidden;
     if (!isHidden) {
       if (this.drawerOpen) this.closeDrawer();
       if (this.guideOpen) this.closeGuide();
@@ -524,12 +542,15 @@ export class ControlPanel {
       this.startVULoop();
     } else {
       this.stopVULoop();
+      this.showControls();
     }
   }
 
   closeTuningPanel() {
     this.els.audioTuningPanel.classList.add('hidden');
+    this.tuningOpen = false;
     this.stopVULoop();
+    this.showControls();
   }
 
   startVULoop() {
@@ -657,11 +678,20 @@ export class ControlPanel {
   showControls() {
     this.els.controlBar.classList.remove('auto-hidden');
     clearTimeout(this.hideTimer);
+    if (this.isEngaged()) return;
     this.hideTimer = setTimeout(() => {
-      if (!this.drawerOpen) {
+      if (!this.isEngaged()) {
         this.els.controlBar.classList.add('auto-hidden');
       }
     }, this.hideDelay);
+  }
+
+  isEngaged() {
+    return this.hoveringControls
+      || this.drawerOpen
+      || this.guideOpen
+      || this.cycleOpen
+      || this.tuningOpen;
   }
 
   showToast(msg) {
@@ -706,7 +736,6 @@ export class ControlPanel {
     switch (e.key) {
       case 'Shift':
         this.engine.setBoost(true);
-        this.els.btnBoost.classList.add('active');
         break;
       case 'a':
       case 'A':
@@ -811,7 +840,6 @@ export class ControlPanel {
     switch (e.key) {
       case 'Shift':
         this.engine.setBoost(false);
-        this.els.btnBoost.classList.remove('active');
         break;
       case 'v':
       case 'V':
