@@ -8,6 +8,12 @@
 Let users author their own presets **inside DiscoCast**, with images as a first-class
 input. Clean, modern, intuitive — no Winamp-era 1998 pixel salad.
 
+**Development approach:** build as a standalone page first (e.g. `/editor` route or
+`editor.html`), prove the UX and data model in isolation, then integrate into the
+main app screen. Every architectural decision below is made with that eventual
+integration in mind — no throwaway scaffolding, no data formats we'll have to
+migrate.
+
 Two things make this non-trivial:
 
 1. Butterchurn presets are a dense JSON of ~80+ baseVals + 4 shapes + 4 waves + two
@@ -163,17 +169,81 @@ Everything obeys:
 - Header always visible: preset name, A/B, Undo/Redo, Save.
 - Bottom: Save as… primary button, `Discard` text link.
 
+## Integration architecture (standalone → main app)
+
+The editor has to speak the same language as `VisualizerEngine` (see [readme.md](readme.md)
+§ Key Classes). That API is already integration-friendly — the engine loads presets
+by name, takes any Web Audio source, and doesn't own its canvas. Build around it.
+
+### Shared modules (live in `src/`, used by both dev page and main app)
+
+| Module | Responsibility |
+|---|---|
+| `src/customPresets.js` | CRUD over custom presets + images. Owns the localStorage + IndexedDB schemas. Single source of truth. |
+| `src/presetRegistry.js` | Wraps the existing bundled-preset map; merges custom presets on top keyed by id-prefixed name. Exposes `getAllNames()`, `getByName(name)`. Replaces the current ad-hoc name lookup. |
+| `src/editor/*` | Inspector UI, control widgets, shader/eq editor. Only imported by the editor page — keeps main-app bundle lean until we're ready. |
+
+### Dev page (Phase A)
+
+- New route: `editor.html` (Vite handles it via `rollupOptions.input`) with its own
+  entry `src/editor/main.js`.
+- Reuses `VisualizerEngine` verbatim — the editor canvas is just another consumer of
+  the same engine.
+- Audio source for the editor: same mic/file pickers as the main app, lifted into a
+  shared `src/audioSource.js` so we don't duplicate.
+- Writes to the same `milkscreen_custom_presets` storage that the main app will
+  eventually read. This means a preset created on the dev page **already appears in
+  the main app's drawer** (under Mine tab) once we wire that tab up. No data
+  migration when we integrate.
+
+### Main-app integration (Phase B)
+
+Once the editor is proven:
+
+1. Add a **"Mine"** tab to the preset drawer next to All / Favorites. Reads from
+   `presetRegistry` — custom presets show alongside bundled ones.
+2. Custom presets participate in the existing favorites + hide systems automatically
+   — they're just names. `setFavoritePool` / `setHiddenPool` already take arbitrary
+   name arrays, so no engine changes needed.
+3. Add a **"Remix"** button in the main control bar (or on each drawer row) that
+   opens the Inspector in-place. Inspector becomes a side panel within the main
+   shell, mirroring the preset drawer pattern.
+4. `editor.html` stays live as a power-user dedicated workspace (like opening a big
+   Photoshop window vs. a quick-edit popover).
+
+### Engine touch points — what changes vs. stays
+
+| Area | Change? | Notes |
+|---|---|---|
+| `VisualizerEngine.loadPreset(name)` | **No change** | Presets are looked up by name; `presetRegistry` resolves custom-or-bundled transparently. |
+| `setFavoritePool` / `setHiddenPool` | **No change** | Already name-based. |
+| `getPresetNames()` | Source swap | Return `presetRegistry.getAllNames()` instead of just bundled names. Includes custom presets. |
+| Cycling / random | **No change** | Operates on name arrays returned above. |
+| **New:** `loadPresetObject(obj, blendTime)` | **Add** | For editor live-preview — feed a preset JSON blob directly without persisting it to the registry. Avoids registry churn on every slider drag. |
+| **New:** image/texture binding | **Add** | Butterchurn supports texture samplers. Engine gets a `setUserTexture(name, bitmap)` method; editor calls it before `loadPresetObject` so shaders referencing `sampler_userimage_0` resolve. |
+
+These two adds are the only engine-side API changes. Everything else is pure UI
+layer on top.
+
 ## Storage model
 
-- `milkscreen_custom_presets` — map of `id → {name, baseVals, shapes, waves,
-  warp, comp, frame_eqs, pixel_eqs, images: [{slot, treatment, audioBand, strength}],
-  parentId?: string, createdAt, updatedAt}`.
-- `milkscreen_custom_images` — IndexedDB store, blob per imageId. Referenced by
-  custom presets.
-- Custom presets show in the drawer with a small `★` (or similar) marker and under a
-  new **"Mine"** tab next to All / Favorites.
-- Export / import as `.json` (images inlined as base64, with a size warning). Sharable
-  without a backend.
+- `milkscreen_custom_presets` (localStorage) — map of `id → {id, name, baseVals,
+  shapes, waves, warp, comp, init_eqs, frame_eqs, pixel_eqs, images: [{slot,
+  imageId, treatment, audioBand, strength}], parentPresetName?: string, createdAt,
+  updatedAt}`.
+- `milkscreen_custom_images` (IndexedDB) — blob per `imageId`. Referenced by
+  `images[].imageId` in presets. IndexedDB (not localStorage) because even one 2MP
+  image base64-encoded blows the 5MB quota.
+- **Namespacing:** custom preset display names are just the user's input, but the
+  registry key is `custom:<id>:<name>` so collisions with bundled presets are
+  impossible. Drawer UI shows just the name; engine uses the full key.
+- Custom presets show in the drawer under a new **"Mine"** tab next to All /
+  Favorites with a small marker (icon TBD).
+- **Export / import** as `.json` (images inlined as base64, with a size warning).
+  Shareable without a backend. Import validates schema + re-hydrates images into
+  IndexedDB.
+- **Schema version** field on every stored preset (`schemaVersion: 1`) so future
+  migrations are possible without guessing which shape a stored blob is in.
 
 ## Things we should NOT build (yet)
 
@@ -186,14 +256,31 @@ Everything obeys:
 
 ## Rough build order (if we commit to this)
 
-1. **Scaffolding** — Inspector panel shell, collapse/expand, A/B, undo stack, Save
-   as…, Mine tab in drawer. *Nothing editable yet.* Prove the data flow first.
-2. **Tier 1 Remix** — the 15 curated controls on baseVals. Randomize per group. Reset.
+**Phase A — standalone dev page (`editor.html`)**
+
+1. **Scaffolding** — `editor.html` entry, `src/customPresets.js` (storage),
+   `src/presetRegistry.js` (merge layer), engine adds `loadPresetObject` +
+   `setUserTexture`. Inspector panel shell, collapse/expand, A/B, undo stack, Save
+   as…. *Nothing editable yet.* Prove the data flow end-to-end before adding any
+   real controls.
+2. **Tier 1 Remix** — the 15 curated controls on baseVals. Randomize per group.
+   Reset. Live preview via `loadPresetObject`.
 3. **Image Mode** — IndexedDB, 3 treatments, 2 layers max. The differentiator.
 4. **Export / import** JSON.
-5. **Tier 3** — advanced shader/eq editor with Safe Mode fallback.
 
-Ship 1–2 together as a usable v1. 3–4 is v2. 5 is v3 (or never).
+**Phase B — integrate into main app**
+
+5. Add **Mine** tab to the existing preset drawer. Custom presets plug in via
+   `presetRegistry` — favorites, hide, cycle all work for free.
+6. Add **Remix** button (drawer row + control bar). Inspector opens as a side panel
+   inside the main shell. `editor.html` stays as the dedicated full workspace.
+
+**Phase C — power user**
+
+7. Tier 3 — advanced shader/eq editor with Safe Mode fallback.
+
+Phase A = v1 of the editor. Phase B = editor merged into the app. Phase C = later,
+maybe never.
 
 ## Risks / open threads worth thinking about
 
