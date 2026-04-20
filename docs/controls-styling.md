@@ -187,3 +187,42 @@
 3. Update each component with new styling
 4. Test contrast and accessibility
 5. Refine hover states and transitions
+
+---
+
+## Updates — 2026-04-19 Session
+
+### Switch Component (replaces checkboxes)
+All boolean toggles in the Cycle and Audio Tuning popovers now use a custom Material-style switch rather than native `<input type="checkbox">` defaults.
+
+**Markup:**
+```html
+<label class="switch">
+  <input type="checkbox" id="..." />
+  <span class="switch-track"></span>
+</label>
+```
+
+**Spec:**
+- Track: 40×22 pill, `rgba(255,255,255,0.12)` off / `var(--text-primary)` on.
+- Thumb: 14px off-state → 16px on-state, slides 18px, flips to `var(--bg-primary)` for contrast on the active track.
+- Hover: 6px soft halo around the thumb.
+- Focus: 2px outline in `var(--accent-glow)`.
+- Disabled: 0.4 opacity, `not-allowed` cursor.
+
+**Row layout (`.switch-row`):**
+Label left, switch right, `space-between`. Adjacent rows are separated by a `border-top` in `--border-subtle` for a settings-list feel.
+
+### Engaged-State Auto-Hide
+The control bar's 3-second fade now pauses while the user is "engaged":
+- Hovering over `#control-bar` (tracked via `mouseenter`/`mouseleave`).
+- Any popover open: cycle, audio tuning, preset drawer, keyboard guide.
+
+When the user dismisses a popover (click outside or close), the 3s timer restarts. A `pointerdown` listener on `document` closes an open cycle or tuning popover when the click lands outside the popover and its trigger button.
+
+### Active-Button Treatment
+`.ctrl-btn.accent` (used for the active cycle button and the active audio source) no longer renders a white border or drop-shadow glow. The active state is now a subtle `rgba(255,255,255,0.08)` background tint only — keeping the bar visually quiet during live performance.
+
+### Removed Controls
+- **MAX BOOST** button in the Audio Tuning popover — redundant with the `Shift` key, which is preferable because it fires silently without revealing the UI.
+- **Next Preset Now** button in the Cycle popover — redundant with the transport arrows and the `→` key.

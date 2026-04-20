@@ -241,15 +241,11 @@ body.force-hide-ui #toast {
 .ctrl-btn:active { transform: scale(0.95); }
 .ctrl-btn.accent {
   color: var(--text-primary);
-  border-color: var(--text-primary);
   background: rgba(255,255,255,0.08);
-  filter: drop-shadow(0 0 6px rgba(255,255,255,0.5));
 }
 .ctrl-btn.accent:hover {
   color: var(--text-primary);
-  background: rgba(255,255,255,0.12);
-  border-color: var(--text-primary);
-  filter: drop-shadow(0 0 10px rgba(255,255,255,0.7));
+  background: rgba(255,255,255,0.14);
 }
 
 .ctrl-select {
@@ -641,29 +637,95 @@ kbd {
   flex: 1;
 }
 
-.tuning-row {
+.switch-row {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 12px;
-  margin-bottom: 20px;
+  padding: 6px 2px;
 }
 
-.toggle-group {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.switch-row + .switch-row {
+  border-top: 1px solid var(--border-subtle);
 }
 
-.toggle-group label {
-  font-size: 0.68rem;
-  color: var(--text-muted);
+.switch-row:last-of-type {
+  margin-bottom: 16px;
+}
+
+.switch-label {
+  font-size: 0.78rem;
+  color: var(--text-primary);
   font-weight: 500;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  user-select: none;
 }
 
-.toggle-group input[type="checkbox"] {
-  width: 16px; height: 16px;
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+  flex-shrink: 0;
   cursor: pointer;
-  accent-color: var(--text-primary);
+}
+
+.switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.switch-track {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.switch-track::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  background: var(--text-muted);
+  border-radius: 50%;
+  transform: translateY(-50%);
+  transition: transform var(--transition-fast), background var(--transition-fast), width var(--transition-fast), height var(--transition-fast);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.switch input:checked + .switch-track {
+  background: var(--text-primary);
+  border-color: var(--text-primary);
+}
+
+.switch input:checked + .switch-track::before {
+  transform: translate(18px, -50%);
+  background: var(--bg-primary);
+  width: 16px;
+  height: 16px;
+}
+
+.switch input:focus-visible + .switch-track {
+  outline: 2px solid var(--accent-glow);
+  outline-offset: 2px;
+}
+
+.switch:hover .switch-track::before {
+  box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.06), 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.switch input:disabled + .switch-track {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .boost-btn {

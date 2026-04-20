@@ -29,9 +29,9 @@ export class ControlPanel {
       cycleHint: document.getElementById('cycle-hint'),
       toggleCycle: document.getElementById('toggle-cycle'),
       toggleCycleRandom: document.getElementById('toggle-cycle-random'),
+      toggleCycleFavorites: document.getElementById('toggle-cycle-favorites'),
       cycleInterval: document.getElementById('cycle-interval'),
       cycleIntervalLabel: document.getElementById('cycle-interval-label'),
-      btnCycleNext: document.getElementById('btn-cycle-next'),
       btnUseMic: document.getElementById('btn-use-mic'),
       btnUseFile: document.getElementById('btn-use-file'),
       btnPresets: document.getElementById('btn-presets'),
@@ -120,17 +120,22 @@ export class ControlPanel {
       this.showToast(e.target.checked ? '🎲 Random order' : '➡ Sequential order');
     });
 
+    els.toggleCycleFavorites.addEventListener('change', (e) => {
+      const on = e.target.checked;
+      engine.setFavoritesOnly(on);
+      if (on && this.favorites.size === 0) {
+        this.showToast('❤️ Add favorites first (S)');
+      } else {
+        this.showToast(on ? '❤️ Cycling favorites only' : '🎨 Cycling all presets');
+      }
+      this.updateCycleUI();
+    });
+
     els.cycleInterval.addEventListener('input', (e) => {
       const secs = parseInt(e.target.value, 10);
       els.cycleIntervalLabel.textContent = secs + 's';
       engine.setAutoCycleInterval(secs * 1000);
       this.updateCycleUI();
-    });
-
-    els.btnCycleNext.addEventListener('click', () => {
-      const name = engine.randomCycleOrder ? engine.randomPreset() : engine.nextPreset();
-      this.updatePresetName(name);
-      this.showToast('⏭ ' + this.truncate(name, 50));
     });
 
     // --- Source switch (always-visible explicit buttons) ---
@@ -256,6 +261,11 @@ export class ControlPanel {
 
     // Sync cycle UI to engine defaults
     this.syncCyclePanel();
+    this.syncFavoritePool();
+  }
+
+  syncFavoritePool() {
+    this.engine.setFavoritePool(Array.from(this.favorites));
   }
 
   // ===================== FAVORITES =====================
@@ -282,6 +292,8 @@ export class ControlPanel {
       this.showToast('❤️ Added to Favorites');
     }
     this.saveFavorites();
+    this.syncFavoritePool();
+    this.updateCycleUI();
 
     // Update active UI state if the toggled preset is the currently playing one
     if (name === this.engine.getCurrentPresetName()) {
@@ -365,6 +377,7 @@ export class ControlPanel {
     const { engine, els } = this;
     els.toggleCycle.checked = engine.autoCycleEnabled;
     els.toggleCycleRandom.checked = engine.randomCycleOrder;
+    els.toggleCycleFavorites.checked = engine.favoritesOnly;
     const secs = Math.round(engine.autoCycleInterval / 1000);
     els.cycleInterval.value = secs;
     els.cycleIntervalLabel.textContent = secs + 's';
@@ -376,9 +389,15 @@ export class ControlPanel {
     els.btnCycle.classList.toggle('accent', engine.autoCycleEnabled);
     els.cycleStatusDot.classList.toggle('active', engine.autoCycleEnabled);
     const secs = Math.round(engine.autoCycleInterval / 1000);
-    els.cycleHint.textContent = engine.autoCycleEnabled
-      ? `Auto-cycling every ${secs}s`
-      : 'Paused — click a toggle or key to resume';
+    const favOnly = engine.favoritesOnly && this.favorites.size > 0;
+    const scope = favOnly ? `${this.favorites.size} favorite${this.favorites.size === 1 ? '' : 's'}` : 'all presets';
+    if (!engine.autoCycleEnabled) {
+      els.cycleHint.textContent = 'Paused — click a toggle or key to resume';
+    } else if (engine.favoritesOnly && this.favorites.size === 0) {
+      els.cycleHint.textContent = 'Favorites only, but none saved yet — press S to add';
+    } else {
+      els.cycleHint.textContent = `Cycling ${scope} every ${secs}s`;
+    }
   }
 
   quickToggleCycle() {

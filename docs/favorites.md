@@ -1,5 +1,7 @@
 # Brainstorm: Favorites Feature UI/UX
 
+> **Status (2026-04-19):** Core favorites (heart toggle, drawer tab, `localStorage` persistence, `S` shortcut) are shipped. This session added **favorites-only cycling** — see the "Implemented: Favorites-Only Cycling" section at the bottom.
+
 Adding a "Favorites" feature allows users to save and easily access their preferred presets from the massive 1,100+ library. Since we are dealing with a visual, immersive application, the UI/UX needs to be intuitive, non-intrusive, and fast.
 
 Here is a proposed approach for the best UI/UX implementation:
@@ -66,3 +68,26 @@ If this approach sounds good, we can implement it in the following order:
 2. Add the UI icons to the Control Bar and Drawer List.
 3. Build the `All / Favorites` toggle in the drawer.
 4. Wire up the click events and keyboard shortcuts.
+
+---
+
+## Implemented: Favorites-Only Cycling (2026-04-19)
+
+A third switch was added to the **Preset Cycling** popover: **Favorites only**. When enabled, the auto-cycle timer and the transport-next action pick from the favorites pool instead of the full 1,144-preset library. Manual `←` / `→` and the drawer remain unaffected — they always navigate the full library so users can still explore.
+
+### Engine API
+Added to `VisualizerEngine` in `src/visualizer.js`:
+
+| Method / Field | Purpose |
+|---|---|
+| `favoritePool: string[]` | Current snapshot of favorite preset names (provided by `ControlPanel`). |
+| `favoritesOnly: boolean` | Filter toggle. |
+| `setFavoritePool(names)` | Updates the pool — called on init and whenever a favorite is added/removed. |
+| `setFavoritesOnly(enabled)` | Enables/disables the filter. |
+| `cycleNext(blendTime)` / `cycleRandom(blendTime)` | Advance within the current cycle pool (respects `favoritesOnly`). Used by the auto-cycle timer. |
+| `_cyclePool()` | Internal helper returning the active pool: favorites when `favoritesOnly && favoritePool.length > 0`, otherwise `presetNames`. |
+
+### UX Details
+- **Empty-favorites safety:** If `favoritesOnly` is on but the user has zero favorites, cycling silently falls back to the full library and the popover hint reads *"Favorites only, but none saved yet — press S to add"*. Enabling the toggle with no favorites also toasts `❤️ Add favorites first (S)`.
+- **Dynamic hint:** When active, the popover header updates to `Cycling N favorites every 30s` (pluralized), or `Cycling all presets every 30s` when off.
+- **Sync:** `ControlPanel.syncFavoritePool()` is called after every `toggleFavorite()` so the engine always has a current snapshot, even mid-performance.

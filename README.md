@@ -12,7 +12,9 @@ A modern browser-based MilkDrop music visualizer powered by [Butterchurn](https:
 - **Dual audio input** — live audio capture or local audio file playback (MP3, WAV, FLAC)
 - **Live device selection** — native support for selecting USB DJ controllers, external sound cards, and specific microphones
 - **Preset browser** — searchable drawer over the full 1,144-preset library with favorites/tabs
-- **Auto-hiding controls** — glassmorphic control bar fades after 3 seconds of inactivity
+- **Favorites-only cycling** — restrict auto-cycle to your hearted presets for curated sets
+- **Auto-hiding controls** — glassmorphic control bar fades after 3 seconds of inactivity, but stays visible while hovered or while a popover is open; click outside a popover to dismiss it
+- **Material-style switches** — all toggles in the cycle and tuning popovers use clean sliding switch components
 - **Fullscreen mode** — native browser fullscreen support
 - **Responsive design** — works on desktop and mobile viewports
 
@@ -82,8 +84,11 @@ Core engine wrapping Butterchurn. Manages audio context, source connections, pre
 | `connectAudioFile(file)` | Connect a File object as audio source |
 | `disconnectSource()` | Stop and clean up current audio source |
 | `loadPreset(name, blendTime)` | Load a preset by name with blend transition |
-| `nextPreset()` / `prevPreset()` | Navigate presets sequentially |
-| `randomPreset()` | Jump to a random preset |
+| `nextPreset()` / `prevPreset()` | Navigate presets sequentially (always over the full library) |
+| `randomPreset()` | Jump to a random preset (always over the full library) |
+| `cycleNext()` / `cycleRandom()` | Advance within the current cycle pool — respects favorites-only |
+| `setFavoritePool(names)` | Provide the list of favorite preset names used by favorites-only cycling |
+| `setFavoritesOnly(enabled)` | Restrict auto-cycle to favorites when true (falls back to full library if empty) |
 | `getPresetNames()` | Returns sorted array of all preset names |
 | `getCurrentPresetName()` | Returns the active preset name |
 | `setSize(w, h)` | Resize the visualizer canvas |
@@ -91,7 +96,7 @@ Core engine wrapping Butterchurn. Manages audio context, source connections, pre
 | `setEnergy(value)` | Set manual energy multiplier (0.2–5.0) |
 | `toggleAGC()` | Toggle dynamic Auto-Gain Control |
 | `toggleKickLock()` | Toggle bass-frequency isolation filter |
-| `setBoost(active)` | Momentary 2× intensity override |
+| `setBoost(active)` | Momentary 2× intensity override (bound to `Shift`) |
 | `destroy()` | Full cleanup — stops render, audio, timers |
 
 #### `ControlPanel` (`src/controls.js`)

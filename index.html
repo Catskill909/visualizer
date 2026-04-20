@@ -103,15 +103,26 @@
             <p class="popover-hint" id="cycle-hint">Auto-cycling every 30s</p>
           </div>
           <div class="popover-content">
-            <div class="tuning-row">
-              <div class="toggle-group">
-                <label for="toggle-cycle">Auto-cycle</label>
+            <div class="switch-row">
+              <label class="switch-label" for="toggle-cycle">Auto-cycle</label>
+              <label class="switch">
                 <input type="checkbox" id="toggle-cycle" checked />
-              </div>
-              <div class="toggle-group">
-                <label for="toggle-cycle-random">Random order</label>
+                <span class="switch-track"></span>
+              </label>
+            </div>
+            <div class="switch-row">
+              <label class="switch-label" for="toggle-cycle-random">Random order</label>
+              <label class="switch">
                 <input type="checkbox" id="toggle-cycle-random" checked />
-              </div>
+                <span class="switch-track"></span>
+              </label>
+            </div>
+            <div class="switch-row">
+              <label class="switch-label" for="toggle-cycle-favorites">Favorites only</label>
+              <label class="switch">
+                <input type="checkbox" id="toggle-cycle-favorites" />
+                <span class="switch-track"></span>
+              </label>
             </div>
 
             <div class="tuning-group">
@@ -124,10 +135,6 @@
                 <input type="range" id="cycle-interval" min="5" max="120" step="1" value="30" />
               </div>
             </div>
-
-            <button id="btn-cycle-next" class="boost-btn" type="button">
-              Next Preset Now
-            </button>
           </div>
         </div>
       </div>
@@ -181,15 +188,19 @@
               </div>
             </div>
 
-            <div class="tuning-row">
-              <div class="toggle-group">
-                <label for="toggle-agc">Auto-Gain (AGC)</label>
+            <div class="switch-row">
+              <label class="switch-label" for="toggle-agc">Auto-Gain (AGC)</label>
+              <label class="switch">
                 <input type="checkbox" id="toggle-agc" checked />
-              </div>
-              <div class="toggle-group">
-                <label for="toggle-kicklock">Kick Lock</label>
+                <span class="switch-track"></span>
+              </label>
+            </div>
+            <div class="switch-row">
+              <label class="switch-label" for="toggle-kicklock">Kick Lock</label>
+              <label class="switch">
                 <input type="checkbox" id="toggle-kicklock" />
-              </div>
+                <span class="switch-track"></span>
+              </label>
             </div>
           </div>
         </div>

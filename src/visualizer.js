@@ -57,6 +57,8 @@ export class VisualizerEngine {
     this.autoCycleEnabled = true;
     this.autoCycleInterval = 30000;
     this.randomCycleOrder = true;
+    this.favoritePool = [];
+    this.favoritesOnly = false;
     
     // Performance controls
     this.energyMultiplier = 1.0;
@@ -346,9 +348,40 @@ export class VisualizerEngine {
     this.stopAutoCycle();
     if (!this.autoCycleEnabled) return;
     this.autoCycleTimer = setInterval(() => {
-      const name = this.randomCycleOrder ? this.randomPreset(3.0) : this.nextPreset(3.0);
+      const name = this.randomCycleOrder ? this.cycleRandom(3.0) : this.cycleNext(3.0);
       window.dispatchEvent(new CustomEvent('presetChanged', { detail: { name, auto: true } }));
     }, this.autoCycleInterval);
+  }
+
+  _cyclePool() {
+    if (this.favoritesOnly && this.favoritePool.length > 0) {
+      const valid = this.favoritePool.filter((n) => this.presets[n]);
+      if (valid.length > 0) return valid;
+    }
+    return this.presetNames;
+  }
+
+  cycleNext(blendTime = 2.0) {
+    const pool = this._cyclePool();
+    if (pool.length === 0) return '';
+    const current = this.getCurrentPresetName();
+    const idx = pool.indexOf(current);
+    const next = pool[(idx + 1) % pool.length] || pool[0];
+    this.loadPreset(next, blendTime);
+    this.resetAutoCycle();
+    return next;
+  }
+
+  cycleRandom(blendTime = 2.0) {
+    const pool = this._cyclePool();
+    if (pool.length === 0) return '';
+    const current = this.getCurrentPresetName();
+    let pick;
+    do { pick = pool[Math.floor(Math.random() * pool.length)]; }
+    while (pick === current && pool.length > 1);
+    this.loadPreset(pick, blendTime);
+    this.resetAutoCycle();
+    return pick;
   }
 
   stopAutoCycle() {
@@ -371,6 +404,14 @@ export class VisualizerEngine {
 
   setRandomCycleOrder(enabled) {
     this.randomCycleOrder = !!enabled;
+  }
+
+  setFavoritePool(names) {
+    this.favoritePool = Array.isArray(names) ? [...names] : [];
+  }
+
+  setFavoritesOnly(enabled) {
+    this.favoritesOnly = !!enabled;
   }
 
   setVolume(value) { if (this.volumeGainNode) this.volumeGainNode.gain.value = value; }
