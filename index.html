@@ -30,6 +30,7 @@
           style="width: 200px; height: 200px; object-fit: contain; margin-bottom: 16px;" />
         <p class="start-subtitle" style="font-size: 1.1rem; letter-spacing: 0.05em; text-transform: uppercase;">Old
           Skool Visualizer</p>
+        <p class="start-tagline">Powered by the Winamp MilkDrop Engine</p>
       </div>
 
       <div class="start-sources">
@@ -275,9 +276,33 @@
       <button id="tab-favorites" class="drawer-tab" type="button">Favorites</button>
     </div>
     <div class="drawer-count">
-      <span id="preset-count">0</span> presets
+      <span><span id="preset-count">0</span> presets</span>
+      <div class="drawer-count-actions">
+        <button id="btn-unhide-all" class="drawer-link hidden" type="button">
+          Unhide all (<span id="hidden-count-label">0</span>)
+        </button>
+        <label class="drawer-show-hidden" data-tooltip="Show hidden presets in list">
+          <span>Show hidden</span>
+          <span class="switch">
+            <input type="checkbox" id="toggle-show-hidden" />
+            <span class="switch-track"></span>
+          </span>
+        </label>
+      </div>
     </div>
     <ul id="preset-list" class="drawer-list"></ul>
+  </div>
+
+  <!-- ============== UNHIDE-ALL CONFIRM MODAL ============== -->
+  <div id="unhide-modal" class="modal hidden">
+    <div class="modal-dialog">
+      <h3>Unhide all presets?</h3>
+      <p><span id="unhide-modal-count">0</span> presets will return to the All list and cycle pool.</p>
+      <div class="modal-actions">
+        <button id="btn-cancel-unhide" class="text-btn" type="button">Cancel</button>
+        <button id="btn-confirm-unhide" class="primary-btn" type="button">Unhide</button>
+      </div>
+    </div>
   </div>
 
   <!-- ============== NOTIFICATION TOAST ============== -->
@@ -340,6 +365,7 @@
           <div class="guide-row"><kbd>R</kbd> <span>Toggle Auto-Cycle</span></div>
           <div class="guide-row"><kbd>C</kbd> <span>Open Cycle Settings</span></div>
           <div class="guide-row"><kbd>S</kbd> <span>Toggle Favorite</span></div>
+          <div class="guide-row"><kbd>X</kbd> <span>Hide Current Preset</span></div>
           <div class="guide-row"><kbd>P</kbd> <span>Open Presets Drawer</span></div>
           <div class="guide-row"><kbd>?</kbd> / <kbd>/</kbd> <span>Toggle This Guide</span></div>
           <div class="guide-row"><kbd>F</kbd> <span>Fullscreen</span></div>

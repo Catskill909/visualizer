@@ -13,6 +13,8 @@ export class ControlPanel {
     this.tuningOpen = false;
     this.hoveringControls = false;
     this.favorites = this.loadFavorites();
+    this.hidden = this.loadHidden();
+    this.showHidden = false; // maintenance mode — resets to off on every load
     this.currentTab = 'all'; // 'all' or 'favorites'
     this.vuAnimId = null;
 
@@ -47,6 +49,13 @@ export class ControlPanel {
       btnCloseDrawer: document.getElementById('btn-close-drawer'),
       tabAll: document.getElementById('tab-all'),
       tabFavorites: document.getElementById('tab-favorites'),
+      toggleShowHidden: document.getElementById('toggle-show-hidden'),
+      btnUnhideAll: document.getElementById('btn-unhide-all'),
+      hiddenCountLabel: document.getElementById('hidden-count-label'),
+      unhideModal: document.getElementById('unhide-modal'),
+      unhideModalCount: document.getElementById('unhide-modal-count'),
+      btnCancelUnhide: document.getElementById('btn-cancel-unhide'),
+      btnConfirmUnhide: document.getElementById('btn-confirm-unhide'),
       btnFavorite: document.getElementById('btn-favorite'),
       btnHelp: document.getElementById('btn-help'),
       btnAudioTuning: document.getElementById('btn-audio-tuning'),
@@ -172,6 +181,24 @@ export class ControlPanel {
       this.filterPresets();
     });
 
+    // --- Hidden mgmt (Show Hidden toggle + Unhide All modal) ---
+    els.toggleShowHidden.addEventListener('change', (e) => {
+      this.showHidden = e.target.checked;
+      this.filterPresets();
+    });
+
+    els.btnUnhideAll.addEventListener('click', () => {
+      if (this.hidden.size === 0) return;
+      els.unhideModalCount.textContent = this.hidden.size;
+      els.unhideModal.classList.remove('hidden');
+    });
+
+    els.btnCancelUnhide.addEventListener('click', () => this.closeUnhideModal());
+    els.btnConfirmUnhide.addEventListener('click', () => this.unhideAll());
+    els.unhideModal.addEventListener('click', (e) => {
+      if (e.target === els.unhideModal) this.closeUnhideModal();
+    });
+
     // --- Favorite toggle (control bar) ---
     els.btnFavorite.addEventListener('click', () => {
       const currentPreset = engine.getCurrentPresetName();
@@ -262,10 +289,15 @@ export class ControlPanel {
     // Sync cycle UI to engine defaults
     this.syncCyclePanel();
     this.syncFavoritePool();
+    this.syncHiddenPool();
   }
 
   syncFavoritePool() {
     this.engine.setFavoritePool(Array.from(this.favorites));
+  }
+
+  syncHiddenPool() {
+    this.engine.setHiddenPool(Array.from(this.hidden));
   }
 
   // ===================== FAVORITES =====================
@@ -304,6 +336,56 @@ export class ControlPanel {
     if (this.drawerOpen) {
       this.filterPresets();
     }
+  }
+
+  // ===================== HIDDEN =====================
+
+  loadHidden() {
+    try {
+      const stored = localStorage.getItem('milkscreen_hidden');
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch (e) {
+      return new Set();
+    }
+  }
+
+  saveHidden() {
+    localStorage.setItem('milkscreen_hidden', JSON.stringify(Array.from(this.hidden)));
+  }
+
+  toggleHidden(name, opts = {}) {
+    const wasHidden = this.hidden.has(name);
+    if (wasHidden) {
+      this.hidden.delete(name);
+      this.showToast('👁 Unhidden');
+    } else {
+      this.hidden.add(name);
+      this.showToast('🙈 Hidden');
+    }
+    this.saveHidden();
+    this.syncHiddenPool();
+
+    // If the user hid the currently-playing preset, advance to the next visible one.
+    if (!wasHidden && opts.advanceIfCurrent && name === this.engine.getCurrentPresetName()) {
+      const next = this.engine.nextPreset();
+      this.updatePresetName(next);
+    }
+
+    if (this.drawerOpen) this.filterPresets();
+  }
+
+  closeUnhideModal() {
+    this.els.unhideModal.classList.add('hidden');
+  }
+
+  unhideAll() {
+    const count = this.hidden.size;
+    this.hidden.clear();
+    this.saveHidden();
+    this.syncHiddenPool();
+    this.closeUnhideModal();
+    this.showToast(`👁 Unhid ${count} preset${count === 1 ? '' : 's'}`);
+    if (this.drawerOpen) this.filterPresets();
   }
 
   // ===================== START FLOWS =====================
@@ -614,12 +696,28 @@ export class ControlPanel {
       ? names.filter(n => this.favorites.has(n))
       : names;
 
-    // 2. Filter by Search Text
+    // 2. Exclude hidden from the All tab unless Show Hidden is on.
+    //    Favorites tab is unaffected — users can still see/unhide favorites they hid.
+    if (this.currentTab === 'all' && !this.showHidden) {
+      filtered = filtered.filter(n => !this.hidden.has(n));
+    }
+
+    // 3. Filter by Search Text
     filtered = filter
       ? filtered.filter(n => n.toLowerCase().includes(lowerFilter))
       : filtered;
 
-    els.presetCount.textContent = filtered.length;
+    // Count display — show "(N hidden)" when Show Hidden is on
+    if (this.showHidden && this.hidden.size > 0) {
+      els.presetCount.textContent = `${filtered.length} (${this.hidden.size} hidden)`;
+    } else {
+      els.presetCount.textContent = filtered.length;
+    }
+
+    // Unhide All button visibility
+    els.btnUnhideAll.classList.toggle('hidden', this.hidden.size === 0);
+    els.hiddenCountLabel.textContent = this.hidden.size;
+
     els.presetList.innerHTML = '';
 
     // Virtual-ish rendering — render up to 500 at a time for performance
@@ -637,23 +735,35 @@ export class ControlPanel {
 
       const heartSpan = document.createElement('span');
       heartSpan.className = 'preset-heart';
-      heartSpan.setAttribute('data-tooltip', 'Toggle Favorite');
+      heartSpan.setAttribute('data-tooltip', this.favorites.has(name) ? 'Remove Favorite' : 'Add Favorite');
       heartSpan.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>';
 
       heartSpan.addEventListener('click', (e) => {
-        e.stopPropagation(); // Don't trigger the preset load click
+        e.stopPropagation();
         this.toggleFavorite(name);
       });
 
       li.appendChild(heartSpan);
 
-      if (this.favorites.has(name)) {
-        li.classList.add('is-favorite');
-      }
+      const hideSpan = document.createElement('span');
+      hideSpan.className = 'preset-hide';
+      const isHidden = this.hidden.has(name);
+      hideSpan.setAttribute('data-tooltip', isHidden ? 'Unhide' : 'Hide');
+      // Eye-slash for hidden state, open-eye for visible state
+      hideSpan.innerHTML = isHidden
+        ? '<svg viewBox="0 0 24 24"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>'
+        : '<svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>';
 
-      if (name === currentName) {
-        li.classList.add('active');
-      }
+      hideSpan.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.toggleHidden(name);
+      });
+
+      li.appendChild(hideSpan);
+
+      if (this.favorites.has(name)) li.classList.add('is-favorite');
+      if (isHidden) li.classList.add('is-hidden');
+      if (name === currentName) li.classList.add('active');
 
       li.addEventListener('click', () => {
         engine.loadPreset(name, 2.0);
@@ -834,6 +944,13 @@ export class ControlPanel {
           if (currentPreset) this.toggleFavorite(currentPreset);
         }
         break;
+      case 'x':
+      case 'X':
+        {
+          const currentPreset = this.engine.getCurrentPresetName();
+          if (currentPreset) this.toggleHidden(currentPreset, { advanceIfCurrent: true });
+        }
+        break;
       case 'f':
       case 'F':
         this.toggleFullscreen();
@@ -843,6 +960,7 @@ export class ControlPanel {
         this.toggleDrawer();
         break;
       case 'Escape':
+        if (!this.els.unhideModal.classList.contains('hidden')) this.closeUnhideModal();
         if (this.drawerOpen) this.closeDrawer();
         if (this.guideOpen) this.closeGuide();
         if (this.cycleOpen) this.closeCyclePanel();

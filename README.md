@@ -11,8 +11,9 @@ A modern browser-based MilkDrop music visualizer powered by [Butterchurn](https:
 - **Live Performance "Hype" Keys** — instant keyboard triggers for strobe, blackout, and color inversion
 - **Dual audio input** — live audio capture or local audio file playback (MP3, WAV, FLAC)
 - **Live device selection** — native support for selecting USB DJ controllers, external sound cards, and specific microphones
-- **Preset browser** — searchable drawer over the full 1,144-preset library with favorites/tabs
+- **Preset browser** — searchable drawer over the full 1,144-preset library with favorites/tabs, heart + hide icons per row, and instant left-anchored tooltips
 - **Favorites-only cycling** — restrict auto-cycle to your hearted presets for curated sets
+- **Hide unwanted presets** — eye-slash icon or `X` keyboard shortcut removes a preset from the All tab, random, and auto-cycle; hidden list persists in localStorage and survives reloads. A *Show hidden* toggle in the drawer exposes them for unhiding (individually or via a clean modal-confirmed "Unhide all"). Hide beats favorite in cycle — a hidden preset never auto-plays, but the Favorites tab still shows it so nothing is ever lost.
 - **Auto-hiding controls** — glassmorphic control bar fades after 3 seconds of inactivity, but stays visible while hovered or while a popover is open; click outside a popover to dismiss it
 - **Material-style switches** — all toggles in the cycle and tuning popovers use clean sliding switch components
 - **Fullscreen mode** — native browser fullscreen support
@@ -120,8 +121,10 @@ UI controller binding all DOM events, keyboard shortcuts, auto-hide behavior, pr
 | `←` | Previous preset |
 | `R` | Random preset toggle |
 | `P` | Toggle preset drawer |
+| `S` | Toggle favorite on current preset |
+| `X` | Hide current preset (auto-advances to next visible) |
 | `F` | Toggle fullscreen |
-| `Esc` | Close drawers / popovers |
+| `Esc` | Close drawers / popovers / modals |
 
 ## Quick Start
 

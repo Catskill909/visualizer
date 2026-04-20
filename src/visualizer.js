@@ -59,6 +59,7 @@ export class VisualizerEngine {
     this.randomCycleOrder = true;
     this.favoritePool = [];
     this.favoritesOnly = false;
+    this.hiddenPool = new Set();
     
     // Performance controls
     this.energyMultiplier = 1.0;
@@ -268,26 +269,44 @@ export class VisualizerEngine {
     return this.loadPreset(this.presetNames[index], blendTime);
   }
 
+  // Visible pool for manual navigation — all names minus hidden, fallback to full list
+  // if everything is hidden (so the app never locks up on a 100%-hidden library).
+  _visibleNames() {
+    if (this.hiddenPool.size === 0) return this.presetNames;
+    const visible = this.presetNames.filter(n => !this.hiddenPool.has(n));
+    return visible.length > 0 ? visible : this.presetNames;
+  }
+
   nextPreset(blendTime = 2.0) {
-    const next = (this.currentPresetIndex + 1) % this.presetNames.length;
-    this.loadPresetByIndex(next, blendTime);
+    const pool = this._visibleNames();
+    if (pool.length === 0) return '';
+    const current = this.getCurrentPresetName();
+    const idx = pool.indexOf(current);
+    const next = pool[(idx + 1) % pool.length] || pool[0];
+    this.loadPreset(next, blendTime);
     this.resetAutoCycle();
     return this.getCurrentPresetName();
   }
 
   prevPreset(blendTime = 2.0) {
-    const prev = this.currentPresetIndex <= 0 ? this.presetNames.length - 1 : this.currentPresetIndex - 1;
-    this.loadPresetByIndex(prev, blendTime);
+    const pool = this._visibleNames();
+    if (pool.length === 0) return '';
+    const current = this.getCurrentPresetName();
+    const idx = pool.indexOf(current);
+    const prev = idx <= 0 ? pool[pool.length - 1] : pool[idx - 1];
+    this.loadPreset(prev, blendTime);
     this.resetAutoCycle();
     return this.getCurrentPresetName();
   }
 
   randomPreset(blendTime = 2.0) {
-    if (this.presetNames.length === 0) return '';
-    let idx;
-    do { idx = Math.floor(Math.random() * this.presetNames.length); }
-    while (idx === this.currentPresetIndex && this.presetNames.length > 1);
-    this.loadPresetByIndex(idx, blendTime);
+    const pool = this._visibleNames();
+    if (pool.length === 0) return '';
+    const current = this.getCurrentPresetName();
+    let pick;
+    do { pick = pool[Math.floor(Math.random() * pool.length)]; }
+    while (pick === current && pool.length > 1);
+    this.loadPreset(pick, blendTime);
     this.resetAutoCycle();
     return this.getCurrentPresetName();
   }
@@ -354,11 +373,15 @@ export class VisualizerEngine {
   }
 
   _cyclePool() {
+    // Hide wins over favorite: any pool below excludes hidden names.
+    // Fallback to full list only if everything ends up filtered out.
+    let pool;
     if (this.favoritesOnly && this.favoritePool.length > 0) {
-      const valid = this.favoritePool.filter((n) => this.presets[n]);
-      if (valid.length > 0) return valid;
+      pool = this.favoritePool.filter(n => this.presets[n] && !this.hiddenPool.has(n));
+      if (pool.length > 0) return pool;
     }
-    return this.presetNames;
+    pool = this.presetNames.filter(n => !this.hiddenPool.has(n));
+    return pool.length > 0 ? pool : this.presetNames;
   }
 
   cycleNext(blendTime = 2.0) {
@@ -408,6 +431,10 @@ export class VisualizerEngine {
 
   setFavoritePool(names) {
     this.favoritePool = Array.isArray(names) ? [...names] : [];
+  }
+
+  setHiddenPool(names) {
+    this.hiddenPool = new Set(Array.isArray(names) ? names : []);
   }
 
   setFavoritesOnly(enabled) {

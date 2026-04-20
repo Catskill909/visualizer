@@ -181,6 +181,13 @@ body.force-hide-ui #toast {
 }
 
 .start-subtitle { font-size: 0.9rem; color: var(--text-secondary); }
+.start-tagline {
+  margin-top: 4px;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  font-style: italic;
+}
 .start-sources { margin-bottom: 24px; }
 .start-sources h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 16px; font-weight: 500; }
 
@@ -359,7 +366,30 @@ body.force-hide-ui #toast {
 .drawer-tab:hover { background: var(--hover-subtle); color: var(--text-primary); }
 .drawer-tab.active { background: var(--text-primary); color: var(--bg-primary); border-color: var(--text-primary); }
 
-.drawer-count { padding: 0 20px 8px; font-size: 0.72rem; color: var(--text-muted); }
+.drawer-count {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 0 20px 10px; font-size: 0.72rem; color: var(--text-muted);
+}
+.drawer-count-actions { display: flex; align-items: center; gap: 12px; }
+
+.drawer-link {
+  background: transparent; border: none; padding: 0;
+  color: var(--text-secondary); font-family: var(--font); font-size: 0.72rem;
+  cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
+  transition: color var(--transition-fast);
+}
+.drawer-link:hover { color: var(--text-primary); }
+
+.drawer-show-hidden {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.72rem; color: var(--text-secondary);
+  cursor: pointer; user-select: none;
+}
+.drawer-show-hidden .switch { width: 30px; height: 16px; }
+.drawer-show-hidden .switch-track::before { width: 10px; height: 10px; left: 2px; }
+.drawer-show-hidden .switch input:checked + .switch-track::before {
+  transform: translate(14px, -50%); width: 12px; height: 12px;
+}
 
 .drawer-list {
   flex: 1; overflow-y: auto; list-style: none; padding: 0 12px 20px;
@@ -378,18 +408,29 @@ body.force-hide-ui #toast {
 
 .preset-name-text { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.preset-heart {
-  flex-shrink: 0; width: 16px; height: 16px; margin-left: 8px;
-  opacity: 0; transform: scale(0.8); transition: all var(--transition-fast);
-  color: var(--text-muted);
+.preset-heart,
+.preset-hide {
+  flex-shrink: 0; width: 16px; height: 16px;
+  opacity: 0.35; transform: scale(0.9);
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
 }
-.preset-heart svg { width: 100%; height: 100%; fill: currentColor; }
+.preset-heart { margin-left: 8px; }
+.preset-hide { margin-left: 6px; }
+.preset-heart svg,
+.preset-hide svg { width: 100%; height: 100%; fill: currentColor; }
 
 .drawer-list li:hover { background: var(--hover-subtle); color: var(--text-primary); }
-.drawer-list li:hover .preset-heart { opacity: 0.5; transform: scale(1); }
-.drawer-list li:hover .preset-heart:hover { color: #ff3b3b; opacity: 1; transform: scale(1.1); }
+.drawer-list li:hover .preset-heart,
+.drawer-list li:hover .preset-hide { opacity: 0.85; transform: scale(1); }
+.drawer-list li:hover .preset-heart:hover { color: #ff3b3b; opacity: 1; transform: scale(1.15); }
+.drawer-list li:hover .preset-hide:hover { color: #ffb84d; opacity: 1; transform: scale(1.15); }
 
 .drawer-list li.is-favorite .preset-heart { opacity: 1; transform: scale(1); color: #ff3b3b; }
+.drawer-list li.is-hidden .preset-hide { opacity: 1; transform: scale(1); color: #ffb84d; }
+.drawer-list li.is-hidden { opacity: 0.55; }
+.drawer-list li.is-hidden .preset-name-text { text-decoration: line-through; text-decoration-color: rgba(255,255,255,0.25); }
+.drawer-list li.is-hidden:hover { opacity: 0.85; }
 
 .drawer-list li.active {
   background: var(--hover-medium); color: var(--text-primary);
@@ -428,6 +469,48 @@ kbd {
   background: var(--bg-elevated); color: var(--text-primary);
   border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
   box-shadow: 0 2px 0 rgba(255,255,255,0.1); font-weight: 600;
+}
+
+/* GENERIC CONFIRM MODAL (reused by unhide-all and future confirms) */
+.modal {
+  position: fixed; inset: 0; z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  animation: fadeIn 0.2s ease;
+}
+.modal-dialog {
+  width: 90%; max-width: 420px; padding: 24px;
+  background: var(--bg-glass);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-soft); animation: scaleIn 0.2s ease;
+}
+.modal-dialog h3 {
+  font-size: 1.05rem; font-weight: 500; color: var(--text-primary);
+  margin-bottom: 10px;
+}
+.modal-dialog p {
+  font-size: 0.88rem; color: var(--text-secondary);
+  line-height: 1.5; margin-bottom: 20px;
+}
+.modal-actions {
+  display: flex; justify-content: flex-end; gap: 10px;
+}
+.modal .primary-btn {
+  padding: 9px 18px; background: var(--text-primary); color: var(--bg-primary);
+  border: 1px solid var(--text-primary); border-radius: var(--radius-md);
+  font-family: var(--font); font-size: 0.85rem; font-weight: 500;
+  cursor: pointer; transition: all var(--transition-fast);
+}
+.modal .primary-btn:hover { background: rgba(255, 255, 255, 0.88); }
+.modal .text-btn {
+  padding: 9px 14px; background: transparent; color: var(--text-secondary);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  font-family: var(--font); font-size: 0.85rem; font-weight: 500;
+  cursor: pointer; transition: all var(--transition-fast);
+}
+.modal .text-btn:hover {
+  color: var(--text-primary); background: var(--hover-subtle); border-color: var(--border-highlight);
 }
 
 /* TOAST */
@@ -493,6 +576,26 @@ kbd {
   opacity: 1;
   visibility: visible;
   transform: translateX(-50%) translateY(0);
+}
+
+/* Preset-row icon tooltips — position to the LEFT of the icon so they
+   escape the drawer's overflow clipping, and fire near-instantly. */
+.preset-heart[data-tooltip]::after,
+.preset-hide[data-tooltip]::after {
+  bottom: auto;
+  top: 50%;
+  left: auto;
+  right: calc(100% + 8px);
+  transform: translateY(-50%) translateX(4px);
+  transition: opacity 0.08s ease, transform 0.08s ease, visibility 0.08s;
+  font-size: 0.68rem;
+  padding: 4px 8px;
+}
+.preset-heart[data-tooltip]:hover::after,
+.preset-hide[data-tooltip]:hover::after {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(-50%) translateX(0);
 }
 
 /* AUDIO TUNING PANEL (Popover) */
