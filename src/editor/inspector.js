@@ -1230,11 +1230,11 @@ export class EditorInspector {
         const groupSpinLines = groupSpin
             ? `    { _u.x *= aspect.y;
 ` +
-              `      float _ca = cos(_spinAng); float _sa = sin(_spinAng);
+            `      float _ca = cos(_spinAng); float _sa = sin(_spinAng);
 ` +
-              `      _u = vec2(_ca*_u.x - _sa*_u.y, _sa*_u.x + _ca*_u.y);
+            `      _u = vec2(_ca*_u.x - _sa*_u.y, _sa*_u.x + _ca*_u.y);
 ` +
-              `      _u.x /= aspect.y; }
+            `      _u.x /= aspect.y; }
 `
             : '';
 
