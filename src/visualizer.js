@@ -60,14 +60,14 @@ export class VisualizerEngine {
     this.favoritePool = [];
     this.favoritesOnly = false;
     this.hiddenPool = new Set();
-    
+
     // Performance controls
     this.energyMultiplier = 1.0;
     this.baseSensitivity = 1.0;
     this.agcEnabled = true;
     this.kickLockEnabled = false;
     this.boostActive = false;
-    
+
     // Audio nodes
     this.analyser = null;
     this.kickFilter = null;
@@ -175,26 +175,26 @@ export class VisualizerEngine {
     try {
       if (this.audioContext.state === 'suspended') await this.audioContext.resume();
       this.disconnectSource();
-      
+
       const constraints = {
         audio: deviceId ? { deviceId: { exact: deviceId } } : true
       };
-      
+
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       const source = this.audioContext.createMediaStreamSource(stream);
       this._micStream = stream;
       this.currentSource = source;
       this.currentSourceType = 'mic';
-      
+
       // Connect to the head of our internal chain
       source.connect(this.analyser);
-      
+
       this.startRenderLoop();
       this.startAutoCycle();
-      
+
       // Force engine re-sync
       if (this.visualizer) this.visualizer.connectAudio(this.visualizerGainNode);
-      
+
       return true;
     } catch (err) {
       console.error('Microphone access denied:', err);
@@ -214,9 +214,9 @@ export class VisualizerEngine {
       this.volumeGainNode = this.audioContext.createGain();
       source.connect(this.volumeGainNode);
       this.volumeGainNode.connect(this.audioContext.destination);
-      
+
       source.connect(this.analyser);
-      
+
       this.currentSource = source;
       this.currentSourceType = 'file';
       this.startRenderLoop();
@@ -442,7 +442,7 @@ export class VisualizerEngine {
   }
 
   setVolume(value) { if (this.volumeGainNode) this.volumeGainNode.gain.value = value; }
-  
+
   // --- PERFORMANCE CONTROL METHODS ---
 
   setEnergy(value) {
@@ -506,6 +506,36 @@ export class VisualizerEngine {
 
   setBoost(active) {
     this.boostActive = active;
+  }
+
+  /**
+   * Load a preset object directly (for editor live-preview).
+   * Deep-clones the object so butterchurn can't mutate the caller's state.
+   */
+  loadPresetObject(presetObj, blendTime = 0.5) {
+    if (!this.visualizer || !presetObj) return false;
+    try {
+      this.visualizer.loadPreset(JSON.parse(JSON.stringify(presetObj)), blendTime);
+      return true;
+    } catch (e) {
+      console.warn('[MilkScreen] loadPresetObject failed:', e.message);
+      return false;
+    }
+  }
+
+  /**
+   * Bind a named texture for use in a comp shader sampler (sampler_<name>).
+   * Butterchurn expects { data: dataURL, width: number, height: number }.
+   */
+  setUserTexture(name, texObj) {
+    if (!this.visualizer) return;
+    try {
+      if (typeof this.visualizer.loadExtraImages === 'function') {
+        this.visualizer.loadExtraImages({ [name]: texObj });
+      }
+    } catch (e) {
+      console.warn('[MilkScreen] setUserTexture failed:', e.message);
+    }
   }
 
   destroy() {

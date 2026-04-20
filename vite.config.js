@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { resolve } from 'path';
 
 export default defineConfig({
   // Pre-bundle CJS/ESM interop for butterchurn and all preset packs
@@ -15,6 +16,11 @@ export default defineConfig({
     },
     chunkSizeWarningLimit: 5000,
     rollupOptions: {
+      // Multi-page app: main visualizer + preset editor
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        editor: resolve(__dirname, 'editor.html'),
+      },
       output: {
         manualChunks(id) {
           // Collapse the 762 individually-imported baron JSONs into one chunk,

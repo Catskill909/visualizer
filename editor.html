@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Preset Studio — DiscoCast</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet" />
+    <link rel="stylesheet" href="/src/editor/style.css" />
+</head>
+
+<body>
+
+    <!-- ════════════════════ START SCREEN ════════════════════ -->
+    <div id="editor-start" class="editor-start">
+        <div class="start-rings" aria-hidden="true">
+            <div class="ring ring-1"></div>
+            <div class="ring ring-2"></div>
+            <div class="ring ring-3"></div>
+        </div>
+        <div class="start-card">
+            <div class="start-brand">
+                <svg class="start-logo" width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+                    <circle cx="13" cy="13" r="12" stroke="white" stroke-width="1" stroke-opacity="0.35" />
+                    <circle cx="13" cy="13" r="7.5" stroke="white" stroke-width="1.5" />
+                    <circle cx="13" cy="13" r="2.5" fill="white" />
+                </svg>
+                <span>Preset Studio</span>
+            </div>
+            <p class="start-tagline">Build audio-reactive visuals from scratch.</p>
+            <div class="start-actions">
+                <button id="start-mic" class="start-btn start-btn--primary" type="button">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                        aria-hidden="true">
+                        <rect x="9" y="2" width="6" height="11" rx="3" />
+                        <path d="M5 10a7 7 0 0 0 14 0" />
+                        <line x1="12" y1="19" x2="12" y2="22" />
+                        <line x1="8" y1="22" x2="16" y2="22" />
+                    </svg>
+                    Use Microphone
+                </button>
+                <button id="start-file" class="start-btn start-btn--secondary" type="button">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                        aria-hidden="true">
+                        <path d="M9 18V5l12-2v13" />
+                        <circle cx="6" cy="18" r="3" />
+                        <circle cx="18" cy="16" r="3" />
+                    </svg>
+                    Load Track
+                </button>
+            </div>
+            <input type="file" id="start-file-input" accept="audio/*" hidden />
+            <a href="/" class="start-back">← Back to DiscoCast</a>
+        </div>
+    </div>
+
+    <!-- ════════════════════ EDITOR SHELL ════════════════════ -->
+    <div id="editor-shell" class="editor-shell" hidden>
+
+        <canvas id="editor-canvas" class="editor-canvas"></canvas>
+
+        <!-- Right panel -->
+        <aside id="editor-panel" class="editor-panel" aria-label="Preset controls">
+
+            <!-- Header: name input + undo / redo / A/B -->
+            <header class="panel-header">
+                <input type="text" id="preset-name-input" class="panel-name-input" placeholder="Untitled preset"
+                    value="Untitled preset" aria-label="Preset name" maxlength="64" spellcheck="false" />
+                <div class="panel-header-btns">
+                    <button id="btn-undo" class="phb" disabled title="Undo (⌘Z)">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M3 7v6h6" />
+                            <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
+                        </svg>
+                    </button>
+                    <button id="btn-redo" class="phb" disabled title="Redo (⌘⇧Z)">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M21 7v6h-6" />
+                            <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13" />
+                        </svg>
+                    </button>
+                    <button id="btn-ab" class="phb phb--ab" title="Hold to compare original">A/B</button>
+                </div>
+            </header>
+
+            <!-- Tab bar -->
+            <nav class="tab-bar" role="tablist" aria-label="Editor sections">
+                <button class="tab active" data-tab="palette" role="tab" aria-selected="true"
+                    aria-controls="tab-palette">Palette</button>
+                <button class="tab" data-tab="motion" role="tab" aria-selected="false"
+                    aria-controls="tab-motion">Motion</button>
+                <button class="tab" data-tab="wave" role="tab" aria-selected="false"
+                    aria-controls="tab-wave">Wave</button>
+                <button class="tab" data-tab="feel" role="tab" aria-selected="false"
+                    aria-controls="tab-feel">Feel</button>
+                <button class="tab" data-tab="image" role="tab" aria-selected="false"
+                    aria-controls="tab-image">Image</button>
+            </nav>
+
+            <!-- ─── PALETTE TAB ─── -->
+            <div id="tab-palette" class="tab-panel" role="tabpanel">
+                <div class="tab-scroll">
+                    <p class="section-label">Start from</p>
+                    <div class="base-var-grid" id="base-var-grid"></div>
+
+                    <p class="section-label">Quick Palettes</p>
+                    <div class="palette-grid" id="palette-grid"></div>
+
+                    <p class="section-label">Colors</p>
+                    <div class="color-rows">
+
+                        <div class="color-row">
+                            <span class="color-row-label">Wave</span>
+                            <div class="color-swatch-wrap">
+                                <span class="color-swatch" id="swatch-wave" style="background:#ffffff"
+                                    aria-label="Wave color"></span>
+                                <input type="color" id="color-wave" class="color-native" value="#ffffff" tabindex="-1"
+                                    aria-hidden="true" />
+                            </div>
+                            <span class="color-row-hex" id="hex-wave">#FFFFFF</span>
+                        </div>
+
+                        <div class="color-row">
+                            <span class="color-row-label">Glow</span>
+                            <div class="color-swatch-wrap">
+                                <span class="color-swatch" id="swatch-glow" style="background:#ffffff"
+                                    aria-label="Outer glow color"></span>
+                                <input type="color" id="color-glow" class="color-native" value="#ffffff" tabindex="-1"
+                                    aria-hidden="true" />
+                            </div>
+                            <span class="color-row-hex" id="hex-glow">#FFFFFF</span>
+                        </div>
+
+                        <div class="color-row">
+                            <span class="color-row-label">Accent</span>
+                            <div class="color-swatch-wrap">
+                                <span class="color-swatch" id="swatch-accent" style="background:#000000"
+                                    aria-label="Inner accent color"></span>
+                                <input type="color" id="color-accent" class="color-native" value="#000000" tabindex="-1"
+                                    aria-hidden="true" />
+                            </div>
+                            <span class="color-row-hex" id="hex-accent">#000000</span>
+                        </div>
+
+                    </div>
+
+                    <p class="section-label">Appearance</p>
+                    <div id="palette-sliders"></div>
+
+                    <div class="toggle-row">
+                        <label class="toggle-label" for="toggle-invert">Invert colors</label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-invert" role="switch" />
+                            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                        </label>
+                    </div>
+                    <div class="toggle-row">
+                        <label class="toggle-label" for="toggle-darken">Darken</label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-darken" role="switch" />
+                            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── MOTION TAB ─── -->
+            <div id="tab-motion" class="tab-panel" role="tabpanel" hidden>
+                <div class="tab-scroll">
+                    <p class="section-label">Movement</p>
+                    <div id="motion-sliders"></div>
+
+                    <p class="section-label">Echo Direction</p>
+                    <div class="seg-control" id="echo-orient-seg" role="group" aria-label="Echo orientation">
+                        <button class="seg active" data-orient="0">Normal</button>
+                        <button class="seg" data-orient="1">↔ Flip H</button>
+                        <button class="seg" data-orient="2">↕ Flip V</button>
+                        <button class="seg" data-orient="3">↔↕ Both</button>
+                    </div>
+
+                    <button class="ghost-btn" id="btn-randomize-motion">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.5">
+                            <rect x="2" y="2" width="20" height="20" rx="4" />
+                            <circle cx="8" cy="8" r="1.5" fill="currentColor" />
+                            <circle cx="16" cy="8" r="1.5" fill="currentColor" />
+                            <circle cx="8" cy="16" r="1.5" fill="currentColor" />
+                            <circle cx="16" cy="16" r="1.5" fill="currentColor" />
+                            <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+                        </svg>
+                        Randomize motion
+                    </button>
+                </div>
+            </div>
+
+            <!-- ─── WAVE TAB ─── -->
+            <div id="tab-wave" class="tab-panel" role="tabpanel" hidden>
+                <div class="tab-scroll">
+                    <p class="section-label">Shape</p>
+                    <div class="wave-mode-grid" id="wave-mode-grid" role="group" aria-label="Wave shape"></div>
+
+                    <p class="section-label">Style</p>
+                    <div id="wave-sliders"></div>
+
+                    <p class="section-label">Options</p>
+                    <div class="toggle-row">
+                        <label class="toggle-label" for="toggle-dots">Draw as dots</label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-dots" role="switch" />
+                            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                        </label>
+                    </div>
+                    <div class="toggle-row">
+                        <label class="toggle-label" for="toggle-additive">Additive blend</label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-additive" role="switch" />
+                            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                        </label>
+                    </div>
+
+                    <button class="ghost-btn" id="btn-randomize-wave">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.5">
+                            <rect x="2" y="2" width="20" height="20" rx="4" />
+                            <circle cx="8" cy="8" r="1.5" fill="currentColor" />
+                            <circle cx="16" cy="8" r="1.5" fill="currentColor" />
+                            <circle cx="8" cy="16" r="1.5" fill="currentColor" />
+                            <circle cx="16" cy="16" r="1.5" fill="currentColor" />
+                            <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+                        </svg>
+                        Randomize wave
+                    </button>
+                </div>
+            </div>
+
+            <!-- ─── FEEL TAB ─── -->
+            <div id="tab-feel" class="tab-panel" role="tabpanel" hidden>
+                <div class="tab-scroll">
+                    <p class="section-label">Audio Reactivity</p>
+                    <p class="section-note">Controls how sensitive the visualizer is to your audio. Not saved in the
+                        preset.</p>
+                    <div id="feel-sliders"></div>
+                    <div class="toggle-row">
+                        <label class="toggle-label" for="toggle-agc">Auto gain control</label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-agc" role="switch" checked />
+                            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── IMAGE TAB ─── -->
+            <div id="tab-image" class="tab-panel" role="tabpanel" hidden>
+                <div class="tab-scroll">
+                    <div class="images-header">
+                        <p class="section-label" style="margin:0">Image Layers</p>
+                        <label class="images-only-row"
+                            title="Hide the base visualizer — show only uploaded images over black">
+                            <span class="images-only-label">Images Only</span>
+                            <label class="toggle-switch toggle-switch--sm">
+                                <input type="checkbox" id="toggle-images-only" />
+                                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                            </label>
+                        </label>
+                    </div>
+                    <p class="section-note">Add up to 2 images. Choose how they react to the music.</p>
+                    <div class="image-dropzone" id="image-dropzone" role="button" tabindex="0"
+                        aria-label="Drop image here or click to browse">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1" stroke-opacity="0.4" aria-hidden="true">
+                            <rect x="3" y="3" width="18" height="18" rx="2" />
+                            <circle cx="8.5" cy="8.5" r="1.5" />
+                            <polyline points="21 15 16 10 5 21" />
+                        </svg>
+                        <span>Drop image here or click to browse</span>
+                        <input type="file" id="image-file-input" accept="image/*" hidden />
+                    </div>
+                    <div class="image-layers" id="image-layers"></div>
+                </div>
+            </div>
+
+            <!-- Footer: save + reset -->
+            <footer class="panel-footer">
+                <button id="btn-save" class="save-btn" type="button">Save preset</button>
+                <button id="btn-reset" class="reset-btn" type="button">Reset</button>
+            </footer>
+
+        </aside>
+    </div>
+
+    <!-- ════════════════════ SAVE MODAL ════════════════════ -->
+    <div id="save-modal" class="save-modal" hidden role="dialog" aria-modal="true" aria-labelledby="save-modal-title">
+        <div class="save-modal-card">
+            <h2 id="save-modal-title" class="save-modal-title">Save Preset</h2>
+            <label class="save-modal-label" for="save-modal-name">Name</label>
+            <input type="text" id="save-modal-name" class="save-modal-input" placeholder="My awesome preset"
+                maxlength="80" spellcheck="false" />
+            <div class="save-modal-actions">
+                <button id="save-modal-confirm" class="save-btn" type="button">Save</button>
+                <button id="save-modal-cancel" class="reset-btn" type="button">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="toast" hidden role="status" aria-live="polite"></div>
+
+    <script type="module" src="/src/editor/main.js"></script>
+</body>
+
+</html>

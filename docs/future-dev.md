@@ -12,6 +12,57 @@ Since DiscoCast (MilkScreen) is going to be bundled with a Silent Disco applicat
 - **❤️ Favorites-Only Cycling** *(2026-04-19)*: Third switch in the Preset Cycling popover restricts auto-cycle to hearted presets — a first step toward the "Preset Crates" idea below.
 - **🎛️ Material-style Toggle Switches** *(2026-04-19)*: All popover checkboxes replaced with sliding switches for cleaner live-performance UX.
 - **👀 Engaged-State Auto-Hide** *(2026-04-19)*: Control bar stays visible while hovered or while a popover is open; click outside a popover dismisses it and restarts the 3-second fade.
+- **🎨 Preset Studio — Phase A** *(2026-04-20)*: Standalone visual preset builder at `/editor.html`. Distinct from the main app — canvas-first design, museum dark, frosted-glass start card. Full details below.
+
+---
+
+## 🎨 Preset Studio — Phase A *(complete 2026-04-20)*
+
+Standalone visual preset builder at **`/editor.html`** — a separate identity from the main app, not a remix of its start screen.
+
+### Architecture
+- **Vite MPA** — dual Rollup entry (`index.html` + `editor.html`); editor bundle is fully isolated.
+- **`src/editor/main.js`** — entry point, boots `VisualizerEngine` on user audio source selection, hands off to `EditorInspector`.
+- **`src/editor/inspector.js`** — `EditorInspector` class, ~600 lines. All panel logic.
+- **`src/editor/style.css`** — museum dark standalone stylesheet (no dependency on `src/style.css`).
+- **`src/customPresets.js`** — CRUD over `milkscreen_custom_presets` (localStorage) + `milkscreen_images` (IndexedDB).
+- **`src/presetRegistry.js`** — merge layer: bundled + custom under one `getAllNames()` / `getByName()` API.
+- **`src/visualizer.js`** additions: `loadPresetObject(obj, blendTime)` for live preview; `setUserTexture(name, bitmap)` for image shader binding.
+
+### Start screen
+Frosted-glass card centred over pulsing concentric ring animation (CSS only, no JS). Two buttons: **Use Microphone** / **Load Track**. No preset picker — the Studio always starts from a clean blank slate.
+
+### Panel tabs
+
+| Tab | Controls |
+|-----|----------|
+| **Palette** | 12 palette chips (Mono → Plasma, each a Wave + Glow pair) · 3 color swatches (Wave / Glow / Accent) with native color picker · Brightness + Trail sliders · Invert / Darken toggles |
+| **Motion** | Zoom / Spin / Warp / Warp Speed / Echo Zoom sliders · 4-way Echo Direction segmented control · Randomize button |
+| **Wave** | 8 visual shape buttons (icon grid) · Size + Opacity sliders · Thick / Dots / Additive toggles · Randomize button |
+| **Feel** | Energy + Bass Sensitivity (engine-level, not saved in preset) · AGC toggle |
+| **Image** | Drag-drop zone · Up to 2 layer cards · treatment select (Bloom / Warp target / Echo source) per layer |
+
+### Color system
+Wave → `wave_r/g/b`, Glow → `ob_r/g/b + ob_a`, Accent → `ib_r/g/b + ib_a`. Palette chips set Wave + Glow as a matched pair; individual swatches override freely afterwards.
+
+### Editing model
+- Every change calls `engine.loadPresetObject(currentState, 0)` — instant live preview.
+- 50-deep undo stack; one entry per pointer interaction (pointerdown → pointerup).
+- **A/B** — hold button previews original state; release restores current.
+- **Save** → opens name modal → `createCustomPreset()` writes to localStorage.
+- **Reset** → restores `BLANK` defaults.
+- `⌘Z` / `⌘⇧Z` keyboard undo/redo wired in `editor/main.js`.
+
+---
+
+## 🚀 Phase B — Main App Integration *(next)*
+
+Preset Studio data is already written to the same storage the main app will read. Phase B wires the two together:
+
+1. **"Mine" tab** in the preset drawer (`src/controls.js`) — reads from `presetRegistry.getCustomPresets()`.
+2. Custom presets participate in favorites, hide, and cycle automatically — they are just names in the registry.
+3. **"Remix" button** per drawer row opens `EditorInspector` as a side panel inside the main shell.
+4. `editor.html` stays live as a dedicated full-workspace; Inspector becomes embeddable in the main app too.
 
 ---
 

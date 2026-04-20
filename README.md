@@ -18,6 +18,7 @@ A modern browser-based MilkDrop music visualizer powered by [Butterchurn](https:
 - **Material-style switches** — all toggles in the cycle and tuning popovers use clean sliding switch components
 - **Fullscreen mode** — native browser fullscreen support
 - **Responsive design** — works on desktop and mobile viewports
+- **Preset Studio** (`/editor.html`) — standalone visual preset builder: 12 one-click palettes, 3 independent color swatches (Wave / Glow / Accent), 5 tabbed control sections, undo/redo, A/B comparison, image layers, save to localStorage
 
 ## Tech Stack
 
@@ -34,16 +35,23 @@ A modern browser-based MilkDrop music visualizer powered by [Butterchurn](https:
 
 ```
 winamp-screen/
-├── index.html              # Main HTML — canvas, start screen, control bar, preset drawer
-├── vite.config.js           # Vite config for CJS/ESM interop with butterchurn
+├── index.html              # Main app — canvas, start screen, control bar, preset drawer
+├── editor.html             # Preset Studio — standalone visual builder (/editor.html)
+├── vite.config.js          # Vite MPA config — dual Rollup entries (main + editor)
 ├── package.json
 ├── public/
-│   └── favicon.svg          # Brand favicon (gradient concentric circles)
+│   └── favicon.svg         # Brand favicon (gradient concentric circles)
 └── src/
-    ├── main.js              # Entry point — wires VisualizerEngine + ControlPanel
-    ├── visualizer.js        # VisualizerEngine class — butterchurn wrapper, audio routing
-    ├── controls.js          # ControlPanel class — UI bindings, keyboard, auto-hide
-    └── style.css            # Design system — dark theme, glassmorphism, animations
+    ├── main.js             # Main app entry — wires VisualizerEngine + ControlPanel
+    ├── visualizer.js       # VisualizerEngine class — butterchurn wrapper, audio routing
+    ├── controls.js         # ControlPanel class — UI bindings, keyboard, auto-hide
+    ├── style.css           # Main app design system — dark theme, glassmorphism
+    ├── customPresets.js    # Custom preset CRUD — localStorage + IndexedDB image storage
+    ├── presetRegistry.js   # Merge layer — bundled + custom presets under one API
+    └── editor/
+        ├── main.js         # Preset Studio entry point — audio source boot
+        ├── inspector.js    # EditorInspector class — tabs, palettes, controls, undo/redo
+        └── style.css       # Preset Studio design system — museum dark, tab layout
 ```
 
 ## Architecture
@@ -103,6 +111,48 @@ Core engine wrapping Butterchurn. Manages audio context, source connections, pre
 #### `ControlPanel` (`src/controls.js`)
 
 UI controller binding all DOM events, keyboard shortcuts, auto-hide behavior, preset drawer, and audio player controls.
+
+#### `EditorInspector` (`src/editor/inspector.js`)
+
+Full panel controller for Preset Studio. Manages 5 tabbed sections, palette chips, color swatches, undo/redo stack, A/B comparison, and save-to-localStorage.
+
+| Method | Description |
+|--------|-------------|
+| `undo()` / `redo()` | Step through 50-deep history stack (called from keyboard handler in `editor/main.js`) |
+
+Palette system maps 12 named moods (Mono, Neon, Electric, Fire, Violet, Ocean, Sunset, Ice, Gold, Rose, Acid, Plasma) to Wave + Glow `baseVals` pairs. Three swatches (Wave → `wave_r/g/b`, Glow → `ob_r/g/b`, Accent → `ib_r/g/b`) are independently overridable after applying a palette.
+
+#### `customPresets.js` (`src/customPresets.js`)
+
+Single source of truth for custom preset CRUD.
+
+| Export | Description |
+|--------|-------------|
+| `createCustomPreset(name, state)` | Save a new custom preset to localStorage |
+| `saveCustomPreset(id, state)` | Update an existing preset |
+| `getCustomPreset(id)` | Load one preset by id |
+| `deleteCustomPreset(id)` | Remove from storage |
+| `loadAllCustomPresets()` | Return all saved custom presets |
+| `storeImage(blob)` | Persist image blob to IndexedDB, return imageId |
+| `getImage(imageId)` | Retrieve image blob by id |
+| `exportPreset(id)` | Serialize preset + inlined images to JSON |
+| `importPreset(json)` | Validate, re-hydrate images, write to storage |
+
+Storage schema: `{ id, name, schemaVersion: 1, baseVals, shapes, waves, warp, comp, init_eqs, frame_eqs, pixel_eqs, images, parentPresetName?, createdAt, updatedAt }`. Registry key format: `custom:<id>:<name>` prevents collision with bundled names.
+
+#### `presetRegistry.js` (`src/presetRegistry.js`)
+
+Merge layer exposing bundled + custom presets under one API.
+
+| Method | Description |
+|--------|-------------|
+| `getAllNames()` | All preset names — bundled + custom |
+| `getByName(name)` | Resolve preset object (custom or bundled) by name |
+| `getBundledNames()` | Bundled-only names |
+| `getCustomPresets()` | Custom-only preset map |
+| `isCustom(name)` | Whether a name is a custom preset |
+| `displayName(name)` | Strip `custom:<id>:` prefix for display |
+| `refresh()` | Re-read localStorage after an external write |
 
 ### Keyboard Shortcuts
 
