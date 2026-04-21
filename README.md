@@ -217,7 +217,34 @@ The app is protected by a single-password overlay shown on first visit. After th
 
 **Local dev:** copy `.env.example` → `.env` and set `VITE_APP_PASSWORD=something`. Leaving it blank disables the gate.
 
-**Security note:** Because this is a static SPA, the password is present in the built JS bundle and visible to anyone who inspects DevTools. Treat it as a soft gate to keep casual visitors out, not as real auth. For stronger protection, use nginx HTTP Basic Auth in [nginx.conf](nginx.conf) or add a backend.
+**Security note:** Because this is a static SPA, the password is present in the built JS bundle and visible to anyone who inspects DevTools. Treat it as a soft gate to keep casual visitors out, not as real auth — there is no private content behind it to protect. For stronger protection, switch to nginx HTTP Basic Auth in [nginx.conf](nginx.conf) or put a real auth service (Authelia, Cloudflare Access) in front.
+
+### Security Posture
+
+The app ships with a hardened HTTP response baseline (see [nginx.conf](nginx.conf)):
+
+| Header | Value | Purpose |
+|---|---|---|
+| `Content-Security-Policy` | `default-src 'self'` + allowlist for Google Fonts, `data:`/`blob:` for images/media | Blocks unexpected script execution and cross-origin loads |
+| `X-Frame-Options` | `DENY` | Prevents clickjacking (the page can't be iframed) |
+| `X-Content-Type-Options` | `nosniff` | Blocks MIME-sniffing on JS/CSS |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | Don't leak full URLs to outbound links |
+| `Permissions-Policy` | `microphone=(self), camera=(), geolocation=()` | Scopes microphone to first-party only; blocks the rest |
+
+**CSP allowlist** (if you add new origins, update `nginx.conf`):
+- `script-src 'self'` — all JS is bundled; no inline scripts, no CDNs
+- `style-src 'self' 'unsafe-inline' fonts.googleapis.com` — inline `style=""` attrs + Google Fonts CSS
+- `font-src 'self' fonts.gstatic.com` — Google Fonts woff2
+- `img-src 'self' data: blob:` — custom preset images (data URLs) and blob URLs
+- `media-src 'self' blob:` — user-loaded audio files via `URL.createObjectURL`
+- `frame-ancestors 'none'` — not embeddable
+
+After changing `nginx.conf`, redeploy and check the browser Console for CSP violation messages. A single violation breaks whatever it touches silently.
+
+**Out of scope / known soft spots:**
+- **Password-in-bundle** — covered above. Not real auth by design.
+- **HTTPS / HSTS** — terminated at the Coolify reverse proxy, not in this Dockerfile. Verify HTTPS redirect is enabled on the Coolify app.
+- **Image layer injection (editor)** — `file.name` from user uploads is set via `textContent`/`title` (not `innerHTML`) so it can't XSS. If preset import/export is ever wired to UI, re-audit image layer card rendering.
 
 ## Dependencies
 
