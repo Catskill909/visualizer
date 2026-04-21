@@ -269,13 +269,13 @@ export class ControlPanel {
     // Click outside popovers closes them
     document.addEventListener('pointerdown', (e) => {
       if (this.cycleOpen
-          && !els.cyclePanel.contains(e.target)
-          && !els.btnCycle.contains(e.target)) {
+        && !els.cyclePanel.contains(e.target)
+        && !els.btnCycle.contains(e.target)) {
         this.closeCyclePanel();
       }
       if (this.tuningOpen
-          && !els.audioTuningPanel.contains(e.target)
-          && !els.btnAudioTuning.contains(e.target)) {
+        && !els.audioTuningPanel.contains(e.target)
+        && !els.btnAudioTuning.contains(e.target)) {
         this.closeTuningPanel();
       }
     });
