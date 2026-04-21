@@ -984,7 +984,7 @@ export class EditorInspector {
 
         card.innerHTML = `
           <div class="layer-header">
-            <span class="layer-name" title="${file.name}">${shortName}</span>
+            <span class="layer-name"></span>
             <button class="layer-remove" aria-label="Remove layer">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -1131,6 +1131,12 @@ export class EditorInspector {
             </div>
           </div>
         `;
+
+        // Set user-controlled filename safely — file.name can contain markup
+        // and the layer card gets re-built if we ever hydrate from imported JSON.
+        const nameEl = card.querySelector('.layer-name');
+        nameEl.textContent = shortName;
+        nameEl.title = file.name;
 
         // ── Wire controls ───────────────────────────────────────────────────
         const refresh = () => { this._buildCompShader(); this._applyToEngine(); };

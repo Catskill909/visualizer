@@ -17,13 +17,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     engine.init(canvas);
 
     // Initialize the control panel (binds all UI events)
-    const controls = new ControlPanel(engine);
+    new ControlPanel(engine);
 
     // Initial canvas sizing
     engine.setSize(window.innerWidth, window.innerHeight);
-
-    // Expose to console for debugging
-    window.__discocast = { engine, controls };
 
     console.log(
       '%c🎨 DiscoCast Visualizer Ready %c— ' + engine.getPresetNames().length + ' presets loaded',
