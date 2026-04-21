@@ -7,6 +7,7 @@ import butterchurnPresetsImport from 'butterchurn-presets';
 import butterchurnPresetsExtra from 'butterchurn-presets/lib/butterchurnPresetsExtra.min.js';
 import butterchurnPresetsExtra2 from 'butterchurn-presets/lib/butterchurnPresetsExtra2.min.js';
 import butterchurnPresetsMD1 from 'butterchurn-presets/lib/butterchurnPresetsMD1.min.js';
+import { loadAllCustomPresets, CUSTOM_PREFIX, registryKey } from './customPresets.js';
 
 // Baron pack: bypass the package's runtime `await import()` loop (which would cause
 // 762 sequential network requests). Vite inlines every JSON into a single static chunk.
@@ -317,6 +318,54 @@ export class VisualizerEngine {
   }
 
   getPresetNames() { return this.presetNames; }
+
+  /**
+   * Re-read custom presets from localStorage and merge them into this.presets
+   * and this.presetNames. Safe to call any time — bundled presets are untouched.
+   * Call this whenever the preset drawer opens so freshly saved editor presets appear.
+   */
+  refreshCustomPresets() {
+    // Remove any previously-registered custom keys
+    for (const name of this.presetNames) {
+      if (name.startsWith(CUSTOM_PREFIX)) delete this.presets[name];
+    }
+    // Re-register from localStorage
+    const stored = loadAllCustomPresets();
+    for (const [, preset] of Object.entries(stored)) {
+      const key = registryKey(preset);
+      this.presets[key] = preset;
+    }
+    // Rebuild sorted name list: bundled (no prefix) then custom
+    const bundled = this.presetNames.filter(n => !n.startsWith(CUSTOM_PREFIX));
+    const custom = Object.keys(this.presets)
+      .filter(n => n.startsWith(CUSTOM_PREFIX))
+      .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+    this.presetNames = [...bundled, ...custom];
+  }
+
+  /**
+   * Re-read custom presets from localStorage and merge them into this.presets
+   * and this.presetNames. Safe to call any time — bundled presets are untouched.
+   * Call this whenever the preset drawer opens so freshly saved editor presets appear.
+   */
+  refreshCustomPresets() {
+    // Remove any previously-registered custom keys
+    for (const name of this.presetNames) {
+      if (name.startsWith(CUSTOM_PREFIX)) delete this.presets[name];
+    }
+    // Re-register from localStorage
+    const stored = loadAllCustomPresets();
+    for (const [, preset] of Object.entries(stored)) {
+      const key = registryKey(preset);
+      this.presets[key] = preset;
+    }
+    // Rebuild sorted name list: bundled (no prefix) then custom
+    const bundled = this.presetNames.filter(n => !n.startsWith(CUSTOM_PREFIX));
+    const custom = Object.keys(this.presets)
+      .filter(n => n.startsWith(CUSTOM_PREFIX))
+      .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+    this.presetNames = [...bundled, ...custom];
+  }
 
   setSize(width, height) {
     if (!this.canvas || !this.visualizer) return;

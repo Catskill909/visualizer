@@ -34,8 +34,9 @@ let inspector = null;
 function sizeCanvas() {
     if (!engine) return;
     const panelW = 340;
+    const topbarH = document.querySelector('.editor-topbar')?.offsetHeight ?? 40;
     const w = Math.max(120, window.innerWidth - panelW);
-    engine.setSize(w, window.innerHeight);
+    engine.setSize(w, window.innerHeight - topbarH);
 }
 
 // ─── Mini player wiring ───────────────────────────────────────────────────────

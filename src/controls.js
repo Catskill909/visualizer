@@ -47,6 +47,7 @@ export class ControlPanel {
       presetList: document.getElementById('preset-list'),
       presetCount: document.getElementById('preset-count'),
       btnCloseDrawer: document.getElementById('btn-close-drawer'),
+      btnPresetStudio: document.getElementById('btn-preset-studio'),
       tabAll: document.getElementById('tab-all'),
       tabFavorites: document.getElementById('tab-favorites'),
       toggleShowHidden: document.getElementById('toggle-show-hidden'),
@@ -164,6 +165,13 @@ export class ControlPanel {
 
     // --- Preset drawer ---
     els.btnPresets.addEventListener('click', () => this.toggleDrawer());
+
+    // --- Preset Studio (editor) ---
+    if (els.btnPresetStudio) {
+      els.btnPresetStudio.addEventListener('click', () => {
+        window.location.href = '/editor.html';
+      });
+    }
     els.btnCloseDrawer.addEventListener('click', () => this.closeDrawer());
     els.presetSearch.addEventListener('input', () => this.filterPresets());
 
@@ -603,6 +611,7 @@ export class ControlPanel {
 
   openDrawer() {
     this.drawerOpen = true;
+    this.engine.refreshCustomPresets();
     this.els.presetDrawer.classList.remove('hidden');
     this.populatePresetList();
     this.els.presetSearch.value = '';
