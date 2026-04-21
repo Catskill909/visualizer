@@ -62,6 +62,7 @@ Drop up to 2 images. Each layer has:
 | **Tint Color** | Color swatch | Multiplies sampled image pixels by this color |
 | **Hue Spin** | 0–2 | Rotates tint hue through full color wheel per second |
 | Images Only | Toggle (header) | Hides base visualizer — black background + images only |
+| **Canvas Mirror** | None / ↔ H / ↕ V / ✦ Both | Folds the entire rendered scene (warp buffer + all image layers) along one or both axes |
 
 ### Tunnel implementation
 
@@ -71,6 +72,23 @@ the loop snap is invisible. Implemented as a **two-layer crossfade** where:
 - Layer B uses `pow(2, phase−1)` (scale 0.5→1)
 - Blend weight = `phase` — continuously interpolated across the full cycle
 - At wrap: blend=1, B at scale 1.0 → A picks up at scale 1.0 → seamless
+
+### Canvas Mirror
+
+A scene-level UV fold applied **before** any sampling in the comp shader — so both the butterchurn warp feedback buffer (`sampler_main`) and all image layer positions are mirrored in lockstep.
+
+**GLSL technique:** butterchurn's comp shader body is injected into a `main()` that already declares `vec2 uv = vUv;` as a local variable. Redeclaring `uv` in the same scope would cause a compile error; likewise `uv` is also declared as `in vec2 uv` in the fragment shader header (a read-only varying in GLSL ES 3.00). The fix is to declare a new local `uv_m` and use it everywhere:
+
+```glsl
+// Mirror H example — baked into shader_body GLSL
+vec2 uv_m = vec2(1.0 - abs(uv.x * 2.0 - 1.0), uv.y);
+vec3 col = texture(sampler_main, uv_m).xyz * 2.0;
+// ...image layers use _u = uv_m - center, not uv - center
+```
+
+When mirror is `none`, `uv_m = uv` (no-op). All three branches (normal, solid-color, images-only) emit `uv_m` first, so it is always in scope for `_buildImageBlock()`.
+
+---
 
 ### Solid color base (Color variation)
 
@@ -163,7 +181,10 @@ Draw *N* copies of the image arranged in a ring around the center anchor. Contro
 ---
 
 ### ✅ Mirror / Kaleidoscope — BUILT
-Segmented control: **Off / ↔ H / ↕ V / ✦ Quad / ✶ Kaleido**. Applied as a UV fold *after* tiling (in [0,1] tile space) so it stacks with spin, tunnel, spacing, etc. Mirror H/V: `1 - abs(fract(u × 0.5) × 2 - 1)` per axis. Kaleido: 6-slice polar fold — `atan2` → mod into `π/3` sector → mirror → polar back to cartesian.
+Segmented control: **Off / ↔ H / ↕ V / ✦ Quad / ✶ Kaleido**. Applied as a UV fold *after* tiling (in [0,1] tile space) so it stacks with spin, tunnel, spacing, etc. Mirror H/V: `1 - abs(u × 2 - 1)` per axis (correct formula for [0,1] UV space — NOT `fract(u×0.5)×2−1` which was an earlier bug). Kaleido: 6-slice polar fold — `atan2` → mod into `π/3` sector → mirror → polar back to cartesian.
+
+### ✅ Canvas Mirror — BUILT
+Scene-level segmented control: **None / ↔ H / ↕ V / ✦ Both** in the Image tab header. Folds the entire comp-shader output — warp buffer AND all image layers move together. Uses `uv_m` local variable technique (see Canvas Mirror section above) to avoid GLSL redeclaration errors.
 
 ---
 

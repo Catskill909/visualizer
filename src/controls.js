@@ -1,6 +1,8 @@
 /**
  * ControlPanel — UI bindings, auto-hide, keyboard shortcuts, preset drawer
  */
+import { getCustomPreset, deleteCustomPreset, deleteImage, CUSTOM_PREFIX } from './customPresets.js';
+
 export class ControlPanel {
   constructor(engine) {
     this.engine = engine;
@@ -15,7 +17,7 @@ export class ControlPanel {
     this.favorites = this.loadFavorites();
     this.hidden = this.loadHidden();
     this.showHidden = false; // maintenance mode — resets to off on every load
-    this.currentTab = 'all'; // 'all' or 'favorites'
+    this.currentTab = 'all'; // 'all', 'favorites', or 'custom'
     this.vuAnimId = null;
 
     // DOM refs
@@ -50,6 +52,7 @@ export class ControlPanel {
       btnPresetStudio: document.getElementById('btn-preset-studio'),
       tabAll: document.getElementById('tab-all'),
       tabFavorites: document.getElementById('tab-favorites'),
+      tabCustom: document.getElementById('tab-custom'),
       toggleShowHidden: document.getElementById('toggle-show-hidden'),
       btnUnhideAll: document.getElementById('btn-unhide-all'),
       hiddenCountLabel: document.getElementById('hidden-count-label'),
@@ -57,6 +60,10 @@ export class ControlPanel {
       unhideModalCount: document.getElementById('unhide-modal-count'),
       btnCancelUnhide: document.getElementById('btn-cancel-unhide'),
       btnConfirmUnhide: document.getElementById('btn-confirm-unhide'),
+      deletePresetModal: document.getElementById('delete-preset-modal'),
+      deletePresetName: document.getElementById('delete-preset-name'),
+      btnCancelDeletePreset: document.getElementById('btn-cancel-delete-preset'),
+      btnConfirmDeletePreset: document.getElementById('btn-confirm-delete-preset'),
       btnFavorite: document.getElementById('btn-favorite'),
       btnHelp: document.getElementById('btn-help'),
       btnAudioTuning: document.getElementById('btn-audio-tuning'),
@@ -68,6 +75,9 @@ export class ControlPanel {
       signalStatus: document.getElementById('signal-status'),
       keyboardGuide: document.getElementById('keyboard-guide'),
       btnCloseGuide: document.getElementById('btn-close-guide'),
+      welcomeGuide: document.getElementById('welcome-guide'),
+      btnWelcomeHelp: document.getElementById('btn-welcome-help'),
+      btnCloseWelcome: document.getElementById('btn-close-welcome'),
       flashOverlay: document.getElementById('flash-overlay'),
       canvas: document.getElementById('visualizer-canvas'),
       audioPlayer: document.getElementById('audio-player'),
@@ -179,6 +189,7 @@ export class ControlPanel {
       this.currentTab = 'all';
       els.tabAll.classList.add('active');
       els.tabFavorites.classList.remove('active');
+      els.tabCustom.classList.remove('active');
       this.filterPresets();
     });
 
@@ -186,6 +197,15 @@ export class ControlPanel {
       this.currentTab = 'favorites';
       els.tabFavorites.classList.add('active');
       els.tabAll.classList.remove('active');
+      els.tabCustom.classList.remove('active');
+      this.filterPresets();
+    });
+
+    els.tabCustom.addEventListener('click', () => {
+      this.currentTab = 'custom';
+      els.tabCustom.classList.add('active');
+      els.tabAll.classList.remove('active');
+      els.tabFavorites.classList.remove('active');
       this.filterPresets();
     });
 
@@ -207,6 +227,14 @@ export class ControlPanel {
       if (e.target === els.unhideModal) this.closeUnhideModal();
     });
 
+    // --- Delete custom preset confirm modal ---
+    this._pendingDeleteName = null;
+    els.btnCancelDeletePreset.addEventListener('click', () => this.closeDeletePresetModal());
+    els.btnConfirmDeletePreset.addEventListener('click', () => this.confirmDeletePreset());
+    els.deletePresetModal.addEventListener('click', (e) => {
+      if (e.target === els.deletePresetModal) this.closeDeletePresetModal();
+    });
+
     // --- Favorite toggle (control bar) ---
     els.btnFavorite.addEventListener('click', () => {
       const currentPreset = engine.getCurrentPresetName();
@@ -219,6 +247,16 @@ export class ControlPanel {
     // --- Guide Modal ---
     els.btnHelp.addEventListener('click', () => this.toggleGuide());
     els.btnCloseGuide.addEventListener('click', () => this.closeGuide());
+
+    // --- Welcome / Feature Guide Modal (start screen) ---
+    els.btnWelcomeHelp.addEventListener('click', () => this.openWelcomeGuide());
+    els.btnCloseWelcome.addEventListener('click', () => this.closeWelcomeGuide());
+    els.welcomeGuide.addEventListener('click', (e) => {
+      if (e.target === els.welcomeGuide) this.closeWelcomeGuide();
+    });
+    els.welcomeGuide.querySelectorAll('.welcome-rail-btn').forEach((btn) => {
+      btn.addEventListener('click', () => this.selectWelcomeSection(btn.dataset.section));
+    });
 
     // --- Audio Tuning ---
     els.btnAudioTuning.addEventListener('click', () => this.toggleTuningPanel());
@@ -393,6 +431,45 @@ export class ControlPanel {
     this.syncHiddenPool();
     this.closeUnhideModal();
     this.showToast(`👁 Unhid ${count} preset${count === 1 ? '' : 's'}`);
+    if (this.drawerOpen) this.filterPresets();
+  }
+
+  openDeletePresetModal(name) {
+    this._pendingDeleteName = name;
+    this.els.deletePresetName.textContent = this.engine.displayName(name);
+    this.els.deletePresetModal.classList.remove('hidden');
+  }
+
+  closeDeletePresetModal() {
+    this._pendingDeleteName = null;
+    this.els.deletePresetModal.classList.add('hidden');
+  }
+
+  async confirmDeletePreset() {
+    const name = this._pendingDeleteName;
+    if (!name) return;
+    // registryKey format: custom:<id>:<displayName>
+    const id = name.slice(CUSTOM_PREFIX.length).split(':')[0];
+    const record = getCustomPreset(id);
+    const display = this.engine.displayName(name);
+
+    // Remove image blobs first so we don't orphan them if the preset delete throws
+    if (record?.images?.length) {
+      await Promise.all(record.images.map(img =>
+        img.imageId ? deleteImage(img.imageId).catch(() => { /* best-effort */ }) : null
+      ));
+    }
+    deleteCustomPreset(id);
+
+    // Drop from favorites/hidden if present
+    if (this.favorites.delete(name)) this.saveFavorites();
+    if (this.hidden.delete(name)) this.saveHidden();
+
+    this.engine.refreshCustomPresets();
+    this.syncFavoritePool();
+    this.syncHiddenPool();
+    this.closeDeletePresetModal();
+    this.showToast(`🗑 Deleted "${this.truncate(display, 40)}"`);
     if (this.drawerOpen) this.filterPresets();
   }
 
@@ -640,6 +717,33 @@ export class ControlPanel {
     this.els.keyboardGuide.classList.add('hidden');
   }
 
+  // ===================== WELCOME GUIDE (start screen) =====================
+
+  openWelcomeGuide() {
+    this.welcomeOpen = true;
+    this.els.welcomeGuide.classList.remove('hidden');
+    const firstBtn = this.els.welcomeGuide.querySelector('.welcome-rail-btn.active');
+    if (firstBtn) firstBtn.focus({ preventScroll: true });
+  }
+
+  closeWelcomeGuide() {
+    this.welcomeOpen = false;
+    this.els.welcomeGuide.classList.add('hidden');
+  }
+
+  selectWelcomeSection(name) {
+    if (!name) return;
+    const root = this.els.welcomeGuide;
+    root.querySelectorAll('.welcome-rail-btn').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.section === name);
+    });
+    root.querySelectorAll('.welcome-section').forEach((sec) => {
+      sec.classList.toggle('active', sec.dataset.section === name);
+    });
+    const content = root.querySelector('.welcome-content');
+    if (content) content.scrollTop = 0;
+  }
+
   // ===================== TUNING PANEL =====================
 
   toggleTuningPanel() {
@@ -700,20 +804,27 @@ export class ControlPanel {
     const currentName = engine.getCurrentPresetName();
     const lowerFilter = filter.toLowerCase();
 
-    // 1. Filter by Tab (All vs Favorites)
-    let filtered = this.currentTab === 'favorites'
-      ? names.filter(n => this.favorites.has(n))
-      : names;
+    // 1. Filter by Tab
+    let filtered;
+    if (this.currentTab === 'favorites') {
+      filtered = names.filter(n => this.favorites.has(n));
+    } else if (this.currentTab === 'custom') {
+      filtered = names.filter(n => n.startsWith('custom:'));
+    } else {
+      // 'all' tab — exclude custom presets (they live in My Presets tab)
+      filtered = names.filter(n => !n.startsWith('custom:'));
+    }
 
     // 2. Exclude hidden from the All tab unless Show Hidden is on.
-    //    Favorites tab is unaffected — users can still see/unhide favorites they hid.
+    //    Favorites and Custom tabs are unaffected.
     if (this.currentTab === 'all' && !this.showHidden) {
       filtered = filtered.filter(n => !this.hidden.has(n));
     }
 
-    // 3. Filter by Search Text
+    // 3. Filter by Search Text (match against display name so custom presets
+    //    are searchable by their user-given name, not the full registry key)
     filtered = filter
-      ? filtered.filter(n => n.toLowerCase().includes(lowerFilter))
+      ? filtered.filter(n => engine.displayName(n).toLowerCase().includes(lowerFilter))
       : filtered;
 
     // Count display — show "(N hidden)" when Show Hidden is on
@@ -739,7 +850,7 @@ export class ControlPanel {
 
       const nameSpan = document.createElement('span');
       nameSpan.className = 'preset-name-text';
-      nameSpan.textContent = name;
+      nameSpan.textContent = engine.displayName(name);
       li.appendChild(nameSpan);
 
       const heartSpan = document.createElement('span');
@@ -770,14 +881,27 @@ export class ControlPanel {
 
       li.appendChild(hideSpan);
 
+      // Trash icon — custom presets only
+      if (name.startsWith(CUSTOM_PREFIX)) {
+        const deleteSpan = document.createElement('span');
+        deleteSpan.className = 'preset-delete';
+        deleteSpan.setAttribute('data-tooltip', 'Delete');
+        deleteSpan.innerHTML = '<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';
+        deleteSpan.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.openDeletePresetModal(name);
+        });
+        li.appendChild(deleteSpan);
+      }
+
       if (this.favorites.has(name)) li.classList.add('is-favorite');
       if (isHidden) li.classList.add('is-hidden');
       if (name === currentName) li.classList.add('active');
 
-      li.addEventListener('click', () => {
-        engine.loadPreset(name, 2.0);
+      li.addEventListener('click', async () => {
+        await engine.loadPreset(name, 2.0);
         this.updatePresetName(name);
-        this.showToast('🎨 ' + this.truncate(name, 50));
+        this.showToast('🎨 ' + this.truncate(engine.displayName(name), 50));
 
         // Update active state
         els.presetList.querySelectorAll('li.active').forEach(el => el.classList.remove('active'));
@@ -806,7 +930,7 @@ export class ControlPanel {
   // ===================== UI HELPERS =====================
 
   updatePresetName(name) {
-    this.els.presetName.textContent = name || 'No preset loaded';
+    this.els.presetName.textContent = this.engine.displayName(name) || 'No preset loaded';
 
     const isFav = this.favorites.has(name);
     this.els.btnFavorite.classList.toggle('is-favorite', isFav);
@@ -969,7 +1093,9 @@ export class ControlPanel {
         this.toggleDrawer();
         break;
       case 'Escape':
+        if (!this.els.welcomeGuide.classList.contains('hidden')) this.closeWelcomeGuide();
         if (!this.els.unhideModal.classList.contains('hidden')) this.closeUnhideModal();
+        if (!this.els.deletePresetModal.classList.contains('hidden')) this.closeDeletePresetModal();
         if (this.drawerOpen) this.closeDrawer();
         if (this.guideOpen) this.closeGuide();
         if (this.cycleOpen) this.closeCyclePanel();

@@ -13,7 +13,7 @@
  *  All three swatches can be freely overridden after applying a palette.
  */
 
-import { createCustomPreset } from '../customPresets.js';
+import { createCustomPreset, storeImage, generateId } from '../customPresets.js';
 
 // ─── Blank start state ────────────────────────────────────────────────────────
 
@@ -39,6 +39,7 @@ const BLANK = {
     comp: BLANK_COMP,  // must be a valid GLSL shader_body string
     init_eqs_str: '', frame_eqs_str: '', pixel_eqs_str: '',
     images: [],
+    sceneMirror: 'none',  // 'none' | 'h' | 'v' | 'both'
 };
 
 // ─── Base Variations ─────────────────────────────────────────────────────────
@@ -701,6 +702,20 @@ export class EditorInspector {
                 seg.querySelectorAll('.seg').forEach(b => b.classList.toggle('active', b === btn));
             });
         });
+
+        // Scene Mirror
+        const smSeg = document.getElementById('scene-mirror-seg');
+        if (smSeg) {
+            smSeg.querySelectorAll('.seg').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    this._preSnap();
+                    this.currentState.sceneMirror = btn.dataset.smirror;
+                    this._postSnap();
+                    this._applyToEngine();
+                    smSeg.querySelectorAll('.seg').forEach(b => b.classList.toggle('active', b === btn));
+                });
+            });
+        }
     }
 
     _syncEchoOrient() {
@@ -708,7 +723,14 @@ export class EditorInspector {
         document.querySelectorAll('#echo-orient-seg .seg').forEach(btn => {
             btn.classList.toggle('active', parseInt(btn.dataset.orient) === orient);
         });
+        // Scene Mirror
+        const sm = this.currentState.sceneMirror || 'none';
+        document.querySelectorAll('#scene-mirror-seg .seg').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.smirror === sm);
+        });
     }
+
+    _applySceneMirror() { }
 
     // ─── Tab switching ─────────────────────────────────────────────────────────
 
@@ -911,10 +933,18 @@ export class EditorInspector {
         }
 
         const texName = `userimg${Date.now().toString(36)}`;
+        const imageId = generateId();
+
+        // Persist the blob so the preset survives reloads. Fire-and-forget —
+        // failure only affects cross-session loading, not the live preview.
+        storeImage(imageId, file).catch(err => {
+            console.warn('[Editor] storeImage failed:', err.message);
+        });
 
         // Full per-image control state — all values baked into GLSL on change
         const entry = {
             texName,
+            imageId,
             fileName: file.name,
             opacity: 0.80,
             opacityPulse: 0.00,  // bass drives opacity up
@@ -1267,13 +1297,8 @@ export class EditorInspector {
     // ─── Apply & sync ──────────────────────────────────────────────────────────
 
     _applyToEngine() {
-        // Always rebuild the comp shader before loading — ensures solid-color
-        // base picks up any baseVal changes (wave_r/g/b, etc.) and images stay
-        // in sync.  _buildCompShader is cheap (string concat, no GPU work).
         this._buildCompShader();
         this.engine.loadPresetObject(this.currentState, 0);
-        // Re-bind all image textures — loadPreset recompiles shaders but samplers
-        // need to be re-loaded so the new shader program can use them.
         for (const [name, texObj] of Object.entries(this._imageTextures)) {
             this.engine.setUserTexture(name, texObj);
         }
@@ -1288,29 +1313,46 @@ export class EditorInspector {
      */
     _buildCompShader() {
         const images = this.currentState.images || [];
-        if (images.length === 0 && !this._solidColor) {
+        const sm = this.currentState.sceneMirror || 'none';
+        if (images.length === 0 && !this._solidColor && sm === 'none') {
             this.currentState.comp = BLANK_COMP;
             return;
         }
         const uniforms = images
             .map(img => `uniform sampler2D sampler_${img.texName};`)
             .join('\n');
+
+        // UV fold for canvas mirror — always declare uv_m as a local alias so
+        // both sampler_main and image layer _u = uv_m - center use it.
+        // We CANNOT redeclare `uv` because the comp shader already has
+        //   vec2 uv = vUv;
+        // in main() at the same scope level.
+        let uvFold;
+        if (sm === 'h') {
+            uvFold = '  vec2 uv_m = vec2(1.0 - abs(uv.x * 2.0 - 1.0), uv.y);\n';
+        } else if (sm === 'v') {
+            uvFold = '  vec2 uv_m = vec2(uv.x, 1.0 - abs(uv.y * 2.0 - 1.0));\n';
+        } else if (sm === 'both') {
+            uvFold = '  vec2 uv_m = vec2(1.0 - abs(uv.x * 2.0 - 1.0), 1.0 - abs(uv.y * 2.0 - 1.0));\n';
+        } else {
+            uvFold = '  vec2 uv_m = uv;\n';
+        }
+        const mainSample = 'texture(sampler_main, uv_m).xyz * 2.0';
+
         let base;
         if (this._imagesOnly) {
-            base = '  vec3 col = vec3(0.0);\n';
+            base = uvFold + '  vec3 col = vec3(0.0);\n';
         } else if (this._solidColor) {
-            // Use wave_r/g/b as the solid base color so palette changes apply live.
-            // Fall back to the variation's own solid[] values if baseVals aren't set yet.
             const bv = this.currentState.baseVals;
             const r = (bv.wave_r ?? this._solidColor[0]).toFixed(4);
             const g = (bv.wave_g ?? this._solidColor[1]).toFixed(4);
             const b = (bv.wave_b ?? this._solidColor[2]).toFixed(4);
-            // Slow breathe + bass pulse so it looks alive before audio starts
-            base = `  float _breath = 0.55 + 0.45 * sin(time * 0.6);\n` +
+            base = uvFold +
+                `  float _breath = 0.55 + 0.45 * sin(time * 0.6);\n` +
                 `  float _bass_b = 1.0 + bass * 0.5;\n` +
                 `  vec3 col = vec3(${r}, ${g}, ${b}) * _breath * _bass_b;\n`;
         } else {
-            base = '  vec3 col = texture(sampler_main, uv).xyz * 2.0;\n';
+            base = uvFold + `  vec3 col = ${mainSample};\n`;
         }
         let body = base;
         for (const img of images) {
@@ -1398,11 +1440,11 @@ export class EditorInspector {
             centerLines =
                 `    vec2 _c = vec2(${cxExpr} + cos(_orbAng) * ${orb},\n` +
                 `                  ${cyExpr} + sin(_orbAng) * ${orb} / aspect.y${bncPart});\n` +
-                `    vec2 _u = uv - _c;\n`;
+                `    vec2 _u = uv_m - _c;\n`;
         } else if (hasBounce) {
-            centerLines = `    vec2 _u = uv - vec2(${cxExpr}, (${cyExpr}) - bass * ${bnc});\n`;
+            centerLines = `    vec2 _u = uv_m - vec2(${cxExpr}, (${cyExpr}) - bass * ${bnc});\n`;
         } else {
-            centerLines = `    vec2 _u = uv - vec2(${cxExpr}, ${cyExpr});\n`;
+            centerLines = `    vec2 _u = uv_m - vec2(${cxExpr}, ${cyExpr});\n`;
         }
 
         // Group spin: rotate the whole UV field around canvas center before tiling
@@ -1457,12 +1499,12 @@ export class EditorInspector {
             if (!hasMirror) return '';
             let m = '';
             if (mirror === 'h') {
-                m += `    ${varName}.x = 1.0 - abs(fract(${varName}.x * 0.5) * 2.0 - 1.0);\n`;
+                m += `    ${varName}.x = 1.0 - abs(${varName}.x * 2.0 - 1.0);\n`;
             } else if (mirror === 'v') {
-                m += `    ${varName}.y = 1.0 - abs(fract(${varName}.y * 0.5) * 2.0 - 1.0);\n`;
+                m += `    ${varName}.y = 1.0 - abs(${varName}.y * 2.0 - 1.0);\n`;
             } else if (mirror === 'quad') {
-                m += `    ${varName}.x = 1.0 - abs(fract(${varName}.x * 0.5) * 2.0 - 1.0);\n`;
-                m += `    ${varName}.y = 1.0 - abs(fract(${varName}.y * 0.5) * 2.0 - 1.0);\n`;
+                m += `    ${varName}.x = 1.0 - abs(${varName}.x * 2.0 - 1.0);\n`;
+                m += `    ${varName}.y = 1.0 - abs(${varName}.y * 2.0 - 1.0);\n`;
             } else if (mirror === 'kaleido') {
                 m += `    { vec2 _kp = ${varName} - 0.5;\n`;
                 m += `      float _kang = atan(_kp.y, _kp.x);\n`;

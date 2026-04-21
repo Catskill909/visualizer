@@ -28,6 +28,7 @@ Standalone visual preset builder at **`/editor.html`** — a separate identity f
 - **`src/customPresets.js`** — CRUD over `milkscreen_custom_presets` (localStorage) + `milkscreen_images` (IndexedDB).
 - **`src/presetRegistry.js`** — merge layer: bundled + custom under one `getAllNames()` / `getByName()` API.
 - **`src/visualizer.js`** additions: `loadPresetObject(obj, blendTime)` for live preview; `setUserTexture(name, bitmap)` for image shader binding.
+- **Canvas Mirror** *(2026-04-21)*: Scene-level UV fold in the comp shader. Uses a local `uv_m` alias instead of reassigning `uv` (which is already declared in butterchurn's `main()` scope and also typed as a read-only `in` varying — both GLSL compile errors). `_buildImageBlock()` references `uv_m` for all center-offset calculations so images fold with the scene.
 
 ### Start screen
 Frosted-glass card centred over pulsing concentric ring animation (CSS only, no JS). Two buttons: **Use Microphone** / **Load Track**. No preset picker — the Studio always starts from a clean blank slate.
@@ -40,7 +41,7 @@ Frosted-glass card centred over pulsing concentric ring animation (CSS only, no 
 | **Motion** | Zoom / Spin / Warp / Warp Speed / Echo Zoom sliders · 4-way Echo Direction segmented control · Randomize button |
 | **Wave** | 8 visual shape buttons (icon grid) · Size + Opacity sliders · Thick / Dots / Additive toggles · Randomize button |
 | **Feel** | Energy + Bass Sensitivity (engine-level, not saved in preset) · AGC toggle |
-| **Image** | Drag-drop zone · Up to 2 layer cards · treatment select (Bloom / Warp target / Echo source) per layer |
+| **Image** | Canvas Mirror segmented (None / H / V / Both) · Drag-drop zone · Up to 2 layer cards · per-layer mirror (Off / H / V / Quad / Kaleido) · treatment select per layer |
 
 ### Color system
 Wave → `wave_r/g/b`, Glow → `ob_r/g/b + ob_a`, Accent → `ib_r/g/b + ib_a`. Palette chips set Wave + Glow as a matched pair; individual swatches override freely afterwards.

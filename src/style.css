@@ -414,7 +414,8 @@ body.force-hide-ui #toast {
 .preset-name-text { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .preset-heart,
-.preset-hide {
+.preset-hide,
+.preset-delete {
   flex-shrink: 0; width: 16px; height: 16px;
   opacity: 0.35; transform: scale(0.9);
   color: var(--text-secondary);
@@ -422,14 +423,18 @@ body.force-hide-ui #toast {
 }
 .preset-heart { margin-left: 8px; }
 .preset-hide { margin-left: 6px; }
+.preset-delete { margin-left: 6px; }
 .preset-heart svg,
-.preset-hide svg { width: 100%; height: 100%; fill: currentColor; }
+.preset-hide svg,
+.preset-delete svg { width: 100%; height: 100%; fill: currentColor; }
 
 .drawer-list li:hover { background: var(--hover-subtle); color: var(--text-primary); }
 .drawer-list li:hover .preset-heart,
-.drawer-list li:hover .preset-hide { opacity: 0.85; transform: scale(1); }
+.drawer-list li:hover .preset-hide,
+.drawer-list li:hover .preset-delete { opacity: 0.85; transform: scale(1); }
 .drawer-list li:hover .preset-heart:hover { color: #ff3b3b; opacity: 1; transform: scale(1.15); }
 .drawer-list li:hover .preset-hide:hover { color: #ffb84d; opacity: 1; transform: scale(1.15); }
+.drawer-list li:hover .preset-delete:hover { color: #ff3b3b; opacity: 1; transform: scale(1.15); }
 
 .drawer-list li.is-favorite .preset-heart { opacity: 1; transform: scale(1); color: #ff3b3b; }
 .drawer-list li.is-hidden .preset-hide { opacity: 1; transform: scale(1); color: #ffb84d; }
@@ -518,6 +523,190 @@ kbd {
   color: var(--text-primary); background: var(--hover-subtle); border-color: var(--border-highlight);
 }
 
+/* WELCOME / FEATURE GUIDE MODAL */
+.welcome-help-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  margin-top: 18px; padding: 10px 20px;
+  background: transparent; border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  color: var(--text-secondary); cursor: pointer;
+  font-family: var(--font); font-size: 0.82rem; font-weight: 500;
+  letter-spacing: 0.02em;
+  transition: all var(--transition-fast);
+}
+.welcome-help-btn svg {
+  opacity: 0.7; transition: opacity var(--transition-fast);
+}
+.welcome-help-btn:hover {
+  color: var(--text-primary); border-color: var(--border-highlight);
+  background: var(--hover-subtle); transform: translateY(-1px);
+}
+.welcome-help-btn:hover svg { opacity: 1; }
+.welcome-help-btn:active { transform: translateY(0); }
+.welcome-help-btn:focus-visible {
+  outline: 2px solid var(--accent-glow); outline-offset: 2px;
+}
+
+.welcome-modal { z-index: 300; }
+
+.welcome-dialog {
+  width: 92%; max-width: 880px; max-height: 88vh;
+  display: flex; flex-direction: column;
+  background: var(--bg-glass);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-soft);
+  animation: scaleInStatic 0.2s ease;
+  overflow: hidden;
+}
+
+.welcome-header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 22px 26px; border-bottom: 1px solid var(--border-subtle);
+}
+.welcome-header h3 {
+  font-size: 1.15rem; font-weight: 500; color: var(--text-primary);
+  margin-bottom: 2px;
+}
+.welcome-subtitle {
+  font-size: 0.78rem; color: var(--text-muted); font-weight: 300;
+}
+
+.welcome-body {
+  display: grid; grid-template-columns: 200px 1fr;
+  flex: 1; min-height: 0;
+}
+
+.welcome-rail {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 16px 12px; border-right: 1px solid var(--border-subtle);
+  background: rgba(255,255,255,0.015);
+  overflow-y: auto;
+}
+.welcome-rail-btn {
+  text-align: left; padding: 10px 14px; font-size: 0.85rem; font-weight: 400;
+  background: transparent; border: none; border-radius: var(--radius-sm);
+  color: var(--text-secondary); cursor: pointer;
+  font-family: var(--font);
+  transition: all var(--transition-fast);
+}
+.welcome-rail-btn:hover {
+  background: var(--hover-subtle); color: var(--text-primary);
+}
+.welcome-rail-btn.active {
+  background: var(--hover-medium); color: var(--text-primary);
+  font-weight: 500;
+}
+.welcome-rail-btn:focus-visible {
+  outline: 2px solid var(--accent-glow); outline-offset: -2px;
+}
+
+.welcome-content {
+  padding: 26px 32px; overflow-y: auto;
+  scrollbar-width: thin; scrollbar-color: var(--border-highlight) transparent;
+}
+.welcome-content::-webkit-scrollbar { width: 8px; }
+.welcome-content::-webkit-scrollbar-track { background: transparent; }
+.welcome-content::-webkit-scrollbar-thumb {
+  background: var(--border-highlight); border-radius: 4px;
+}
+
+.welcome-section { display: none; animation: welcomeFadeIn 0.2s ease; }
+.welcome-section.active { display: block; }
+
+.welcome-section h4 {
+  font-size: 1.15rem; font-weight: 500; color: var(--text-primary);
+  margin-bottom: 12px; letter-spacing: -0.01em;
+}
+.welcome-section h5 {
+  font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--text-muted); font-weight: 600;
+  margin-top: 18px; margin-bottom: 10px;
+}
+.welcome-section h5:first-child { margin-top: 0; }
+.welcome-section p {
+  font-size: 0.88rem; line-height: 1.6; color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+.welcome-section strong { color: var(--text-primary); font-weight: 500; }
+.welcome-section em { font-style: italic; color: var(--text-primary); }
+
+.welcome-list {
+  list-style: none; padding: 0; margin: 0 0 14px;
+}
+.welcome-list li {
+  position: relative; padding: 6px 0 6px 18px;
+  font-size: 0.87rem; line-height: 1.55; color: var(--text-secondary);
+  border-bottom: 1px solid var(--hover-subtle);
+}
+.welcome-list li:last-child { border-bottom: none; }
+.welcome-list li::before {
+  content: ''; position: absolute; left: 4px; top: 14px;
+  width: 4px; height: 4px; border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.welcome-feature {
+  padding: 14px 0; border-bottom: 1px solid var(--hover-subtle);
+}
+.welcome-feature:last-child { border-bottom: none; padding-bottom: 4px; }
+.welcome-feature-title {
+  font-size: 0.82rem; font-weight: 600; color: var(--text-primary);
+  margin-bottom: 8px; letter-spacing: 0.01em;
+}
+.welcome-feature p { margin-bottom: 8px; }
+.welcome-feature p:last-child { margin-bottom: 0; }
+
+.welcome-hint {
+  font-size: 0.8rem; color: var(--text-muted);
+  font-style: italic; padding: 8px 12px;
+  background: var(--hover-subtle); border-left: 2px solid var(--border-highlight);
+  border-radius: var(--radius-sm);
+}
+.welcome-note {
+  margin-top: 16px; font-size: 0.8rem; color: var(--text-muted);
+  font-style: italic;
+}
+
+.welcome-swatch {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  font-size: 0.72rem; margin: 0 2px; vertical-align: -3px;
+  background: var(--bg-elevated); border: 1px solid var(--border-subtle);
+}
+.welcome-swatch--heart { color: #ff3b3b; }
+.welcome-swatch--hide { color: #ffb84d; }
+
+.welcome-shortcuts {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px 28px;
+}
+.welcome-shortcut-col .guide-row {
+  font-size: 0.82rem;
+}
+
+@keyframes scaleInStatic {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes welcomeFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Responsive — collapse rail on narrow viewports */
+@media (max-width: 640px) {
+  .welcome-dialog { max-height: 92vh; }
+  .welcome-body { grid-template-columns: 1fr; }
+  .welcome-rail {
+    flex-direction: row; border-right: none; border-bottom: 1px solid var(--border-subtle);
+    padding: 10px; overflow-x: auto; gap: 4px;
+  }
+  .welcome-rail-btn {
+    flex-shrink: 0; padding: 8px 12px; font-size: 0.8rem;
+  }
+  .welcome-content { padding: 20px 20px; }
+  .welcome-shortcuts { grid-template-columns: 1fr; gap: 4px; }
+}
+
 /* TOAST */
 #toast {
   position: fixed; top: 24px; left: 50%; transform: translateX(-50%) translateY(-10px); z-index: 200;
@@ -586,7 +775,8 @@ kbd {
 /* Preset-row icon tooltips — position to the LEFT of the icon so they
    escape the drawer's overflow clipping, and fire near-instantly. */
 .preset-heart[data-tooltip]::after,
-.preset-hide[data-tooltip]::after {
+.preset-hide[data-tooltip]::after,
+.preset-delete[data-tooltip]::after {
   bottom: auto;
   top: 50%;
   left: auto;
@@ -597,7 +787,8 @@ kbd {
   padding: 4px 8px;
 }
 .preset-heart[data-tooltip]:hover::after,
-.preset-hide[data-tooltip]:hover::after {
+.preset-hide[data-tooltip]:hover::after,
+.preset-delete[data-tooltip]:hover::after {
   opacity: 1;
   visibility: visible;
   transform: translateY(-50%) translateX(0);

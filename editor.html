@@ -106,14 +106,14 @@
                 <nav class="tab-bar" role="tablist" aria-label="Editor sections">
                     <button class="tab active" data-tab="palette" role="tab" aria-selected="true"
                         aria-controls="tab-palette">Palette</button>
+                    <button class="tab" data-tab="image" role="tab" aria-selected="false"
+                        aria-controls="tab-image">Image</button>
                     <button class="tab" data-tab="motion" role="tab" aria-selected="false"
                         aria-controls="tab-motion">Motion</button>
                     <button class="tab" data-tab="wave" role="tab" aria-selected="false"
                         aria-controls="tab-wave">Wave</button>
                     <button class="tab" data-tab="feel" role="tab" aria-selected="false"
                         aria-controls="tab-feel">Feel</button>
-                    <button class="tab" data-tab="image" role="tab" aria-selected="false"
-                        aria-controls="tab-image">Image</button>
                 </nav>
 
                 <!-- ─── PALETTE TAB ─── -->
@@ -272,7 +272,18 @@
                 <!-- ─── IMAGE TAB ─── -->
                 <div id="tab-image" class="tab-panel" role="tabpanel" hidden>
                     <div class="tab-scroll">
-                        <div class="images-header">
+
+                        <p class="section-label">Canvas Mirror</p>
+                        <p class="section-note" style="margin-bottom:8px">Splits the scene in half — one side reflects
+                            the other.</p>
+                        <div class="seg-control" id="scene-mirror-seg" role="group" aria-label="Canvas mirror">
+                            <button class="seg active" data-smirror="none">Off</button>
+                            <button class="seg" data-smirror="h">↔ H</button>
+                            <button class="seg" data-smirror="v">↕ V</button>
+                            <button class="seg" data-smirror="both">↔↕ Both</button>
+                        </div>
+
+                        <div class="images-header" style="margin-top:16px">
                             <p class="section-label" style="margin:0">Image Layers</p>
                             <label class="images-only-row"
                                 title="Hide the base visualizer — show only uploaded images over black">

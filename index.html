@@ -60,6 +60,15 @@
       </div>
 
       <p class="start-hint">Requires WebGL 2 • Works best in Chrome or Firefox</p>
+
+      <button id="btn-welcome-help" class="welcome-help-btn" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+          <line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+        <span>User Guide</span>
+      </button>
     </div>
   </div>
 
@@ -282,6 +291,7 @@
     <div class="drawer-tabs">
       <button id="tab-all" class="drawer-tab active" type="button">All Presets</button>
       <button id="tab-favorites" class="drawer-tab" type="button">Favorites</button>
+      <button id="tab-custom" class="drawer-tab" type="button">My Presets</button>
     </div>
     <div class="drawer-count">
       <span><span id="preset-count">0</span> presets</span>
@@ -309,6 +319,18 @@
       <div class="modal-actions">
         <button id="btn-cancel-unhide" class="text-btn" type="button">Cancel</button>
         <button id="btn-confirm-unhide" class="primary-btn" type="button">Unhide</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============== DELETE PRESET CONFIRM MODAL ============== -->
+  <div id="delete-preset-modal" class="modal hidden">
+    <div class="modal-dialog">
+      <h3>Delete preset?</h3>
+      <p>"<span id="delete-preset-name"></span>" will be permanently removed, along with any images it references. This can't be undone.</p>
+      <div class="modal-actions">
+        <button id="btn-cancel-delete-preset" class="text-btn" type="button">Cancel</button>
+        <button id="btn-confirm-delete-preset" class="primary-btn" type="button">Delete</button>
       </div>
     </div>
   </div>
@@ -379,6 +401,236 @@
           <div class="guide-row"><kbd>?</kbd> / <kbd>/</kbd> <span>Toggle This Guide</span></div>
           <div class="guide-row"><kbd>F</kbd> <span>Fullscreen</span></div>
           <div class="guide-row"><kbd>Esc</kbd> <span>Close Drawers/Menus</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============== WELCOME / FEATURE GUIDE MODAL ============== -->
+  <div id="welcome-guide" class="modal welcome-modal hidden">
+    <div class="welcome-dialog">
+      <div class="welcome-header">
+        <div>
+          <h3>MilkScreen Guide</h3>
+          <p class="welcome-subtitle">Everything you can do with the app</p>
+        </div>
+        <button id="btn-close-welcome" class="ctrl-btn" type="button" data-tooltip="Close (Esc)">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="welcome-body">
+        <nav class="welcome-rail" role="tablist" aria-label="Guide sections">
+          <button class="welcome-rail-btn active" type="button" role="tab" data-section="welcome">Welcome</button>
+          <button class="welcome-rail-btn" type="button" role="tab" data-section="sources">Audio Sources</button>
+          <button class="welcome-rail-btn" type="button" role="tab" data-section="presets">Browsing Presets</button>
+          <button class="welcome-rail-btn" type="button" role="tab" data-section="cycling">Auto-Cycling</button>
+          <button class="welcome-rail-btn" type="button" role="tab" data-section="performance">Live Performance</button>
+          <button class="welcome-rail-btn" type="button" role="tab" data-section="studio">Preset Studio</button>
+          <button class="welcome-rail-btn" type="button" role="tab" data-section="shortcuts">Shortcuts</button>
+          <button class="welcome-rail-btn" type="button" role="tab" data-section="tips">Tips</button>
+        </nav>
+
+        <div class="welcome-content">
+          <!-- Welcome -->
+          <section class="welcome-section active" data-section="welcome" role="tabpanel">
+            <h4>Welcome to MilkScreen</h4>
+            <p>A modern browser-based music visualizer powered by the Winamp MilkDrop engine (Butterchurn / WebGL). Turn any audio source into a full-screen reactive light show.</p>
+            <ul class="welcome-list">
+              <li><strong>1,144 bundled presets</strong> — from subtle ambient washes to peak-hour chaos.</li>
+              <li><strong>Live performance suite</strong> — Auto-Gain, Kick-Lock, Energy slider, and instant "Hype Keys" for DJs and VJs.</li>
+              <li><strong>Build your own visuals</strong> — the Preset Studio lets you design reactive presets from scratch, no code.</li>
+            </ul>
+            <p class="welcome-note">Pick a section on the left to dive deeper, or press a button on the start screen to jump in.</p>
+          </section>
+
+          <!-- Audio Sources -->
+          <section class="welcome-section" data-section="sources" role="tabpanel">
+            <h4>Audio Sources</h4>
+            <p>Three ways to feed the visualizer:</p>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Live Audio</div>
+              <p>Uses your microphone, line-in, or any connected USB device (DJ controllers, audio interfaces). When you pick Live Audio, a device selector appears so you can choose the exact input.</p>
+              <p class="welcome-hint">Requires <strong>localhost</strong> or <strong>HTTPS</strong> and microphone permission in your browser.</p>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Audio File</div>
+              <p>Load a local <strong>MP3, WAV, or FLAC</strong>. You get a transport bar with play/pause, seek, and volume. File audio is split two ways: one path to your speakers, one to the visualizer (with a 5× sensitivity boost to make visuals pop).</p>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Preset Studio</div>
+              <p>Skip the visualizer entirely and go straight into the creative editor to design your own presets from scratch. See the <em>Preset Studio</em> section for details.</p>
+            </div>
+          </section>
+
+          <!-- Browsing Presets -->
+          <section class="welcome-section" data-section="presets" role="tabpanel">
+            <h4>Browsing the Preset Library</h4>
+            <p>Open the drawer with the list icon in the bottom bar or press <kbd>P</kbd>. Everything about the library lives here.</p>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Search &amp; Tabs</div>
+              <p>Type in the search box to filter by name. Three tabs across the top:</p>
+              <ul class="welcome-list">
+                <li><strong>All Presets</strong> — the full 1,144-preset library.</li>
+                <li><strong>Favorites</strong> — just the ones you've hearted.</li>
+                <li><strong>My Presets</strong> — anything you built in the Preset Studio.</li>
+              </ul>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Favorites &amp; Hiding</div>
+              <p>Hover a row in the drawer to reveal two icons: a <span class="welcome-swatch welcome-swatch--heart">♥</span> heart (favorite) and a <span class="welcome-swatch welcome-swatch--hide">⊘</span> eye-slash (hide). On the currently-playing preset, press <kbd>S</kbd> to favorite or <kbd>X</kbd> to hide.</p>
+              <p>Hidden presets disappear from the All tab, random picks, and auto-cycle. Toggle <em>Show hidden</em> at the top of the drawer to bring them back — individually, or via <em>Unhide all</em>.</p>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Navigating</div>
+              <p><kbd>←</kbd> / <kbd>→</kbd> step through the full library. Arrow keys always navigate the complete library, even when favorites-only cycling is on — so you can always explore.</p>
+            </div>
+          </section>
+
+          <!-- Auto-Cycling -->
+          <section class="welcome-section" data-section="cycling" role="tabpanel">
+            <h4>Auto-Cycling</h4>
+            <p>Let the app rotate through presets automatically. Click the cycle icon in the control bar (or press <kbd>C</kbd>) to open the Cycling popover.</p>
+
+            <ul class="welcome-list">
+              <li><strong>Auto-cycle</strong> — on/off. Default interval is 30s.</li>
+              <li><strong>Random order</strong> — shuffle vs. sequential.</li>
+              <li><strong>Favorites only</strong> — restrict the cycle pool to your hearted presets. Perfect for live sets — curate once, cycle through the night.</li>
+              <li><strong>Blend time</strong> — how long transitions take.</li>
+            </ul>
+            <p class="welcome-hint">If <em>Favorites only</em> is on but you haven't saved any, the cycle silently falls back to the full library so you're never stuck on a blank screen.</p>
+          </section>
+
+          <!-- Live Performance -->
+          <section class="welcome-section" data-section="performance" role="tabpanel">
+            <h4>Live Performance Tools</h4>
+            <p>Designed for DJs and VJs — quick access to everything you need mid-set.</p>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Audio Tuning (press <kbd>T</kbd>)</div>
+              <ul class="welcome-list">
+                <li><strong>Energy slider</strong> — master visual sensitivity, 0.2× to 5×.</li>
+                <li><strong>Auto-Gain (AGC)</strong> — dynamic normalization so visuals stay "hype" regardless of input volume. <kbd>A</kbd> toggles it. On by default.</li>
+                <li><strong>Kick-Lock</strong> — low-pass filter at 150 Hz locks visuals to the kick drum only. <kbd>K</kbd> toggles it.</li>
+                <li><strong>Hold Shift</strong> — momentary 2× boost for drops. Silent — doesn't reveal the UI.</li>
+              </ul>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Hype Keys</div>
+              <p>Instant visual accents, beat-synced by hand:</p>
+              <ul class="welcome-list">
+                <li><kbd>V</kbd> — <strong>Strobe</strong> (white flash)</li>
+                <li><kbd>B</kbd> — <strong>Blackout</strong> (cut to black)</li>
+                <li><kbd>I</kbd> — <strong>Invert colors</strong></li>
+                <li><kbd>H</kbd> — <strong>Hide UI</strong> instantly (for clean projector feeds)</li>
+              </ul>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Auto-hiding control bar</div>
+              <p>The bottom bar fades after 3 seconds of inactivity but stays visible while you hover or while a popover is open. Move the mouse to bring it back.</p>
+            </div>
+          </section>
+
+          <!-- Preset Studio -->
+          <section class="welcome-section" data-section="studio" role="tabpanel">
+            <h4>Preset Studio</h4>
+            <p>A standalone creative editor for building your own audio-reactive visuals. Launch it from the start screen — it opens on its own page with a live butterchurn canvas on the left and an inspector panel on the right. Every control is live; no page reload.</p>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Five tabs</div>
+              <ul class="welcome-list">
+                <li><strong>Palette</strong> — 9 base variations (Color, Clear, Drift, Pulse, Storm, Ripple, Radiate, Scatter, Bloom), 12 color palettes, and three independent color swatches (Wave / Glow / Accent).</li>
+                <li><strong>Motion</strong> — Zoom, Rotation, Warp amount &amp; speed, Echo controls.</li>
+                <li><strong>Wave</strong> — 8 wave shapes, size, opacity, thickness, dots, additive blend.</li>
+                <li><strong>Feel</strong> — Decay (trail length), Gamma (brightness), warp scale/speed.</li>
+                <li><strong>Image</strong> — drop up to 2 images and animate them with tile, spin, orbit, tunnel, sway, wander, mirror, hue-spin, and more.</li>
+              </ul>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Workflow</div>
+              <ul class="welcome-list">
+                <li><strong>Undo / Redo</strong> — 50-deep stack. <kbd>⌘Z</kbd> / <kbd>⌘⇧Z</kbd>.</li>
+                <li><strong>A/B compare</strong> — hold the button to preview the original state; release to restore.</li>
+                <li><strong>Save</strong> — writes to your browser (localStorage + IndexedDB for images). Saved presets show up in the <em>My Presets</em> tab of the main app.</li>
+              </ul>
+            </div>
+          </section>
+
+          <!-- Keyboard Shortcuts -->
+          <section class="welcome-section" data-section="shortcuts" role="tabpanel">
+            <h4>Keyboard Shortcuts</h4>
+            <div class="welcome-shortcuts">
+              <div class="welcome-shortcut-col">
+                <h5>Performance</h5>
+                <div class="guide-row"><kbd>V</kbd><span>Strobe flash</span></div>
+                <div class="guide-row"><kbd>B</kbd><span>Blackout</span></div>
+                <div class="guide-row"><kbd>I</kbd><span>Invert colors</span></div>
+                <div class="guide-row"><kbd>H</kbd><span>Hide UI instantly</span></div>
+                <div class="guide-row"><kbd>Shift</kbd><span>Hold for Energy boost</span></div>
+
+                <h5>Audio</h5>
+                <div class="guide-row"><kbd>A</kbd><span>Toggle Auto-Gain</span></div>
+                <div class="guide-row"><kbd>K</kbd><span>Toggle Kick-Lock</span></div>
+                <div class="guide-row"><kbd>T</kbd><span>Open tuning panel</span></div>
+                <div class="guide-row"><kbd>Space</kbd><span>Play / pause (file mode)</span></div>
+              </div>
+              <div class="welcome-shortcut-col">
+                <h5>Navigation</h5>
+                <div class="guide-row"><kbd>←</kbd> / <kbd>→</kbd><span>Previous / next preset</span></div>
+                <div class="guide-row"><kbd>R</kbd><span>Toggle auto-cycle</span></div>
+                <div class="guide-row"><kbd>C</kbd><span>Open cycle settings</span></div>
+                <div class="guide-row"><kbd>P</kbd><span>Open presets drawer</span></div>
+                <div class="guide-row"><kbd>S</kbd><span>Toggle favorite</span></div>
+                <div class="guide-row"><kbd>X</kbd><span>Hide current preset</span></div>
+
+                <h5>View</h5>
+                <div class="guide-row"><kbd>F</kbd><span>Fullscreen</span></div>
+                <div class="guide-row"><kbd>?</kbd> / <kbd>/</kbd><span>Keyboard guide</span></div>
+                <div class="guide-row"><kbd>Esc</kbd><span>Close drawers &amp; menus</span></div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Tips -->
+          <section class="welcome-section" data-section="tips" role="tabpanel">
+            <h4>Tips &amp; Troubleshooting</h4>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Browser support</div>
+              <p>MilkScreen needs <strong>WebGL 2</strong> and the <strong>Web Audio API</strong>. Works best in <strong>Chrome</strong> or <strong>Firefox</strong>. Safari works but some presets may render differently.</p>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Microphone access</div>
+              <p>Browsers only allow mic access on <strong>localhost</strong> or <strong>HTTPS</strong>. If the mic button fails, check the address bar for a blocked-permission icon and re-allow.</p>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Your data stays local</div>
+              <p>Favorites, hidden presets, and saved custom presets are all stored in your browser's localStorage (and IndexedDB for images). Nothing is uploaded — clearing site data resets everything.</p>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Performance</div>
+              <p>For the smoothest visuals on older machines, use <kbd>F</kbd> for fullscreen, close other tabs running video or WebGL, and prefer <em>file</em> input over <em>live</em> (less processing overhead).</p>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Projector / VJ setup</div>
+              <p>Press <kbd>H</kbd> to hide the UI completely for a clean feed, then <kbd>F</kbd> for fullscreen. Move the mouse to bring controls back.</p>
+            </div>
+          </section>
         </div>
       </div>
     </div>

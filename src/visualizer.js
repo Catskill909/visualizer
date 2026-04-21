@@ -7,7 +7,7 @@ import butterchurnPresetsImport from 'butterchurn-presets';
 import butterchurnPresetsExtra from 'butterchurn-presets/lib/butterchurnPresetsExtra.min.js';
 import butterchurnPresetsExtra2 from 'butterchurn-presets/lib/butterchurnPresetsExtra2.min.js';
 import butterchurnPresetsMD1 from 'butterchurn-presets/lib/butterchurnPresetsMD1.min.js';
-import { loadAllCustomPresets, CUSTOM_PREFIX, registryKey } from './customPresets.js';
+import { loadAllCustomPresets, CUSTOM_PREFIX, registryKey, getImage } from './customPresets.js';
 
 // Baron pack: bypass the package's runtime `await import()` loop (which would cause
 // 762 sequential network requests). Vite inlines every JSON into a single static chunk.
@@ -257,11 +257,33 @@ export class VisualizerEngine {
     this.currentSourceType = null;
   }
 
-  loadPreset(name, blendTime = 2.0) {
+  async loadPreset(name, blendTime = 2.0) {
     const preset = this.presets[name];
     if (!preset) return false;
-    this.visualizer.loadPreset(preset, blendTime);
+
+    // Optimistic index update so getCurrentPresetName() is correct immediately
+    // even while the async image-bind is in flight.
     this.currentPresetIndex = this.presetNames.indexOf(name);
+
+    // For custom presets: pre-bind images from IndexedDB BEFORE telling
+    // butterchurn to load the preset so the first rendered frame already
+    // has the correct textures (avoids the clouds2 fallback flash).
+    // Use blendTime=0 for instant switch — 2-second cross-fade is too slow
+    // and makes the preset appear to do nothing.
+    if (name.startsWith(CUSTOM_PREFIX)) {
+      await this._bindCustomPresetImages(preset);
+      // Near-zero (not 0) — butterchurn's blendProgress = elapsed / blendDuration
+      // produces NaN/Infinity at 0, which keeps it stuck in permanent-blend state
+      // and the new preset never actually takes over.
+      blendTime = 0.001;
+    }
+
+    try {
+      this.visualizer.loadPreset(JSON.parse(JSON.stringify(preset)), blendTime);
+    } catch (e) {
+      console.warn('[MilkScreen] loadPreset failed:', e.message, e);
+      return false;
+    }
     return true;
   }
 
@@ -319,28 +341,46 @@ export class VisualizerEngine {
 
   getPresetNames() { return this.presetNames; }
 
-  /**
-   * Re-read custom presets from localStorage and merge them into this.presets
-   * and this.presetNames. Safe to call any time — bundled presets are untouched.
-   * Call this whenever the preset drawer opens so freshly saved editor presets appear.
-   */
-  refreshCustomPresets() {
-    // Remove any previously-registered custom keys
-    for (const name of this.presetNames) {
-      if (name.startsWith(CUSTOM_PREFIX)) delete this.presets[name];
+  /** Strip the `custom:<id>:` prefix from a registry key for display. */
+  displayName(name) {
+    if (name && name.startsWith(CUSTOM_PREFIX)) {
+      const parts = name.split(':');
+      return parts.slice(2).join(':');
     }
-    // Re-register from localStorage
-    const stored = loadAllCustomPresets();
-    for (const [, preset] of Object.entries(stored)) {
-      const key = registryKey(preset);
-      this.presets[key] = preset;
+    return name;
+  }
+
+  /** Async: fetch image blobs from IndexedDB and bind them as user textures. */
+  async _bindCustomPresetImages(presetRecord) {
+    const images = presetRecord.images || [];
+    if (images.length === 0) return;
+    for (const img of images) {
+      if (!img.imageId || !img.texName) continue;
+      try {
+        const blob = await getImage(img.imageId);
+        if (!blob) {
+          console.warn('[MilkScreen] Image not found in IndexedDB:', img.imageId, '(texName:', img.texName + ')');
+          continue;
+        }
+        // Convert blob → data URL → Image to get natural dimensions
+        const dataURL = await new Promise((res, rej) => {
+          const reader = new FileReader();
+          reader.onload = (e) => res(e.target.result);
+          reader.onerror = rej;
+          reader.readAsDataURL(blob);
+        });
+        const imgEl = await new Promise((res, rej) => {
+          const el = new Image();
+          el.onload = () => res(el);
+          el.onerror = rej;
+          el.src = dataURL;
+        });
+        this.setUserTexture(img.texName, { data: dataURL, width: imgEl.naturalWidth, height: imgEl.naturalHeight });
+        console.log('[MilkScreen] Image bound:', img.texName, imgEl.naturalWidth + 'x' + imgEl.naturalHeight);
+      } catch (e) {
+        console.warn('[MilkScreen] Failed to bind image for', img.texName, e.message);
+      }
     }
-    // Rebuild sorted name list: bundled (no prefix) then custom
-    const bundled = this.presetNames.filter(n => !n.startsWith(CUSTOM_PREFIX));
-    const custom = Object.keys(this.presets)
-      .filter(n => n.startsWith(CUSTOM_PREFIX))
-      .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-    this.presetNames = [...bundled, ...custom];
   }
 
   /**
@@ -357,6 +397,13 @@ export class VisualizerEngine {
     const stored = loadAllCustomPresets();
     for (const [, preset] of Object.entries(stored)) {
       const key = registryKey(preset);
+      // Migration: old presets used init_eqs/frame_eqs/pixel_eqs; butterchurn
+      // requires the _str variants. Patch on load so existing saves still work.
+      if (!('init_eqs_str' in preset)) {
+        preset.init_eqs_str = preset.init_eqs || '';
+        preset.frame_eqs_str = preset.frame_eqs || '';
+        preset.pixel_eqs_str = preset.pixel_eqs || '';
+      }
       this.presets[key] = preset;
     }
     // Rebuild sorted name list: bundled (no prefix) then custom
