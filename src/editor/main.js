@@ -16,6 +16,16 @@ const btnMic = document.getElementById('start-mic');
 const btnFile = document.getElementById('start-file');
 const fileInput = document.getElementById('start-file-input');
 
+// Mini player refs
+const miniPlayer = document.getElementById('mini-player');
+const mpFilename = document.getElementById('mp-filename');
+const mpTime = document.getElementById('mp-time');
+const mpPlay = document.getElementById('mp-play');
+const mpIconPlay = document.getElementById('mp-icon-play');
+const mpIconPause = document.getElementById('mp-icon-pause');
+const mpSeek = document.getElementById('mp-seek');
+const mpVol = document.getElementById('mp-vol');
+
 // ─── Engine ───────────────────────────────────────────────────────────────────
 
 let engine = null;
@@ -26,6 +36,55 @@ function sizeCanvas() {
     const panelW = 340;
     const w = Math.max(120, window.innerWidth - panelW);
     engine.setSize(w, window.innerHeight);
+}
+
+// ─── Mini player wiring ───────────────────────────────────────────────────────
+
+function fmt(s) {
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60).toString().padStart(2, '0');
+    return `${m}:${sec}`;
+}
+
+function mountMiniPlayer(audio, filename) {
+    mpFilename.textContent = filename.length > 32 ? filename.slice(0, 30) + '…' : filename;
+    miniPlayer.hidden = false;
+
+    const updateUI = () => {
+        const cur = audio.currentTime;
+        const dur = audio.duration || 0;
+        mpTime.textContent = `${fmt(cur)} / ${fmt(dur)}`;
+        const pct = dur > 0 ? (cur / dur) * 100 : 0;
+        mpSeek.value = dur > 0 ? cur / dur : 0;
+        mpSeek.style.setProperty('--pct', `${pct.toFixed(1)}%`);
+        mpIconPlay.hidden = !audio.paused;
+        mpIconPause.hidden = audio.paused;
+    };
+
+    audio.addEventListener('timeupdate', updateUI);
+    audio.addEventListener('play', updateUI);
+    audio.addEventListener('pause', updateUI);
+    audio.addEventListener('durationchange', updateUI);
+
+    mpPlay.addEventListener('click', () => {
+        if (audio.paused) audio.play(); else audio.pause();
+    });
+
+    let seeking = false;
+    mpSeek.addEventListener('mousedown', () => { seeking = true; });
+    mpSeek.addEventListener('input', () => {
+        const pct = parseFloat(mpSeek.value);
+        mpSeek.style.setProperty('--pct', `${(pct * 100).toFixed(1)}%`);
+        if (audio.duration) audio.currentTime = pct * audio.duration;
+    });
+    mpSeek.addEventListener('mouseup', () => { seeking = false; });
+
+    mpVol.addEventListener('input', () => {
+        audio.volume = parseFloat(mpVol.value);
+        mpVol.style.setProperty('--pct', `${(audio.volume * 100).toFixed(1)}%`);
+    });
+
+    updateUI();
 }
 
 async function boot(connectAudioFn) {
@@ -82,6 +141,7 @@ fileInput.addEventListener('change', () => {
     boot(async (eng) => {
         const audio = await eng.connectAudioFile(file);
         audio.play();
+        mountMiniPlayer(audio, file.name);
         showToast('Playing: ' + file.name);
     });
 });

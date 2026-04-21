@@ -918,11 +918,23 @@ export class EditorInspector {
             fileName: file.name,
             opacity: 0.80,
             opacityPulse: 0.00,  // bass drives opacity up
-            size: 1.00,
+            size: 0.25,
             spinSpeed: 0.00,
             orbitRadius: 0.00,  // orbit around screen center at 0.5 rad/s
             bounceAmp: 0.00,  // bass Y-displacement (up on beat)
             tunnelSpeed: 0.00,  // seamless zoom-through all tiles (+ = toward, - = away)
+            spacing: 0.00,      // gap between tiles (0 = none, 0.8 = mostly gap)
+            cx: 0.50,           // anchor point X (0=left, 1=right)
+            cy: 0.50,           // anchor point Y (0=top, 1=bottom)
+            swayAmt: 0.00,      // sinusoidal X oscillation amplitude
+            swaySpeed: 1.00,    // sway cycles per second
+            wanderAmt: 0.00,    // organic random drift amplitude
+            wanderSpeed: 0.50,  // wander drift rate
+            mirror: 'none',     // 'none' | 'h' | 'v' | 'quad' | 'kaleido'
+            tintR: 1.00,        // tint color red (1=white = no tint)
+            tintG: 1.00,
+            tintB: 1.00,
+            hueSpinSpeed: 0.00, // tint hue rotation speed (cycles/sec)
             tile: true,
             blendMode: 'overlay',
             audioPulse: 0.00,  // bass drives size
@@ -978,9 +990,15 @@ export class EditorInspector {
             </div>
             <div class="layer-slider-row">
               <span class="layer-ctrl-label">Size</span>
-              <input type="range" class="slider" min="0.1" max="4" step="0.05"
-                value="${entry.size}" style="--pct:${pct(entry.size, 0.1, 4)}">
+              <input type="range" class="slider" min="0.05" max="1.5" step="0.01"
+                value="${entry.size}" style="--pct:${pct(entry.size, 0.05, 1.5)}">
               <span class="lsv">${entry.size.toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label">Spacing</span>
+              <input type="range" class="slider" min="0" max="0.8" step="0.01"
+                value="${entry.spacing}" style="--pct:${pct(entry.spacing, 0, 0.8)}">
+              <span class="lsv">${entry.spacing.toFixed(2)}</span>
             </div>
             <div class="layer-row-inline">
               <span class="layer-ctrl-label">Pulse</span>
@@ -1022,6 +1040,65 @@ export class EditorInspector {
                 value="${entry.tunnelSpeed}" style="--pct:${pct(entry.tunnelSpeed, -2, 2)}">
               <span class="lsv">${entry.tunnelSpeed.toFixed(2)}</span>
             </div>
+            <div class="layer-center-row">
+              <span class="layer-ctrl-label" style="margin-bottom:5px">Center</span>
+              <div class="xy-pad-wrap">
+                <canvas class="xy-pad" width="96" height="96" title="Drag to set anchor point"></canvas>
+                <button class="xy-reset" title="Reset to center">↺</button>
+              </div>
+            </div>
+            <div class="layer-section-divider"></div>
+            <p class="layer-section-label">Sway</p>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label">Amount</span>
+              <input type="range" class="slider" min="0" max="0.4" step="0.01"
+                value="${entry.swayAmt}" style="--pct:${pct(entry.swayAmt, 0, 0.4)}">
+              <span class="lsv">${entry.swayAmt.toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label">Speed</span>
+              <input type="range" class="slider" min="0" max="4" step="0.05"
+                value="${entry.swaySpeed}" style="--pct:${pct(entry.swaySpeed, 0, 4)}">
+              <span class="lsv">${entry.swaySpeed.toFixed(2)}</span>
+            </div>
+            <div class="layer-section-divider"></div>
+            <p class="layer-section-label">Wander</p>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label">Amount</span>
+              <input type="range" class="slider" min="0" max="0.4" step="0.01"
+                value="${entry.wanderAmt}" style="--pct:${pct(entry.wanderAmt, 0, 0.4)}">
+              <span class="lsv">${entry.wanderAmt.toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label">Speed</span>
+              <input type="range" class="slider" min="0" max="2" step="0.02"
+                value="${entry.wanderSpeed}" style="--pct:${pct(entry.wanderSpeed, 0, 2)}">
+              <span class="lsv">${entry.wanderSpeed.toFixed(2)}</span>
+            </div>
+            <div class="layer-section-divider"></div>
+            <p class="layer-section-label">Mirror</p>
+            <div class="layer-mirror-seg" role="group">
+              <button class="lseg active" data-mirror="none">Off</button>
+              <button class="lseg" data-mirror="h">↔ H</button>
+              <button class="lseg" data-mirror="v">↕ V</button>
+              <button class="lseg" data-mirror="quad">⊞ Quad</button>
+              <button class="lseg" data-mirror="kaleido">✦ Kaleido</button>
+            </div>
+            <div class="layer-section-divider"></div>
+            <p class="layer-section-label">Tint</p>
+            <div class="layer-row-inline" style="gap:8px;margin-bottom:6px">
+              <span class="layer-ctrl-label">Color</span>
+              <div class="layer-tint-wrap">
+                <span class="layer-tint-swatch" style="background:#ffffff"></span>
+                <input type="color" class="layer-tint-picker" value="#ffffff" tabindex="-1" aria-hidden="true" />
+              </div>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label">Hue Spin</span>
+              <input type="range" class="slider" min="0" max="2" step="0.02"
+                value="${entry.hueSpinSpeed}" style="--pct:${pct(entry.hueSpinSpeed, 0, 2)}">
+              <span class="lsv">${entry.hueSpinSpeed.toFixed(2)}</span>
+            </div>
           </div>
         `;
 
@@ -1061,11 +1138,13 @@ export class EditorInspector {
             refresh();
         });
 
-        // Remaining slider rows: opacity, opacityPulse, size, orbitRadius, bounceAmp, tunnelSpeed (DOM order)
-        // (spinSpeed is an inline row wired above, not a .layer-slider-row)
-        const sliderKeys = ['opacity', 'opacityPulse', 'size', 'orbitRadius', 'bounceAmp', 'tunnelSpeed'];
-        const sliderMins = [0, 0, 0.1, 0, 0, -2];
-        const sliderMaxes = [1, 1, 4, 0.45, 0.4, 2];
+        // Remaining slider rows — DOM order must match sliderKeys exactly:
+        // opacity, opacityPulse, size, spacing, orbitRadius, bounceAmp, tunnelSpeed,
+        // swayAmt, swaySpeed, wanderAmt, wanderSpeed, hueSpinSpeed
+        const sliderKeys = ['opacity', 'opacityPulse', 'size', 'spacing', 'orbitRadius', 'bounceAmp', 'tunnelSpeed',
+            'swayAmt', 'swaySpeed', 'wanderAmt', 'wanderSpeed', 'hueSpinSpeed'];
+        const sliderMins = [0, 0, 0.05, 0, 0, 0, -2, 0, 0, 0, 0, 0];
+        const sliderMaxes = [1, 1, 1.5, 0.8, 0.45, 0.4, 2, 0.4, 4, 0.4, 2, 2];
 
         card.querySelectorAll('.layer-slider-row input[type=range]').forEach((sl, i) => {
             const valEl = sl.nextElementSibling;
@@ -1078,6 +1157,82 @@ export class EditorInspector {
                 refresh();
             });
         });
+
+        // Mirror segmented control
+        card.querySelectorAll('.lseg').forEach(btn => {
+            btn.addEventListener('click', () => {
+                card.querySelectorAll('.lseg').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                entry.mirror = btn.dataset.mirror;
+                refresh();
+            });
+        });
+
+        // Tint color swatch
+        const tintSwatch = card.querySelector('.layer-tint-swatch');
+        const tintPicker = card.querySelector('.layer-tint-picker');
+        const rgbToHexLocal = (r, g, b) => '#' + [r, g, b].map(v => Math.round(v * 255).toString(16).padStart(2, '0')).join('');
+        tintSwatch.addEventListener('click', () => tintPicker.click());
+        tintPicker.addEventListener('input', () => {
+            const hex = tintPicker.value;
+            entry.tintR = parseInt(hex.slice(1, 3), 16) / 255;
+            entry.tintG = parseInt(hex.slice(3, 5), 16) / 255;
+            entry.tintB = parseInt(hex.slice(5, 7), 16) / 255;
+            tintSwatch.style.background = hex;
+            refresh();
+        });
+
+        // XY Pad — anchor / center point
+        const xyPad = card.querySelector('.xy-pad');
+        const xyReset = card.querySelector('.xy-reset');
+        const xyCtx = xyPad.getContext('2d');
+        const PAD = 96;
+
+        const drawPad = () => {
+            xyCtx.clearRect(0, 0, PAD, PAD);
+            // background
+            xyCtx.fillStyle = 'rgba(255,255,255,0.04)';
+            xyCtx.beginPath();
+            xyCtx.roundRect(0, 0, PAD, PAD, 4);
+            xyCtx.fill();
+            // crosshair
+            xyCtx.strokeStyle = 'rgba(255,255,255,0.10)';
+            xyCtx.lineWidth = 1;
+            xyCtx.beginPath(); xyCtx.moveTo(PAD / 2, 0); xyCtx.lineTo(PAD / 2, PAD); xyCtx.stroke();
+            xyCtx.beginPath(); xyCtx.moveTo(0, PAD / 2); xyCtx.lineTo(PAD, PAD / 2); xyCtx.stroke();
+            // border
+            xyCtx.strokeStyle = 'rgba(255,255,255,0.10)';
+            xyCtx.strokeRect(0.5, 0.5, PAD - 1, PAD - 1);
+            // dot
+            const dx = entry.cx * PAD;
+            const dy = entry.cy * PAD;
+            xyCtx.beginPath();
+            xyCtx.arc(dx, dy, 5, 0, Math.PI * 2);
+            xyCtx.fillStyle = '#ffffff';
+            xyCtx.fill();
+            xyCtx.strokeStyle = 'rgba(0,0,0,0.5)';
+            xyCtx.lineWidth = 1.5;
+            xyCtx.stroke();
+        };
+        drawPad();
+
+        const onPadMove = (e) => {
+            const rect = xyPad.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            entry.cx = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+            entry.cy = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+            drawPad();
+            refresh();
+        };
+        let draggingPad = false;
+        xyPad.addEventListener('mousedown', (e) => { draggingPad = true; onPadMove(e); });
+        xyPad.addEventListener('touchstart', (e) => { draggingPad = true; onPadMove(e); e.preventDefault(); }, { passive: false });
+        window.addEventListener('mousemove', (e) => { if (draggingPad) onPadMove(e); });
+        window.addEventListener('mouseup', () => { draggingPad = false; });
+        window.addEventListener('touchmove', (e) => { if (draggingPad) onPadMove(e); }, { passive: true });
+        window.addEventListener('touchend', () => { draggingPad = false; });
+        xyReset.addEventListener('click', () => { entry.cx = 0.5; entry.cy = 0.5; drawPad(); refresh(); });
 
         card.querySelector('.layer-remove').addEventListener('click', () => {
             const idx = this.currentState.images.indexOf(entry);
@@ -1189,6 +1344,18 @@ export class EditorInspector {
         const orb = (img.orbitRadius || 0).toFixed(4);
         const bnc = (img.bounceAmp || 0).toFixed(4);
         const ts = Math.abs(img.tunnelSpeed || 0).toFixed(4);
+        const spc = (img.spacing || 0).toFixed(4);
+        const cx = (img.cx !== undefined ? img.cx : 0.5).toFixed(4);
+        const cy = (img.cy !== undefined ? img.cy : 0.5).toFixed(4);
+        const swayAmt = (img.swayAmt || 0).toFixed(4);
+        const swaySpd = (img.swaySpeed !== undefined ? img.swaySpeed : 1.0).toFixed(4);
+        const wanderAmt = (img.wanderAmt || 0).toFixed(4);
+        const wanderSpd = (img.wanderSpeed !== undefined ? img.wanderSpeed : 0.5).toFixed(4);
+        const mirror = img.mirror || 'none';
+        const tintR = (img.tintR !== undefined ? img.tintR : 1.0).toFixed(4);
+        const tintG = (img.tintG !== undefined ? img.tintG : 1.0).toFixed(4);
+        const tintB = (img.tintB !== undefined ? img.tintB : 1.0).toFixed(4);
+        const hueSpin = (img.hueSpinSpeed || 0).toFixed(4);
         const tex = `sampler_${img.texName}`;
 
         const pulseSign = img.pulseInvert ? '-' : '+';
@@ -1196,6 +1363,10 @@ export class EditorInspector {
         const hasOrbit = parseFloat(orb) !== 0;
         const hasBounce = parseFloat(bnc) !== 0;
         const hasTunnel = parseFloat(ts) !== 0 && img.tile;
+        const hasSway = parseFloat(swayAmt) !== 0;
+        const hasWander = parseFloat(wanderAmt) !== 0;
+        const hasMirror = mirror !== 'none';
+        const hasTint = parseFloat(hueSpin) !== 0 || parseFloat(tintR) !== 1 || parseFloat(tintG) !== 1 || parseFloat(tintB) !== 1;
         const groupSpin = img.tile && hasSpin && !!img.groupSpin;
         const perTileSpin = img.tile && hasSpin && !img.groupSpin;
         const fwd = (img.tunnelSpeed || 0) >= 0;
@@ -1212,18 +1383,26 @@ export class EditorInspector {
         if (hasOrbit) angLines += `    float _orbAng = time * 0.5;\n`;
         if (hasSpin) angLines += `    float _spinAng = time * ${sp};\n`;
 
-        // Image centre (orbit + bounce)
+        // Image centre (anchor + orbit + bounce + sway + wander)
+        let cxExpr = cx;
+        let cyExpr = cy;
+        if (hasSway) cxExpr = `${cx} + sin(time * ${swaySpd}) * ${swayAmt}`;
+        if (hasWander) {
+            cxExpr = `(${cxExpr}) + (sin(time*${wanderSpd}*0.7+1.3)*0.6 + sin(time*${wanderSpd}*1.3+2.7)*0.4) * ${wanderAmt}`;
+            cyExpr = `${cyExpr} + (sin(time*${wanderSpd}*0.9+0.5)*0.6 + sin(time*${wanderSpd}*1.7+3.1)*0.4) * ${wanderAmt}`;
+        }
+
         let centerLines;
         if (hasOrbit) {
             const bncPart = hasBounce ? ` - bass * ${bnc}` : '';
             centerLines =
-                `    vec2 _c = vec2(0.5 + cos(_orbAng) * ${orb},\n` +
-                `                  0.5 + sin(_orbAng) * ${orb} / aspect.y${bncPart});\n` +
+                `    vec2 _c = vec2(${cxExpr} + cos(_orbAng) * ${orb},\n` +
+                `                  ${cyExpr} + sin(_orbAng) * ${orb} / aspect.y${bncPart});\n` +
                 `    vec2 _u = uv - _c;\n`;
         } else if (hasBounce) {
-            centerLines = `    vec2 _u = uv - vec2(0.5, 0.5 - bass * ${bnc});\n`;
+            centerLines = `    vec2 _u = uv - vec2(${cxExpr}, (${cyExpr}) - bass * ${bnc});\n`;
         } else {
-            centerLines = `    vec2 _u = uv - 0.5;\n`;
+            centerLines = `    vec2 _u = uv - vec2(${cxExpr}, ${cyExpr});\n`;
         }
 
         // Group spin: rotate the whole UV field around canvas center before tiling
@@ -1240,11 +1419,20 @@ export class EditorInspector {
 
         // Helper: apply tiled UV to an already-declared vec2 variable, with optional per-tile spin.
         // The variable is modified in-place (no redeclaration).
-        const applyTileUV = (varName, sizeExpr) => {
+        // dxVar / dyVar: if provided, will emit  vec2 <dxVar> = dFdx(…)  BEFORE the fract wrap
+        //   so the caller can use textureGrad(tex, uv, dxVar, dyVar) to avoid mip-seams.
+        // maskVar: if provided, a float variable to multiply by 0 in the gap region.
+        const applyTileUV = (varName, sizeExpr, maskVar = null, dxVar = null, dyVar = null) => {
             let s = '';
             s += `    ${varName}.x *= aspect.y;\n`;
             s += `    ${varName} /= ${sizeExpr};\n`;
             s += `    ${varName}.x /= aspect.y;\n`;
+            // Capture smooth derivatives BEFORE fract so textureGrad picks the right mip level.
+            // Without this, the UV jump at each tile edge (0.999→0.001) makes dFdx/dFdy huge
+            // and the GPU samples the lowest mipmap, producing a visible seam line.
+            if (dxVar && dyVar) {
+                s += `    vec2 ${dxVar} = dFdx(${varName}); vec2 ${dyVar} = dFdy(${varName});\n`;
+            }
             s += `    ${varName} = fract(${varName} + 0.5);\n`;
             if (perTileSpin) {
                 s +=
@@ -1253,22 +1441,45 @@ export class EditorInspector {
                     `      _tl = vec2(_ca*_tl.x - _sa*_tl.y, _sa*_tl.x + _ca*_tl.y);\n` +
                     `      _tl.x /= aspect.y; ${varName} = _tl + 0.5; }\n`;
             }
+            if (parseFloat(spc) > 0 && maskVar) {
+                s += `    { float _sg = ${spc} * 0.5;\n`;
+                s += `      ${maskVar} *= step(_sg, ${varName}.x) * step(_sg, 1.0 - ${varName}.x)\n`;
+                s += `                  * step(_sg, ${varName}.y) * step(_sg, 1.0 - ${varName}.y);\n`;
+                s += `      if (1.0 - 2.0 * _sg > 0.001) ${varName} = clamp((${varName} - _sg) / (1.0 - 2.0 * _sg), 0.0, 1.0); }\n`;
+            }
             return s;
         };
 
         const sizeBase = `${sz} * (1.0 ${pulseSign} bass * ${pu})`;
+
+        // Mirror UV fold helper — generates GLSL to fold a vec2 variable in-place
+        const applyMirrorUV = (varName) => {
+            if (!hasMirror) return '';
+            let m = '';
+            if (mirror === 'h') {
+                m += `    ${varName}.x = 1.0 - abs(fract(${varName}.x * 0.5) * 2.0 - 1.0);\n`;
+            } else if (mirror === 'v') {
+                m += `    ${varName}.y = 1.0 - abs(fract(${varName}.y * 0.5) * 2.0 - 1.0);\n`;
+            } else if (mirror === 'quad') {
+                m += `    ${varName}.x = 1.0 - abs(fract(${varName}.x * 0.5) * 2.0 - 1.0);\n`;
+                m += `    ${varName}.y = 1.0 - abs(fract(${varName}.y * 0.5) * 2.0 - 1.0);\n`;
+            } else if (mirror === 'kaleido') {
+                m += `    { vec2 _kp = ${varName} - 0.5;\n`;
+                m += `      float _kang = atan(_kp.y, _kp.x);\n`;
+                m += `      float _krad = length(_kp);\n`;
+                m += `      float _kseg = 3.14159265 / 3.0;\n`;
+                m += `      _kang = mod(_kang, _kseg * 2.0);\n`;
+                m += `      if (_kang > _kseg) _kang = _kseg * 2.0 - _kang;\n`;
+                m += `      ${varName} = vec2(cos(_kang), sin(_kang)) * _krad + 0.5; }\n`;
+            }
+            return m;
+        };
 
         let pipeline = '';
         let sampleLine = '';
 
         if (hasTunnel) {
             // Seamless two-layer crossfade tunnel
-            // ---
-            // Layer A uses zoom _tz1 (primary, e.g. 1→2 forward).
-            // Layer B uses zoom _tz2 = _tz1/2 (secondary, e.g. 0.5→1 forward).
-            // Near the wrap point (last 15% of cycle), crossfade A→B.
-            // Key: _tz2 at cycle-end == _tz1 at cycle-start (both = 1.0 forward, 1.0 backward)
-            // so after the fract reset, the primary layer continues exactly where B left off.
             const tz1Expr = fwd ? `pow(2.0, _tp)` : `pow(2.0, -_tp)`;
             const tz2Expr = fwd ? `pow(2.0, _tp - 1.0)` : `pow(2.0, 1.0 - _tp)`;
             pipeline =
@@ -1277,18 +1488,25 @@ export class EditorInspector {
                 `    float _tz1 = ${tz1Expr};\n` +
                 `    float _tz2 = ${tz2Expr};\n` +
                 `    float _tf = _tp;\n` +
+                `    float _gapMaskA = 1.0; float _gapMaskB = 1.0;\n` +
                 `    vec2 _uA = _u;\n` +
-                applyTileUV('_uA', `${sizeBase} * _tz1`) +
+                applyTileUV('_uA', `${sizeBase} * _tz1`, '_gapMaskA', '_dxA', '_dyA') +
+                applyMirrorUV('_uA') +
                 `    vec2 _uB = _u;\n` +
-                applyTileUV('_uB', `${sizeBase} * _tz2`);
+                applyTileUV('_uB', `${sizeBase} * _tz2`, '_gapMaskB', '_dxB', '_dyB') +
+                applyMirrorUV('_uB');
             sampleLine =
-                `    vec4 _tA = texture(${tex}, _uA);\n` +
-                `    vec4 _tB = texture(${tex}, _uB);\n` +
-                `    vec4 _t = mix(_tA, _tB, _tf);\n`;
+                `    vec4 _tA = textureGrad(${tex}, _uA, _dxA, _dyA);\n` +
+                `    vec4 _tB = textureGrad(${tex}, _uB, _dxB, _dyB);\n` +
+                `    vec4 _t = mix(_tA, _tB, _tf);\n` +
+                `    float _gapMask = mix(_gapMaskA, _gapMaskB, _tf);\n`;
         } else if (img.tile) {
             // Plain tiled — group spin rotates field first, then tile (with optional per-tile spin)
-            pipeline = groupSpinLines + applyTileUV('_u', sizeBase);
-            sampleLine = `    vec4 _t = texture(${tex}, _u);\n`;
+            pipeline = groupSpinLines +
+                `    float _gapMask = 1.0;\n` +
+                applyTileUV('_u', sizeBase, '_gapMask', '_dx', '_dy') +
+                applyMirrorUV('_u');
+            sampleLine = `    vec4 _t = textureGrad(${tex}, _u, _dx, _dy);\n`;
         } else {
             // Non-tiled: clamp edges, optional spin
             const rotLines = hasSpin
@@ -1296,11 +1514,13 @@ export class EditorInspector {
                 `    _u = vec2(_ca*_u.x - _sa*_u.y, _sa*_u.x + _ca*_u.y);\n`
                 : '';
             pipeline =
+                `    float _gapMask = 1.0;\n` +
                 `    _u.x *= aspect.y;\n` +
                 `    _u /= ${sizeBase};\n` +
                 rotLines +
                 `    _u.x /= aspect.y;\n` +
-                `    _u = clamp(_u + 0.5, 0.0, 1.0);\n`;
+                `    _u = clamp(_u + 0.5, 0.0, 1.0);\n` +
+                applyMirrorUV('_u');
             sampleLine = `    vec4 _t = texture(${tex}, _u);\n`;
         }
 
@@ -1311,7 +1531,32 @@ export class EditorInspector {
             pipeline +
             sampleLine +
             `    vec3 _src = _t.xyz;\n` +
-            `    float _op = _t.w * clamp(${op} + bass * ${opa}, 0.0, 1.0);\n` +
+            (hasTint ? (() => {
+                if (parseFloat(hueSpin) !== 0) {
+                    // Rotate hue over time using RGB rotation matrix approximation
+                    // hue angle in radians
+                    return (
+                        `    { float _ha = time * ${hueSpin} * 6.28318;\n` +
+                        `      float _hc = cos(_ha); float _hs = sin(_ha);\n` +
+                        `      float _lum = dot(_src, vec3(0.299, 0.587, 0.114));\n` +
+                        `      vec3 _tc = vec3(${tintR}, ${tintG}, ${tintB});\n` +
+                        `      vec3 _rh = vec3(_hc + (1.0-_hc)*0.299,\n` +
+                        `                      (1.0-_hc)*0.587 - _hs*0.114,\n` +
+                        `                      (1.0-_hc)*0.114 + _hs*0.587);\n` +
+                        `      vec3 _gh = vec3((1.0-_hc)*0.299 + _hs*0.114,\n` +
+                        `                      _hc + (1.0-_hc)*0.587,\n` +
+                        `                      (1.0-_hc)*0.114 - _hs*0.299);\n` +
+                        `      vec3 _bh = vec3((1.0-_hc)*0.299 - _hs*0.587,\n` +
+                        `                      (1.0-_hc)*0.587 + _hs*0.299,\n` +
+                        `                      _hc + (1.0-_hc)*0.114);\n` +
+                        `      vec3 _tinted = vec3(dot(_src, _rh), dot(_src, _gh), dot(_src, _bh));\n` +
+                        `      _src = _tinted * _tc; }\n`
+                    );
+                } else {
+                    return `    _src *= vec3(${tintR}, ${tintG}, ${tintB});\n`;
+                }
+            })() : '') +
+            `    float _op = _t.w * _gapMask * clamp(${op} + bass * ${opa}, 0.0, 1.0);\n` +
             `    ${blendLine}\n` +
             `  }\n`
         );
