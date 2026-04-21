@@ -14,6 +14,7 @@ export class ControlPanel {
     this.cycleOpen = false;
     this.tuningOpen = false;
     this.hoveringControls = false;
+    this.wakeLock = null;
     this.favorites = this.loadFavorites();
     this.hidden = this.loadHidden();
     this.showHidden = false; // maintenance mode — resets to off on every load
@@ -101,6 +102,7 @@ export class ControlPanel {
     const { els, engine } = this;
 
     this.initPermissionRetry();
+    document.addEventListener('visibilitychange', () => this.handleVisibilityChange());
 
     // --- Start screen & Audio loading ---
     els.btnMic.addEventListener('click', () => this.startWithMic());
@@ -498,6 +500,7 @@ export class ControlPanel {
       this.updateSourceButtons();
       this.updatePresetName(this.engine.getCurrentPresetName());
       this.showControls();
+      this.requestWakeLock();
       this.showToast('🎤 Microphone connected');
       await this.populateDeviceList();
     } catch (err) {
@@ -516,6 +519,7 @@ export class ControlPanel {
       this.updateSourceButtons();
       this.updatePresetName(this.engine.getCurrentPresetName());
       this.showControls();
+      this.requestWakeLock();
 
       audioEl.play();
       this.updatePlayPauseIcon(true);
@@ -953,13 +957,31 @@ export class ControlPanel {
 
   showControls() {
     this.els.controlBar.classList.remove('auto-hidden');
+    document.body.classList.remove('controls-hidden');
     clearTimeout(this.hideTimer);
     if (this.isEngaged()) return;
     this.hideTimer = setTimeout(() => {
       if (!this.isEngaged()) {
         this.els.controlBar.classList.add('auto-hidden');
+        document.body.classList.add('controls-hidden');
       }
     }, this.hideDelay);
+  }
+
+  async requestWakeLock() {
+    if (!('wakeLock' in navigator)) return;
+    try {
+      this.wakeLock = await navigator.wakeLock.request('screen');
+      console.log('Wake Lock active');
+    } catch (err) {
+      console.error(`Wake Lock error: ${err.name}, ${err.message}`);
+    }
+  }
+
+  async handleVisibilityChange() {
+    if (this.wakeLock !== null && document.visibilityState === 'visible') {
+      await this.requestWakeLock();
+    }
   }
 
   isEngaged() {

@@ -17,6 +17,7 @@ A modern browser-based MilkDrop music visualizer powered by [Butterchurn](https:
 - **Auto-hiding controls** — glassmorphic control bar fades after 3 seconds of inactivity, but stays visible while hovered or while a popover is open; click outside a popover to dismiss it
 - **Material-style switches** — all toggles in the cycle and tuning popovers use clean sliding switch components
 - **Fullscreen mode** — native browser fullscreen support
+- **Projector Optimized** — automatic Screen Wake Lock prevents sleep, mouse cursor auto-hides with UI, and "Zen Mode" (H key) for zero-UI projection
 - **Responsive design** — works on desktop and mobile viewports
 - **Preset Studio** (`/editor.html`) — standalone visual preset builder: 12 one-click palettes, 3 independent color swatches (Wave / Glow / Accent), 5 tabbed control sections, undo/redo, A/B comparison, image layers, save to localStorage
 

@@ -156,6 +156,9 @@ body.force-hide-ui #keyboard-guide,
 body.force-hide-ui #toast {
   opacity: 0 !important; pointer-events: none !important;
 }
+body.force-hide-ui, body.controls-hidden {
+  cursor: none !important;
+}
 
 /* START SCREEN */
 #start-screen {
