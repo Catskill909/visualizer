@@ -4,9 +4,11 @@
  */
 import { VisualizerEngine } from './visualizer.js';
 import { ControlPanel } from './controls.js';
+import { initAuthGate } from './auth-gate.js';
 
 // Wait for DOM
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  await initAuthGate();
   const canvas = document.getElementById('visualizer-canvas');
 
   try {

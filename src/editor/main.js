@@ -6,6 +6,9 @@
 
 import { VisualizerEngine } from '../visualizer.js';
 import { EditorInspector, showToast } from './inspector.js';
+import { initAuthGate } from '../auth-gate.js';
+
+initAuthGate();
 
 // ─── DOM refs ─────────────────────────────────────────────────────────────────
 

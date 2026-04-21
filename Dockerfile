@@ -2,6 +2,11 @@
 FROM node:20-alpine AS build
 WORKDIR /app
 
+# Build-time secrets (Vite inlines VITE_* vars into the bundle).
+# In Coolify, set VITE_APP_PASSWORD as a "Build Variable" so it's passed here.
+ARG VITE_APP_PASSWORD
+ENV VITE_APP_PASSWORD=$VITE_APP_PASSWORD
+
 # Install dependencies
 COPY package*.json ./
 RUN npm install

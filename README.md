@@ -204,6 +204,20 @@ The repository includes a multi-stage `Dockerfile` that builds the Vite app and 
 If you prefer a Node.js-based static server, the project includes `sirv-cli` as a dependency and a configured `start` script.
 - **Setup in Coolify:** Leave Build Pack as **Nixpacks**. Coolify will run `npm install`, `npm run build`, and `npm run start`.
 
+### Password Gate
+
+The app is protected by a single-password overlay shown on first visit. After the user enters the correct password, a `localStorage` marker unlocks them automatically on future visits.
+
+**Configure in Coolify:**
+1. Go to your app → **Environment Variables**.
+2. Add `VITE_APP_PASSWORD` with your chosen password.
+3. **Check the "Build Variable" / "Is Build Time" box** — Vite inlines the value at build time, so it must be available when `npm run build` runs, not just at runtime.
+4. Redeploy.
+
+**Local dev:** copy `.env.example` → `.env` and set `VITE_APP_PASSWORD=something`. Leaving it blank disables the gate.
+
+**Security note:** Because this is a static SPA, the password is present in the built JS bundle and visible to anyone who inspects DevTools. Treat it as a soft gate to keep casual visitors out, not as real auth. For stronger protection, use nginx HTTP Basic Auth in [nginx.conf](nginx.conf) or add a backend.
+
 ## Dependencies
 
 | Package | Version | Purpose |
