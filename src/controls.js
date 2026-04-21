@@ -350,7 +350,14 @@ export class ControlPanel {
 
   loadFavorites() {
     try {
-      const stored = localStorage.getItem('milkscreen_favorites');
+      let stored = localStorage.getItem('discocast_favorites');
+      if (!stored) {
+        // Migration from old MilkScreen keys
+        stored = localStorage.getItem('milkscreen_favorites');
+        if (stored) {
+          localStorage.setItem('discocast_favorites', stored);
+        }
+      }
       return stored ? new Set(JSON.parse(stored)) : new Set();
     } catch (e) {
       return new Set();
@@ -358,7 +365,7 @@ export class ControlPanel {
   }
 
   saveFavorites() {
-    localStorage.setItem('milkscreen_favorites', JSON.stringify(Array.from(this.favorites)));
+    localStorage.setItem('discocast_favorites', JSON.stringify(Array.from(this.favorites)));
   }
 
   toggleFavorite(name) {
@@ -388,7 +395,14 @@ export class ControlPanel {
 
   loadHidden() {
     try {
-      const stored = localStorage.getItem('milkscreen_hidden');
+      let stored = localStorage.getItem('discocast_hidden');
+      if (!stored) {
+        // Migration from old MilkScreen keys
+        stored = localStorage.getItem('milkscreen_hidden');
+        if (stored) {
+          localStorage.setItem('discocast_hidden', stored);
+        }
+      }
       return stored ? new Set(JSON.parse(stored)) : new Set();
     } catch (e) {
       return new Set();
@@ -396,7 +410,7 @@ export class ControlPanel {
   }
 
   saveHidden() {
-    localStorage.setItem('milkscreen_hidden', JSON.stringify(Array.from(this.hidden)));
+    localStorage.setItem('discocast_hidden', JSON.stringify(Array.from(this.hidden)));
   }
 
   toggleHidden(name, opts = {}) {

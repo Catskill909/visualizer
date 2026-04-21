@@ -1,7 +1,7 @@
-# Handoff: Audio Triggering Debug (MilkScreen)
+# Handoff: Audio Triggering Debug (DiscoCast Visualizer)
 
 ## Project Overview
-**MilkScreen** is a browser-based music visualizer using **Butterchurn** (a MilkDrop 2 port). The goal is a high-intensity VJ tool for live DJ sets.
+**DiscoCast Visualizer** is a browser-based music visualizer using **Butterchurn** (a MilkDrop 2 port). The goal is a high-intensity VJ tool for live DJ sets.
 
 ## The Problem
 Despite a working VU meter and confirmed audio data reaching the final analysis node, the **visualizations are not reacting (triggering)** to the beat as expected. They behave as if the signal is silent or extremely "flat," even when the audio is loud and bass-heavy.
@@ -17,7 +17,7 @@ We use a complex Web Audio graph to normalize and boost signals for the engine:
 
 ## Known Working Components
 - **VU Meter**: Works perfectly, showing that `Input Analyser` and `VisualizerGainNode` are processing data.
-- **Energy Check Log**: The console logs `[MilkScreen] Engine Energy Check: ✅ SIGNAL OK` every few seconds, confirming that the `Output Analyser` has non-zero RMS data.
+- **Energy Check Log**: The console logs `[DiscoCast Visualizer] Engine Energy Check: ✅ SIGNAL OK` every few seconds, confirming that the `Output Analyser` has non-zero RMS data.
 - **Microphone**: Permission flow and device selection are robust.
 - **File Loading**: Works and is audible.
 

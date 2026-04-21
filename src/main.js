@@ -1,5 +1,5 @@
 /**
- * MilkScreen — Entry Point
+ * DiscoCast Visualizer — Entry Point
  * Wires up the VisualizerEngine and ControlPanel
  */
 import { VisualizerEngine } from './visualizer.js';
@@ -23,15 +23,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     engine.setSize(window.innerWidth, window.innerHeight);
 
     // Expose to console for debugging
-    window.__milkscreen = { engine, controls };
+    window.__discocast = { engine, controls };
 
     console.log(
-      '%c🎨 MilkScreen Ready %c— ' + engine.getPresetNames().length + ' presets loaded',
+      '%c🎨 DiscoCast Visualizer Ready %c— ' + engine.getPresetNames().length + ' presets loaded',
       'color: #00e5ff; font-weight: bold; font-size: 14px;',
       'color: #8888a0; font-size: 12px;'
     );
   } catch (err) {
-    console.error('[MilkScreen] Failed to initialize:', err);
+    console.error('[DiscoCast Visualizer] Failed to initialize:', err);
 
     // Show the error on the start screen so the user knows what happened
     const startScreen = document.getElementById('start-screen');

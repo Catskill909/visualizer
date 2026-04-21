@@ -128,7 +128,7 @@ editor.html
 **Undo/redo:** `_preSnap()` / `_postSnap()` wrap every interaction. 50-deep stack.
 Keyboard: Cmd/Ctrl+Z / Shift+Cmd/Ctrl+Z.
 
-**Save:** Writes to `milkscreen_custom_presets` in localStorage via `createCustomPreset`.
+**Save:** Writes to `discocast_custom_presets` in localStorage via `createCustomPreset`.
 Images are stored as raw pixel data in `this._imageTextures` (texName → `{data, width, height}`).
 
 ---

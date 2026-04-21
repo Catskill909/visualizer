@@ -121,10 +121,10 @@ export class VisualizerEngine {
         if (presets) {
           const count = Object.keys(presets).length;
           Object.assign(this.presets, presets);
-          console.log(`[MilkScreen] ${pack.label}: +${count} presets`);
+          console.log(`[DiscoCast Visualizer] ${pack.label}: +${count} presets`);
         }
       } catch (e) {
-        console.warn(`[MilkScreen] Failed to load ${pack.label}:`, e.message);
+        console.warn(`[DiscoCast Visualizer] Failed to load ${pack.label}:`, e.message);
       }
     }
 
@@ -139,16 +139,16 @@ export class VisualizerEngine {
           baronCount++;
         }
       }
-      console.log(`[MilkScreen] Baron: +${baronCount} presets`);
+      console.log(`[DiscoCast Visualizer] Baron: +${baronCount} presets`);
     } catch (e) {
-      console.warn('[MilkScreen] Failed to load Baron pack:', e.message);
+      console.warn('[DiscoCast Visualizer] Failed to load Baron pack:', e.message);
     }
 
 
     this.presetNames = Object.keys(this.presets).sort((a, b) =>
       a.toLowerCase().localeCompare(b.toLowerCase())
     );
-    console.log(`[MilkScreen] Loaded ${this.presetNames.length} presets`);
+    console.log(`[DiscoCast Visualizer] Loaded ${this.presetNames.length} presets`);
 
     // Create visualizer
     const width = window.innerWidth;
@@ -158,7 +158,7 @@ export class VisualizerEngine {
 
     const butterchurnLib = resolveModule(butterchurnImport, 'butterchurn', 'createVisualizer');
     if (!butterchurnLib || typeof butterchurnLib.createVisualizer !== 'function') {
-      console.error('[MilkScreen] butterchurn.createVisualizer not found:', butterchurnImport);
+      console.error('[DiscoCast Visualizer] butterchurn.createVisualizer not found:', butterchurnImport);
       throw new Error('butterchurn.createVisualizer is not available');
     }
 
@@ -228,7 +228,7 @@ export class VisualizerEngine {
         this.visualizer.connectAudio(this.visualizerGainNode);
       }
 
-      console.log('[MilkScreen] File source connected to engine and destination');
+      console.log('[DiscoCast Visualizer] File source connected to engine and destination');
       return this.audioElement;
     } catch (err) {
       console.error('Error loading audio file:', err);
@@ -281,7 +281,7 @@ export class VisualizerEngine {
     try {
       this.visualizer.loadPreset(JSON.parse(JSON.stringify(preset)), blendTime);
     } catch (e) {
-      console.warn('[MilkScreen] loadPreset failed:', e.message, e);
+      console.warn('[DiscoCast Visualizer] loadPreset failed:', e.message, e);
       return false;
     }
     return true;
@@ -359,7 +359,7 @@ export class VisualizerEngine {
       try {
         const blob = await getImage(img.imageId);
         if (!blob) {
-          console.warn('[MilkScreen] Image not found in IndexedDB:', img.imageId, '(texName:', img.texName + ')');
+          console.warn('[DiscoCast Visualizer] Image not found in IndexedDB:', img.imageId, '(texName:', img.texName + ')');
           continue;
         }
         // Convert blob → data URL → Image to get natural dimensions
@@ -376,9 +376,9 @@ export class VisualizerEngine {
           el.src = dataURL;
         });
         this.setUserTexture(img.texName, { data: dataURL, width: imgEl.naturalWidth, height: imgEl.naturalHeight });
-        console.log('[MilkScreen] Image bound:', img.texName, imgEl.naturalWidth + 'x' + imgEl.naturalHeight);
+        console.log('[DiscoCast Visualizer] Image bound:', img.texName, imgEl.naturalWidth + 'x' + imgEl.naturalHeight);
       } catch (e) {
-        console.warn('[MilkScreen] Failed to bind image for', img.texName, e.message);
+        console.warn('[DiscoCast Visualizer] Failed to bind image for', img.texName, e.message);
       }
     }
   }
@@ -563,7 +563,7 @@ export class VisualizerEngine {
 
     // Log once to confirm data flow
     if (peak > 0 && !this._audioConfirmed) {
-      console.log('[MilkScreen] Audio signal confirmed at analyser.');
+      console.log('[DiscoCast Visualizer] Audio signal confirmed at analyser.');
       this._audioConfirmed = true;
     }
 
@@ -614,7 +614,7 @@ export class VisualizerEngine {
       this.visualizer.loadPreset(JSON.parse(JSON.stringify(presetObj)), blendTime);
       return true;
     } catch (e) {
-      console.warn('[MilkScreen] loadPresetObject failed:', e.message);
+      console.warn('[DiscoCast Visualizer] loadPresetObject failed:', e.message);
       return false;
     }
   }
@@ -630,7 +630,7 @@ export class VisualizerEngine {
         this.visualizer.loadExtraImages({ [name]: texObj });
       }
     } catch (e) {
-      console.warn('[MilkScreen] setUserTexture failed:', e.message);
+      console.warn('[DiscoCast Visualizer] setUserTexture failed:', e.message);
     }
   }
 

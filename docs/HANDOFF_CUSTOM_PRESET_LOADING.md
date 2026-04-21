@@ -18,9 +18,9 @@
 ## How custom presets work
 
 ### Storage
-- Preset JSON saved to `localStorage["milkscreen_custom_presets"]` as `{ [id]: presetRecord }`
+- Preset JSON saved to `localStorage["discocast_custom_presets"]` as `{ [id]: presetRecord }`
 - Registry key format: `` `custom:${id}:${name}` ``
-- Image blobs stored separately in IndexedDB `milkscreen_images`, keyed by `imageId`
+- Image blobs stored separately in IndexedDB `discocast_images`, keyed by `imageId`
 - Preset's `images` array holds `[{ imageId, texName }]` — references, not blobs
 
 ### Preset record shape (what butterchurn needs)
@@ -60,7 +60,7 @@ Clicking a custom preset in "My Presets" tab:
 - Toast shows the preset name ✓
 - Visualizer continues showing whatever was playing before ✗
 - No errors in console ✗
-- `[MilkScreen] Image bound: …` log does NOT appear (meaning `_bindCustomPresetImages` is not confirming a successful bind)
+- `[DiscoCast Visualizer] Image bound: …` log does NOT appear (meaning `_bindCustomPresetImages` is not confirming a successful bind)
 
 ---
 
@@ -121,7 +121,7 @@ async loadPreset(name, blendTime = 2.0) {
   try {
     this.visualizer.loadPreset(JSON.parse(JSON.stringify(preset)), blendTime);
   } catch (e) {
-    console.warn('[MilkScreen] loadPreset failed:', e.message, e);
+    console.warn('[DiscoCast Visualizer] loadPreset failed:', e.message, e);
     return false;
   }
   return true;
@@ -138,7 +138,7 @@ async _bindCustomPresetImages(presetRecord) {
     try {
       const blob = await getImage(img.imageId);
       if (!blob) {
-        console.warn('[MilkScreen] Image not found in IndexedDB:', img.imageId, '(texName:', img.texName + ')');
+        console.warn('[DiscoCast Visualizer] Image not found in IndexedDB:', img.imageId, '(texName:', img.texName + ')');
         continue;
       }
       const dataURL = await new Promise((res, rej) => {
@@ -154,9 +154,9 @@ async _bindCustomPresetImages(presetRecord) {
         el.src = dataURL;
       });
       this.setUserTexture(img.texName, { data: dataURL, width: imgEl.naturalWidth, height: imgEl.naturalHeight });
-      console.log('[MilkScreen] Image bound:', img.texName, imgEl.naturalWidth + 'x' + imgEl.naturalHeight);
+      console.log('[DiscoCast Visualizer] Image bound:', img.texName, imgEl.naturalWidth + 'x' + imgEl.naturalHeight);
     } catch (e) {
-      console.warn('[MilkScreen] Failed to bind image for', img.texName, e.message);
+      console.warn('[DiscoCast Visualizer] Failed to bind image for', img.texName, e.message);
     }
   }
 }
@@ -171,7 +171,7 @@ setUserTexture(name, texObj) {
       this.visualizer.loadExtraImages({ [name]: texObj });
     }
   } catch (e) {
-    console.warn('[MilkScreen] setUserTexture failed:', e.message);
+    console.warn('[DiscoCast Visualizer] setUserTexture failed:', e.message);
   }
 }
 ```

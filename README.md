@@ -1,6 +1,6 @@
-# MilkScreen 🎨
+# DiscoCast Visualizer 🎨
 
-A modern browser-based MilkDrop music visualizer powered by [Butterchurn](https://github.com/jberg/butterchurn) (WebGL). Built with vanilla HTML/CSS/JS and bundled via Vite.
+A modern browser-based MilkDrop music visualizer powered by [Butterchurn](https://github.com/jberg/butterchurn) (WebGL). Built with vanilla HTML/CSS/JS and bundled via Vite. Previously known as MilkScreen.
 
 ## Features
 
@@ -34,7 +34,7 @@ A modern browser-based MilkDrop music visualizer powered by [Butterchurn](https:
 ## Project Structure
 
 ```
-winamp-screen/
+discocast-visualizer/
 ├── index.html              # Main app — canvas, start screen, control bar, preset drawer
 ├── editor.html             # Preset Studio — standalone visual builder (/editor.html)
 ├── vite.config.js          # Vite MPA config — dual Rollup entries (main + editor)

@@ -1,6 +1,6 @@
 # Future Dev Features: Silent Disco & Live DJ Enhancements
 
-Since DiscoCast (MilkScreen) is going to be bundled with a Silent Disco application, we have an awesome opportunity to make the visualizer an actual performance tool for DJs and a more immersive experience for the dancers. 
+Since DiscoCast (DiscoCast Visualizer) is going to be bundled with a Silent Disco application, we have an awesome opportunity to make the visualizer an actual performance tool for DJs and a more immersive experience for the dancers. 
 
 ## ✅ Implemented Features (Performance Suite)
 - **⚡ Performance "Hype" Keys**: Instant triggers for Strobe (`V`), Blackout (`B`), and Invert (`I`).
@@ -25,7 +25,7 @@ Standalone visual preset builder at **`/editor.html`** — a separate identity f
 - **`src/editor/main.js`** — entry point, boots `VisualizerEngine` on user audio source selection, hands off to `EditorInspector`.
 - **`src/editor/inspector.js`** — `EditorInspector` class, ~600 lines. All panel logic.
 - **`src/editor/style.css`** — museum dark standalone stylesheet (no dependency on `src/style.css`).
-- **`src/customPresets.js`** — CRUD over `milkscreen_custom_presets` (localStorage) + `milkscreen_images` (IndexedDB).
+- **`src/customPresets.js`** — CRUD over `discocast_custom_presets` (localStorage) + `discocast_images` (IndexedDB).
 - **`src/presetRegistry.js`** — merge layer: bundled + custom under one `getAllNames()` / `getByName()` API.
 - **`src/visualizer.js`** additions: `loadPresetObject(obj, blendTime)` for live preview; `setUserTexture(name, bitmap)` for image shader binding.
 - **Canvas Mirror** *(2026-04-21)*: Scene-level UV fold in the comp shader. Uses a local `uv_m` alias instead of reassigning `uv` (which is already declared in butterchurn's `main()` scope and also typed as a read-only `in` varying — both GLSL compile errors). `_buildImageBlock()` references `uv_m` for all center-offset calculations so images fold with the scene.

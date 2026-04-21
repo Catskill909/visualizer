@@ -253,7 +253,7 @@ optimizeDeps: {
 
 ### 3. Verification
 
-- Run `npm run dev` and confirm console shows `[MilkScreen] Loaded ~1100 presets`
+- Run `npm run dev` and confirm console shows `[DiscoCast Visualizer] Loaded ~1100 presets`
 - Cycle through several presets to confirm they render
 - Run `npm run build` to confirm production bundle compiles
 

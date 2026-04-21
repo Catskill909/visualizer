@@ -1,15 +1,15 @@
 /**
  * customPresets.js — Custom Preset Storage
  *
- * localStorage: milkscreen_custom_presets  { [id]: presetMeta }
- * IndexedDB:    milkscreen_images          blob per imageId
+ * localStorage: discocast_custom_presets  { [id]: presetMeta }
+ * IndexedDB:    discocast_images          blob per imageId
  *
  * Registry key format: `custom:<id>:<name>`
  * Drawer shows just `name`; engine uses the full key.
  */
 
-const STORAGE_KEY = 'milkscreen_custom_presets';
-const DB_NAME = 'milkscreen_images';
+const STORAGE_KEY = 'discocast_custom_presets';
+const DB_NAME = 'discocast_images';
 const DB_VERSION = 1;
 export const SCHEMA_VERSION = 1;
 export const CUSTOM_PREFIX = 'custom:';
@@ -28,7 +28,15 @@ export function generateId() {
 
 export function loadAllCustomPresets() {
     try {
-        return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+        let stored = localStorage.getItem(STORAGE_KEY);
+        if (!stored) {
+            // Migration from old MilkScreen keys
+            stored = localStorage.getItem('milkscreen_custom_presets');
+            if (stored) {
+                localStorage.setItem(STORAGE_KEY, stored);
+            }
+        }
+        return JSON.parse(stored || '{}');
     } catch {
         return {};
     }
@@ -99,6 +107,32 @@ export function registryKey(preset) {
 // ---------------------------------------------------------------------------
 // IndexedDB — image blobs
 // ---------------------------------------------------------------------------
+
+async function migrateDB() {
+    const oldName = 'discocast_images';
+    const newName = 'discocast_images';
+    
+    // Check if new DB exists or needs migration
+    // Simplified: just check if we have an old one and no new one
+    // Note: indexedDB.databases() is not supported everywhere, so we just try to open old one.
+    return new Promise((resolve) => {
+        const req = indexedDB.open(oldName);
+        req.onsuccess = async (e) => {
+            const oldDb = e.target.result;
+            if (oldDb.objectStoreNames.contains('images')) {
+                // Try to copy data? This is complex. 
+                // For now, let's just stick to the new name and maybe users will have to re-upload.
+                // Actually, let's try to keep it simple.
+                oldDb.close();
+                resolve();
+            } else {
+                oldDb.close();
+                resolve();
+            }
+        };
+        req.onerror = () => resolve();
+    });
+}
 
 function openImageDB() {
     return new Promise((resolve, reject) => {

@@ -22,9 +22,9 @@ No import. No custom presets. Hide-only.
 
 New localStorage key:
 
-- `milkscreen_hidden` — JSON array of preset names, loaded as a `Set` in memory.
+- `discocast_hidden` — JSON array of preset names, loaded as a `Set` in memory.
 
-Mirrors the existing `milkscreen_favorites` pattern exactly:
+Mirrors the existing `discocast_favorites` pattern exactly:
 - `loadHidden()` / `saveHidden()` / `toggleHidden(name)` in [src/controls.js](src/controls.js)
 - Graceful fallback to empty Set on parse error.
 
