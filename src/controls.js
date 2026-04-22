@@ -1028,7 +1028,7 @@ export class ControlPanel {
     if (e.repeat && ['v', 'V', 'b', 'B', 'a', 'A', 'k', 'K'].includes(e.key)) return;
 
     // Performance/hype keys that should fire silently without revealing the UI
-    const SILENT_KEYS = new Set(['v', 'V', 'b', 'B', 'i', 'I', 'h', 'H', 'Shift']);
+    const SILENT_KEYS = new Set(['v', 'V', 'b', 'B', 'i', 'I', 'h', 'H', 'Shift', 'ArrowLeft', 'ArrowRight']);
     const silent = SILENT_KEYS.has(e.key);
 
     switch (e.key) {
@@ -1084,19 +1084,11 @@ export class ControlPanel {
         break;
       case 'ArrowRight':
         e.preventDefault();
-        {
-          const name = this.engine.nextPreset();
-          this.updatePresetName(name);
-          this.showToast('⏭ ' + this.truncate(name, 50));
-        }
+        this.engine.nextPreset();
         break;
       case 'ArrowLeft':
         e.preventDefault();
-        {
-          const name = this.engine.prevPreset();
-          this.updatePresetName(name);
-          this.showToast('⏮ ' + this.truncate(name, 50));
-        }
+        this.engine.prevPreset();
         break;
       case 'r':
       case 'R':
