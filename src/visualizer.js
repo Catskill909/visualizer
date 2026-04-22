@@ -308,7 +308,7 @@ export class VisualizerEngine {
     const next = pool[(idx + 1) % pool.length] || pool[0];
     this.loadPreset(next, blendTime);
     this.resetAutoCycle();
-    return this.getCurrentPresetName();
+    return next;
   }
 
   prevPreset(blendTime = 2.0) {
@@ -319,7 +319,7 @@ export class VisualizerEngine {
     const prev = idx <= 0 ? pool[pool.length - 1] : pool[idx - 1];
     this.loadPreset(prev, blendTime);
     this.resetAutoCycle();
-    return this.getCurrentPresetName();
+    return prev;
   }
 
   randomPreset(blendTime = 2.0) {
@@ -331,7 +331,7 @@ export class VisualizerEngine {
     while (pick === current && pool.length > 1);
     this.loadPreset(pick, blendTime);
     this.resetAutoCycle();
-    return this.getCurrentPresetName();
+    return pick;
   }
 
   getCurrentPresetName() {
@@ -462,9 +462,9 @@ export class VisualizerEngine {
   startAutoCycle() {
     this.stopAutoCycle();
     if (!this.autoCycleEnabled) return;
-    this.autoCycleTimer = setInterval(() => {
+    this.autoCycleTimer = setInterval(async () => {
       const name = this.randomCycleOrder ? this.cycleRandom(3.0) : this.cycleNext(3.0);
-      window.dispatchEvent(new CustomEvent('presetChanged', { detail: { name, auto: true } }));
+      if (name) window.dispatchEvent(new CustomEvent('presetChanged', { detail: { name, auto: true } }));
     }, this.autoCycleInterval);
   }
 
@@ -583,6 +583,7 @@ export class VisualizerEngine {
   }
 
   toggleKickLock() {
+    if (!this.currentSource) return this.kickLockEnabled;
     this.kickLockEnabled = !this.kickLockEnabled;
 
     if (this.currentSource) {

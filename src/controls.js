@@ -972,6 +972,7 @@ export class ControlPanel {
     if (!('wakeLock' in navigator)) return;
     try {
       this.wakeLock = await navigator.wakeLock.request('screen');
+      this.wakeLock.addEventListener('release', () => { this.wakeLock = null; });
       console.log('Wake Lock active');
     } catch (err) {
       console.error(`Wake Lock error: ${err.name}, ${err.message}`);

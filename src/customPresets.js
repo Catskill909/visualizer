@@ -108,37 +108,14 @@ export function registryKey(preset) {
 // IndexedDB — image blobs
 // ---------------------------------------------------------------------------
 
-async function migrateDB() {
-    const oldName = 'discocast_images';
-    const newName = 'discocast_images';
-    
-    // Check if new DB exists or needs migration
-    // Simplified: just check if we have an old one and no new one
-    // Note: indexedDB.databases() is not supported everywhere, so we just try to open old one.
-    return new Promise((resolve) => {
-        const req = indexedDB.open(oldName);
-        req.onsuccess = async (e) => {
-            const oldDb = e.target.result;
-            if (oldDb.objectStoreNames.contains('images')) {
-                // Try to copy data? This is complex. 
-                // For now, let's just stick to the new name and maybe users will have to re-upload.
-                // Actually, let's try to keep it simple.
-                oldDb.close();
-                resolve();
-            } else {
-                oldDb.close();
-                resolve();
-            }
-        };
-        req.onerror = () => resolve();
-    });
-}
-
 function openImageDB() {
     return new Promise((resolve, reject) => {
         const req = indexedDB.open(DB_NAME, DB_VERSION);
         req.onupgradeneeded = (e) => {
-            e.target.result.createObjectStore('images');
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains('images')) {
+                db.createObjectStore('images');
+            }
         };
         req.onsuccess = (e) => resolve(e.target.result);
         req.onerror = (e) => reject(e.target.error);
@@ -225,7 +202,8 @@ export async function importPreset(json) {
             const blob = await res.blob();
             const newId = generateId();
             await storeImage(newId, blob);
-            images.push({ ...img, imageId: newId, _inlinedDataUrl: undefined });
+            const { _inlinedDataUrl: _discarded, ...imgClean } = img;
+            images.push({ ...imgClean, imageId: newId });
         } else {
             images.push(img);
         }
