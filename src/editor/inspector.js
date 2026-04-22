@@ -1020,9 +1020,9 @@ export class EditorInspector {
             </div>
             <div class="layer-slider-row">
               <span class="layer-ctrl-label">Size</span>
-              <input type="range" class="slider" min="0.05" max="1.5" step="0.01"
-                value="${entry.size}" style="--pct:${pct(entry.size, 0.05, 1.5)}">
-              <span class="lsv">${entry.size.toFixed(2)}</span>
+              <input type="range" class="slider layer-size-sl" min="0" max="1" step="0.01"
+                value="${Math.sqrt((entry.size - 0.05) / 1.45).toFixed(3)}" style="--pct:${(Math.sqrt((entry.size - 0.05) / 1.45) * 100).toFixed(1)}%">
+              <span class="lsv layer-size-val">${entry.size.toFixed(2)}</span>
             </div>
             <div class="layer-slider-row">
               <span class="layer-ctrl-label">Spacing</span>
@@ -1032,8 +1032,8 @@ export class EditorInspector {
             </div>
             <div class="layer-row-inline">
               <span class="layer-ctrl-label">Pulse</span>
-              <input type="range" class="slider layer-slider-inline" min="0" max="2" step="0.05"
-                value="${entry.audioPulse}" style="--pct:${pct(entry.audioPulse, 0, 2)}">
+              <input type="range" class="slider layer-slider-inline" min="0" max="1" step="0.01"
+                value="${Math.sqrt(entry.audioPulse / 2).toFixed(3)}" style="--pct:${(Math.sqrt(entry.audioPulse / 2) * 100).toFixed(1)}%">
               <span class="lsv layer-pulse-val">${entry.audioPulse.toFixed(2)}</span>
               <span class="layer-ctrl-label" style="margin-left:8px;width:auto" title="Shrink on beat instead of grow">Shrink</span>
               <label class="toggle-switch toggle-switch--sm">
@@ -1060,9 +1060,9 @@ export class EditorInspector {
             </div>
             <div class="layer-slider-row">
               <span class="layer-ctrl-label">Bounce</span>
-              <input type="range" class="slider" min="0" max="0.4" step="0.01"
-                value="${entry.bounceAmp}" style="--pct:${pct(entry.bounceAmp, 0, 0.4)}">
-              <span class="lsv">${entry.bounceAmp.toFixed(2)}</span>
+              <input type="range" class="slider layer-bounce-sl" min="0" max="1" step="0.01"
+                value="${Math.sqrt(entry.bounceAmp / 0.4).toFixed(3)}" style="--pct:${(Math.sqrt(entry.bounceAmp / 0.4) * 100).toFixed(1)}%">
+              <span class="lsv layer-bounce-val">${entry.bounceAmp.toFixed(2)}</span>
             </div>
             <div class="layer-slider-row">
               <span class="layer-ctrl-label">Tunnel</span>
@@ -1163,26 +1163,51 @@ export class EditorInspector {
             refresh();
         });
 
-        // Pulse inline slider (not inside .layer-slider-row, wired separately)
+        // Pulse inline slider — squared curve for more subtle range at low end
         const pulseSlider = card.querySelector('.layer-slider-inline');
         const pulseVal = card.querySelector('.layer-pulse-val');
         pulseSlider.addEventListener('input', () => {
-            const v = parseFloat(pulseSlider.value);
-            entry.audioPulse = v;
-            pulseVal.textContent = v.toFixed(2);
-            pulseSlider.style.setProperty('--pct', `${((v / 2) * 100).toFixed(1)}%`);
+            const pos = parseFloat(pulseSlider.value);
+            const stored = pos * pos * 2;
+            entry.audioPulse = stored;
+            pulseVal.textContent = stored.toFixed(2);
+            pulseSlider.style.setProperty('--pct', `${(pos * 100).toFixed(1)}%`);
+            refresh();
+        });
+
+        // Bounce slider — squared curve for more subtle range at low end
+        const bounceSlider = card.querySelector('.layer-bounce-sl');
+        const bounceVal = card.querySelector('.layer-bounce-val');
+        bounceSlider.addEventListener('input', () => {
+            const pos = parseFloat(bounceSlider.value);
+            const stored = pos * pos * 0.4;
+            entry.bounceAmp = stored;
+            bounceVal.textContent = stored.toFixed(2);
+            bounceSlider.style.setProperty('--pct', `${(pos * 100).toFixed(1)}%`);
+            refresh();
+        });
+
+        // Size slider — squared curve so value 1.0 lands near ~82% of travel
+        const sizeSlider = card.querySelector('.layer-size-sl');
+        const sizeVal = card.querySelector('.layer-size-val');
+        sizeSlider.addEventListener('input', () => {
+            const pos = parseFloat(sizeSlider.value);
+            const stored = 0.05 + 1.45 * pos * pos;
+            entry.size = stored;
+            sizeVal.textContent = stored.toFixed(2);
+            sizeSlider.style.setProperty('--pct', `${(pos * 100).toFixed(1)}%`);
             refresh();
         });
 
         // Remaining slider rows — DOM order must match sliderKeys exactly:
-        // opacity, opacityPulse, size, spacing, orbitRadius, bounceAmp, tunnelSpeed,
+        // opacity, opacityPulse, spacing, orbitRadius, tunnelSpeed,
         // swayAmt, swaySpeed, wanderAmt, wanderSpeed, hueSpinSpeed
-        const sliderKeys = ['opacity', 'opacityPulse', 'size', 'spacing', 'orbitRadius', 'bounceAmp', 'tunnelSpeed',
+        const sliderKeys = ['opacity', 'opacityPulse', 'spacing', 'orbitRadius', 'tunnelSpeed',
             'swayAmt', 'swaySpeed', 'wanderAmt', 'wanderSpeed', 'hueSpinSpeed'];
-        const sliderMins = [0, 0, 0.05, 0, 0, 0, -2, 0, 0, 0, 0, 0];
-        const sliderMaxes = [1, 1, 1.5, 0.8, 0.45, 0.4, 2, 0.4, 4, 0.4, 2, 2];
+        const sliderMins = [0, 0, 0, 0, -2, 0, 0, 0, 0, 0];
+        const sliderMaxes = [1, 1, 0.8, 0.45, 2, 0.4, 4, 0.4, 2, 2];
 
-        card.querySelectorAll('.layer-slider-row input[type=range]').forEach((sl, i) => {
+        card.querySelectorAll('.layer-slider-row input[type=range]:not(.layer-bounce-sl):not(.layer-size-sl)').forEach((sl, i) => {
             const valEl = sl.nextElementSibling;
             sl.addEventListener('input', () => {
                 const v = parseFloat(sl.value);
