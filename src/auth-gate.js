@@ -38,6 +38,17 @@ export function initAuthGate() {
     const input = overlay.querySelector('.dc-gate-input');
     const form = overlay.querySelector('.dc-gate-form');
     const error = overlay.querySelector('.dc-gate-error');
+    const eyeBtn = overlay.querySelector('.dc-gate-eye');
+    const eyeShow = overlay.querySelector('.dc-gate-eye-show');
+    const eyeHide = overlay.querySelector('.dc-gate-eye-hide');
+
+    eyeBtn.addEventListener('click', () => {
+      const isPassword = input.type === 'password';
+      input.type = isPassword ? 'text' : 'password';
+      eyeShow.style.display = isPassword ? 'none' : '';
+      eyeHide.style.display = isPassword ? '' : 'none';
+      eyeBtn.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
+    });
 
     input.focus();
 
@@ -79,16 +90,29 @@ function buildOverlay() {
       <h1 id="dc-gate-title" class="dc-gate-title">DiscoCast</h1>
       <p class="dc-gate-subtitle">Enter password to continue</p>
       <form class="dc-gate-form" autocomplete="off">
-        <input
-          type="password"
-          class="dc-gate-input"
-          placeholder="Password"
-          autocomplete="current-password"
-          autocapitalize="off"
-          autocorrect="off"
-          spellcheck="false"
-          required
-        />
+        <div class="dc-gate-input-wrap">
+          <input
+            type="password"
+            class="dc-gate-input"
+            placeholder="Password"
+            autocomplete="current-password"
+            autocapitalize="off"
+            autocorrect="off"
+            spellcheck="false"
+            required
+          />
+          <button type="button" class="dc-gate-eye" aria-label="Show password">
+            <svg class="dc-gate-eye-icon dc-gate-eye-show" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+            <svg class="dc-gate-eye-icon dc-gate-eye-hide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+              <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+              <line x1="1" y1="1" x2="23" y2="23"/>
+            </svg>
+          </button>
+        </div>
         <button type="submit" class="dc-gate-button">Unlock</button>
         <p class="dc-gate-error" role="alert" aria-live="polite"></p>
       </form>
@@ -148,9 +172,14 @@ function injectStyles() {
       display: flex; flex-direction: column; gap: 10px;
     }
 
+    .dc-gate-input-wrap {
+      position: relative;
+      width: 100%;
+    }
+
     .dc-gate-input {
       width: 100%;
-      padding: 12px 14px;
+      padding: 12px 44px 12px 14px;
       background: #000;
       border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: 8px;
@@ -164,6 +193,18 @@ function injectStyles() {
       background: #050505;
     }
     .dc-gate-input::placeholder { color: #555; }
+
+    .dc-gate-eye {
+      position: absolute;
+      right: 10px; top: 50%;
+      transform: translateY(-50%);
+      background: none; border: none; padding: 4px;
+      color: #666; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: color 150ms ease;
+    }
+    .dc-gate-eye:hover { color: #fff; }
+    .dc-gate-eye-icon { width: 18px; height: 18px; display: block; }
 
     .dc-gate-button {
       width: 100%;
