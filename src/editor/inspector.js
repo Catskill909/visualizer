@@ -1560,7 +1560,7 @@ export class EditorInspector {
                 `    float _tp = fract(time * ${ts});\n` +
                 `    float _tz1 = ${tz1Expr};\n` +
                 `    float _tz2 = ${tz2Expr};\n` +
-                `    float _tf = _tp;\n` +
+                `    float _tf = smoothstep(0.5, 1.0, _tp);\n` +
                 `    float _gapMaskA = 1.0; float _gapMaskB = 1.0;\n` +
                 `    vec2 _uA = _u;\n` +
                 applyTileUV('_uA', `${sizeBase} * _tz1`, '_gapMaskA', '_dxA', '_dyA') +
