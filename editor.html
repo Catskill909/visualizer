@@ -294,7 +294,20 @@
                                 </label>
                             </label>
                         </div>
-                        <p class="section-note">Add up to 2 images. Choose how they react to the music.</p>
+                        <p class="section-note">Add up to 5 images. Choose how they react to the music.</p>
+                        <div class="layers-bar">
+                            <span class="layers-count" id="layers-count">Layers: 0 / 5</span>
+                            <label class="hd-upload-row"
+                                title="Next upload gets resized to 2048px (HD) instead of 1024px. Uses more VRAM.">
+                                <span class="hd-upload-label">HD uploads</span>
+                                <label class="toggle-switch toggle-switch--sm">
+                                    <input type="checkbox" id="toggle-hd-uploads" />
+                                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                                </label>
+                            </label>
+                            <button class="mini-btn" id="btn-collapse-all" type="button"
+                                title="Collapse / expand all layers">⇕</button>
+                        </div>
                         <div class="image-dropzone" id="image-dropzone" role="button" tabindex="0"
                             aria-label="Drop image here or click to browse">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -334,8 +347,33 @@
             </div>
         </div>
 
+        <!-- Delete layer confirmation modal -->
+        <div id="layer-delete-modal" class="save-modal" hidden role="dialog" aria-modal="true"
+            aria-labelledby="layer-delete-title">
+            <div class="save-modal-card">
+                <h2 id="layer-delete-title" class="save-modal-title">Delete Layer?</h2>
+                <p class="layer-delete-msg" id="layer-delete-msg">This removes the image and all of its
+                    settings. This can't be undone.</p>
+                <div class="save-modal-actions">
+                    <button id="layer-delete-confirm" class="danger-btn" type="button">Delete</button>
+                    <button id="layer-delete-cancel" class="reset-btn" type="button">Cancel</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Toast -->
         <div id="toast" class="toast" hidden role="status" aria-live="polite"></div>
+
+        <!-- Dev overhead monitor — toggle with Shift+F12 -->
+        <div id="dev-hud" hidden aria-hidden="true">
+            <div class="dev-hud-title">Dev Monitor</div>
+            <div class="dev-hud-row"><span>FPS</span><span id="hud-fps">—</span></div>
+            <div class="dev-hud-row"><span>Frame</span><span><span id="hud-frame">—</span> ms</span></div>
+            <div class="dev-hud-row"><span>Layers</span><span id="hud-layers">0</span></div>
+            <div class="dev-hud-row"><span>VRAM</span><span><span id="hud-vram">0</span> MB</span></div>
+            <div class="dev-hud-row"><span>Build</span><span><span id="hud-build">—</span> ms</span></div>
+            <div class="dev-hud-hint">Press ` to hide</div>
+        </div>
 
         <!-- ════════════════════ MINI PLAYER ════════════════════ -->
         <div id="mini-player" class="mini-player" hidden>

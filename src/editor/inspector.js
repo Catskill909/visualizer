@@ -15,6 +15,60 @@
 
 import { createCustomPreset, storeImage, generateId } from '../customPresets.js';
 
+// ─── Phase 1: layer limits + upload resize ───────────────────────────────────
+// Cap surface area for Phase 1. Internals (shader builder, state array) are
+// N-generic — raising this later is a one-line change.
+const MAX_LAYERS = 5;
+const STD_MAX_DIM = 1024;   // Standard upload max dimension (longest side)
+const HD_MAX_DIM = 2048;    // "HD" toggle max dimension
+
+/**
+ * Downscale an image file to at most `maxDim` on its longest side.
+ * Destructive — the original blob is not retained anywhere.
+ * Returns a new Blob (original format preserved when possible) plus dimensions
+ * so callers can report the before/after size in a toast.
+ */
+async function resizeImageFile(file, maxDim) {
+    const dataURL = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result);
+        r.onerror = () => reject(new Error('read failed'));
+        r.readAsDataURL(file);
+    });
+    const img = await new Promise((resolve, reject) => {
+        const el = new Image();
+        el.onload = () => resolve(el);
+        el.onerror = () => reject(new Error('decode failed'));
+        el.src = dataURL;
+    });
+    const longest = Math.max(img.naturalWidth, img.naturalHeight);
+    if (longest <= maxDim) {
+        // Already small enough — keep as-is, but still return dimensions.
+        return { blob: file, dataURL, width: img.naturalWidth, height: img.naturalHeight, resized: false, originalW: img.naturalWidth, originalH: img.naturalHeight };
+    }
+    const scale = maxDim / longest;
+    const w = Math.round(img.naturalWidth * scale);
+    const h = Math.round(img.naturalHeight * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, w, h);
+    // Prefer the original mime type (JPEG stays JPEG for size; PNG keeps alpha).
+    const outType = (file.type === 'image/jpeg' || file.type === 'image/webp') ? file.type : 'image/png';
+    const blob = await new Promise(r => canvas.toBlob(r, outType, 0.92));
+    const outDataURL = canvas.toDataURL(outType, 0.92);
+    return { blob, dataURL: outDataURL, width: w, height: h, resized: true, originalW: img.naturalWidth, originalH: img.naturalHeight };
+}
+
+function formatBytes(bytes) {
+    if (bytes < 1024) return `${bytes}B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)}KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+}
+
 // ─── Blank start state ────────────────────────────────────────────────────────
 
 // Minimal passthrough comp shader — butterchurn won't accept an empty string.
@@ -253,6 +307,8 @@ export class EditorInspector {
         this._imageTextures = {};     // texName → { data, width, height } — survives preset reloads
         this._imagesOnly = false;     // when true: black comp base, no wave
         this._solidColor = BASE_VARIATIONS[0].solid || null;  // solid color base for first variation
+        this._hdUploads = false;      // when true: next upload is resized to HD_MAX_DIM instead of STD_MAX_DIM
+        this._lastBuildMs = 0;        // dev monitor: last shader rebuild time
 
         this._buildBaseVariations();
         this._buildPaletteChips();
@@ -271,6 +327,10 @@ export class EditorInspector {
         this._bindReset();
         this._bindImageDropzone();
         this._bindImagesOnly();
+        this._bindHdUploads();
+        this._bindCollapseAll();
+        this._initDevHud();
+        this._updateLayersBar();
 
         // Apply the first variation (Color) as the startup state — gives users
         // something vivid to look at immediately instead of a black screen.
@@ -925,20 +985,190 @@ export class EditorInspector {
         });
     }
 
-    _addImageLayer(file) {
-        if (!this.currentState.images) this.currentState.images = [];
-        if (this.currentState.images.length >= 2) {
-            showToast('Max 2 image layers', true);
+    // ─── Phase 1: HD uploads toggle ────────────────────────────────────────────
+
+    _bindHdUploads() {
+        const cb = document.getElementById('toggle-hd-uploads');
+        if (!cb) return;
+        cb.addEventListener('change', () => {
+            this._hdUploads = cb.checked;
+        });
+    }
+
+    // ─── Phase 1: collapse-all / expand-all toggle ─────────────────────────────
+
+    _bindCollapseAll() {
+        const btn = document.getElementById('btn-collapse-all');
+        if (!btn) return;
+        btn.addEventListener('click', () => {
+            const imgs = this.currentState.images || [];
+            // If ANY card is currently expanded, the action collapses all.
+            // If everything is already collapsed, the action expands all.
+            const anyExpanded = imgs.some(e => !e.collapsed);
+            const target = anyExpanded;  // true = collapse, false = expand
+            imgs.forEach(e => { e.collapsed = target; });
+            document.querySelectorAll('#image-layers .image-layer-card').forEach((c, i) => {
+                c.classList.toggle('collapsed', target);
+                const h = c.querySelector('.layer-header');
+                if (h) h.setAttribute('aria-expanded', String(!target));
+            });
+        });
+    }
+
+    // ─── Phase 1: layers count + dropzone-disabled bar state ───────────────────
+
+    _updateLayersBar() {
+        const countEl = document.getElementById('layers-count');
+        const dropzone = document.getElementById('image-dropzone');
+        const imgs = this.currentState.images || [];
+        if (countEl) countEl.textContent = `Layers: ${imgs.length} / ${MAX_LAYERS}`;
+        if (dropzone) dropzone.classList.toggle('disabled', imgs.length >= MAX_LAYERS);
+    }
+
+    // ─── Phase 1: delete confirmation modal ────────────────────────────────────
+
+    _confirmDeleteLayer(entry, card, texName) {
+        const modal = document.getElementById('layer-delete-modal');
+        const confirmBtn = document.getElementById('layer-delete-confirm');
+        const cancelBtn = document.getElementById('layer-delete-cancel');
+        const msg = document.getElementById('layer-delete-msg');
+        if (!modal || !confirmBtn || !cancelBtn) {
+            // No modal in DOM — fall back to immediate delete (shouldn't happen)
+            this._performDeleteLayer(entry, card, texName);
             return;
+        }
+
+        if (msg) {
+            const name = entry.fileName ? `"${entry.fileName}"` : 'this layer';
+            msg.textContent = `Remove ${name} and all its settings? This can't be undone.`;
+        }
+
+        modal.hidden = false;
+        confirmBtn.focus();
+
+        const cleanup = () => {
+            modal.hidden = true;
+            confirmBtn.removeEventListener('click', onConfirm);
+            cancelBtn.removeEventListener('click', onCancel);
+            modal.removeEventListener('click', onBackdrop);
+            window.removeEventListener('keydown', onKey);
+        };
+        const onConfirm = () => { cleanup(); this._performDeleteLayer(entry, card, texName); };
+        const onCancel = () => { cleanup(); };
+        const onBackdrop = (e) => { if (e.target === modal) onCancel(); };
+        const onKey = (e) => {
+            if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+            else if (e.key === 'Enter') { e.preventDefault(); onConfirm(); }
+        };
+        confirmBtn.addEventListener('click', onConfirm);
+        cancelBtn.addEventListener('click', onCancel);
+        modal.addEventListener('click', onBackdrop);
+        window.addEventListener('keydown', onKey);
+    }
+
+    _performDeleteLayer(entry, card, texName) {
+        const idx = this.currentState.images.indexOf(entry);
+        if (idx !== -1) this.currentState.images.splice(idx, 1);
+        delete this._imageTextures[texName];
+        this._buildCompShader();
+        this._applyToEngine();
+        card.remove();
+        this._updateLayersBar();
+    }
+
+    // ─── Phase 1: dev overhead monitor (Shift+F12) ─────────────────────────────
+
+    _initDevHud() {
+        const hud = document.getElementById('dev-hud');
+        if (!hud) return;
+        this._hudEls = {
+            hud,
+            fps: document.getElementById('hud-fps'),
+            frame: document.getElementById('hud-frame'),
+            layers: document.getElementById('hud-layers'),
+            vram: document.getElementById('hud-vram'),
+            build: document.getElementById('hud-build'),
+        };
+        this._hudVisible = false;
+        this._hudTimes = [];       // rolling frame timestamps
+        this._hudLastTs = 0;
+
+        // Keybinding: backtick (`) toggles HUD. macOS doesn't give you F12
+        // without Fn, and Shift+F12 was getting eaten by the OS. Backtick is
+        // the classic dev-overlay convention and has zero OS/browser conflict.
+        // Skip when typing in an input/textarea/contenteditable.
+        window.addEventListener('keydown', (e) => {
+            if (e.key !== '`' && e.key !== '~') return;
+            const t = e.target;
+            if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+            e.preventDefault();
+            this._hudVisible = !this._hudVisible;
+            hud.hidden = !this._hudVisible;
+            hud.setAttribute('aria-hidden', String(!this._hudVisible));
+        });
+
+        const tick = (ts) => {
+            if (this._hudVisible) {
+                if (this._hudLastTs) {
+                    const dt = ts - this._hudLastTs;
+                    this._hudTimes.push(dt);
+                    if (this._hudTimes.length > 60) this._hudTimes.shift();
+                    const avg = this._hudTimes.reduce((a, b) => a + b, 0) / this._hudTimes.length;
+                    this._hudEls.fps.textContent = (1000 / avg).toFixed(0);
+                    this._hudEls.frame.textContent = avg.toFixed(1);
+                }
+                const imgs = this.currentState.images || [];
+                this._hudEls.layers.textContent = imgs.length;
+                let bytes = 0;
+                for (const name in this._imageTextures) {
+                    const t = this._imageTextures[name];
+                    bytes += (t.width || 0) * (t.height || 0) * 4;
+                }
+                this._hudEls.vram.textContent = (bytes / (1024 * 1024)).toFixed(1);
+                this._hudEls.build.textContent = this._lastBuildMs.toFixed(1);
+            }
+            this._hudLastTs = ts;
+            requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+    }
+
+    async _addImageLayer(file) {
+        if (!this.currentState.images) this.currentState.images = [];
+        if (this.currentState.images.length >= MAX_LAYERS) {
+            showToast(`Max ${MAX_LAYERS} image layers`, true);
+            return;
+        }
+
+        // ── Resize on upload (destructive) ───────────────────────────────────
+        const maxDim = this._hdUploads ? HD_MAX_DIM : STD_MAX_DIM;
+        const hdMode = this._hdUploads;
+        let resized;
+        try {
+            resized = await resizeImageFile(file, maxDim);
+        } catch (err) {
+            showToast('Could not load image', true);
+            return;
+        }
+        const storeBlob = resized.blob;
+        if (resized.resized) {
+            showToast(`Resized ${resized.originalW}×${resized.originalH} → ${resized.width}×${resized.height} (${formatBytes(file.size)} → ${formatBytes(storeBlob.size)})`);
         }
 
         const texName = `userimg${Date.now().toString(36)}`;
         const imageId = generateId();
 
-        // Persist the blob so the preset survives reloads. Fire-and-forget —
+        // Persist the (resized) blob so the preset survives reloads. Fire-and-forget —
         // failure only affects cross-session loading, not the live preview.
-        storeImage(imageId, file).catch(err => {
+        storeImage(imageId, storeBlob).catch(err => {
             console.warn('[Editor] storeImage failed:', err.message);
+        });
+
+        // Smart accordion: collapse every existing card before we add the new one.
+        // The new card goes in expanded so user focus follows what they just dropped.
+        this.currentState.images.forEach(e => { e.collapsed = true; });
+        document.querySelectorAll('#image-layers .image-layer-card').forEach(c => {
+            c.classList.add('collapsed');
         });
 
         // Full per-image control state — all values baked into GLSL on change
@@ -961,6 +1191,7 @@ export class EditorInspector {
             wanderAmt: 0.00,    // organic random drift amplitude
             wanderSpeed: 0.50,  // wander drift rate
             mirror: 'none',     // 'none' | 'h' | 'v' | 'quad' | 'kaleido'
+            mirrorScope: 'tile',  // 'tile' = fold inside each tile, 'field' = fold the whole tiled group
             tintR: 1.00,        // tint color red (1=white = no tint)
             tintG: 1.00,
             tintB: 1.00,
@@ -970,6 +1201,10 @@ export class EditorInspector {
             audioPulse: 0.00,  // bass drives size
             pulseInvert: false, // shrink instead of grow on beat
             groupSpin: false,   // when tile=ON: spin the whole grid instead of each tile
+            collapsed: false,   // Phase 1: card collapse state
+            hdMode,             // Phase 1: true if uploaded at HD (2048px) instead of Std (1024px)
+            texW: resized.width,
+            texH: resized.height,
         };
         this.currentState.images.push(entry);
 
@@ -983,8 +1218,12 @@ export class EditorInspector {
             `${(((v - min) / (max - min)) * 100).toFixed(1)}%`;
 
         card.innerHTML = `
-          <div class="layer-header">
+          <div class="layer-header" role="button" aria-expanded="true" tabindex="0">
+            <svg class="layer-chevron" width="10" height="10" viewBox="0 0 12 12" aria-hidden="true">
+              <path d="M2 4 L6 8 L10 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
             <span class="layer-name"></span>
+            ${hdMode ? '<span class="layer-hd-badge" title="Uploaded at HD (2048px). Re-upload to change.">HD</span>' : ''}
             <button class="layer-remove" aria-label="Remove layer">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -1106,13 +1345,17 @@ export class EditorInspector {
               <span class="lsv">${entry.wanderSpeed.toFixed(2)}</span>
             </div>
             <div class="layer-section-divider"></div>
-            <p class="layer-section-label">Mirror</p>
+            <p class="layer-section-label">Mirror <span class="lseg-status">Off</span></p>
             <div class="layer-mirror-seg" role="group">
               <button class="lseg active" data-mirror="none">Off</button>
               <button class="lseg" data-mirror="h">↔ H</button>
               <button class="lseg" data-mirror="v">↕ V</button>
               <button class="lseg" data-mirror="quad">⊞ Quad</button>
               <button class="lseg" data-mirror="kaleido">✦ Kaleido</button>
+            </div>
+            <div class="layer-mirror-scope" role="group" aria-label="Mirror scope" hidden>
+              <button class="lseg lseg-scope active" data-scope="tile" title="Fold inside each tile">Per Tile</button>
+              <button class="lseg lseg-scope" data-scope="field" title="Fold the whole tiled group">Whole Image</button>
             </div>
             <div class="layer-section-divider"></div>
             <p class="layer-section-label">Tint</p>
@@ -1219,12 +1462,34 @@ export class EditorInspector {
             });
         });
 
-        // Mirror segmented control
-        card.querySelectorAll('.lseg').forEach(btn => {
+        // Mirror segmented controls — updates entry.mirror + entry.mirrorScope,
+        // plus a live label readout and auto show/hide of the scope toggle.
+        const mirrorStatus = card.querySelector('.lseg-status');
+        const scopeRow = card.querySelector('.layer-mirror-scope');
+        const mirrorLabels = { none: 'Off', h: 'H', v: 'V', quad: 'Quad', kaleido: 'Kaleido' };
+        const scopeLabels = { tile: 'Per Tile', field: 'Whole Image' };
+        const updateStatus = () => {
+            if (!mirrorStatus) return;
+            const m = mirrorLabels[entry.mirror] || 'Off';
+            if (entry.mirror === 'none') mirrorStatus.textContent = 'Off';
+            else mirrorStatus.textContent = `${m} · ${scopeLabels[entry.mirrorScope || 'tile']}`;
+            if (scopeRow) scopeRow.hidden = entry.mirror === 'none';
+        };
+        card.querySelectorAll('.layer-mirror-seg .lseg').forEach(btn => {
             btn.addEventListener('click', () => {
-                card.querySelectorAll('.lseg').forEach(b => b.classList.remove('active'));
+                card.querySelectorAll('.layer-mirror-seg .lseg').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 entry.mirror = btn.dataset.mirror;
+                updateStatus();
+                refresh();
+            });
+        });
+        card.querySelectorAll('.lseg-scope').forEach(btn => {
+            btn.addEventListener('click', () => {
+                card.querySelectorAll('.lseg-scope').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                entry.mirrorScope = btn.dataset.scope;
+                updateStatus();
                 refresh();
             });
         });
@@ -1295,34 +1560,37 @@ export class EditorInspector {
         window.addEventListener('touchend', () => { draggingPad = false; });
         xyReset.addEventListener('click', () => { entry.cx = 0.5; entry.cy = 0.5; drawPad(); refresh(); });
 
-        card.querySelector('.layer-remove').addEventListener('click', () => {
-            const idx = this.currentState.images.indexOf(entry);
-            if (idx !== -1) this.currentState.images.splice(idx, 1);
-            delete this._imageTextures[texName];
-            this._buildCompShader();
-            this._applyToEngine();
-            card.remove();
+        const removeBtn = card.querySelector('.layer-remove');
+        removeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();   // don't trigger header toggle
+            this._confirmDeleteLayer(entry, card, texName);
+        });
+
+        // Collapse / expand via the whole header strip
+        const header = card.querySelector('.layer-header');
+        const toggleCollapse = () => {
+            entry.collapsed = !entry.collapsed;
+            card.classList.toggle('collapsed', entry.collapsed);
+            header.setAttribute('aria-expanded', String(!entry.collapsed));
+        };
+        header.addEventListener('click', (e) => {
+            if (e.target.closest('.layer-remove')) return;
+            toggleCollapse();
+        });
+        header.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleCollapse(); }
         });
 
         layers.appendChild(card);
+        this._updateLayersBar();
 
-        // ── Load texture async ──────────────────────────────────────────────
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const dataURL = e.target.result;
-            const img = new Image();
-            img.onload = () => {
-                const texObj = { data: dataURL, width: img.naturalWidth, height: img.naturalHeight };
-                this._imageTextures[texName] = texObj;
-                this.engine.setUserTexture(texName, texObj);
-                this._buildCompShader();
-                this._applyToEngine();
-                showToast('Image layer added');
-            };
-            img.onerror = () => showToast('Could not load image', true);
-            img.src = dataURL;
-        };
-        reader.readAsDataURL(file);
+        // Texture load — resized.dataURL is already decoded from the resize step
+        const texObj = { data: resized.dataURL, width: resized.width, height: resized.height };
+        this._imageTextures[texName] = texObj;
+        this.engine.setUserTexture(texName, texObj);
+        this._buildCompShader();
+        this._applyToEngine();
+        if (!resized.resized) showToast('Image layer added');
     }
 
     // ─── Apply & sync ──────────────────────────────────────────────────────────
@@ -1343,10 +1611,12 @@ export class EditorInspector {
      * (time, bass, aspect, uv, ret, sampler_main) are used.
      */
     _buildCompShader() {
+        const _t0 = performance.now();
         const images = this.currentState.images || [];
         const sm = this.currentState.sceneMirror || 'none';
         if (images.length === 0 && !this._solidColor && sm === 'none') {
             this.currentState.comp = BLANK_COMP;
+            this._lastBuildMs = performance.now() - _t0;
             return;
         }
         const uniforms = images
@@ -1391,6 +1661,7 @@ export class EditorInspector {
         }
         body += '  ret = col;\n';
         this.currentState.comp = `${uniforms}\n shader_body {\n${body} }`;
+        this._lastBuildMs = performance.now() - _t0;
     }
 
     /**
@@ -1425,6 +1696,7 @@ export class EditorInspector {
         const wanderAmt = (img.wanderAmt || 0).toFixed(4);
         const wanderSpd = (img.wanderSpeed !== undefined ? img.wanderSpeed : 0.5).toFixed(4);
         const mirror = img.mirror || 'none';
+        const mirrorScope = img.mirrorScope || 'tile';
         const tintR = (img.tintR !== undefined ? img.tintR : 1.0).toFixed(4);
         const tintG = (img.tintG !== undefined ? img.tintG : 1.0).toFixed(4);
         const tintB = (img.tintB !== undefined ? img.tintB : 1.0).toFixed(4);
@@ -1439,6 +1711,8 @@ export class EditorInspector {
         const hasSway = parseFloat(swayAmt) !== 0;
         const hasWander = parseFloat(wanderAmt) !== 0;
         const hasMirror = mirror !== 'none';
+        const fieldMirror = hasMirror && mirrorScope === 'field';
+        const tileMirror = hasMirror && mirrorScope === 'tile';
         const hasTint = parseFloat(hueSpin) !== 0 || parseFloat(tintR) !== 1 || parseFloat(tintG) !== 1 || parseFloat(tintB) !== 1;
         const groupSpin = img.tile && hasSpin && !!img.groupSpin;
         const perTileSpin = img.tile && hasSpin && !img.groupSpin;
@@ -1465,18 +1739,43 @@ export class EditorInspector {
             cyExpr = `${cyExpr} + (sin(time*${wanderSpd}*0.9+0.5)*0.6 + sin(time*${wanderSpd}*1.7+3.1)*0.4) * ${wanderAmt}`;
         }
 
+        // Image UV source — either straight uv_m, or uv_m with a whole-group
+        // mirror fold applied BEFORE the tile pipeline (so the entire tiled
+        // image field gets mirrored, not just the inside of each tile).
+        let fieldLines = `    vec2 _uvf = uv_m;\n`;
+        if (fieldMirror) {
+            if (mirror === 'h') {
+                fieldLines += `    _uvf.x = 1.0 - abs(_uvf.x * 2.0 - 1.0);\n`;
+            } else if (mirror === 'v') {
+                fieldLines += `    _uvf.y = 1.0 - abs(_uvf.y * 2.0 - 1.0);\n`;
+            } else if (mirror === 'quad') {
+                fieldLines += `    _uvf.x = 1.0 - abs(_uvf.x * 2.0 - 1.0);\n`;
+                fieldLines += `    _uvf.y = 1.0 - abs(_uvf.y * 2.0 - 1.0);\n`;
+            } else if (mirror === 'kaleido') {
+                fieldLines +=
+                    `    { vec2 _kp = _uvf - 0.5;\n` +
+                    `      float _kang = atan(_kp.y, _kp.x);\n` +
+                    `      float _krad = length(_kp);\n` +
+                    `      float _kseg = 3.14159265 / 3.0;\n` +
+                    `      _kang = mod(_kang, _kseg * 2.0);\n` +
+                    `      if (_kang > _kseg) _kang = _kseg * 2.0 - _kang;\n` +
+                    `      _uvf = vec2(cos(_kang), sin(_kang)) * _krad + 0.5; }\n`;
+            }
+        }
+
         let centerLines;
         if (hasOrbit) {
             const bncPart = hasBounce ? ` - bass * ${bnc}` : '';
             centerLines =
                 `    vec2 _c = vec2(${cxExpr} + cos(_orbAng) * ${orb},\n` +
                 `                  ${cyExpr} + sin(_orbAng) * ${orb} / aspect.y${bncPart});\n` +
-                `    vec2 _u = uv_m - _c;\n`;
+                `    vec2 _u = _uvf - _c;\n`;
         } else if (hasBounce) {
-            centerLines = `    vec2 _u = uv_m - vec2(${cxExpr}, (${cyExpr}) - bass * ${bnc});\n`;
+            centerLines = `    vec2 _u = _uvf - vec2(${cxExpr}, (${cyExpr}) - bass * ${bnc});\n`;
         } else {
-            centerLines = `    vec2 _u = uv_m - vec2(${cxExpr}, ${cyExpr});\n`;
+            centerLines = `    vec2 _u = _uvf - vec2(${cxExpr}, ${cyExpr});\n`;
         }
+        centerLines = fieldLines + centerLines;
 
         // Group spin: rotate the whole UV field around canvas center before tiling
         const groupSpinLines = groupSpin
@@ -1525,9 +1824,10 @@ export class EditorInspector {
 
         const sizeBase = `${sz} * (1.0 ${pulseSign} bass * ${pu})`;
 
-        // Mirror UV fold helper — generates GLSL to fold a vec2 variable in-place
+        // Mirror UV fold helper — generates GLSL to fold a vec2 variable in-place.
+        // Only emits for the per-tile scope; whole-group scope already folded _uvf upstream.
         const applyMirrorUV = (varName) => {
-            if (!hasMirror) return '';
+            if (!tileMirror) return '';
             let m = '';
             if (mirror === 'h') {
                 m += `    ${varName}.x = 1.0 - abs(${varName}.x * 2.0 - 1.0);\n`;

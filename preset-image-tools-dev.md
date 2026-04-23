@@ -1,0 +1,306 @@
+# Preset Image Tools — Phased Dev Plan
+
+> **Status:** Phase 1 shipped (with polish). Companion to [custom-preset-editor.md](custom-preset-editor.md).
+> Each phase below is independently shippable. We pause after each to review before starting the next.
+
+---
+
+## Performance reality check (answers the "server overhead" question)
+
+There is **zero server cost** — nginx/sirv-cli only ship static files. All rendering is WebGL on the user's GPU in their browser.
+
+The real cost is VRAM and shader fill rate. Scaling from 2 → 5 image layers:
+
+| Cost | Today (2) | At 5 | Notes |
+|---|---|---|---|
+| Texture samples / pixel | ~5 | ~11 | Modern GPUs handle 20+ easily at 1080p |
+| Shader instructions | Moderate | ~2.5× | Scales linearly per layer; well under GPU budgets |
+| VRAM | ~32MB worst case | ~80MB worst case | 2048² RGBA = 16MB. Fine on desktop, tight on mobile |
+| IndexedDB | One-time on save | Same | Not a per-frame cost |
+
+**Bottom line:** 5 layers is very doable on desktop/laptop. Mobile needs care (smaller texture clamp, maybe a lower cap). We'll revisit in Phase 4 once we have a live FPS readout.
+
+---
+
+## Phase 1 — Foundation: up to 5 layers + collapsible cards
+
+**Goal:** lift the 2-layer cap to 5 and make the editor usable when multiple layers are present.
+
+**In scope:**
+- Raise the layer cap from 2 to 5; stack starts at 1 with an **Add layer** button (disabled at 5).
+- Each layer is a self-contained card in a vertical list.
+- **Collapse / expand per card** — collapsed state shows a compact header strip; expanded shows the full control set as it does today.
+- **Collapse all / Expand all** buttons above the list.
+- **Layer count indicator** ("Layers: 3 / 5").
+- Collapsed state persists in `currentState` so it survives save/reload.
+- Empty layer slots generate zero shader code — no cost for unused layers.
+- **Image resizer on upload** (see below).
+- **Dev overhead monitor** (see below) — visible throughout the phase so we gather real cost data as the feature lands.
+
+### Recommended UX: Smart Accordion (with override)
+
+You're right that both pure-expanded and pure-collapsed have problems. Recommend a **smart accordion with manual override**:
+
+- **First layer starts expanded** by default — familiar, nothing hidden.
+- **Adding a new layer auto-collapses the others and expands the new one.** This answers your "would everything shrink?" worry — no, the act of adding focuses attention on the new card, and the prior ones tuck away.
+- **Manual expand still works any time.** A user can have 2, 3, or all 5 expanded if they want. We don't enforce one-at-a-time like a strict accordion.
+- **Affordance that makes collapse obvious:**
+  - A **chevron icon** on the right edge of the header strip that rotates on toggle.
+  - The **entire header strip** is the click target (not just the chevron).
+  - Clear **hover highlight** on the collapsed strip so it reads as interactive.
+  - **Visual state cue** for "has content vs. empty": an empty slot shows a dashed outline + "Drop image"; a loaded layer shows a solid background. Even without a thumbnail (Phase 4), users can see which layers are populated.
+- **Collapsed header contents (Phase 1):** drag-handle-placeholder · name ("Layer 1", "Layer 2"…) · delete · chevron. Thumbnail + solo/mute come in Phase 4.
+
+Net effect: users never get surprised by a layer suddenly taking up a huge amount of panel height, and the expand affordance is always visible. Predictable but not restrictive.
+
+### Image resizer on upload
+
+Images bigger than the output resolution are wasted memory, so we clamp on upload. Recommendation:
+
+| Mode | Max dimension | VRAM at 5 layers | Good for |
+|---|---|---|---|
+| **Standard (default)** | **1024px longest side** | ~20MB | 99% of cases |
+| **HD (opt-in toggle)** | 2048px longest side | ~80MB | Full-screen non-tiled images with fine detail |
+| Original (not offered) | — | Up to gigabytes | Dangerous — OOM on mobile |
+
+Why 1024 as default:
+- Butterchurn's warp feedback blurs everything anyway — fine detail is imperceptible at play time.
+- When tiled (the common case), each tile is 1/16 or 1/64 of screen area. A 1024px source is already oversampled for a 4×4 tile grid on a 1080p screen.
+- Both 1024 and 2048 are powers of two — ideal for GPU texture sampling and mipmaps.
+- JPEG or PNG is preserved (no forced conversion) — we just resize the pixel grid.
+
+Flow: user drops a 4000×3000px photo → we canvas-downscale to 1024×768 before creating the texture → show a brief toast "Resized 4000×3000 → 1024×768 (8.2MB → 420KB)". Original is never stored. An **HD toggle** in the layer card lets power users bump this specific layer to 2048px.
+
+### Dev overhead monitor
+
+Pull forward the FPS readout from Phase 4 as a dev-only monitor so we observe real cost as layers come in. Minimum:
+- **Frame time** (ms, rolling average over 60 frames).
+- **Texture VRAM estimate** (sum of layer `width × height × 4` bytes).
+- **Active layer count**.
+- **Shader rebuild time** on each edit (one-shot readout after each rebuild).
+
+Hidden behind a keybinding (**backtick `` ` ``**) in Phase 1 — becomes a polished user-facing HUD in Phase 4. *(Originally planned as Shift+F12, but macOS F-keys need Fn and browsers eat Shift+F12. Backtick is the classic dev-overlay convention with zero OS conflict, and we skip the handler when focus is in an input so it doesn't steal typing.)*
+
+**Out of scope (deferred):**
+- Reordering the stack (Phase 2).
+- Per-layer canvas mirror (Phase 3).
+- Thumbnails, solo/mute, rename, live preview — full user-facing FPS HUD (Phase 4).
+
+**Decisions (settled before Phase 1 build):**
+- **Internal design: N-layer generic; UI cap at 5.** Shader builder, state array, and card renderer all walk the array; raising the cap later is a one-line change.
+- **HD toggle: global "HD uploads" switch above the dropzone** (revised from per-layer). Because resize is destructive, the choice has to be made *before* upload — a per-layer switch would be meaningless after the fact. Each uploaded layer shows a small **HD** badge in its header so users can see which layers used HD. Flip the toggle between uploads to mix HD and Standard layers in one preset.
+- **Resize: destructive.** The original upload is downscaled before texture creation and never stored. Saves disk and IndexedDB; we have no need for the source.
+
+**Success criteria:**
+- User can add/remove up to 5 layers without reload.
+- With 5 expanded cards the panel scrolls cleanly (max-height + overflow).
+- All existing 2-layer presets load unchanged.
+- Uploading a 10MP photo never produces a texture larger than the configured max.
+- Dev monitor shows frame time staying under ~16ms (60fps) with 5 Standard-size layers on a typical laptop.
+
+### Phase 1 polish (landed after first user pass)
+
+- **Brighter card background** — bumped from `--bg-3` (#111) to #1d1d1f with a stronger border. Collapsed cards stay slightly dimmer so the stack reads as "active on top, resting below." Full thumbnail-driven visual distinction comes in Phase 4.
+- **Delete confirmation modal** — removed the silent-on-click delete. Now a dialog shows the filename with a red Delete button and a Cancel; backdrop click / Escape cancels, Enter confirms.
+- **Dev HUD keybinding: backtick (`` ` ``)** — swapped from Shift+F12 after macOS testing (F-keys need Fn, browser eats Shift+F12). Skips the handler when focus is in an input so it doesn't steal typing.
+- **Live Mirror status pill** — next to the "Mirror" label in each layer card. Shows the active mode (`Off`, `H`, `V`, `Quad`, `Kaleido`) and, when a mode is active, the scope (`H · Per Tile`, `H · Whole Image`). Makes every click self-evident — users never wonder "did that register?" and gives us a diagnostic breadcrumb if the shader ever misbehaves.
+- **Per-image Mirror scope — "Per Tile" vs "Whole Image"** — delivers the core of Phase 3 early. The existing Mirror control folds *inside each tile*; users expect per-image mirror to fold the whole tiled group. Added a second segmented row that appears whenever Mirror is active: **[Per Tile] [Whole Image]**. "Whole Image" applies the fold upstream of the tile pipeline (via a new `_uvf` local in GLSL) so the entire tiled field mirrors as one unit — effectively a per-image canvas mirror, which was Phase 3's goal. Row auto-hides when Mirror is Off.
+- **Diagnostic hook** — `window.__editorInspector` exposes the live EditorInspector in DevTools so we can introspect `currentState`, layer entries, and `_imageTextures` during debugging without adding logging. Harmless in production; zero bundle cost beyond one assignment.
+
+### Deferred to Phase 2 (explicit pickup list)
+
+These items came up during Phase 1 testing but belong in the reorder phase:
+- **Drag-reorder affordance** — right now you can't grab a card; there's no handle or cursor feedback. Phase 2 adds a visible drag handle on the left edge and full drag-to-reorder behavior.
+- **Trash icon** — the current `×` close icon is easy to miss; Phase 2 swaps it for a trash icon (and keeps the confirmation modal).
+
+### What this means for Phase 3
+
+The "per-image canvas mirror" goal is effectively met by the Mirror scope toggle (see above). **Phase 3 as originally scoped is largely delivered**, with one remaining item worth doing in a small Phase 3 pickup (not a full phase):
+- **Parity with scene Canvas Mirror's control set** — scene mirror offers `None / ↔ H / ↕ V / ✦ Both`. Per-image Mirror already covers all four and adds Kaleido. No extra work required.
+- **Possible future add:** a *second* independent fold inside the same layer (stacking field-scope H with tile-scope V, etc.). Parked for now — no user demand yet and the single-scope control feels sufficient.
+
+---
+
+## Phase 2 — Reordering + Z-order
+
+**Goal:** let users control which image renders on top.
+
+**In scope:**
+- **Drag handle** on the left edge of each card.
+- Reordering mutates the `currentState.images[]` array order directly — the shader builder already walks that array in order, so "top of UI = drawn last = on top" falls out naturally.
+- Small **index badge** on each card ("Layer 3 of 5") so users understand what the order means.
+
+**Out of scope:**
+- Per-layer rendering effects (Phase 3+).
+
+**Open questions:**
+- Keyboard reorder for accessibility (↑/↓ when card is focused)?
+- Do we animate the reorder, or snap?
+
+**Success criteria:**
+- Reordering is visible in the live canvas within one frame of drop.
+- Undo/redo treats a reorder as a single history step.
+
+---
+
+## Phase 3 — Per-image Canvas Mirror  *(delivered early during Phase 1 polish)*
+
+**Goal:** let each image fold its own UV independently of the scene mirror.
+
+**Status:** delivered via the Mirror scope toggle added in Phase 1 polish.
+- The existing per-image Mirror control (Off/H/V/Quad/Kaleido) gained a **Per Tile / Whole Image** scope row.
+- "Whole Image" folds the entire tiled field as one unit (the Phase 3 intent) — cheaper than scene mirror because it skips the base warp buffer.
+- Scene-level Canvas Mirror stays untouched — both compose cleanly.
+
+**What's left (minor, can roll into any future small pass):**
+- Naming audit — "Mirror" per-image vs "Canvas Mirror" scene-level. Could rename the per-image control to "Fold" to avoid confusion with the scene mirror, if user feedback warrants it.
+- No new functionality to build here.
+
+---
+
+## Phase 4 — Workflow quality-of-life
+
+**Goal:** make tuning 3+ layers pleasant instead of overwhelming.
+
+**In scope:**
+- **Solo / Mute per layer** — solo shows only that layer; mute hides it. Non-destructive; no state change to image settings.
+- **Live thumbnails** — tiny 64×64 canvas in each card header, updated ~1× per second. Makes collapsed cards actually informative.
+- **Layer name field** — rename "Image 1" to "Logo", "Backdrop", "Strobe", etc.
+- **Reset this layer** — per-card reset button (global reset is too aggressive at 5 layers).
+- **FPS readout** — small HUD corner, red when < 30fps. Ties back to the Phase 1 performance question.
+- **Thumbnail scrubbing** — hover a collapsed thumbnail to temporarily solo it; release to restore.
+
+**Out of scope:**
+- Copy-between-layers and layer "Looks" (Phase 6).
+
+**Open questions:**
+- Solo model: one-layer-solo (radio) or multi-solo (toggle)?
+- Thumbnail render cost at 5 layers × 1Hz — negligible, but worth measuring with the FPS readout we're adding anyway.
+
+**Success criteria:**
+- Can isolate any one layer in <1 second via solo.
+- FPS counter visible but unobtrusive; red threshold matches what we see on a typical laptop with 5 layers.
+
+---
+
+## Phase 5 — Per-layer audio reactivity
+
+**Goal:** unlock variety without new animation code. Right now almost everything reacts to `bass`; butterchurn exposes `mid`, `treb`, plus attenuated variants.
+
+**In scope:**
+- **Reactivity source dropdown** attached to each reactive control (Pulse, Bounce, Beat Fade, future Shake/Strobe): **Bass / Mid / Treble / Volume / Off**.
+- **Beat divider** per layer: trigger every 1st / 2nd / 4th / 8th beat (detected via `bass_att` threshold crossings).
+- **Silence gate** — hide layer when audio falls below a threshold. Great for "hits-only" accent layers.
+- **Reactivity curve picker** — linear / squared / cubed / thresholded. Squared matches what our main sliders already use.
+
+**Out of scope:**
+- Any new animation primitives themselves — those come in Phase 7.
+
+**Open questions:**
+- One shared dropdown component across all reactive controls, or grouped (per-layer "Reactivity" mini-panel)?
+- Does the beat divider live per-control or per-layer? Per-layer is simpler; per-control gives more expressive power.
+
+**Success criteria:**
+- A layer can be driven exclusively by treble with no bass coupling.
+- A layer can be visible only during silence, or only during loud sections.
+
+---
+
+## Phase 6 — Layer templates ("Looks")
+
+**Goal:** build a vocabulary of reusable layer configurations.
+
+**In scope:**
+- **Copy settings to layer N** — right-click / kebab menu → copy all settings into another layer.
+- **Save layer as "Look"** — persist a named layer snapshot. Dropdown in each card applies a saved Look instantly.
+- **Randomize this layer** — per-card dice button (in addition to global randomize).
+- **Link slider across layers** — small chain icon on a slider; clicked sliders sync their value across all layers (useful for Spin, Sway Speed, etc.).
+
+**Open questions:**
+- Are Looks global to the app or per-preset? Global is more reusable; per-preset is more contained.
+- How do we handle Looks that reference an image the user doesn't have loaded? Fall through with placeholder? Skip image fields entirely?
+
+**Success criteria:**
+- Tuning 5 layers feels like composing from blocks, not dialing each one from zero.
+
+---
+
+## Phase 7 — New animation primitives
+
+**Goal:** expand what a single layer can *do*. Ship these individually, pick order based on what's most wanted after Phase 1–6.
+
+Candidates:
+- **Lissajous path** — replace/supplement Orbit with freq-x, freq-y, phase. Ratios like 3:2 give bow-ties; 3:4 four-leaf clovers.
+- **Beat Shake / Jitter** — omnidirectional displacement spike on kick, decays over ~4 frames. Different feel from the directional Bounce.
+- **Strobe / Blink** — hard binary opacity cut driven by a bass threshold. Distinct from smooth Beat Fade.
+- **Depth Stack (Z-phase offset)** — in tunnel mode, offset each layer's phase so they feel at different depths — genuine parallax during zoom.
+- **Scatter / Radial Clone** — draw N copies in a ring around the anchor. Count (2–12) × Ring Radius. Each clone can spin in place.
+- **Path recording** — drag the anchor dot for 4 seconds, record it as a looping path the layer follows.
+- **Chromatic aberration** — per-layer RGB-channel UV offset. Two extra samples, huge payoff.
+- **Edge / Sobel mode** — replace sampled pixel with its edge detection. Any image → neon line art.
+- **Posterize / Threshold** — bucket colors to N levels. Pairs with tint + hue spin we already have.
+- **Displacement mapping** — use Layer 2 as a UV displacement source for Layer 1. Rippling, heat-haze, glitch.
+
+**Open questions:**
+- Order matters — pick the two highest-impact first (Lissajous + Strobe are my vote).
+- Some of these (Displacement, Scatter) will change the shader builder shape. Schedule those later in the phase.
+
+---
+
+## Phase 8 — New image sources (non-camera)
+
+**Goal:** let a layer be something other than an uploaded image file.
+
+**In scope:**
+- **Text layer** — type a string; we render it to an offscreen canvas with font/size/color; that canvas becomes the texture. Updates on edit. Opens the door to beat-synced lyric reveals.
+- **Procedural generator** — radial gradient, checkerboard, noise, stripes, circle. No upload needed. Great for pure-shape layers that want animation tools but no photo.
+- **Canvas snapshot** — "freeze current visualizer output and use it as an image." Enables feedback loops.
+- **SVG import** — render SVG to canvas, then texture. Scales cleanly, tiny file size.
+
+**Out of scope:**
+- **Webcam** — explicitly deferred (see Future ideas).
+
+**Open questions:**
+- Text layer font selection — system fonts only, or bundled web fonts? Bundling adds to the build; system fonts vary per device.
+- Canvas snapshot — does it grab the current frame (still) or keep resampling live (video feedback)? Start with still; live is Phase 9+ territory.
+
+---
+
+## Phase 9 — Render-quality controls
+
+**Goal:** polish layer. Not foundation.
+
+Candidates:
+- **Per-layer blur** — 3×5 gaussian tap. Pairs beautifully with additive blending for glow layers.
+- **Per-layer motion blur** — blend current frame with prior frame's position at reduced alpha. Cheap trail effect independent of butterchurn's decay.
+- **Per-layer color grade** — brightness / contrast / saturation after the tint stage.
+- **Per-layer vignette mask** — darken edges, focus attention. Nice on center spotlight layers.
+
+**Open questions:**
+- Blur is the heaviest of these. Worth a dedicated "quality vs. performance" toggle that drops tap count?
+
+---
+
+## Future ideas — deferred
+
+These are good ideas we're explicitly **not** picking up in the current phase plan:
+
+- **Webcam layer** — `getUserMedia({video:true})` as a live texture. Powerful for live events ("AV selfie" mode), but requires:
+  - Permissions-Policy change (`camera=()` → `camera=(self)` in [nginx.conf](nginx.conf)).
+  - User-facing privacy prompt and clear UX around a camera indicator.
+  - Decision on whether captured frames ever leave the browser (they shouldn't — but we need to say so in the UI).
+  - Revisit once Phases 1–8 are solid. Not complex to build; it's a product/privacy decision, not an engineering one.
+- **Layer cap beyond 5** — worth reconsidering after Phase 4 FPS telemetry shows real-world headroom.
+- **Export format for large presets** — see Cross-phase open questions below.
+- **AI-assisted Look suggestions** — "describe a vibe, get a layer stack." Too speculative to scope now.
+
+---
+
+## Cross-phase open questions
+
+These apply across multiple phases; worth deciding once rather than re-litigating each time:
+
+- **Mobile policy** — silently cap mobile at 3 layers, or expose a "Performance mode" switch and let users opt into 5?
+- **Schema versioning** — `schemaVersion: 1` today. Moving from "fixed 2 images" to "array of up to N" is technically already supported (the schema stores `images` as an array), so we likely don't need a `v2` bump. Confirm in Phase 1.
+- **Export size** — a single preset with 5 × 2048² images can serialize to 100+MB. Options: cap export resolution, strip images and re-prompt on import, or keep full-fat and accept the size. Decide before Phase 8 (new sources make this worse).
+- **Undo/redo granularity** — every phase adds new controls. Confirm each lands as a single history step, not per-keystroke.

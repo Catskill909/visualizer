@@ -115,6 +115,8 @@ async function boot(connectAudioFn) {
 
     // Wire up the inspector panel
     inspector = new EditorInspector(engine);
+    // Diagnostic hook — lets DevTools console introspect state without touching internals.
+    window.__editorInspector = inspector;
 
     // Editor owns its own preset state — stop the engine's auto-cycle
     // so it never overrides what the user is building.

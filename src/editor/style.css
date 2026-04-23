@@ -632,6 +632,30 @@ html, body {
   font-size: 10px; color: var(--text-3); white-space: nowrap;
 }
 
+/* Layer count + HD toggle + collapse-all bar (above dropzone) */
+.layers-bar {
+  display: flex; align-items: center; gap: 10px;
+  margin: 6px 0 8px;
+}
+.layers-count {
+  font-size: 10px; color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  flex: 1;
+}
+.hd-upload-row {
+  display: flex; align-items: center; gap: 6px; cursor: pointer;
+}
+.hd-upload-label {
+  font-size: 10px; color: var(--text-3); white-space: nowrap;
+}
+.mini-btn {
+  background: transparent; border: 1px solid var(--border);
+  border-radius: var(--r-s); color: var(--text-3);
+  font-size: 13px; line-height: 1; cursor: pointer;
+  padding: 3px 7px; transition: all 0.12s;
+}
+.mini-btn:hover { border-color: var(--border-hi); color: var(--text); }
+
 .image-dropzone {
   display: flex; flex-direction: column; align-items: center;
   justify-content: center; gap: 8px;
@@ -648,12 +672,20 @@ html, body {
   background: rgba(255,255,255,0.04);
   color: var(--text-2);
 }
+.image-dropzone.disabled {
+  opacity: 0.4; cursor: not-allowed; pointer-events: none;
+}
 
 .image-layer-card {
   display: flex; flex-direction: column;
-  background: var(--bg-3); border: 1px solid var(--border);
+  background: #1d1d1f;                /* brighter than bg-3 so cards pop in dark mode */
+  border: 1px solid rgba(255,255,255,0.14);
   border-radius: var(--r-m); margin-bottom: 8px;
   overflow: hidden;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset;
+}
+.image-layer-card.collapsed {
+  background: #18181a;                /* slightly dimmer when collapsed */
 }
 
 /* ── card header ── */
@@ -661,11 +693,29 @@ html, body {
   display: flex; align-items: center; gap: 6px;
   padding: 7px 10px 6px;
   border-bottom: 1px solid var(--border);
+  cursor: pointer; user-select: none;
+  transition: background 0.12s;
 }
+.layer-header:hover { background: rgba(255,255,255,0.03); }
+.image-layer-card.collapsed .layer-header { border-bottom-color: transparent; }
+.image-layer-card.collapsed .layer-controls { display: none; }
+
+.layer-chevron {
+  flex-shrink: 0; color: var(--text-3);
+  transition: transform 0.18s ease;
+}
+.image-layer-card.collapsed .layer-chevron { transform: rotate(-90deg); }
+
 .layer-name {
   flex: 1; min-width: 0;
   font-size: 11px; color: var(--text-2);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.layer-hd-badge {
+  flex-shrink: 0;
+  font-size: 9px; font-weight: 600; letter-spacing: 0.06em;
+  padding: 2px 5px; border-radius: 3px;
+  background: rgba(255,255,255,0.10); color: var(--text-2);
 }
 .layer-remove {
   background: transparent; border: none;
@@ -766,6 +816,16 @@ html, body {
   text-transform: uppercase;
   color: var(--text-2);
   margin: 0 0 5px;
+}
+.lseg-status {
+  font-weight: 500;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  color: var(--text-3);
+  margin-left: 6px;
+  padding: 1px 5px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 3px;
 }
 
 /* ── Mirror segmented control ─────────────────────────────────────────── */
@@ -893,6 +953,19 @@ html, body {
 
 .save-modal-actions { display: flex; gap: 8px; }
 
+.layer-delete-msg {
+  font-size: 12.5px; line-height: 1.45; color: var(--text-2);
+  margin: 0 0 18px;
+}
+.danger-btn {
+  flex: 1; padding: 9px 16px;
+  background: #d93636; color: #fff;
+  border: none; border-radius: var(--r-s);
+  font-family: var(--font); font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: background 0.15s;
+}
+.danger-btn:hover { background: #e24747; }
+
 /* ══════════════════════════════════════════════════════════════════════
    MINI PLAYER
    ══════════════════════════════════════════════════════════════════════ */
@@ -980,6 +1053,38 @@ html, body {
 @keyframes toast-in {
   from { transform: translateX(-50%) translateY(6px); opacity: 0; }
   to   { transform: translateX(-50%) translateY(0);   opacity: 1; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   DEV HUD (Shift+F12 toggle) — overhead monitor for layer scaling work
+   ══════════════════════════════════════════════════════════════════════ */
+#dev-hud {
+  position: fixed; top: 14px; left: 14px;
+  z-index: 400;
+  min-width: 150px;
+  padding: 8px 10px;
+  background: rgba(10,10,14,0.88);
+  border: 1px solid var(--border-hi);
+  border-radius: var(--r-m);
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 10.5px; color: var(--text-2);
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+}
+#dev-hud[hidden] { display: none; }
+.dev-hud-title {
+  font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text-3); margin-bottom: 4px;
+}
+.dev-hud-row {
+  display: flex; justify-content: space-between; gap: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.dev-hud-row > span:first-child { color: var(--text-3); }
+.dev-hud-hint {
+  margin-top: 4px; padding-top: 4px;
+  border-top: 1px solid var(--border);
+  font-size: 9px; color: var(--text-3);
 }
 
 /* ══════════════════════════════════════════════════════════════════════
