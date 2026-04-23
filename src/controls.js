@@ -1,7 +1,16 @@
 /**
  * ControlPanel — UI bindings, auto-hide, keyboard shortcuts, preset drawer
  */
-import { getCustomPreset, deleteCustomPreset, deleteImage, CUSTOM_PREFIX } from './customPresets.js';
+import {
+  getCustomPreset,
+  deleteCustomPreset,
+  deleteImage,
+  exportPreset,
+  exportAllPresets,
+  importFromFile,
+  loadAllCustomPresets,
+  CUSTOM_PREFIX,
+} from './customPresets.js';
 
 export class ControlPanel {
   constructor(engine) {
@@ -65,6 +74,11 @@ export class ControlPanel {
       deletePresetName: document.getElementById('delete-preset-name'),
       btnCancelDeletePreset: document.getElementById('btn-cancel-delete-preset'),
       btnConfirmDeletePreset: document.getElementById('btn-confirm-delete-preset'),
+      backupBar: document.getElementById('backup-bar'),
+      btnExportAll: document.getElementById('btn-export-all'),
+      btnImportPresets: document.getElementById('btn-import-presets'),
+      importFileInput: document.getElementById('import-file-input'),
+      backupCount: document.getElementById('backup-count'),
       btnFavorite: document.getElementById('btn-favorite'),
       btnHelp: document.getElementById('btn-help'),
       btnAudioTuning: document.getElementById('btn-audio-tuning'),
@@ -192,6 +206,7 @@ export class ControlPanel {
       els.tabAll.classList.add('active');
       els.tabFavorites.classList.remove('active');
       els.tabCustom.classList.remove('active');
+      this.syncBackupBar();
       this.filterPresets();
     });
 
@@ -200,6 +215,7 @@ export class ControlPanel {
       els.tabFavorites.classList.add('active');
       els.tabAll.classList.remove('active');
       els.tabCustom.classList.remove('active');
+      this.syncBackupBar();
       this.filterPresets();
     });
 
@@ -208,7 +224,17 @@ export class ControlPanel {
       els.tabCustom.classList.add('active');
       els.tabAll.classList.remove('active');
       els.tabFavorites.classList.remove('active');
+      this.syncBackupBar();
       this.filterPresets();
+    });
+
+    // --- Backup / Restore custom presets ---
+    els.btnExportAll.addEventListener('click', () => this.exportAllCustomPresets());
+    els.btnImportPresets.addEventListener('click', () => els.importFileInput.click());
+    els.importFileInput.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) this.importCustomPresetsFromFile(file);
+      e.target.value = ''; // allow re-selecting the same file
     });
 
     // --- Hidden mgmt (Show Hidden toggle + Unhide All modal) ---
@@ -489,6 +515,86 @@ export class ControlPanel {
     if (this.drawerOpen) this.filterPresets();
   }
 
+  // ===================== BACKUP / RESTORE =====================
+
+  syncBackupBar() {
+    const { backupBar, backupCount, btnExportAll } = this.els;
+    if (!backupBar) return;
+    const count = Object.keys(loadAllCustomPresets()).length;
+    backupCount.textContent = count;
+    btnExportAll.disabled = count === 0;
+    backupBar.classList.toggle('hidden', this.currentTab !== 'custom');
+  }
+
+  downloadJson(filename, data) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  async exportAllCustomPresets() {
+    const count = Object.keys(loadAllCustomPresets()).length;
+    if (count === 0) {
+      this.showToast('No custom presets to back up');
+      return;
+    }
+    this.showToast('⏳ Preparing backup…');
+    try {
+      const backup = await exportAllPresets();
+      const date = new Date().toISOString().slice(0, 10);
+      this.downloadJson(`discocast-presets-${date}.json`, backup);
+      this.showToast(`💾 Backed up ${count} preset${count === 1 ? '' : 's'}`);
+    } catch (err) {
+      console.error('Export failed:', err);
+      this.showToast('❌ Export failed — see console');
+    }
+  }
+
+  async exportSingleCustomPreset(name) {
+    const id = name.slice(CUSTOM_PREFIX.length).split(':')[0];
+    const record = getCustomPreset(id);
+    if (!record) return;
+    try {
+      const data = await exportPreset(id);
+      const safe = (record.name || 'preset').replace(/[^a-z0-9_\-]+/gi, '_').slice(0, 60);
+      this.downloadJson(`${safe}.preset.json`, data);
+      this.showToast(`💾 Exported "${this.truncate(record.name, 40)}"`);
+    } catch (err) {
+      console.error('Export failed:', err);
+      this.showToast('❌ Export failed — see console');
+    }
+  }
+
+  async importCustomPresetsFromFile(file) {
+    this.showToast('⏳ Importing…');
+    try {
+      const text = await file.text();
+      const { imported, failed } = await importFromFile(text);
+      this.engine.refreshCustomPresets();
+      this.syncBackupBar();
+      if (this.drawerOpen) this.filterPresets();
+
+      if (imported && !failed.length) {
+        this.showToast(`📥 Imported ${imported} preset${imported === 1 ? '' : 's'}`);
+      } else if (imported && failed.length) {
+        this.showToast(`📥 Imported ${imported}, ${failed.length} failed`);
+        console.warn('Some presets failed to import:', failed);
+      } else {
+        this.showToast('❌ Nothing imported — check file format');
+        console.warn('Import failed:', failed);
+      }
+    } catch (err) {
+      console.error('Import failed:', err);
+      this.showToast(`❌ Import failed: ${err.message}`);
+    }
+  }
+
   // ===================== START FLOWS =====================
 
   async startWithMic() {
@@ -708,6 +814,7 @@ export class ControlPanel {
     this.drawerOpen = true;
     this.engine.refreshCustomPresets();
     this.els.presetDrawer.classList.remove('hidden');
+    this.syncBackupBar();
     this.populatePresetList();
     this.els.presetSearch.value = '';
     this.els.presetSearch.focus();
@@ -899,8 +1006,18 @@ export class ControlPanel {
 
       li.appendChild(hideSpan);
 
-      // Trash icon — custom presets only
+      // Download + Trash icons — custom presets only
       if (name.startsWith(CUSTOM_PREFIX)) {
+        const exportSpan = document.createElement('span');
+        exportSpan.className = 'preset-export';
+        exportSpan.setAttribute('data-tooltip', 'Export');
+        exportSpan.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 3a1 1 0 0 1 1 1v9.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42L11 13.6V4a1 1 0 0 1 1-1zM5 19a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H6a1 1 0 0 1-1-1z"/></svg>';
+        exportSpan.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.exportSingleCustomPreset(name);
+        });
+        li.appendChild(exportSpan);
+
         const deleteSpan = document.createElement('span');
         deleteSpan.className = 'preset-delete';
         deleteSpan.setAttribute('data-tooltip', 'Delete');

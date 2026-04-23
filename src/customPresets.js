@@ -192,6 +192,15 @@ export async function importPreset(json) {
 
     if (!data.name) throw new Error('Preset must have a name');
 
+    // Rename on name collision so we never clobber an existing preset
+    const existingNames = new Set(Object.values(loadAllCustomPresets()).map(p => p.name));
+    let name = data.name;
+    if (existingNames.has(name)) {
+        let n = 2;
+        while (existingNames.has(`${data.name} (imported${n > 2 ? ' ' + n : ''})`)) n++;
+        name = `${data.name} (imported${n > 2 ? ' ' + n : ''})`;
+    }
+
     // Assign a fresh id to avoid collisions
     const id = generateId();
     const images = [];
@@ -212,9 +221,68 @@ export async function importPreset(json) {
     return saveCustomPreset({
         ...data,
         id,
+        name,
         images,
         schemaVersion: SCHEMA_VERSION,
         createdAt: Date.now(),
         updatedAt: Date.now(),
     });
+}
+
+// ---------------------------------------------------------------------------
+// Bulk export / import — one JSON file for the whole library
+// ---------------------------------------------------------------------------
+
+/**
+ * Export every custom preset as an array with image blobs inlined.
+ * Returned shape: { version: 1, exportedAt: ISO, presets: [...] }
+ */
+export async function exportAllPresets() {
+    const all = loadAllCustomPresets();
+    const ids = Object.keys(all);
+    const presets = await Promise.all(ids.map(id => exportPreset(id)));
+    return {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        presets,
+    };
+}
+
+/**
+ * Import from a JSON payload that is either:
+ *   - a bulk backup:  { version, presets: [...] }
+ *   - an array:       [...]  (legacy / hand-rolled)
+ *   - a single preset: { id, name, ... }
+ * Returns { imported: N, failed: [{ name, error }] }.
+ */
+export async function importFromFile(json) {
+    let data;
+    try {
+        data = typeof json === 'string' ? JSON.parse(json) : json;
+    } catch {
+        throw new Error('Invalid JSON file');
+    }
+
+    let list;
+    if (Array.isArray(data)) {
+        list = data;
+    } else if (data && Array.isArray(data.presets)) {
+        list = data.presets;
+    } else if (data && data.name) {
+        list = [data];
+    } else {
+        throw new Error('Unrecognized preset file format');
+    }
+
+    const failed = [];
+    let imported = 0;
+    for (const preset of list) {
+        try {
+            await importPreset(preset);
+            imported++;
+        } catch (err) {
+            failed.push({ name: preset?.name || '(unnamed)', error: err.message });
+        }
+    }
+    return { imported, failed };
 }

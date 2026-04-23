@@ -779,7 +779,8 @@ kbd {
    escape the drawer's overflow clipping, and fire near-instantly. */
 .preset-heart[data-tooltip]::after,
 .preset-hide[data-tooltip]::after,
-.preset-delete[data-tooltip]::after {
+.preset-delete[data-tooltip]::after,
+.preset-export[data-tooltip]::after {
   bottom: auto;
   top: 50%;
   left: auto;
@@ -791,11 +792,49 @@ kbd {
 }
 .preset-heart[data-tooltip]:hover::after,
 .preset-hide[data-tooltip]:hover::after,
-.preset-delete[data-tooltip]:hover::after {
+.preset-delete[data-tooltip]:hover::after,
+.preset-export[data-tooltip]:hover::after {
   opacity: 1;
   visibility: visible;
   transform: translateY(-50%) translateX(0);
 }
+
+/* ===== Backup bar (My Presets tab) ===== */
+.backup-bar {
+  display: flex; gap: 8px;
+  padding: 0 20px 12px;
+}
+.backup-btn {
+  flex: 1;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 7px 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  color: var(--text-secondary);
+  font-family: var(--font); font-size: 0.72rem; font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.backup-btn:hover:not(:disabled) {
+  background: var(--hover-subtle);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.backup-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.backup-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+/* Export icon on custom preset rows — matches .preset-delete sizing */
+.preset-export {
+  flex-shrink: 0; width: 16px; height: 16px;
+  opacity: 0.35; transform: scale(0.9);
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+  margin-left: 6px;
+}
+.preset-export svg { width: 100%; height: 100%; fill: currentColor; }
+.drawer-list li:hover .preset-export { opacity: 0.85; transform: scale(1); }
+.drawer-list li:hover .preset-export:hover { color: #6fc2ff; opacity: 1; transform: scale(1.15); }
 
 /* AUDIO TUNING PANEL (Popover) */
 .popover {
