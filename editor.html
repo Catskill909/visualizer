@@ -84,21 +84,21 @@
                     <input type="text" id="preset-name-input" class="panel-name-input" placeholder="Untitled preset"
                         value="Untitled preset" aria-label="Preset name" maxlength="64" spellcheck="false" />
                     <div class="panel-header-btns">
-                        <button id="btn-undo" class="phb" disabled title="Undo (⌘Z)">
+                        <button id="btn-undo" class="phb" disabled data-tooltip="Undo (⌘Z)">
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                 stroke-width="2">
                                 <path d="M3 7v6h6" />
                                 <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
                             </svg>
                         </button>
-                        <button id="btn-redo" class="phb" disabled title="Redo (⌘⇧Z)">
+                        <button id="btn-redo" class="phb" disabled data-tooltip="Redo (⌘⇧Z)">
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                 stroke-width="2">
                                 <path d="M21 7v6h-6" />
                                 <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13" />
                             </svg>
                         </button>
-                        <button id="btn-ab" class="phb phb--ab" title="Hold to compare original">A/B</button>
+                        <button id="btn-ab" class="phb phb--ab" data-tooltip="Hold to compare original">A/B</button>
                     </div>
                 </header>
 
@@ -286,7 +286,7 @@
                         <div class="images-header" style="margin-top:16px">
                             <p class="section-label" style="margin:0">Image Layers</p>
                             <label class="images-only-row"
-                                title="Hide the base visualizer — show only uploaded images over black">
+                                data-tooltip="Hide the base visualizer — show only uploaded images over black">
                                 <span class="images-only-label">Images Only</span>
                                 <label class="toggle-switch toggle-switch--sm">
                                     <input type="checkbox" id="toggle-images-only" />
@@ -298,7 +298,7 @@
                         <div class="layers-bar">
                             <span class="layers-count" id="layers-count">Layers: 0 / 5</span>
                             <label class="hd-upload-row"
-                                title="Next upload gets resized to 2048px (HD) instead of 1024px. Uses more VRAM.">
+                                data-tooltip="Next upload gets resized to 2048px (HD) instead of 1024px. Uses more VRAM.">
                                 <span class="hd-upload-label">HD uploads</span>
                                 <label class="toggle-switch toggle-switch--sm">
                                     <input type="checkbox" id="toggle-hd-uploads" />
@@ -306,7 +306,7 @@
                                 </label>
                             </label>
                             <button class="mini-btn" id="btn-collapse-all" type="button"
-                                title="Collapse / expand all layers">⇕</button>
+                                data-tooltip="Collapse / expand all layers">⇕</button>
                         </div>
                         <div class="image-dropzone" id="image-dropzone" role="button" tabindex="0"
                             aria-label="Drop image here or click to browse">
@@ -382,7 +382,7 @@
                 <span id="mp-time" class="mp-time">0:00 / 0:00</span>
             </div>
             <div class="mp-controls">
-                <button id="mp-play" class="mp-btn" type="button" title="Play / Pause">
+                <button id="mp-play" class="mp-btn" type="button" data-tooltip="Play / Pause">
                     <svg id="mp-icon-play" viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
                         <path d="M8 5v14l11-7z" />
                     </svg>

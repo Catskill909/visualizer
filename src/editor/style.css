@@ -681,20 +681,26 @@ html, body {
   background: #1d1d1f;                /* brighter than bg-3 so cards pop in dark mode */
   border: 1px solid rgba(255,255,255,0.14);
   border-radius: var(--r-m); margin-bottom: 8px;
-  overflow: hidden;
+  overflow: visible;                  /* allow [data-tooltip] popups to escape the card */
   box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset;
+}
+/* Keep header hover-bg inside the card's rounded corners now that overflow is visible */
+.image-layer-card > .layer-header:first-child {
+  border-top-left-radius: var(--r-m);
+  border-top-right-radius: var(--r-m);
 }
 .image-layer-card.collapsed {
   background: #18181a;                /* slightly dimmer when collapsed */
 }
 
-/* ── card header ── */
+/* ── card header (Phase 4: taller to fit thumb + name + action buttons) ── */
 .layer-header {
-  display: flex; align-items: center; gap: 6px;
-  padding: 7px 10px 6px;
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px;
   border-bottom: 1px solid var(--border);
   cursor: pointer; user-select: none;
   transition: background 0.12s;
+  min-height: 64px;
 }
 .layer-header:hover { background: rgba(255,255,255,0.03); }
 .image-layer-card.collapsed .layer-header { border-bottom-color: transparent; }
@@ -705,6 +711,72 @@ html, body {
   transition: transform 0.18s ease;
 }
 .image-layer-card.collapsed .layer-chevron { transform: rotate(-90deg); }
+
+/* Static source-image thumbnail in header (Phase 4) */
+.layer-thumb {
+  flex-shrink: 0;
+  width: 48px; height: 48px;
+  border-radius: 4px;
+  background: #0a0a0a;
+  border: 1px solid rgba(255,255,255,0.10);
+  display: block;
+}
+
+/* Meta column: index/HD row + editable name input (Phase 4) */
+.layer-meta {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.layer-meta-top {
+  display: flex; align-items: center; gap: 5px;
+}
+.layer-name-input {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--text);
+  font-family: var(--font); font-size: 12px; font-weight: 500;
+  padding: 3px 5px;
+  outline: none;
+  transition: background 0.12s, border-color 0.12s;
+  width: 100%; min-width: 0;
+}
+.layer-name-input:hover {
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.08);
+}
+.layer-name-input:focus {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.22);
+  cursor: text;
+}
+
+/* Right-side action buttons (Solo / Mute / Reset / Delete) */
+.layer-actions {
+  display: flex; align-items: center; gap: 4px;
+  flex-shrink: 0;
+}
+.layer-action-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-3);
+  font-family: var(--font); font-size: 10px; font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 4px 7px; line-height: 1;
+  cursor: pointer;
+  transition: all 0.12s;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.layer-action-btn:hover { border-color: var(--border-hi); color: var(--text); }
+.layer-action-btn.active { background: rgba(255,255,255,0.14); border-color: rgba(255,255,255,0.35); color: #fff; }
+/* Solo active = warm accent, Mute active = cooler */
+.layer-action-btn.layer-solo.active  { background: rgba(255, 200, 60, 0.22); border-color: rgba(255, 200, 60, 0.55); color: #ffe29a; }
+.layer-action-btn.layer-mute.active  { background: rgba(160, 160, 160, 0.18); border-color: rgba(200, 200, 200, 0.35); color: #ccc; }
+
+/* Visual state on the card itself when soloed / muted */
+.image-layer-card.layer-muted { opacity: 0.62; }
+.image-layer-card.layer-soloed { border-color: rgba(255, 200, 60, 0.45); }
 
 /* Drag handle + index badge (Phase 2) */
 .layer-drag-handle {
@@ -1091,6 +1163,38 @@ html, body {
 @keyframes toast-in {
   from { transform: translateX(-50%) translateY(6px); opacity: 0; }
   to   { transform: translateX(-50%) translateY(0);   opacity: 1; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   TOOLTIPS — fast custom tooltips (native title= has a 500-1500ms delay)
+   Uses data-tooltip=; element receives position: relative via the base rule.
+   ══════════════════════════════════════════════════════════════════════ */
+[data-tooltip] { position: relative; }
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-3px);
+  background: #141416;
+  color: var(--text);
+  padding: 5px 9px;
+  border: 1px solid var(--border-hi);
+  border-radius: var(--r-s);
+  font-size: 11px;
+  font-family: var(--font);
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0; visibility: hidden;
+  transition: opacity 0.08s ease, transform 0.08s ease, visibility 0.08s;
+  z-index: 500;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.45);
+}
+[data-tooltip]:hover::after,
+[data-tooltip]:focus-visible::after {
+  opacity: 1; visibility: visible;
+  transform: translateX(-50%) translateY(0);
 }
 
 /* ══════════════════════════════════════════════════════════════════════

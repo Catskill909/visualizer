@@ -367,7 +367,7 @@ export class EditorInspector {
             const btn = document.createElement('button');
             btn.className = 'base-var-btn' + (i === 0 ? ' active' : '');
             btn.dataset.variation = i;
-            btn.title = v.desc;
+            btn.setAttribute('data-tooltip', v.desc);
             btn.innerHTML = `
         <span class="bv-strip" style="background:${v.color}"></span>
         <span class="bv-body">
@@ -415,7 +415,7 @@ export class EditorInspector {
             const gHex = rgbToHex(...p.glow);
             const btn = document.createElement('button');
             btn.className = 'palette-chip';
-            btn.title = p.name;
+            btn.setAttribute('data-tooltip', p.name);
             btn.dataset.palette = i;
             btn.innerHTML = `
         <span class="chip-dots">
@@ -600,7 +600,7 @@ export class EditorInspector {
             const btn = document.createElement('button');
             btn.className = 'wave-mode-btn' + (mode === BLANK.baseVals.wave_mode ? ' active' : '');
             btn.dataset.mode = mode;
-            btn.title = label;
+            btn.setAttribute('data-tooltip', label);
             btn.innerHTML = `
         <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">${icon}</svg>
         <span class="wave-mode-label">${label}</span>
@@ -1321,6 +1321,9 @@ export class EditorInspector {
             hdMode,             // Phase 1: true if uploaded at HD (2048px) instead of Std (1024px)
             texW: resized.width,
             texH: resized.height,
+            solo: false,        // Phase 4: solo-override (only soloed layers render when any solo is on)
+            muted: false,       // Phase 4: hide this layer unless another layer is solo'd
+            name: file.name.replace(/\.[^.]+$/, '') || 'Layer',  // Phase 4: user-editable display name
         };
         this.currentState.images.push(entry);
 
@@ -1335,7 +1338,7 @@ export class EditorInspector {
 
         card.innerHTML = `
           <div class="layer-header" role="button" aria-expanded="true" tabindex="0">
-            <span class="layer-drag-handle" title="Drag to reorder (or press ↑ / ↓ while focused)"
+            <span class="layer-drag-handle" data-tooltip="Drag to reorder (↑ / ↓ while focused)"
                   tabindex="0" role="button" aria-label="Reorder layer">
               <svg width="10" height="14" viewBox="0 0 10 14" aria-hidden="true">
                 <circle cx="3" cy="2"  r="1.1" fill="currentColor"/>
@@ -1349,18 +1352,37 @@ export class EditorInspector {
             <svg class="layer-chevron" width="10" height="10" viewBox="0 0 12 12" aria-hidden="true">
               <path d="M2 4 L6 8 L10 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            <span class="layer-index-badge" aria-hidden="true">#1</span>
-            <span class="layer-name"></span>
-            ${hdMode ? '<span class="layer-hd-badge" title="Uploaded at HD (2048px). Re-upload to change.">HD</span>' : ''}
-            <button class="layer-remove" aria-label="Delete layer" title="Delete layer">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="3 6 5 6 21 6"/>
-                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                <path d="M10 11v6"/>
-                <path d="M14 11v6"/>
-                <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
-              </svg>
-            </button>
+            <canvas class="layer-thumb" width="48" height="48" aria-hidden="true"></canvas>
+            <div class="layer-meta">
+              <div class="layer-meta-top">
+                <span class="layer-index-badge" aria-hidden="true">#1</span>
+                ${hdMode ? '<span class="layer-hd-badge" data-tooltip="Uploaded at HD (2048px). Re-upload to change.">HD</span>' : ''}
+              </div>
+              <input type="text" class="layer-name-input" maxlength="32" spellcheck="false"
+                     aria-label="Layer name" />
+            </div>
+            <div class="layer-actions">
+              <button class="layer-action-btn layer-solo" type="button"
+                      aria-pressed="false" data-tooltip="Solo (show only this layer)">Solo</button>
+              <button class="layer-action-btn layer-mute" type="button"
+                      aria-pressed="false" data-tooltip="Mute (hide this layer)">Mute</button>
+              <button class="layer-action-btn layer-reset" type="button"
+                      data-tooltip="Reset this layer (undoable)">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="1 4 1 10 7 10"/>
+                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                </svg>
+              </button>
+              <button class="layer-remove" aria-label="Delete layer" data-tooltip="Delete layer">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                  <path d="M10 11v6"/>
+                  <path d="M14 11v6"/>
+                  <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
+                </svg>
+              </button>
+            </div>
           </div>
           <div class="layer-controls">
             <div class="layer-row-inline">
@@ -1406,7 +1428,7 @@ export class EditorInspector {
               <input type="range" class="slider layer-slider-inline" min="0" max="1" step="0.01"
                 value="${Math.sqrt(entry.audioPulse / 2).toFixed(3)}" style="--pct:${(Math.sqrt(entry.audioPulse / 2) * 100).toFixed(1)}%">
               <span class="lsv layer-pulse-val">${entry.audioPulse.toFixed(2)}</span>
-              <span class="layer-ctrl-label" style="margin-left:8px;width:auto" title="Shrink on beat instead of grow">Shrink</span>
+              <span class="layer-ctrl-label" style="margin-left:8px;width:auto" data-tooltip="Shrink on beat instead of grow">Shrink</span>
               <label class="toggle-switch toggle-switch--sm">
                 <input type="checkbox" class="layer-pulse-inv" />
                 <span class="toggle-track"><span class="toggle-thumb"></span></span>
@@ -1417,7 +1439,7 @@ export class EditorInspector {
               <input type="range" class="slider layer-slider-inline layer-spin-sl" min="-3" max="3" step="0.05"
                 value="${entry.spinSpeed}" style="--pct:${pct(entry.spinSpeed, -3, 3)}">
               <span class="lsv layer-spin-val">${entry.spinSpeed.toFixed(2)}</span>
-              <span class="layer-ctrl-label" style="margin-left:8px;width:auto" title="Rotate the whole tile grid instead of each tile">Group</span>
+              <span class="layer-ctrl-label" style="margin-left:8px;width:auto" data-tooltip="Rotate the whole tile grid instead of each tile">Group</span>
               <label class="toggle-switch toggle-switch--sm">
                 <input type="checkbox" class="layer-group-spin" />
                 <span class="toggle-track"><span class="toggle-thumb"></span></span>
@@ -1444,8 +1466,8 @@ export class EditorInspector {
             <div class="layer-center-row">
               <span class="layer-ctrl-label" style="margin-bottom:5px">Center</span>
               <div class="xy-pad-wrap">
-                <canvas class="xy-pad" width="96" height="96" title="Drag to set anchor point"></canvas>
-                <button class="xy-reset" title="Reset to center">↺</button>
+                <canvas class="xy-pad" width="96" height="96" data-tooltip="Drag to set anchor point"></canvas>
+                <button class="xy-reset" data-tooltip="Reset to center">↺</button>
               </div>
             </div>
             <div class="layer-section-divider"></div>
@@ -1486,8 +1508,8 @@ export class EditorInspector {
               <button class="lseg" data-mirror="kaleido">✦ Kaleido</button>
             </div>
             <div class="layer-mirror-scope" role="group" aria-label="Mirror scope" hidden>
-              <button class="lseg lseg-scope active" data-scope="tile" title="Fold inside each tile">Per Tile</button>
-              <button class="lseg lseg-scope" data-scope="field" title="Fold the whole tiled group">Whole Image</button>
+              <button class="lseg lseg-scope active" data-scope="tile" data-tooltip="Fold inside each tile">Per Tile</button>
+              <button class="lseg lseg-scope" data-scope="field" data-tooltip="Fold the whole tiled group">Whole Image</button>
             </div>
             <div class="layer-section-divider"></div>
             <p class="layer-section-label">Tint</p>
@@ -1507,11 +1529,10 @@ export class EditorInspector {
           </div>
         `;
 
-        // Set user-controlled filename safely — file.name can contain markup
-        // and the layer card gets re-built if we ever hydrate from imported JSON.
-        const nameEl = card.querySelector('.layer-name');
-        nameEl.textContent = shortName;
-        nameEl.title = file.name;
+        // Populate the editable name input (value-set is safe — no innerHTML path)
+        const nameInput = card.querySelector('.layer-name-input');
+        nameInput.value = entry.name;
+        nameInput.title = `Filename: ${file.name}`;
 
         // ── Wire controls ───────────────────────────────────────────────────
         const refresh = () => { this._buildCompShader(); this._applyToEngine(); };
@@ -1720,6 +1741,62 @@ export class EditorInspector {
         const dragHandle = card.querySelector('.layer-drag-handle');
         this._wireDragReorder(card, entry, dragHandle);
 
+        // ── Phase 4: inline name edit ────────────────────────────────────────
+        // Stop clicks on the input from toggling collapse. Commit on Enter/blur,
+        // cancel on Escape. preSnap/postSnap make rename undoable.
+        nameInput.addEventListener('click', (e) => e.stopPropagation());
+        nameInput.addEventListener('keydown', (e) => e.stopPropagation());
+        let nameBeforeEdit = entry.name;
+        nameInput.addEventListener('focus', () => { nameBeforeEdit = entry.name; });
+        nameInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); nameInput.blur(); }
+            else if (e.key === 'Escape') { e.preventDefault(); nameInput.value = nameBeforeEdit; nameInput.blur(); }
+        });
+        nameInput.addEventListener('blur', () => {
+            const v = nameInput.value.trim() || 'Layer';
+            nameInput.value = v;
+            if (v === nameBeforeEdit) return;
+            this._preSnap();
+            entry.name = v;
+            this._postSnap();
+        });
+
+        // ── Phase 4: Solo / Mute / Reset ─────────────────────────────────────
+        const soloBtn = card.querySelector('.layer-solo');
+        const muteBtn = card.querySelector('.layer-mute');
+        const resetBtn = card.querySelector('.layer-reset');
+
+        const syncSoloMute = () => {
+            soloBtn.classList.toggle('active', !!entry.solo);
+            soloBtn.setAttribute('aria-pressed', String(!!entry.solo));
+            muteBtn.classList.toggle('active', !!entry.muted);
+            muteBtn.setAttribute('aria-pressed', String(!!entry.muted));
+            card.classList.toggle('layer-muted', !!entry.muted);
+            card.classList.toggle('layer-soloed', !!entry.solo);
+        };
+        syncSoloMute();
+
+        soloBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this._preSnap();
+            entry.solo = !entry.solo;
+            this._postSnap();
+            syncSoloMute();
+            refresh();
+        });
+        muteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this._preSnap();
+            entry.muted = !entry.muted;
+            this._postSnap();
+            syncSoloMute();
+            refresh();
+        });
+        resetBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this._resetImageLayer(entry, card);
+        });
+
         layers.appendChild(card);
         this._updateLayersBar();
         this._updateLayerIndices();
@@ -1731,6 +1808,94 @@ export class EditorInspector {
         this._buildCompShader();
         this._applyToEngine();
         if (!resized.resized) showToast('Image layer added');
+
+        // Phase 4: render the static thumbnail into the header canvas.
+        // Letterbox the image into the 48×48 slot so aspect is preserved.
+        const thumbCanvas = card.querySelector('.layer-thumb');
+        if (thumbCanvas) {
+            const thumbImg = new Image();
+            thumbImg.onload = () => {
+                const ctx = thumbCanvas.getContext('2d');
+                const W = thumbCanvas.width, H = thumbCanvas.height;
+                ctx.fillStyle = '#0a0a0a';
+                ctx.fillRect(0, 0, W, H);
+                const srcAR = thumbImg.naturalWidth / thumbImg.naturalHeight;
+                const dstAR = W / H;
+                let dw, dh, dx, dy;
+                if (srcAR > dstAR) { dw = W; dh = W / srcAR; dx = 0; dy = (H - dh) / 2; }
+                else { dh = H; dw = H * srcAR; dy = 0; dx = (W - dw) / 2; }
+                ctx.drawImage(thumbImg, dx, dy, dw, dh);
+            };
+            thumbImg.src = resized.dataURL;
+            thumbCanvas.setAttribute('data-tooltip', entry.fileName);
+        }
+    }
+
+    // ─── Phase 4: reset a single layer to defaults ─────────────────────────────
+
+    /**
+     * Reset a layer: remove it and re-add the same image from its cached
+     * texture blob. Re-addition goes through _addImageLayer, which builds a
+     * fresh card with every control at default values. Preserves the user's
+     * chosen name; the array position is restored after the async re-add.
+     */
+    async _resetImageLayer(entry, card) {
+        const texObj = this._imageTextures[entry.texName];
+        if (!texObj) return;
+        this._preSnap();
+        const origIdx = this.currentState.images.indexOf(entry);
+        const origName = entry.name;
+        const origHdMode = !!entry.hdMode;
+        const origFileName = entry.fileName || 'image';
+
+        // Remove the old entry + card + texture binding
+        if (origIdx !== -1) this.currentState.images.splice(origIdx, 1);
+        delete this._imageTextures[entry.texName];
+        card.remove();
+
+        // Convert the cached dataURL back to a File so _addImageLayer's existing
+        // flow works unchanged. Skip the resize toast by forcing HD mode to match
+        // whatever it was — texObj is already at the right size, so resize is a no-op.
+        const savedHd = this._hdUploads;
+        this._hdUploads = origHdMode;
+        try {
+            const resp = await fetch(texObj.data);
+            const blob = await resp.blob();
+            const file = new File([blob], origFileName, { type: blob.type || 'image/png' });
+            await this._addImageLayer(file);
+        } finally {
+            this._hdUploads = savedHd;
+        }
+
+        // The new entry is at the end of the array — move it back to original index
+        // and restore the user-chosen name.
+        const arr = this.currentState.images;
+        const newEntry = arr[arr.length - 1];
+        if (newEntry && origIdx !== -1 && origIdx < arr.length - 1) {
+            arr.pop();
+            arr.splice(origIdx, 0, newEntry);
+        }
+        if (newEntry) {
+            newEntry.name = origName;
+            // Sync the input value in the freshly-built card
+            const newCard = document.querySelector(`.image-layer-card[data-tex-name="${newEntry.texName}"]`);
+            const input = newCard?.querySelector('.layer-name-input');
+            if (input) input.value = origName;
+            // Resync DOM order to match array
+            const layers = document.getElementById('image-layers');
+            const byTex = new Map();
+            layers.querySelectorAll('.image-layer-card').forEach(c => byTex.set(c.dataset.texName, c));
+            arr.forEach(e => {
+                const c = byTex.get(e.texName);
+                if (c) layers.appendChild(c);
+            });
+        }
+
+        this._updateLayerIndices();
+        this._buildCompShader();
+        this._applyToEngine();
+        this._postSnap();
+        showToast(`Reset "${origName}"`);
     }
 
     // ─── Apply & sync ──────────────────────────────────────────────────────────
@@ -1754,12 +1919,18 @@ export class EditorInspector {
         const _t0 = performance.now();
         const images = this.currentState.images || [];
         const sm = this.currentState.sceneMirror || 'none';
-        if (images.length === 0 && !this._solidColor && sm === 'none') {
+        // Phase 4: solo / mute filter. If any layer is soloed, only soloed
+        // layers render; otherwise everything except muted layers renders.
+        const anySolo = images.some(img => img.solo);
+        const visibleImages = anySolo
+            ? images.filter(img => img.solo)
+            : images.filter(img => !img.muted);
+        if (visibleImages.length === 0 && !this._solidColor && sm === 'none') {
             this.currentState.comp = BLANK_COMP;
             this._lastBuildMs = performance.now() - _t0;
             return;
         }
-        const uniforms = images
+        const uniforms = visibleImages
             .map(img => `uniform sampler2D sampler_${img.texName};`)
             .join('\n');
 
@@ -1796,7 +1967,7 @@ export class EditorInspector {
             base = uvFold + `  vec3 col = ${mainSample};\n`;
         }
         let body = base;
-        for (const img of images) {
+        for (const img of visibleImages) {
             body += this._buildImageBlock(img);
         }
         body += '  ret = col;\n';

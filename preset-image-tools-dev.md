@@ -1,6 +1,6 @@
 # Preset Image Tools — Phased Dev Plan
 
-> **Status:** Phase 1 ✅ · Phase 2 ✅ (pending user review) · Phase 3 delivered early during Phase 1 polish.
+> **Status:** Phase 1 ✅ · Phase 2 ✅ · Phase 3 ✅ (delivered early during Phase 1 polish) · Phase 4 ✅ (pending user review).
 > Companion to [custom-preset-editor.md](custom-preset-editor.md).
 > Each phase below is independently shippable. We pause after each to review before starting the next.
 
@@ -163,28 +163,38 @@ The "per-image canvas mirror" goal is effectively met by the Mirror scope toggle
 
 ---
 
-## Phase 4 — Workflow quality-of-life
+## Phase 4 — Workflow quality-of-life  *(shipped — pending user review)*
 
-**Goal:** make tuning 3+ layers pleasant instead of overwhelming.
+**Goal:** make tuning 3+ layers pleasant instead of overwhelming. Make the collapsed header informative so users can identify each layer at a glance.
 
 **In scope:**
-- **Solo / Mute per layer** — solo shows only that layer; mute hides it. Non-destructive; no state change to image settings.
-- **Live thumbnails** — tiny 64×64 canvas in each card header, updated ~1× per second. Makes collapsed cards actually informative.
-- **Layer name field** — rename "Image 1" to "Logo", "Backdrop", "Strobe", etc.
-- **Reset this layer** — per-card reset button (global reset is too aggressive at 5 layers).
-- **FPS readout** — small HUD corner, red when < 30fps. Ties back to the Phase 1 performance question.
-- **Thumbnail scrubbing** — hover a collapsed thumbnail to temporarily solo it; release to restore.
+- **Taller header** — grows enough to fit a thumbnail + name field + action buttons without squeezing.
+- **Static thumbnail** (source-image preview, 48×48) in each card header. Informative whether the card is expanded or collapsed. Live-updating per-frame thumbnails are deferred — they need offscreen layer rendering, which is a bigger lift.
+- **Inline name field** — editable text input (defaults to filename-without-extension, e.g. `sunset.jpg` → `sunset`). Click to edit, Enter/blur to commit, Escape to cancel.
+- **Solo / Mute per layer** — as **toggle switches** (not radios). Multiple layers can be soloed together; if any layer is soloed, only soloed layers render. Mute hides a layer independently.
+- **Reset this layer** — per-card ↻ button. Instant reset (no modal) since the action is undoable — `Cmd+Z` reverts.
+- **Trash + HD badge** stay where they are from Phase 1/2.
 
 **Out of scope:**
+- **FPS readout polish** (red-under-30fps) — the dev HUD exists already; promoting it to a user-facing pill is a small follow-up.
+- **Live per-frame thumbnails** — requires offscreen rendering of each layer, too expensive for a Phase 4 landing. Deferred as a Phase 9 "render quality" item if demand appears.
+- **Thumbnail scrubbing** (hover to solo temporarily) — deferred until solo-via-button is proven. Can add as `Alt + hover` later.
 - Copy-between-layers and layer "Looks" (Phase 6).
 
-**Open questions:**
-- Solo model: one-layer-solo (radio) or multi-solo (toggle)?
-- Thumbnail render cost at 5 layers × 1Hz — negligible, but worth measuring with the FPS readout we're adding anyway.
+**Decisions (settled for Phase 4 build):**
+- **Solo model: multi-select switches, not radio.** Confirmed with user. If any layer has `solo=true`, only soloed layers render; otherwise all non-muted layers render.
+- **Solo/Mute/name persist** with the preset. They're part of the entry, so they round-trip through save/load. Feels right — a user who soloed a layer would expect that state on reload.
+- **Reset scope: layer only, not images array.** Resetting a layer keeps `texName`, `imageId`, `fileName`, `hdMode`, and `name`, but restores every animation/style field to default. One click, one undoable step.
 
 **Success criteria:**
-- Can isolate any one layer in <1 second via solo.
-- FPS counter visible but unobtrusive; red threshold matches what we see on a typical laptop with 5 layers.
+- Can isolate any one layer in <1 second by clicking Solo.
+- Collapsed cards are identifiable at a glance (thumb + name).
+- Inline rename works with keyboard only (Tab → type → Enter).
+- All Phase 4 actions are undoable.
+
+### Phase 4 polish (landed after first user pass)
+
+- **Fast tooltips** — native `title=` tooltips had the browser's default 500–1500ms delay, which felt sluggish after Phase 4's new header buttons landed. Ported the main app's `data-tooltip` + CSS `::after` pattern to the editor with an 80ms transition. Converted every button / label / segmented control / drag handle / HD badge / thumbnail across the editor panel (toolbar Undo/Redo/A/B, Images Only, HD uploads, Collapse-all, Base Variations, Palette chips, Wave modes, Mirror scope, Shrink/Group labels, XY pad, XY reset, Solo/Mute/Reset/Trash, drag handle, thumbnail filename, mini-player Play). Card overflow changed from `hidden` to `visible` so tooltips can escape the card; header got its own top border-radius so hover backgrounds still respect the rounded corners. Two leftovers remain on native `title=` because pseudo-elements don't render on `<input>` replaced elements: the name field's "Filename: …" hint and the mini-player volume slider. Both are secondary and not worth a wrapper-span refactor.
 
 ---
 
