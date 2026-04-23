@@ -1074,6 +1074,122 @@ export class EditorInspector {
         this._applyToEngine();
         card.remove();
         this._updateLayersBar();
+        this._updateLayerIndices();
+    }
+
+    // ─── Phase 2: drag-to-reorder + keyboard reorder ──────────────────────────
+
+    _updateLayerIndices() {
+        const cards = document.querySelectorAll('#image-layers .image-layer-card');
+        const total = cards.length;
+        cards.forEach((c, i) => {
+            const badge = c.querySelector('.layer-index-badge');
+            if (badge) badge.textContent = `#${i + 1}`;
+            // Disable up/down ends for arrow-reorder UX clarity via CSS data attrs
+            c.dataset.atTop = i === 0 ? '1' : '0';
+            c.dataset.atBottom = i === total - 1 ? '1' : '0';
+        });
+    }
+
+    _reorderImage(fromIdx, toIdx) {
+        const arr = this.currentState.images;
+        if (fromIdx < 0 || fromIdx >= arr.length) return;
+        if (toIdx < 0 || toIdx > arr.length) return;
+        // Drop at own position or the slot immediately after = no-op
+        if (fromIdx === toIdx || fromIdx + 1 === toIdx) return;
+
+        this._preSnap();
+        const [moved] = arr.splice(fromIdx, 1);
+        const adjustedTo = toIdx > fromIdx ? toIdx - 1 : toIdx;
+        arr.splice(adjustedTo, 0, moved);
+
+        // Resync DOM to match array order — re-appending moves each node to the end
+        const layers = document.getElementById('image-layers');
+        const byTex = new Map();
+        layers.querySelectorAll('.image-layer-card').forEach(c => {
+            byTex.set(c.dataset.texName, c);
+        });
+        arr.forEach(e => {
+            const c = byTex.get(e.texName);
+            if (c) layers.appendChild(c);
+        });
+
+        this._updateLayerIndices();
+        this._buildCompShader();
+        this._applyToEngine();
+        this._postSnap();
+    }
+
+    _wireDragReorder(card, entry, dragHandle) {
+        // Handle-only drag initiator: set draggable=true only while the handle
+        // is pressed so the rest of the card's controls stay responsive. A
+        // document-level mouseup guarantees we reset even if the release
+        // happens off the handle (mousedown-then-drag-off-without-drag case).
+        const enable = () => {
+            card.draggable = true;
+            const off = () => { card.draggable = false; document.removeEventListener('mouseup', off); };
+            document.addEventListener('mouseup', off);
+        };
+        dragHandle.addEventListener('mousedown', enable);
+        dragHandle.addEventListener('touchstart', enable, { passive: true });
+        dragHandle.addEventListener('touchend', () => { card.draggable = false; });
+
+        card.addEventListener('dragstart', (e) => {
+            if (!card.draggable) return;
+            card.classList.add('dragging');
+            this._dragSrcEntry = entry;
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', 'layer-drag');
+        });
+        card.addEventListener('dragend', () => {
+            card.classList.remove('dragging');
+            card.draggable = false;
+            document.querySelectorAll('#image-layers .image-layer-card').forEach(c => {
+                c.classList.remove('drop-above', 'drop-below');
+            });
+            this._dragSrcEntry = null;
+        });
+        card.addEventListener('dragover', (e) => {
+            if (!this._dragSrcEntry || this._dragSrcEntry === entry) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            const rect = card.getBoundingClientRect();
+            const isAbove = (e.clientY - rect.top) < rect.height / 2;
+            card.classList.toggle('drop-above', isAbove);
+            card.classList.toggle('drop-below', !isAbove);
+        });
+        card.addEventListener('dragleave', (e) => {
+            // Only clear if leaving the card itself, not moving to a child
+            if (!card.contains(e.relatedTarget)) {
+                card.classList.remove('drop-above', 'drop-below');
+            }
+        });
+        card.addEventListener('drop', (e) => {
+            if (!this._dragSrcEntry || this._dragSrcEntry === entry) return;
+            e.preventDefault();
+            const rect = card.getBoundingClientRect();
+            const isAbove = (e.clientY - rect.top) < rect.height / 2;
+            card.classList.remove('drop-above', 'drop-below');
+            const fromIdx = this.currentState.images.indexOf(this._dragSrcEntry);
+            const targetIdx = this.currentState.images.indexOf(entry);
+            if (fromIdx === -1 || targetIdx === -1) return;
+            const insertIdx = isAbove ? targetIdx : targetIdx + 1;
+            this._reorderImage(fromIdx, insertIdx);
+        });
+
+        // Keyboard reorder — arrows on the handle move the layer up/down
+        dragHandle.addEventListener('keydown', (e) => {
+            if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+            e.preventDefault();
+            const idx = this.currentState.images.indexOf(entry);
+            if (idx === -1) return;
+            const newIdx = e.key === 'ArrowUp' ? idx - 1 : idx + 2;
+            if ((e.key === 'ArrowUp' && idx === 0) ||
+                (e.key === 'ArrowDown' && idx === this.currentState.images.length - 1)) return;
+            this._reorderImage(idx, newIdx);
+            // Restore focus on this card's handle (DOM moved but reference is stable)
+            requestAnimationFrame(() => dragHandle.focus());
+        });
     }
 
     // ─── Phase 1: dev overhead monitor (Shift+F12) ─────────────────────────────
@@ -1219,14 +1335,30 @@ export class EditorInspector {
 
         card.innerHTML = `
           <div class="layer-header" role="button" aria-expanded="true" tabindex="0">
+            <span class="layer-drag-handle" title="Drag to reorder (or press ↑ / ↓ while focused)"
+                  tabindex="0" role="button" aria-label="Reorder layer">
+              <svg width="10" height="14" viewBox="0 0 10 14" aria-hidden="true">
+                <circle cx="3" cy="2"  r="1.1" fill="currentColor"/>
+                <circle cx="7" cy="2"  r="1.1" fill="currentColor"/>
+                <circle cx="3" cy="7"  r="1.1" fill="currentColor"/>
+                <circle cx="7" cy="7"  r="1.1" fill="currentColor"/>
+                <circle cx="3" cy="12" r="1.1" fill="currentColor"/>
+                <circle cx="7" cy="12" r="1.1" fill="currentColor"/>
+              </svg>
+            </span>
             <svg class="layer-chevron" width="10" height="10" viewBox="0 0 12 12" aria-hidden="true">
               <path d="M2 4 L6 8 L10 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
+            <span class="layer-index-badge" aria-hidden="true">#1</span>
             <span class="layer-name"></span>
             ${hdMode ? '<span class="layer-hd-badge" title="Uploaded at HD (2048px). Re-upload to change.">HD</span>' : ''}
-            <button class="layer-remove" aria-label="Remove layer">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            <button class="layer-remove" aria-label="Delete layer" title="Delete layer">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                <path d="M10 11v6"/>
+                <path d="M14 11v6"/>
+                <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
               </svg>
             </button>
           </div>
@@ -1566,7 +1698,7 @@ export class EditorInspector {
             this._confirmDeleteLayer(entry, card, texName);
         });
 
-        // Collapse / expand via the whole header strip
+        // Collapse / expand via the whole header strip (but not the drag handle / delete)
         const header = card.querySelector('.layer-header');
         const toggleCollapse = () => {
             entry.collapsed = !entry.collapsed;
@@ -1575,14 +1707,22 @@ export class EditorInspector {
         };
         header.addEventListener('click', (e) => {
             if (e.target.closest('.layer-remove')) return;
+            if (e.target.closest('.layer-drag-handle')) return;
             toggleCollapse();
         });
         header.addEventListener('keydown', (e) => {
+            if (e.target.closest('.layer-drag-handle')) return;  // handle manages its own keys
             if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleCollapse(); }
         });
 
+        // ── Phase 2: drag-to-reorder (handle-only initiator) ─────────────────
+        card.dataset.texName = texName;  // lets _reorderImage resync DOM → array
+        const dragHandle = card.querySelector('.layer-drag-handle');
+        this._wireDragReorder(card, entry, dragHandle);
+
         layers.appendChild(card);
         this._updateLayersBar();
+        this._updateLayerIndices();
 
         // Texture load — resized.dataURL is already decoded from the resize step
         const texObj = { data: resized.dataURL, width: resized.width, height: resized.height };

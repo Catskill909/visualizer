@@ -1,6 +1,7 @@
 # Preset Image Tools — Phased Dev Plan
 
-> **Status:** Phase 1 shipped (with polish). Companion to [custom-preset-editor.md](custom-preset-editor.md).
+> **Status:** Phase 1 ✅ · Phase 2 ✅ (pending user review) · Phase 3 delivered early during Phase 1 polish.
+> Companion to [custom-preset-editor.md](custom-preset-editor.md).
 > Each phase below is independently shippable. We pause after each to review before starting the next.
 
 ---
@@ -121,25 +122,29 @@ The "per-image canvas mirror" goal is effectively met by the Mirror scope toggle
 
 ---
 
-## Phase 2 — Reordering + Z-order
+## Phase 2 — Reordering + Z-order  *(shipped — pending user review)*
 
-**Goal:** let users control which image renders on top.
+**Goal:** let users control which image renders on top, plus pick up the Phase 1 deferrals (trash icon, missing drag affordance).
 
 **In scope:**
-- **Drag handle** on the left edge of each card.
-- Reordering mutates the `currentState.images[]` array order directly — the shader builder already walks that array in order, so "top of UI = drawn last = on top" falls out naturally.
-- Small **index badge** on each card ("Layer 3 of 5") so users understand what the order means.
+- **Drag handle** on the left edge of each card — 6-dot grip icon, `cursor: grab` → `grabbing` during drag, whole-handle is the drag initiator (cards are not draggable from elsewhere, so controls keep working).
+- **Drag-to-reorder** using HTML5 drag-and-drop API. Dragged card gets a dim+scale treatment; a 2px accent line shows the insertion point above/below the hovered card.
+- Reordering mutates `currentState.images[]` array order directly — the shader builder already walks that array in order, so **top of UI = drawn last = on top**.
+- **Small index badge** (`#1/3` style) on each card so users understand what the order means; updates live on reorder / add / remove.
+- **Trash icon** replaces the tiny `×` — the delete confirmation modal from Phase 1 stays wired as-is.
+- **Keyboard reorder** for accessibility — `↑` / `↓` when the drag handle is focused swaps with the neighbour above/below.
+- **Undo/redo** — wrap reorder in `_preSnap` / `_postSnap` so one drag = one history step.
 
-**Out of scope:**
-- Per-layer rendering effects (Phase 3+).
-
-**Open questions:**
-- Keyboard reorder for accessibility (↑/↓ when card is focused)?
-- Do we animate the reorder, or snap?
+**Decisions (settled for Phase 2 build):**
+- **Handle-only drag initiator.** Setting `draggable` only while the handle is pressed means clicking a slider, colour swatch, or XY pad never accidentally starts a drag. Standard HTML5 DnD pattern.
+- **Snap, don't animate.** Feels faster and matches the rest of the editor. No layout-shift animation for the reorder itself; just a CSS transition on the insertion line fade-in/out.
+- **DOM move, not rebuild.** On drop we call `layers.insertBefore(sourceCard, target)` + splice the array. Keeps each card's event handlers, XY pad state, and slider positions intact. Rebuilding the card would lose all that.
 
 **Success criteria:**
 - Reordering is visible in the live canvas within one frame of drop.
 - Undo/redo treats a reorder as a single history step.
+- Drag handle is obvious — user immediately knows where to grab.
+- Tab order still works; keyboard users can reorder without a mouse.
 
 ---
 

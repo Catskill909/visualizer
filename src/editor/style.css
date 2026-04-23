@@ -706,6 +706,44 @@ html, body {
 }
 .image-layer-card.collapsed .layer-chevron { transform: rotate(-90deg); }
 
+/* Drag handle + index badge (Phase 2) */
+.layer-drag-handle {
+  flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--text-3);
+  cursor: grab;
+  padding: 2px 2px;
+  border-radius: 3px;
+  transition: color 0.12s, background 0.12s;
+}
+.layer-drag-handle:hover,
+.layer-drag-handle:focus-visible {
+  color: var(--text);
+  background: rgba(255,255,255,0.06);
+  outline: none;
+}
+.layer-drag-handle:active { cursor: grabbing; }
+
+.layer-index-badge {
+  flex-shrink: 0;
+  font-size: 9px; font-weight: 600;
+  padding: 2px 5px; border-radius: 3px;
+  color: var(--text-3);
+  background: rgba(255,255,255,0.05);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Drag in-flight: dim the source card */
+.image-layer-card.dragging {
+  opacity: 0.45;
+  transform: scale(0.99);
+  transition: transform 0.12s, opacity 0.12s;
+}
+
+/* Drop indicator lines — 2px accent above or below the target card */
+.image-layer-card.drop-above  { box-shadow: 0 -2px 0 0 #4f9dff inset, 0 1px 0 rgba(255,255,255,0.04) inset; }
+.image-layer-card.drop-below  { box-shadow: 0  2px 0 0 #4f9dff inset, 0 1px 0 rgba(255,255,255,0.04) inset; }
+
 .layer-name {
   flex: 1; min-width: 0;
   font-size: 11px; color: var(--text-2);
