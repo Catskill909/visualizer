@@ -19,7 +19,7 @@ A modern browser-based MilkDrop music visualizer powered by [Butterchurn](https:
 - **Fullscreen mode** — native browser fullscreen support
 - **Projector Optimized** — automatic Screen Wake Lock prevents sleep, mouse cursor auto-hides with UI, and "Zen Mode" (H key) for zero-UI projection
 - **Responsive design** — works on desktop and mobile viewports
-- **Preset Studio** (`/editor.html` or press **E**) — standalone visual preset builder: 12 one-click palettes, 3 independent color swatches (Wave / Glow / Accent), 5 tabbed control sections (Palette / Motion / Wave / Feel / Images), undo/redo (50-deep), A/B comparison; **up to 5 image layers** in a collapsible smart-accordion stack with drag-to-reorder, per-layer solo / mute / rename / static thumbnail, image resize on upload (1024px standard / 2048px HD toggle), per-layer UV mirror with Per Tile · Whole Image scope, scene-level Canvas Mirror, dev performance HUD (`` ` `` key); saves to localStorage
+- **Preset Studio** (`/editor.html` or press **E**) — standalone visual preset builder: 12 one-click palettes, 3 independent color swatches (Wave / Glow / Accent), 5 tabbed control sections (Palette / Motion / Wave / Feel / Images), undo/redo (50-deep), A/B comparison; **up to 5 image layers** in a collapsible smart-accordion stack with drag-to-reorder, per-layer solo / mute / rename / static thumbnail, image resize on upload (1024px standard / 2048px HD toggle), per-layer UV mirror with Per Tile · Whole Image scope, scene-level Canvas Mirror, per-layer audio reactivity (source: Bass / Mid / Treble / Volume; curve: Linear / Squared / Cubed / Gate; silence gate), dev performance HUD (`` ` `` key); saves to localStorage
 
 ## Tech Stack
 

@@ -574,16 +574,31 @@
           <!-- Preset Studio -->
           <section class="welcome-section" data-section="studio" role="tabpanel">
             <h4>Preset Studio</h4>
-            <p>A standalone creative editor for building your own audio-reactive visuals. Launch it from the start screen — it opens on its own page with a live butterchurn canvas on the left and an inspector panel on the right. Every control is live; no page reload.</p>
+            <p>A standalone creative editor for building your own audio-reactive visuals. Launch it from the start screen — it opens on its own page with a live canvas on the left and an inspector panel on the right. Every control is live; no page reload.</p>
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Five tabs</div>
               <ul class="welcome-list">
-                <li><strong>Palette</strong> — 9 base variations (Color, Clear, Drift, Pulse, Storm, Ripple, Radiate, Scatter, Bloom), 12 color palettes, and three independent color swatches (Wave / Glow / Accent).</li>
+                <li><strong>Palette</strong> — base variations (Color, Solid Color, Pulse/Breath, Color Shift, Clear, Drift, and more), 12 one-click color palettes, three independent color swatches (Wave / Glow / Accent).</li>
                 <li><strong>Motion</strong> — Zoom, Rotation, Warp amount &amp; speed, Echo controls.</li>
                 <li><strong>Wave</strong> — 8 wave shapes, size, opacity, thickness, dots, additive blend.</li>
                 <li><strong>Feel</strong> — Decay (trail length), Gamma (brightness), warp scale/speed.</li>
-                <li><strong>Image</strong> — drop up to 2 images and animate them with tile, spin, orbit, tunnel, sway, wander, mirror, hue-spin, and more.</li>
+                <li><strong>Images</strong> — up to 5 animated image or GIF layers with full reactivity and mirror controls (see below).</li>
+              </ul>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Image Layers</div>
+              <p>Add up to 5 image or GIF layers in a collapsible smart-accordion stack. Drag any card to reorder. Each layer has:</p>
+              <ul class="welcome-list">
+                <li><strong>Solo / Mute</strong> — audition one layer in isolation or hide it without deleting.</li>
+                <li><strong>Animation</strong> — Tile, Spin, Orbit, Tunnel zoom, Bounce (beat-lift), Sway, Wander, and a draggable XY anchor point.</li>
+                <li><strong>Beat Fade / Pulse</strong> — bass drives opacity or size on every kick.</li>
+                <li><strong>Mirror</strong> — Off, Horizontal, Vertical, Quad, or Kaleido (6-slice polar fold). Apply per tile or across the whole field.</li>
+                <li><strong>Canvas Mirror</strong> — folds the entire rendered scene horizontally, vertically, or both.</li>
+                <li><strong>Tint &amp; Hue Spin</strong> — colorize any layer and animate it through a spinning hue cycle.</li>
+                <li><strong>Audio Reactivity</strong> — per layer, choose which audio band drives reactive controls: Bass, Mid, Treble, or Volume. Shape the response with Linear, Squared, Cubed, or Gate curves.</li>
+                <li><strong>HD uploads</strong> — toggle before uploading to resize at 2048 px (default is 1024 px).</li>
               </ul>
             </div>
 
@@ -591,8 +606,9 @@
               <div class="welcome-feature-title">Workflow</div>
               <ul class="welcome-list">
                 <li><strong>Undo / Redo</strong> — 50-deep stack. <kbd>⌘Z</kbd> / <kbd>⌘⇧Z</kbd>.</li>
-                <li><strong>A/B compare</strong> — hold the button to preview the original state; release to restore.</li>
-                <li><strong>Save</strong> — writes to your browser (localStorage + IndexedDB for images). Saved presets show up in the <em>My Presets</em> tab of the main app.</li>
+                <li><strong>A/B compare</strong> — hold the button to preview the saved state; release to restore.</li>
+                <li><strong>Save</strong> — writes to your browser (localStorage + IndexedDB for images). Saved presets appear in the <em>My Presets</em> tab of the main app.</li>
+                <li><strong>Dev HUD</strong> — press <kbd>`</kbd> (backtick) to overlay frame time, estimated VRAM, active layer count, and last shader rebuild time.</li>
               </ul>
             </div>
           </section>

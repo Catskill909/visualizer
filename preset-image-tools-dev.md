@@ -1,6 +1,6 @@
 # Preset Image Tools — Phased Dev Plan
 
-> **Status:** Phase 1 ✅ · Phase 2 ✅ · Phase 3 ✅ (delivered early during Phase 1 polish) · Phase 4 ✅
+> **Status:** Phase 1 ✅ · Phase 2 ✅ · Phase 3 ✅ (delivered early during Phase 1 polish) · Phase 4 ✅ · Phase 5 ✅
 > Companion to [custom-preset-editor.md](custom-preset-editor.md).
 > Each phase below is independently shippable. We pause after each to review before starting the next.
 
@@ -198,26 +198,35 @@ The "per-image canvas mirror" goal is effectively met by the Mirror scope toggle
 
 ---
 
-## Phase 5 — Per-layer audio reactivity
+## Phase 5 — Per-layer audio reactivity  *(shipped ✅)*
 
 **Goal:** unlock variety without new animation code. Right now almost everything reacts to `bass`; butterchurn exposes `mid`, `treb`, plus attenuated variants.
 
 **In scope:**
 - **Reactivity source dropdown** attached to each reactive control (Pulse, Bounce, Beat Fade, future Shake/Strobe): **Bass / Mid / Treble / Volume / Off**.
 - **Beat divider** per layer: trigger every 1st / 2nd / 4th / 8th beat (detected via `bass_att` threshold crossings).
-- **Silence gate** — hide layer when audio falls below a threshold. Great for "hits-only" accent layers.
 - **Reactivity curve picker** — linear / squared / cubed / thresholded. Squared matches what our main sliders already use.
 
 **Out of scope:**
 - Any new animation primitives themselves — those come in Phase 7.
+- Beat divider — deferred to Phase 5b (requires CPU-side beat tracking; not achievable with baked GLSL literals).
 
-**Open questions:**
-- One shared dropdown component across all reactive controls, or grouped (per-layer "Reactivity" mini-panel)?
-- Does the beat divider live per-control or per-layer? Per-layer is simpler; per-control gives more expressive power.
+**Decisions (settled for Phase 5 build):**
+- **UI model: per-layer Reactivity panel** (not per-control dropdowns). A single collapsible "Reactivity" section at the bottom of each card groups Source + Curve. Adding a dropdown to every reactive slider would create too much noise. Per-control source can revisit in Phase 7 if demand appears.
+- **Beat divider: deferred to Phase 5b.** Dividing by 2/4/8 requires a CPU-side beat counter passed as a uniform — incompatible with the current baked-literals architecture. Removing it from this phase keeps Phase 5 shippable without an audio-engine refactor.
+- **reactCurve default: linear.** Existing sliders already apply a squared curve at the UI level (pos² mapping). Defaulting to linear in GLSL preserves exact backward compatibility with saved presets.
+- **GLSL variable `_r`** is declared at the top of each `{}` image block (before angle/center/pipeline) so all expressions (sizeBase, bounce, opacity) can reference it uniformly.
 
 **Success criteria:**
 - A layer can be driven exclusively by treble with no bass coupling.
-- A layer can be visible only during silence, or only during loud sections.
+- All existing saved presets render identically (reactSource defaults to bass, reactCurve defaults to linear).
+
+### Phase 5 implementation notes
+
+- **`_r_raw`** = raw audio signal from chosen source; **`_r`** = curve-transformed signal. Both are declared at the very top of each `{}` image block, before angle/center/pipeline code, so all reactive expressions reference `_r` uniformly.
+- **Backward compatibility**: `reactSource` absent → defaults to `'bass'`; `reactCurve` absent → defaults to `'linear'` (matching the pre-Phase-5 GLSL which used raw `bass` linearly). All existing saved presets render identically.
+- **Curve segmented control** initialises from `entry.reactCurve` in the wiring step (not from the hardcoded `active` class in HTML), so loading a saved preset restores the correct button state.
+- **Beat divider** deferred to Phase 5b — noted in Decisions above.
 
 ---
 

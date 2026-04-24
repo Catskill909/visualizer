@@ -1460,6 +1460,8 @@ export class EditorInspector {
             name: file.name.replace(/\.[^.]+$/, '') || 'Layer',  // Phase 4: user-editable display name
             isGif: resized.isGif || false,
             gifSpeed: 1.0,      // playback multiplier: 2 = twice as fast, 0.5 = half speed
+            reactSource: 'bass',   // Phase 5: 'bass' | 'mid' | 'treb' | 'vol'
+            reactCurve: 'linear',  // Phase 5: 'linear' | 'squared' | 'cubed' | 'threshold'
         };
         this.currentState.images.push(entry);
 
@@ -1663,7 +1665,7 @@ export class EditorInspector {
               <span class="layer-ctrl-label">Color</span>
               <div class="layer-tint-wrap">
                 <span class="layer-tint-swatch" style="background:#ffffff"></span>
-                <input type="color" class="layer-tint-picker" value="#ffffff" tabindex="-1" aria-hidden="true" />
+                <input type="color" class="layer-tint-picker" value="#ffffff" tabindex="-1" />
               </div>
             </div>
             <div class="layer-slider-row">
@@ -1671,6 +1673,26 @@ export class EditorInspector {
               <input type="range" class="slider" min="0" max="2" step="0.02"
                 value="${entry.hueSpinSpeed}" style="--pct:${pct(entry.hueSpinSpeed, 0, 2)}">
               <span class="lsv">${entry.hueSpinSpeed.toFixed(2)}</span>
+            </div>
+            <div class="layer-section-divider"></div>
+            <p class="layer-section-label">Reactivity</p>
+            <div class="layer-row-inline" style="gap:8px;margin-bottom:6px">
+              <span class="layer-ctrl-label" data-tooltip="Which audio band drives all reactive controls on this layer">Source</span>
+              <select class="layer-react-source">
+                <option value="bass" selected>Bass</option>
+                <option value="mid">Mid</option>
+                <option value="treb">Treble</option>
+                <option value="vol">Volume</option>
+              </select>
+            </div>
+            <div class="layer-row-inline" style="gap:8px;margin-bottom:4px">
+              <span class="layer-ctrl-label" data-tooltip="Response curve applied to the audio signal before driving reactive controls">Curve</span>
+              <div class="layer-react-curve" role="group" aria-label="Reactivity curve">
+                <button class="lseg active" data-curve="linear">Linear</button>
+                <button class="lseg" data-curve="squared">Squared</button>
+                <button class="lseg" data-curve="cubed">Cubed</button>
+                <button class="lseg" data-curve="threshold">Gate</button>
+              </div>
             </div>
           </div>
         `;
@@ -1820,6 +1842,22 @@ export class EditorInspector {
             entry.tintB = parseInt(hex.slice(5, 7), 16) / 255;
             tintSwatch.style.background = hex;
             refresh();
+        });
+
+        // Reactivity section — Phase 5
+        const reactSrcSel = card.querySelector('.layer-react-source');
+        reactSrcSel.value = entry.reactSource || 'bass';
+        reactSrcSel.addEventListener('change', () => { entry.reactSource = reactSrcSel.value; refresh(); });
+
+        const curveBtns = card.querySelectorAll('.layer-react-curve .lseg');
+        curveBtns.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.curve === (entry.reactCurve || 'linear'));
+            btn.addEventListener('click', () => {
+                curveBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                entry.reactCurve = btn.dataset.curve;
+                refresh();
+            });
         });
 
         // XY Pad — anchor / center point
@@ -2189,6 +2227,21 @@ export class EditorInspector {
         const hueSpin = (img.hueSpinSpeed || 0).toFixed(4);
         const tex = `sampler_${img.texName}`;
 
+        const reactSrc = { bass: 'bass', mid: 'mid', treb: 'treb', vol: 'vol' }[img.reactSource || 'bass'] || 'bass';
+        const curve = img.reactCurve || 'linear';
+        let curveExpr;
+        switch (curve) {
+            case 'squared':   curveExpr = '_r_raw * _r_raw'; break;
+            case 'cubed':     curveExpr = '_r_raw * _r_raw * _r_raw'; break;
+            case 'threshold': curveExpr = 'step(0.3, _r_raw)'; break;
+            default:          curveExpr = '_r_raw'; // linear
+        }
+        const reactLines =
+            `    float _r_raw = ${reactSrc};
+` +
+            `    float _r = ${curveExpr};
+`;
+
         const pulseSign = img.pulseInvert ? '-' : '+';
         const hasSpin = parseFloat(sp) !== 0;
         const hasOrbit = parseFloat(orb) !== 0;
@@ -2251,13 +2304,13 @@ export class EditorInspector {
 
         let centerLines;
         if (hasOrbit) {
-            const bncPart = hasBounce ? ` - bass * ${bnc}` : '';
+            const bncPart = hasBounce ? ` - _r * ${bnc}` : '';
             centerLines =
                 `    vec2 _c = vec2(${cxExpr} + cos(_orbAng) * ${orb},\n` +
                 `                  ${cyExpr} + sin(_orbAng) * ${orb} / aspect.y${bncPart});\n` +
                 `    vec2 _u = _uvf - _c;\n`;
         } else if (hasBounce) {
-            centerLines = `    vec2 _u = _uvf - vec2(${cxExpr}, (${cyExpr}) - bass * ${bnc});\n`;
+            centerLines = `    vec2 _u = _uvf - vec2(${cxExpr}, (${cyExpr}) - _r * ${bnc});\n`;
         } else {
             centerLines = `    vec2 _u = _uvf - vec2(${cxExpr}, ${cyExpr});\n`;
         }
@@ -2308,7 +2361,7 @@ export class EditorInspector {
             return s;
         };
 
-        const sizeBase = `${sz} * (1.0 ${pulseSign} bass * ${pu})`;
+        const sizeBase = `${sz} * (1.0 ${pulseSign} _r * ${pu})`;
 
         // Mirror UV fold helper — generates GLSL to fold a vec2 variable in-place.
         // Only emits for the per-tile scope; whole-group scope already folded _uvf upstream.
@@ -2385,6 +2438,7 @@ export class EditorInspector {
 
         return (
             `  {\n` +
+            reactLines +
             angLines +
             centerLines +
             pipeline +
@@ -2415,7 +2469,8 @@ export class EditorInspector {
                     return `    _src *= vec3(${tintR}, ${tintG}, ${tintB});\n`;
                 }
             })() : '') +
-            `    float _op = _t.w * _gapMask * clamp(${op} + bass * ${opa}, 0.0, 1.0);\n` +
+            `    float _op = _t.w * _gapMask * clamp(${op} + _r * ${opa}, 0.0, 1.0);
+` +
             `    ${blendLine}\n` +
             `  }\n`
         );

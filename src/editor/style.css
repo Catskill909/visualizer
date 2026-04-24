@@ -848,7 +848,8 @@ html, body {
   display: flex; align-items: center; gap: 5px;
   margin-bottom: 3px;
 }
-.layer-blend {
+.layer-blend,
+.layer-react-source {
   background: var(--bg-4); border: 1px solid var(--border);
   border-radius: var(--r-s); color: var(--text-2);
   font-family: var(--font); font-size: 11px; padding: 3px 5px; cursor: pointer;
