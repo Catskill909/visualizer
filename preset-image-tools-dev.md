@@ -1,6 +1,6 @@
 # Preset Image Tools — Phased Dev Plan
 
-> **Status:** Phase 1 ✅ · Phase 2 ✅ · Phase 3 ✅ (delivered early during Phase 1 polish) · Phase 4 ✅ (pending user review).
+> **Status:** Phase 1 ✅ · Phase 2 ✅ · Phase 3 ✅ (delivered early during Phase 1 polish) · Phase 4 ✅
 > Companion to [custom-preset-editor.md](custom-preset-editor.md).
 > Each phase below is independently shippable. We pause after each to review before starting the next.
 
@@ -122,7 +122,7 @@ The "per-image canvas mirror" goal is effectively met by the Mirror scope toggle
 
 ---
 
-## Phase 2 — Reordering + Z-order  *(shipped — pending user review)*
+## Phase 2 — Reordering + Z-order  *(shipped ✅)*
 
 **Goal:** let users control which image renders on top, plus pick up the Phase 1 deferrals (trash icon, missing drag affordance).
 
@@ -163,7 +163,7 @@ The "per-image canvas mirror" goal is effectively met by the Mirror scope toggle
 
 ---
 
-## Phase 4 — Workflow quality-of-life  *(shipped — pending user review)*
+## Phase 4 — Workflow quality-of-life  *(shipped ✅)*
 
 **Goal:** make tuning 3+ layers pleasant instead of overwhelming. Make the collapsed header informative so users can identify each layer at a glance.
 

@@ -37,7 +37,34 @@ Nine starting-point snapshots in the Palette tab:
 
 ### Image Layers
 
-Drop up to 2 images. Each layer has:
+Up to **5 image layers** in a collapsible smart-accordion stack. Adding a new layer auto-collapses prior cards and expands the new one; any card can be manually expanded at any time.
+
+**Global controls above the layer stack:**
+
+| Control | Notes |
+|---|---|
+| HD uploads toggle | ON = resize to 2048px longest side on upload; OFF (default) = 1024px. Set before uploading — resize is destructive. Layers uploaded in HD show an **HD** badge in their card header. |
+| Add layer button | Disabled when 5 layers are present |
+| Layer count indicator | "Layers: N / 5" |
+| Collapse all / Expand all | |
+
+**Dev performance HUD:** press `` ` `` (backtick) to toggle an overlay showing frame time (ms, 60-frame rolling average), estimated texture VRAM, active layer count, and last shader rebuild time. Skips the key when focus is in an input.
+
+**Layer card header (always visible, collapsed or expanded):**
+
+| Control | Notes |
+|---|---|
+| Drag handle ⠿ | `grab` cursor — drag to reorder; `↑` / `↓` keys when handle is focused swaps with neighbour |
+| Index badge | `#1/3` style — updates live on add / remove / reorder |
+| Thumbnail (48×48) | Static source-image preview |
+| Inline name field | Defaults to filename without extension; click to edit, Enter/blur to commit, Esc to cancel |
+| Solo toggle | If any layer is soloed, only soloed layers render; multiple layers can be soloed together |
+| Mute toggle | Hides this layer independently of solo |
+| Reset ↻ | Resets all animation/style fields to default; keeps image binding; undoable via Cmd+Z |
+| Trash 🗑 | Delete with confirmation modal (Enter confirms, Esc / backdrop cancels) |
+| Chevron | Expand / collapse the card body |
+
+**Per-layer controls (expanded card body):**
 
 | Control | Range | Notes |
 |---|---|---|
@@ -59,6 +86,7 @@ Drop up to 2 images. Each layer has:
 | **Wander Amount** | 0–0.4 | Organic random-drift amplitude (layered sin noise) |
 | **Wander Speed** | 0–2 | Wander drift rate |
 | **Mirror** | Off / ↔ H / ↕ V / ✦ Quad / ✶ Kaleido | UV fold mode — applied after tiling. Stacks with all other controls. Kaleido = 6-slice polar fold. |
+| **Mirror scope** | Per Tile / Whole Image | Visible when Mirror ≠ Off. "Whole Image" folds the entire tiled field upstream of the tile pipeline (via `_uvf` local in GLSL); "Per Tile" folds inside each individual tile. |
 | **Tint Color** | Color swatch | Multiplies sampled image pixels by this color |
 | **Hue Spin** | 0–2 | Rotates tint hue through full color wheel per second |
 | Images Only | Toggle (header) | Hides base visualizer — black background + images only |
