@@ -228,6 +228,27 @@ The "per-image canvas mirror" goal is effectively met by the Mirror scope toggle
 - **Curve segmented control** initialises from `entry.reactCurve` in the wiring step (not from the hardcoded `active` class in HTML), so loading a saved preset restores the correct button state.
 - **Beat divider** deferred to Phase 5b — noted in Decisions above.
 
+### Phase 5 polish — portrait image tiling (DO NOT RE-ATTEMPT failed approaches)
+
+**Problem:** uploading a portrait image (taller than wide) produces squashed or gapped tiles because the tile cells are sized by the screen's own aspect ratio (landscape on a 16:9 monitor), not the image's aspect ratio.
+
+**Attempt 1 — "contain" letterbox inside each tile (FAILED / REVERTED)**
+- After `fract()`, remapped UV inside each tile to maintain image aspect with transparent bars on the sides.
+- Result: purple/visualizer bars visible between Godzilla tiles. User rejected.
+
+**Attempt 2 — "cover" centre-crop inside each tile (FAILED / REVERTED)**
+- After `fract()`, scaled UV so the image filled the tile completely by cropping top/bottom.
+- Result: image still appeared squashed because the tile cells themselves were landscape-shaped. Godzilla head visibly truncated.
+
+**Working solution — `aspectPreScale` before `applyTileUV`**
+- Pre-divide `_u.x` by `imgAsp * aspect.y` BEFORE calling `applyTileUV`.
+- This makes the tiling grid cells themselves match the image's aspect ratio in screen pixels.
+- Portrait image → portrait-shaped tile cells. Square image → square cells. 16:9 image on 16:9 screen → no change (formula is a no-op).
+- No masking, no cropping, no letterboxing — the texture UV [0,1]×[0,1] maps exactly to the portrait cell with zero distortion.
+- `imgAsp` is baked as a literal at shader build time; `aspect.y` is a runtime uniform so it adapts to window resize.
+
+**Key insight:** you cannot fix the distortion AFTER `fract()` — that only changes what portion of the image is shown inside an already-wrong cell shape. The cell shape itself must be set correctly BEFORE tiling.
+
 ---
 
 ## Phase 6 — Layer templates ("Looks")
@@ -254,6 +275,7 @@ The "per-image canvas mirror" goal is effectively met by the Mirror scope toggle
 **Goal:** expand what a single layer can *do*. Ship these individually, pick order based on what's most wanted after Phase 1–6.
 
 Candidates:
+- **Independent tile X / Y scale** — separate Width and Height sliders for tiled images so the tile cell can be given an explicit aspect ratio instead of inheriting the screen ratio. Pairs with the current cover-crop behaviour: if Width < Height the tile is portrait-shaped and the image fills it exactly with no crop. Requested after Phase 5 portrait-image aspect fix.
 - **Lissajous path** — replace/supplement Orbit with freq-x, freq-y, phase. Ratios like 3:2 give bow-ties; 3:4 four-leaf clovers.
 - **Beat Shake / Jitter** — omnidirectional displacement spike on kick, decays over ~4 frames. Different feel from the directional Bounce.
 - **Strobe / Blink** — hard binary opacity cut driven by a bass threshold. Distinct from smooth Beat Fade.

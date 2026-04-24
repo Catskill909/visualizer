@@ -89,8 +89,9 @@ Up to **5 image layers** in a collapsible smart-accordion stack. Adding a new la
 | **Mirror scope** | Per Tile / Whole Image | Visible when Mirror ≠ Off. "Whole Image" folds the entire tiled field upstream of the tile pipeline (via `_uvf` local in GLSL); "Per Tile" folds inside each individual tile. |
 | **Tint Color** | Color swatch | Multiplies sampled image pixels by this color |
 | **Hue Spin** | 0–2 | Rotates tint hue through full color wheel per second |
-| **Reactivity Source** | Bass / Mid / Treble / Volume | Which audio band drives all reactive controls (Pulse, Bounce, Beat Fade) on this layer. Default: Bass. |
+| **Reactivity Source** | Bass / Mid / Treble / Volume | Which audio band drives all reactive controls (Pulse, Bounce, Beat Fade) on this layer. Default: Bass. A subtitle in the UI reads “Drives Pulse · Bounce · Beat Fade” as a reminder. |
 | **Reactivity Curve** | Linear / Squared / Cubed / Gate | Transform applied to the raw signal before driving reactive controls. Gate = hard on/off at 30% threshold. Default: Linear. |
+| **Aspect-correct tiling** | Automatic | Portrait, square, and landscape images tile without distortion. The GLSL pre-scales `_u.x` by `imgAsp × aspect.y` before the tile UV pipeline, so tile cells match the image’s native aspect ratio in screen pixels. No cropping, no letterboxing. |
 | Images Only | Toggle (header) | Hides base visualizer — black background + images only |
 | **Canvas Mirror** | None / ↔ H / ↕ V / ✦ Both | Folds the entire rendered scene (warp buffer + all image layers) along one or both axes |
 

@@ -927,7 +927,13 @@ html, body {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-2);
-  margin: 0 0 5px;
+  margin: 0 0 3px;
+}
+.layer-section-sub {
+  font-size: 10px;
+  color: var(--text-3);
+  margin: 0 0 7px;
+  letter-spacing: 0.02em;
 }
 .lseg-status {
   font-weight: 500;

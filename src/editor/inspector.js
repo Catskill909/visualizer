@@ -1676,6 +1676,7 @@ export class EditorInspector {
             </div>
             <div class="layer-section-divider"></div>
             <p class="layer-section-label">Reactivity</p>
+            <p class="layer-section-sub">Drives Pulse · Bounce · Beat Fade</p>
             <div class="layer-row-inline" style="gap:8px;margin-bottom:6px">
               <span class="layer-ctrl-label" data-tooltip="Which audio band drives all reactive controls on this layer">Source</span>
               <select class="layer-react-source">
@@ -2226,6 +2227,7 @@ export class EditorInspector {
         const tintB = (img.tintB !== undefined ? img.tintB : 1.0).toFixed(4);
         const hueSpin = (img.hueSpinSpeed || 0).toFixed(4);
         const tex = `sampler_${img.texName}`;
+        const imgAsp = (img.texW && img.texH) ? (img.texW / img.texH).toFixed(4) : '1.0000';
 
         const reactSrc = { bass: 'bass', mid: 'mid', treb: 'treb', vol: 'vol' }[img.reactSource || 'bass'] || 'bass';
         const curve = img.reactCurve || 'linear';
@@ -2361,6 +2363,13 @@ export class EditorInspector {
             return s;
         };
 
+        // Aspect-correct tiling: pre-scale _u.x by (imgAsp * aspect.y) BEFORE applyTileUV so
+        // the tile cells themselves have the image's native aspect ratio in screen pixels.
+        // Portrait image → portrait-shaped tiles; square → square tiles; 16:9 image on 16:9 → no-op.
+        // Must be applied to each UV variable (or copy) just before its applyTileUV call.
+        const aspectPreScale = (varName) =>
+            `    ${varName}.x /= ${imgAsp} * aspect.y;\n`;
+
         const sizeBase = `${sz} * (1.0 ${pulseSign} _r * ${pu})`;
 
         // Mirror UV fold helper — generates GLSL to fold a vec2 variable in-place.
@@ -2402,9 +2411,11 @@ export class EditorInspector {
                 `    float _tf = smoothstep(0.5, 1.0, _tp);\n` +
                 `    float _gapMaskA = 1.0; float _gapMaskB = 1.0;\n` +
                 `    vec2 _uA = _u;\n` +
+                aspectPreScale('_uA') +
                 applyTileUV('_uA', `${sizeBase} * _tz1`, '_gapMaskA', '_dxA', '_dyA') +
                 applyMirrorUV('_uA') +
                 `    vec2 _uB = _u;\n` +
+                aspectPreScale('_uB') +
                 applyTileUV('_uB', `${sizeBase} * _tz2`, '_gapMaskB', '_dxB', '_dyB') +
                 applyMirrorUV('_uB');
             sampleLine =
@@ -2416,6 +2427,7 @@ export class EditorInspector {
             // Plain tiled — group spin rotates field first, then tile (with optional per-tile spin)
             pipeline = groupSpinLines +
                 `    float _gapMask = 1.0;\n` +
+                aspectPreScale('_u') +
                 applyTileUV('_u', sizeBase, '_gapMask', '_dx', '_dy') +
                 applyMirrorUV('_u');
             sampleLine = `    vec4 _t = textureGrad(${tex}, _u, _dx, _dy);\n`;
