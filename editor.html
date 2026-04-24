@@ -122,6 +122,23 @@
                         <p class="section-label">Start from</p>
                         <div class="base-var-grid" id="base-var-grid"></div>
 
+                        <!-- Solid-mode FX: visible only when Solid or Shift is active.
+                             Pulse/Breath apply to both; Shift row appears for Shift only. -->
+                        <div id="solid-fx-panel" hidden>
+                            <p class="section-label" id="solid-fx-label">Pulse &amp; Breath</p>
+                            <div id="solid-fx-sliders"></div>
+                            <div class="color-row" id="solid-colorb-row" hidden>
+                                <span class="color-row-label">Shift color</span>
+                                <div class="color-swatch-wrap">
+                                    <span class="color-swatch" id="swatch-shift" style="background:#1a33e6"
+                                        aria-label="Shift target color"></span>
+                                    <input type="color" id="color-shift" class="color-native" value="#1a33e6"
+                                        tabindex="-1" aria-hidden="true" />
+                                </div>
+                                <span class="color-row-hex" id="hex-shift">#1A33E6</span>
+                            </div>
+                        </div>
+
                         <p class="section-label">Quick Palettes</p>
                         <div class="palette-grid" id="palette-grid"></div>
 
@@ -129,7 +146,7 @@
                         <div class="color-rows">
 
                             <div class="color-row">
-                                <span class="color-row-label">Wave</span>
+                                <span class="color-row-label" id="wave-row-label">Wave</span>
                                 <div class="color-swatch-wrap">
                                     <span class="color-swatch" id="swatch-wave" style="background:#ffffff"
                                         aria-label="Wave color"></span>

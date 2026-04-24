@@ -8,6 +8,7 @@ import butterchurnPresetsExtra from 'butterchurn-presets/lib/butterchurnPresetsE
 import butterchurnPresetsExtra2 from 'butterchurn-presets/lib/butterchurnPresetsExtra2.min.js';
 import butterchurnPresetsMD1 from 'butterchurn-presets/lib/butterchurnPresetsMD1.min.js';
 import { loadAllCustomPresets, CUSTOM_PREFIX, registryKey, getImage } from './customPresets.js';
+import { parseGIF, decompressFrames } from 'gifuct-js';
 
 // Baron pack: bypass the package's runtime `await import()` loop (which would cause
 // 762 sequential network requests). Vite inlines every JSON into a single static chunk.
@@ -75,6 +76,9 @@ export class VisualizerEngine {
     this.agcDataArray = null;
     this.lastPeak = 0.5;
     this.hypeLevel = 0; // 0-1 value for UI feedback
+
+    // GIF animation state: texName → { frames, delays, uploadCanvas, uploadCtx, frameIndex, nextFrameAt, width, height }
+    this._gifAnimations = new Map();
     this._audioConfirmed = false;
   }
 
@@ -369,13 +373,14 @@ export class VisualizerEngine {
           reader.onerror = rej;
           reader.readAsDataURL(blob);
         });
+        const isGif = blob.type === 'image/gif' || img.isGif;
         const imgEl = await new Promise((res, rej) => {
           const el = new Image();
           el.onload = () => res(el);
           el.onerror = rej;
           el.src = dataURL;
         });
-        this.setUserTexture(img.texName, { data: dataURL, width: imgEl.naturalWidth, height: imgEl.naturalHeight });
+        this.setUserTexture(img.texName, { data: dataURL, width: imgEl.naturalWidth, height: imgEl.naturalHeight, isGif, gifSpeed: img.gifSpeed || 1.0 });
         console.log('[DiscoCast Visualizer] Image bound:', img.texName, imgEl.naturalWidth + 'x' + imgEl.naturalHeight);
       } catch (e) {
         console.warn('[DiscoCast Visualizer] Failed to bind image for', img.texName, e.message);
@@ -448,6 +453,7 @@ export class VisualizerEngine {
         this.hypeLevel = Math.min((peak * targetGain) / 5.0, 1.2);
       }
 
+      this._tickGifAnimations();
       this.visualizer.render();
       this.animFrameId = requestAnimationFrame(render);
     };
@@ -622,16 +628,147 @@ export class VisualizerEngine {
 
   /**
    * Bind a named texture for use in a comp shader sampler (sampler_<name>).
-   * Butterchurn expects { data: dataURL, width: number, height: number }.
+   * Static images go through Butterchurn's loadExtraImages as normal.
+   * Animated GIFs bypass it entirely — we create and own the WebGL texture directly.
    */
   setUserTexture(name, texObj) {
     if (!this.visualizer) return;
+    if (texObj.isGif && texObj.data) {
+      this._loadGifTexture(name, texObj.data, texObj.gifSpeed || 1.0);
+      return;
+    }
+    this._gifAnimations.delete(name);
     try {
       if (typeof this.visualizer.loadExtraImages === 'function') {
         this.visualizer.loadExtraImages({ [name]: texObj });
       }
     } catch (e) {
       console.warn('[DiscoCast Visualizer] setUserTexture failed:', e.message);
+    }
+  }
+
+  /** Called by inspector when a GIF layer is deleted. */
+  removeGifAnimation(name) {
+    this._gifAnimations.delete(name);
+  }
+
+  /** Update playback speed of a running GIF animation (1.0 = native, 2.0 = 2× faster). */
+  setGifAnimationSpeed(name, speed) {
+    const anim = this._gifAnimations.get(name);
+    if (anim) anim.speed = Math.max(0.01, speed);
+  }
+
+  /**
+   * Decode a GIF dataURL into pre-composited per-frame Uint8ClampedArray snapshots,
+   * then create a WebGL texture directly on Butterchurn's samplers map.
+   *
+   * Frames are composited in plain JS (no canvas 2D) so we never touch the canvas
+   * premultiplied-alpha pipeline. Canvas 2D stores pixels as premultiplied RGBA
+   * internally and getImageData() unpremultiplies on read — that roundtrip loses
+   * precision on semi-transparent pixels and produces the colour shift we observed.
+   * Uploading a raw Uint8ClampedArray to texImage2D bypasses all of that.
+   */
+  async _loadGifTexture(name, dataURL, speed = 1.0) {
+    try {
+      const imgTextures = this.visualizer?.renderer?.image;
+      if (!imgTextures?.gl) {
+        console.warn('[DiscoCast Visualizer] WebGL context not ready for GIF', name);
+        return;
+      }
+      const gl = imgTextures.gl;
+
+      // Decode base64 data URL → ArrayBuffer without fetch()
+      const base64 = dataURL.split(',')[1];
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
+      const gif = parseGIF(bytes.buffer);
+      const rawFrames = decompressFrames(gif, true);
+      if (!rawFrames.length) return;
+
+      const W = gif.lsd.width;
+      const H = gif.lsd.height;
+      const stride = W * 4;
+
+      // Running composite buffer — mutated in place, snapshotted per frame.
+      // Pure JS: no canvas, no premultiplied-alpha roundtrip.
+      const composite = new Uint8ClampedArray(W * H * 4);
+      const frames = [];
+      const delays = [];
+
+      for (let i = 0; i < rawFrames.length; i++) {
+        const f = rawFrames[i];
+        const { left, top, width: fw, height: fh } = f.dims;
+
+        // Dispose previous frame region if needed
+        if (i > 0 && rawFrames[i - 1].disposalType === 2) {
+          const { left: pl, top: pt, width: pw, height: ph } = rawFrames[i - 1].dims;
+          for (let y = 0; y < ph; y++) {
+            composite.fill(0, (pt + y) * stride + pl * 4, (pt + y) * stride + (pl + pw) * 4);
+          }
+        }
+
+        // Composite patch — transparent pixels (alpha=0) leave the composite unchanged
+        for (let y = 0; y < fh; y++) {
+          const srcRow = y * fw * 4;
+          const dstRow = (top + y) * stride + left * 4;
+          for (let x = 0; x < fw; x++) {
+            const s = srcRow + x * 4;
+            const d = dstRow + x * 4;
+            if (f.patch[s + 3] > 0) {
+              composite[d]     = f.patch[s];
+              composite[d + 1] = f.patch[s + 1];
+              composite[d + 2] = f.patch[s + 2];
+              composite[d + 3] = f.patch[s + 3];
+            }
+          }
+        }
+
+        frames.push(new Uint8ClampedArray(composite)); // snapshot
+        delays.push(Math.max((f.delay || 10) * 10, 20));
+      }
+
+      // Register texture directly in Butterchurn's samplers map so the comp shader
+      // finds it via sampler_<name> without going through loadExtraImages.
+      const texture = gl.createTexture();
+      imgTextures.samplers[name] = texture;
+
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+      // Allocate texture storage once — tick path uses texSubImage2D to update in-place
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, W, H, 0, gl.RGBA, gl.UNSIGNED_BYTE, frames[0]);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+      // LINEAR (no mipmaps) — generateMipmap on every animated frame is expensive and
+      // the quality gain for a looping GIF texture is not worth the per-frame GPU cost.
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+      this._gifAnimations.set(name, { frames, delays, gl, texture, frameIndex: 0, nextFrameAt: 0, width: W, height: H, speed });
+    } catch (e) {
+      console.warn('[DiscoCast Visualizer] _loadGifTexture failed for', name, e.message);
+    }
+  }
+
+  /**
+   * Called once per render tick. Advances any GIF whose deadline has passed and
+   * uploads the new frame pixels directly via gl.texImage2D (raw Uint8ClampedArray —
+   * no canvas, no colour-space conversion, no premultiplied-alpha).
+   */
+  _tickGifAnimations() {
+    if (this._gifAnimations.size === 0) return;
+    const now = performance.now();
+    for (const [, anim] of this._gifAnimations) {
+      if (now < anim.nextFrameAt) continue;
+      anim.frameIndex = (anim.frameIndex + 1) % anim.frames.length;
+      anim.nextFrameAt = now + anim.delays[anim.frameIndex] / (anim.speed || 1.0);
+      const { gl, texture, width, height } = anim;
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+      // texSubImage2D writes into the existing GPU allocation — no realloc, much faster than texImage2D
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, anim.frames[anim.frameIndex]);
     }
   }
 

@@ -17,6 +17,7 @@
     "butterchurn-presets": "^2.4.7",
     "butterchurn-presets-baron": "^1.5.1",
     "butterchurn-presets-weekly": "^0.0.4",
+    "gifuct-js": "^2.1.2",
     "sirv-cli": "^3.0.1"
   }
 }

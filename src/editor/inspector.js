@@ -35,6 +35,19 @@ async function resizeImageFile(file, maxDim) {
         r.onerror = () => reject(new Error('read failed'));
         r.readAsDataURL(file);
     });
+
+    // GIFs must never pass through canvas — drawImage() freezes on frame 1.
+    // Store the raw bytes; the visualizer decodes frames from the dataURL directly.
+    if (file.type === 'image/gif') {
+        const img = await new Promise((resolve, reject) => {
+            const el = new Image();
+            el.onload = () => resolve(el);
+            el.onerror = () => reject(new Error('decode failed'));
+            el.src = dataURL;
+        });
+        return { blob: file, dataURL, width: img.naturalWidth, height: img.naturalHeight, resized: false, originalW: img.naturalWidth, originalH: img.naturalHeight, isGif: true };
+    }
+
     const img = await new Promise((resolve, reject) => {
         const el = new Image();
         el.onload = () => resolve(el);
@@ -94,6 +107,12 @@ const BLANK = {
     init_eqs_str: '', frame_eqs_str: '', pixel_eqs_str: '',
     images: [],
     sceneMirror: 'none',  // 'none' | 'h' | 'v' | 'both'
+    // Solid-mode fx — only applied when a variation with a `solid:` base is active.
+    // All default to 0 so "Solid" out of the box is truly static (no breath, no pulse).
+    solidPulse: 0,        // bass multiplier: col *= (1 + bass * pulse)
+    solidBreath: 0,       // slow sine amplitude: col *= mix(1, 0.5+0.5*sin(t*0.6), breath)
+    solidShift: 0,        // beat-driven mix amount toward solidColorB (uses bass_att)
+    solidColorB: [0, 0, 0],
 };
 
 // ─── Base Variations ─────────────────────────────────────────────────────────
@@ -102,20 +121,29 @@ const BLANK = {
 
 const BASE_VARIATIONS = [
     {
-        name: 'Color', desc: 'Solid ambient glow', color: '#2a0050',
-        // solid: [r,g,b] tells the comp shader to use a flat base color
-        // instead of the warp feedback buffer — gives a clean starting canvas
-        solid: [0.08, 0.02, 0.22],
+        // One flat color. Pulse/Breath default to 0 — truly static unless the
+        // user dials them up. `solid:` tells the comp shader to use a flat base
+        // color instead of the warp feedback buffer.
+        name: 'Solid', desc: 'One color', color: '#2a0050',
+        solid: [0.16, 0.04, 0.44],
         bv: {
             decay: 0.98, gammaadj: 2.0,
-            wave_mode: 3,
-            wave_r: 0.75, wave_g: 0.25, wave_b: 1.0, wave_a: 0.75, wave_scale: 0.9,
+            wave_a: 0,  // no audio waveform overlay by default
         },
     },
     {
-        name: 'Clear', desc: 'Blank canvas', color: '#333333',
-        solid: [0, 0, 0],   // comp shader outputs black — no feedback buffer bleed
-        bv: { decay: 0.5 },
+        // Two colors that cross-fade on the beat. Same comp shader path as Solid
+        // but with a non-zero solidShift driving a mix() toward solidColorB.
+        name: 'Shift', desc: 'Two-color beat mix', color: '#d02060',
+        solid: [0.88, 0.12, 0.38],
+        solidColorB: [0.10, 0.20, 0.90],
+        solidPulse: 0.3,
+        solidBreath: 0.2,
+        solidShift: 0.7,
+        bv: {
+            decay: 0.98, gammaadj: 2.0,
+            wave_a: 0,
+        },
     },
     {
         name: 'Drift', desc: 'Slow & dreamy', color: '#5010c0',
@@ -313,6 +341,7 @@ export class EditorInspector {
         this._buildBaseVariations();
         this._buildPaletteChips();
         this._buildPaletteSliders();
+        this._buildSolidFxPanel();
         this._buildMotionSliders();
         this._buildWaveModeGrid();
         this._buildWaveSliders();
@@ -332,15 +361,26 @@ export class EditorInspector {
         this._initDevHud();
         this._updateLayersBar();
 
-        // Apply the first variation (Color) as the startup state — gives users
-        // something vivid to look at immediately instead of a black screen.
-        this.currentState.baseVals = { ...deepClone(BLANK.baseVals), ...BASE_VARIATIONS[0].bv };
+        // Apply the first variation (Solid) as the startup state — gives users
+        // something to look at immediately instead of a black screen.
+        const v0 = BASE_VARIATIONS[0];
+        this.currentState.baseVals = { ...deepClone(BLANK.baseVals), ...v0.bv };
+        if (v0.solid) {
+            this.currentState.baseVals.wave_r = v0.solid[0];
+            this.currentState.baseVals.wave_g = v0.solid[1];
+            this.currentState.baseVals.wave_b = v0.solid[2];
+        }
+        this.currentState.solidPulse = v0.solidPulse ?? 0;
+        this.currentState.solidBreath = v0.solidBreath ?? 0;
+        this.currentState.solidShift = v0.solidShift ?? 0;
+        this.currentState.solidColorB = (v0.solidColorB || [0, 0, 0]).slice();
         // _buildCompShader must run here so the solid-color GLSL is baked into
         // currentState.comp before the first _applyToEngine call.
         this._buildCompShader();
 
         this._applyToEngine();
         this._syncAllControls();
+        this._updateSolidFxVisibility(v0);
 
         // Butterchurn may be mid-blend from the engine's initial randomPreset() call.
         // Hammer the preset for several frames to guarantee we win the blend race.
@@ -385,6 +425,18 @@ export class EditorInspector {
         this._preSnap();
         // Merge BLANK baseVals with the variation's overrides
         this.currentState.baseVals = { ...deepClone(BLANK.baseVals), ...v.bv };
+        // If the variation sets a solid base, copy its wave_r/g/b from `solid:`
+        // so the swatch and shader agree. Non-solid variations keep BLANK's defaults.
+        if (v.solid) {
+            this.currentState.baseVals.wave_r = v.solid[0];
+            this.currentState.baseVals.wave_g = v.solid[1];
+            this.currentState.baseVals.wave_b = v.solid[2];
+        }
+        // Solid-mode fx: reset to BLANK defaults, then apply variation overrides.
+        this.currentState.solidPulse = v.solidPulse ?? 0;
+        this.currentState.solidBreath = v.solidBreath ?? 0;
+        this.currentState.solidShift = v.solidShift ?? 0;
+        this.currentState.solidColorB = (v.solidColorB || [0, 0, 0]).slice();
         // Reset equations but preserve comp (may have image layers)
         this.currentState.init_eqs_str = '';
         this.currentState.frame_eqs_str = '';
@@ -401,9 +453,79 @@ export class EditorInspector {
         this._applyToEngine();
         this._syncAllControls();
         this._clearPaletteActive();
+        this._updateSolidFxVisibility(v);
         document.querySelectorAll('.base-var-btn').forEach((el, idx) => {
             el.classList.toggle('active', idx === i);
         });
+    }
+
+    /**
+     * Show/hide the Solid-FX panel and the Shift color row based on the active
+     * variation. Also relabels the main Wave swatch to match the current mode:
+     *   Solid → "Color"
+     *   Shift → "Color A"
+     *   other → "Wave"   (waveform color, original meaning)
+     */
+    _updateSolidFxVisibility(variation) {
+        const panel = document.getElementById('solid-fx-panel');
+        const shiftRow = document.getElementById('solid-colorb-row');
+        const waveLabel = document.getElementById('wave-row-label');
+        const hasSolid = !!(variation && variation.solid);
+        const isShift = hasSolid && variation.name === 'Shift';
+        if (panel) panel.hidden = !hasSolid;
+        if (shiftRow) shiftRow.hidden = !isShift;
+        if (waveLabel) waveLabel.textContent = isShift ? 'Color A' : hasSolid ? 'Color' : 'Wave';
+    }
+
+    /**
+     * Build the Solid-FX panel: Pulse, Breath, Shift sliders and the Shift-color
+     * swatch binding. Shift slider is created but conceptually only meaningful
+     * in Shift mode — the Shift color row hides in Solid mode, so moving the
+     * slider there has no visible effect (mix toward (0,0,0) at pulse=0 is fine).
+     */
+    _buildSolidFxPanel() {
+        const container = document.getElementById('solid-fx-sliders');
+        if (!container) return;
+        const configs = [
+            { id: 'sf-pulse', label: 'Pulse', min: 0, max: 2.0, step: 0.01, value: 0, key: 'solidPulse' },
+            { id: 'sf-breath', label: 'Breath', min: 0, max: 1.0, step: 0.01, value: 0, key: 'solidBreath' },
+            { id: 'sf-shift', label: 'Shift', min: 0, max: 1.0, step: 0.01, value: 0, key: 'solidShift' },
+        ];
+        configs.forEach(cfg => {
+            const input = makeSlider(container, cfg);
+            const valEl = document.getElementById(`${cfg.id}-val`);
+            input.addEventListener('pointerdown', () => this._preSnap());
+            input.addEventListener('input', () => {
+                const v = parseFloat(input.value);
+                if (valEl) valEl.textContent = v.toFixed(2);
+                input.style.setProperty('--pct', `${((v - cfg.min) / (cfg.max - cfg.min)) * 100}%`);
+                this.currentState[cfg.key] = v;
+                this._buildCompShader();
+                this._applyToEngine();
+            });
+            input.addEventListener('pointerup', () => this._postSnap());
+        });
+
+        // Shift color swatch (Color B)
+        const swatch = document.getElementById('swatch-shift');
+        const native = document.getElementById('color-shift');
+        const hexLabel = document.getElementById('hex-shift');
+        if (swatch && native) {
+            swatch.addEventListener('click', () => native.click());
+            let needsSnap = true;
+            native.addEventListener('input', () => {
+                if (needsSnap) { this._preSnap(); needsSnap = false; }
+                swatch.style.background = native.value;
+                if (hexLabel) hexLabel.textContent = native.value.toUpperCase();
+                this.currentState.solidColorB = hexToRgb(native.value);
+                this._buildCompShader();
+                this._applyToEngine();
+            });
+            native.addEventListener('change', () => {
+                this._postSnap();
+                needsSnap = true;
+            });
+        }
     }
 
     // ─── Palette chips ────────────────────────────────────────────────────────
@@ -919,8 +1041,18 @@ export class EditorInspector {
         document.getElementById('btn-reset')?.addEventListener('click', () => {
             this._preSnap();
             this.currentState = deepClone(BLANK);
-            this._solidColor = BASE_VARIATIONS[0].solid || null;
-            this.currentState.baseVals = { ...deepClone(BLANK.baseVals), ...BASE_VARIATIONS[0].bv };
+            const v0 = BASE_VARIATIONS[0];
+            this._solidColor = v0.solid || null;
+            this.currentState.baseVals = { ...deepClone(BLANK.baseVals), ...v0.bv };
+            if (v0.solid) {
+                this.currentState.baseVals.wave_r = v0.solid[0];
+                this.currentState.baseVals.wave_g = v0.solid[1];
+                this.currentState.baseVals.wave_b = v0.solid[2];
+            }
+            this.currentState.solidPulse = v0.solidPulse ?? 0;
+            this.currentState.solidBreath = v0.solidBreath ?? 0;
+            this.currentState.solidShift = v0.solidShift ?? 0;
+            this.currentState.solidColorB = (v0.solidColorB || [0, 0, 0]).slice();
             this._imagesOnly = false;
             const ioToggle = document.getElementById('toggle-images-only');
             if (ioToggle) ioToggle.checked = false;
@@ -929,7 +1061,8 @@ export class EditorInspector {
             this._applyToEngine();
             this._syncAllControls();
             this._clearPaletteActive();
-            // Re-highlight the first variation (Color)
+            this._updateSolidFxVisibility(v0);
+            // Re-highlight the first variation (Solid)
             document.querySelectorAll('.base-var-btn').forEach((el, idx) => {
                 el.classList.toggle('active', idx === 0);
             });
@@ -1070,6 +1203,7 @@ export class EditorInspector {
         const idx = this.currentState.images.indexOf(entry);
         if (idx !== -1) this.currentState.images.splice(idx, 1);
         delete this._imageTextures[texName];
+        this.engine.removeGifAnimation(texName);
         this._buildCompShader();
         this._applyToEngine();
         card.remove();
@@ -1324,6 +1458,8 @@ export class EditorInspector {
             solo: false,        // Phase 4: solo-override (only soloed layers render when any solo is on)
             muted: false,       // Phase 4: hide this layer unless another layer is solo'd
             name: file.name.replace(/\.[^.]+$/, '') || 'Layer',  // Phase 4: user-editable display name
+            isGif: resized.isGif || false,
+            gifSpeed: 1.0,      // playback multiplier: 2 = twice as fast, 0.5 = half speed
         };
         this.currentState.images.push(entry);
 
@@ -1511,6 +1647,16 @@ export class EditorInspector {
               <button class="lseg lseg-scope active" data-scope="tile" data-tooltip="Fold inside each tile">Per Tile</button>
               <button class="lseg lseg-scope" data-scope="field" data-tooltip="Fold the whole tiled group">Whole Image</button>
             </div>
+            ${entry.isGif ? `
+            <div class="layer-section-divider"></div>
+            <p class="layer-section-label">Animation</p>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label">Speed</span>
+              <input type="range" class="slider layer-gif-speed-sl" min="0.25" max="4" step="0.05"
+                value="1" style="--pct:${pct(1, 0.25, 4)}">
+              <span class="lsv layer-gif-speed-val">1.00×</span>
+            </div>
+            ` : ''}
             <div class="layer-section-divider"></div>
             <p class="layer-section-label">Tint</p>
             <div class="layer-row-inline" style="gap:8px;margin-bottom:6px">
@@ -1646,6 +1792,21 @@ export class EditorInspector {
                 refresh();
             });
         });
+
+        // GIF speed slider (only present for animated GIF layers)
+        if (entry.isGif) {
+            const gifSpeedSl = card.querySelector('.layer-gif-speed-sl');
+            const gifSpeedVal = card.querySelector('.layer-gif-speed-val');
+            if (gifSpeedSl) {
+                gifSpeedSl.addEventListener('input', () => {
+                    const v = parseFloat(gifSpeedSl.value);
+                    entry.gifSpeed = v;
+                    gifSpeedVal.textContent = `${v.toFixed(2)}×`;
+                    gifSpeedSl.style.setProperty('--pct', `${pct(v, 0.25, 4)}`);
+                    this.engine.setGifAnimationSpeed(entry.texName, v);
+                });
+            }
+        }
 
         // Tint color swatch
         const tintSwatch = card.querySelector('.layer-tint-swatch');
@@ -1802,7 +1963,7 @@ export class EditorInspector {
         this._updateLayerIndices();
 
         // Texture load — resized.dataURL is already decoded from the resize step
-        const texObj = { data: resized.dataURL, width: resized.width, height: resized.height };
+        const texObj = { data: resized.dataURL, width: resized.width, height: resized.height, isGif: resized.isGif || false };
         this._imageTextures[texName] = texObj;
         this.engine.setUserTexture(texName, texObj);
         this._buildCompShader();
@@ -1956,13 +2117,27 @@ export class EditorInspector {
             base = uvFold + '  vec3 col = vec3(0.0);\n';
         } else if (this._solidColor) {
             const bv = this.currentState.baseVals;
-            const r = (bv.wave_r ?? this._solidColor[0]).toFixed(4);
-            const g = (bv.wave_g ?? this._solidColor[1]).toFixed(4);
-            const b = (bv.wave_b ?? this._solidColor[2]).toFixed(4);
+            const aR = (bv.wave_r ?? this._solidColor[0]).toFixed(4);
+            const aG = (bv.wave_g ?? this._solidColor[1]).toFixed(4);
+            const aB = (bv.wave_b ?? this._solidColor[2]).toFixed(4);
+            const cb = this.currentState.solidColorB || [0, 0, 0];
+            const bR = Number(cb[0]).toFixed(4);
+            const bG = Number(cb[1]).toFixed(4);
+            const bB = Number(cb[2]).toFixed(4);
+            const pulse = Number(this.currentState.solidPulse || 0).toFixed(4);
+            const breath = Number(this.currentState.solidBreath || 0).toFixed(4);
+            const shift = Number(this.currentState.solidShift || 0).toFixed(4);
+            // Breath: lerp between 1.0 (off) and a slow sine (0..1) by breath amount.
+            // Pulse:  multiplies brightness by (1 + bass * pulse).
+            // Shift:  mixes A→B by bass_att * shift, clamped 0..1. bass_att is the
+            //         attack-smoothed bass — feels like a beat, not a wobble.
             base = uvFold +
-                `  float _breath = 0.55 + 0.45 * sin(time * 0.6);\n` +
-                `  float _bass_b = 1.0 + bass * 0.5;\n` +
-                `  vec3 col = vec3(${r}, ${g}, ${b}) * _breath * _bass_b;\n`;
+                `  float _breath = mix(1.0, 0.5 + 0.5 * sin(time * 0.6), ${breath});\n` +
+                `  float _pulse = 1.0 + bass * ${pulse};\n` +
+                `  float _shiftT = clamp(bass_att * ${shift}, 0.0, 1.0);\n` +
+                `  vec3 _colA = vec3(${aR}, ${aG}, ${aB});\n` +
+                `  vec3 _colB = vec3(${bR}, ${bG}, ${bB});\n` +
+                `  vec3 col = mix(_colA, _colB, _shiftT) * _breath * _pulse;\n`;
         } else {
             base = uvFold + `  vec3 col = ${mainSample};\n`;
         }
@@ -2252,6 +2427,7 @@ export class EditorInspector {
         this._syncWaveControls();
         this._syncEchoOrient();
         this._syncPaletteSliders();
+        this._syncSolidFx();
         this._syncToggle('toggle-invert', 'invert');
         this._syncToggle('toggle-darken', 'darken');
     }
@@ -2260,6 +2436,20 @@ export class EditorInspector {
         const bv = this.currentState.baseVals;
         this._syncSlider('ps-gamma', bv.gammaadj, 0.5, 4.0, 2);
         this._syncSlider('ps-decay', bv.decay, 0.85, 0.999, 3);
+    }
+
+    _syncSolidFx() {
+        this._syncSlider('sf-pulse', this.currentState.solidPulse || 0, 0, 2.0, 2);
+        this._syncSlider('sf-breath', this.currentState.solidBreath || 0, 0, 1.0, 2);
+        this._syncSlider('sf-shift', this.currentState.solidShift || 0, 0, 1.0, 2);
+        const cb = this.currentState.solidColorB || [0, 0, 0];
+        const hex = rgbToHex(cb[0], cb[1], cb[2]);
+        const swatch = document.getElementById('swatch-shift');
+        const native = document.getElementById('color-shift');
+        const hexLabel = document.getElementById('hex-shift');
+        if (swatch) swatch.style.background = hex;
+        if (native) native.value = hex;
+        if (hexLabel) hexLabel.textContent = hex.toUpperCase();
     }
 
     _syncSlider(id, value, min, max, decimals = 2) {
