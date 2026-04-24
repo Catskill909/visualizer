@@ -60,6 +60,7 @@ export class ControlPanel {
       presetCount: document.getElementById('preset-count'),
       btnCloseDrawer: document.getElementById('btn-close-drawer'),
       btnPresetStudio: document.getElementById('btn-preset-studio'),
+      btnOpenEditor: document.getElementById('btn-open-editor'),
       tabAll: document.getElementById('tab-all'),
       tabFavorites: document.getElementById('tab-favorites'),
       tabCustom: document.getElementById('tab-custom'),
@@ -192,9 +193,15 @@ export class ControlPanel {
     // --- Preset drawer ---
     els.btnPresets.addEventListener('click', () => this.toggleDrawer());
 
-    // --- Preset Studio (editor) ---
+    // --- Preset Studio (editor) --- start screen button
     if (els.btnPresetStudio) {
       els.btnPresetStudio.addEventListener('click', () => {
+        window.location.href = '/editor.html';
+      });
+    }
+    // --- Preset Studio (editor) --- control bar button
+    if (els.btnOpenEditor) {
+      els.btnOpenEditor.addEventListener('click', () => {
         window.location.href = '/editor.html';
       });
     }
@@ -730,6 +737,13 @@ export class ControlPanel {
   }
 
   showPermissionError() {
+    const isTauri = typeof window.__TAURI__ !== 'undefined';
+    const nativeSteps = document.getElementById('permission-steps-native');
+    const browserSteps = document.getElementById('permission-steps-browser');
+    if (nativeSteps && browserSteps) {
+      nativeSteps.style.display = isTauri ? 'block' : 'none';
+      browserSteps.style.display = isTauri ? 'none' : 'block';
+    }
     this.els.permissionError.classList.remove('hidden');
   }
 
@@ -1237,6 +1251,10 @@ export class ControlPanel {
       case 'p':
       case 'P':
         this.toggleDrawer();
+        break;
+      case 'e':
+      case 'E':
+        window.location.href = '/editor.html';
         break;
       case 'Escape':
         if (!this.els.welcomeGuide.classList.contains('hidden')) this.closeWelcomeGuide();

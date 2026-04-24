@@ -19,7 +19,7 @@ A modern browser-based MilkDrop music visualizer powered by [Butterchurn](https:
 - **Fullscreen mode** — native browser fullscreen support
 - **Projector Optimized** — automatic Screen Wake Lock prevents sleep, mouse cursor auto-hides with UI, and "Zen Mode" (H key) for zero-UI projection
 - **Responsive design** — works on desktop and mobile viewports
-- **Preset Studio** (`/editor.html`) — standalone visual preset builder: 12 one-click palettes, 3 independent color swatches (Wave / Glow / Accent), 5 tabbed control sections, undo/redo, A/B comparison, image layers, save to localStorage
+- **Preset Studio** (`/editor.html` or press **E**) — standalone visual preset builder accessible from the main app's control bar: 12 one-click palettes, 3 independent color swatches (Wave / Glow / Accent), 5 tabbed control sections, undo/redo, A/B comparison, image layers, save to localStorage
 
 ## Tech Stack
 
@@ -40,8 +40,16 @@ discocast-visualizer/
 ├── editor.html             # Preset Studio — standalone visual builder (/editor.html)
 ├── vite.config.js          # Vite MPA config — dual Rollup entries (main + editor)
 ├── package.json
+├── build-and-sign.sh       # One-command macOS build script
+├── macos-app-generate.md   # macOS app packaging guide
 ├── public/
-│   └── favicon.svg         # Brand favicon (gradient concentric circles)
+│   ├── favicon.svg         # Brand favicon (gradient concentric circles)
+│   └── logo.png            # App icon source (used for macOS app icons)
+├── src-tauri/              # macOS app packaging (Tauri)
+│   ├── Cargo.toml          # Rust app config
+│   ├── tauri.conf.json     # Tauri build config (signing, entitlements)
+│   ├── entitlements.plist  # macOS permissions (audio input)
+│   └── icons/              # Generated app icons (from logo.png)
 └── src/
     ├── main.js             # Main app entry — wires VisualizerEngine + ControlPanel
     ├── visualizer.js       # VisualizerEngine class — butterchurn wrapper, audio routing
@@ -172,6 +180,7 @@ Merge layer exposing bundled + custom presets under one API.
 | `←` | Previous preset |
 | `R` | Random preset toggle |
 | `P` | Toggle preset drawer |
+| `E` | Open Preset Studio |
 | `S` | Toggle favorite on current preset |
 | `X` | Hide current preset (auto-advances to next visible) |
 | `F` | Toggle fullscreen |
@@ -191,6 +200,28 @@ npm run dev
 npm run build
 # → Output in dist/
 ```
+
+## macOS App
+
+A standalone, signed, and notarized macOS app — fully working including mic and USB audio input.
+
+### Install
+1. Open `DiscoCast Visualizer-1.0.YYYYMMDD.HHMM.dmg` from the project root
+2. Drag **DiscoCast Visualizer** → **Applications**
+3. Launch from Applications — no right-click needed (notarized)
+4. First time using mic/USB: macOS will prompt for microphone permission — click **Allow**
+
+### Build from Source
+
+```bash
+./build-and-sign.sh
+```
+
+Outputs `DiscoCast Visualizer-1.0.YYYYMMDD.HHMM.dmg` to the project root. Each build gets a unique date-stamped name.
+
+Requires: Apple Developer account (`3UT7698LZ6`), Rust/Cargo, Xcode tools.
+
+See `macos-app-generate.md` for full details.
 
 ## Deployment (Coolify)
 

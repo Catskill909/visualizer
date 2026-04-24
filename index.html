@@ -233,6 +233,15 @@
         </button>
       </div>
 
+      <!-- Preset Studio (Editor) -->
+      <div class="control-section">
+        <button id="btn-open-editor" class="ctrl-btn" data-tooltip="Open Preset Studio (E)" type="button">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+          </svg>
+        </button>
+      </div>
+
       <!-- Help / Guide -->
       <div class="control-section">
         <button id="btn-help" class="ctrl-btn" data-tooltip="Keyboard Shortcuts (?)" type="button">
@@ -353,12 +362,21 @@
   <div id="permission-error" class="hidden">
     <div class="permission-card">
       <div class="permission-icon">🚫</div>
-      <h3>Microphone Denied</h3>
-      <p>The visualizer needs microphone access to react to your music. Make sure you are using
-        <strong>localhost</strong> or <strong>HTTPS</strong>.
-      </p>
+      <h3>Microphone Access Needed</h3>
+      <p>DiscoCast Visualizer needs microphone access to react to your audio.</p>
 
-      <div class="permission-steps">
+      <!-- Native app instructions (shown when running as macOS app) -->
+      <div class="permission-steps" id="permission-steps-native" style="display:none">
+        <ol>
+          <li>Open <strong>System Settings</strong> on your Mac.</li>
+          <li>Go to <strong>Privacy &amp; Security → Microphone</strong>.</li>
+          <li>Toggle <strong>DiscoCast Visualizer</strong> <strong>ON</strong>.</li>
+          <li>Relaunch the app.</li>
+        </ol>
+      </div>
+
+      <!-- Browser instructions -->
+      <div class="permission-steps" id="permission-steps-browser">
         <ol>
           <li>Click the <strong>Lock icon</strong> 🔒 in the address bar.</li>
           <li>Find <strong>Microphone</strong> and toggle it <strong>ON</strong>.</li>
@@ -409,6 +427,7 @@
           <div class="guide-row"><kbd>S</kbd> <span>Toggle Favorite</span></div>
           <div class="guide-row"><kbd>X</kbd> <span>Hide Current Preset</span></div>
           <div class="guide-row"><kbd>P</kbd> <span>Open Presets Drawer</span></div>
+          <div class="guide-row"><kbd>E</kbd> <span>Open Preset Studio</span></div>
           <div class="guide-row"><kbd>?</kbd> / <kbd>/</kbd> <span>Toggle This Guide</span></div>
           <div class="guide-row"><kbd>F</kbd> <span>Fullscreen</span></div>
           <div class="guide-row"><kbd>Esc</kbd> <span>Close Drawers/Menus</span></div>
@@ -602,6 +621,7 @@
                 <div class="guide-row"><kbd>R</kbd><span>Toggle auto-cycle</span></div>
                 <div class="guide-row"><kbd>C</kbd><span>Open cycle settings</span></div>
                 <div class="guide-row"><kbd>P</kbd><span>Open presets drawer</span></div>
+                <div class="guide-row"><kbd>E</kbd><span>Open Preset Studio</span></div>
                 <div class="guide-row"><kbd>S</kbd><span>Toggle favorite</span></div>
                 <div class="guide-row"><kbd>X</kbd><span>Hide current preset</span></div>
 

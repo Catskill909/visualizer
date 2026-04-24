@@ -17,6 +17,13 @@ dist-ssr
 .env.local
 .env.*.local
 
+# macOS signing credentials — local only, never push
+.build-credentials
+
+# macOS build scripts and docs — not needed by Coolify web deployment
+build-and-sign.sh
+macos-app-generate.md
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -27,3 +34,13 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# macOS build artifacts
+*.app
+*.dmg
+*.app.zip
+build-log.txt
+src-tauri/target/
+
+# Keep Tauri config, ignore only build output
+# (src-tauri/tauri.conf.json, Cargo.toml, etc. should be committed)
