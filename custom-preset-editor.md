@@ -174,6 +174,12 @@ Images are stored as raw pixel data in `this._imageTextures` (texName → `{data
 
 ---
 
+## Timeline Editor (Separate Tool)
+
+The Timeline Editor lives at `/timeline.html` — fully self-contained, no changes needed here. A "Send to Timeline →" option on library cards opens `timeline.html?preset=<name>` (one line in `presetLibrary.js`). See `timeline-editor.md` for the full design.
+
+---
+
 ## Future ideas
 
 - Audio-reactive orbit radius (orbit grows on bass)

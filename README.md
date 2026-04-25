@@ -20,6 +20,7 @@ A modern browser-based MilkDrop music visualizer powered by [Butterchurn](https:
 - **Projector Optimized** — automatic Screen Wake Lock prevents sleep, mouse cursor auto-hides with UI, and "Zen Mode" (H key) for zero-UI projection
 - **Responsive design** — works on desktop and mobile viewports
 - **Preset Studio** (`/editor.html` or press **E**) — standalone visual preset builder: 12 one-click palettes, 3 independent color swatches (Wave / Glow / Accent), 5 tabbed control sections (Palette / Motion / Wave / Feel / Images), undo/redo (50-deep), A/B comparison; **up to 5 image layers** in a collapsible smart-accordion stack with drag-to-reorder, per-layer solo / mute / rename / static thumbnail, image resize on upload (1024px standard / 2048px HD toggle), per-layer UV mirror with Per Tile · Whole Image scope, scene-level Canvas Mirror, per-layer audio reactivity (source: Bass / Mid / Treble / Volume; curve: Linear / Squared / Cubed / Gate), aspect-correct tiling (portrait · square · landscape images tile without distortion), dev performance HUD (`` ` `` key); saves to localStorage
+- **Timeline Editor** (`/timeline.html` or press **L**) — self-contained full-screen show sequencer: canvas fills the screen, glassmorphic controls float on top and auto-hide during playback; arrange presets on a proportional-width multi-track strip, set per-entry durations and blend times, play/stop/loop live; **Zone Compositor** assigns each entry to a named screen region (quadrant, banner, center square, custom rectangle) so multiple presets render simultaneously in different areas — each zone has independent opacity, blend mode (screen/overlay/multiply/add), and gap behavior; supports drag-to-reorder, snap-to-grid, waveform overlay, BPM grid, JSON export/import
 
 ## Tech Stack
 
@@ -57,6 +58,11 @@ discocast-visualizer/
     ├── style.css           # Main app design system — dark theme, glassmorphism
     ├── customPresets.js    # Custom preset CRUD — localStorage + IndexedDB image storage
     ├── presetRegistry.js   # Merge layer — bundled + custom presets under one API
+    ├── timelineStorage.js  # Timeline CRUD — localStorage (no blobs; stores preset name refs)
+    ├── timeline/
+    │   ├── main.js         # Timeline Editor entry point — audio source boot
+    │   ├── timelineEditor.js # Core editor class — strip rendering, drag, playback wiring
+    │   └── style.css       # Timeline editor design system
     └── editor/
         ├── main.js         # Preset Studio entry point — audio source boot
         ├── inspector.js    # EditorInspector class — tabs, palettes, controls, undo/redo
@@ -116,6 +122,11 @@ Core engine wrapping Butterchurn. Manages audio context, source connections, pre
 | `toggleKickLock()` | Toggle bass-frequency isolation filter |
 | `setBoost(active)` | Momentary 2× intensity override (bound to `Shift`) |
 | `destroy()` | Full cleanup — stops render, audio, timers |
+| `startTimeline(id, startIndex?)` | Play a saved timeline; optionally start from a given entry index |
+| `stopTimeline()` | Stop active timeline and resume auto-cycle |
+| `timelineNext()` | Skip to next entry in the active timeline |
+| `timelinePrev()` | Go back to previous entry in the active timeline |
+| `getTimelineState()` | Returns active timeline playback state, or `null` if no timeline is playing |
 
 #### `ControlPanel` (`src/controls.js`)
 
@@ -176,6 +187,7 @@ Merge layer exposing bundled + custom presets under one API.
 | `A` | Toggle Auto-Gain (AGC) |
 | `K` | Toggle Kick-Lock |
 | `T` | Open Audio Tuning Panel |
+| `L` | Open Timeline Editor (`/timeline.html`) |
 | `→` | Next preset |
 | `←` | Previous preset |
 | `R` | Random preset toggle |
