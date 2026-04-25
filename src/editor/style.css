@@ -1238,6 +1238,359 @@ html, body {
 }
 
 /* ══════════════════════════════════════════════════════════════════════
+   MODE TOGGLE  (Edit | Library segment control at top of sidebar)
+   ══════════════════════════════════════════════════════════════════════ */
+
+.mode-toggle {
+  display: flex; gap: 5px;
+  padding: 8px 10px 7px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.mode-seg {
+  flex: 1;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  padding: 6px 8px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r-s);
+  color: var(--text-3);
+  font-family: var(--font); font-size: 11px; font-weight: 500;
+  cursor: pointer; transition: all 0.15s;
+}
+.mode-seg:hover { color: var(--text-2); border-color: var(--border-hi); }
+.mode-seg.active {
+  background: rgba(255,255,255,0.10);
+  color: var(--text);
+  border-color: rgba(255,255,255,0.22);
+}
+
+/* ── Dual-mode content containers ── */
+/* CSS controls visibility via data-mode; never rely on [hidden] + display:flex conflict */
+
+.panel-edit-content,
+.panel-library-content {
+  flex: 1; min-height: 0;
+  display: none;             /* hidden by default */
+  flex-direction: column;
+}
+
+.editor-panel[data-mode="edit"]    .panel-edit-content    { display: flex; }
+.editor-panel[data-mode="library"] .panel-library-content { display: flex; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   LIBRARY PANEL
+   ══════════════════════════════════════════════════════════════════════ */
+
+.library-panel {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column;
+}
+
+/* ── Top bar: count + New button + sort ── */
+
+.library-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px 8px;
+  flex-shrink: 0;
+}
+
+.library-count {
+  font-size: 10px; color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.library-topbar-right {
+  display: flex; align-items: center; gap: 6px;
+}
+
+.library-new-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r-s);
+  color: var(--text-2);
+  font-family: var(--font); font-size: 11px; font-weight: 500;
+  padding: 4px 9px; cursor: pointer; transition: all 0.15s;
+}
+.library-new-btn:hover {
+  background: rgba(255,255,255,0.07);
+  border-color: var(--border-hi); color: var(--text);
+}
+
+.library-sort-select {
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-s);
+  color: var(--text-2);
+  font-family: var(--font); font-size: 11px;
+  padding: 3px 6px; cursor: pointer;
+  outline: none;
+}
+.library-sort-select:hover { border-color: var(--border-hi); }
+
+/* ── Search ── */
+
+.library-search-wrap {
+  position: relative;
+  padding: 0 10px 8px;
+  flex-shrink: 0;
+}
+
+.library-search-icon {
+  position: absolute;
+  left: 19px; top: 50%; transform: translateY(-65%);
+  color: var(--text-3); pointer-events: none;
+}
+
+.library-search-input {
+  width: 100%;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-s);
+  color: var(--text);
+  font-family: var(--font); font-size: 12px;
+  padding: 7px 10px 7px 30px;
+  outline: none; transition: border-color 0.15s;
+}
+.library-search-input::placeholder { color: var(--text-3); }
+.library-search-input:focus { border-color: var(--border-hi); }
+
+/* ── Card grid ── */
+
+.library-grid {
+  flex: 1; min-height: 0;
+  overflow-y: auto;
+  padding: 4px 10px 10px;
+  display: flex; flex-direction: column;
+  gap: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.09) transparent;
+}
+.library-grid::-webkit-scrollbar { width: 4px; }
+.library-grid::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.09); border-radius: 2px;
+}
+
+/* ── Empty state ── */
+
+.library-empty {
+  grid-column: 1 / -1;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 48px 16px 32px;
+  gap: 8px; text-align: center;
+}
+.library-empty-icon {
+  font-size: 28px; opacity: 0.35; margin-bottom: 4px;
+}
+.library-empty-title {
+  font-size: 13px; font-weight: 500; color: var(--text-2);
+}
+.library-empty-sub {
+  font-size: 11px; color: var(--text-3); line-height: 1.55;
+}
+
+/* ── Preset card — compact list row ── */
+
+.preset-card {
+  position: relative;
+  display: flex; flex-direction: row; align-items: stretch;
+  height: 46px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-s);
+  overflow: visible;           /* let tooltips escape; delete overlay clips itself */
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.12s, border-color 0.12s;
+  user-select: none;
+}
+.preset-card:hover {
+  background: var(--bg-4);
+  border-color: var(--border-hi);
+  z-index: 2;                  /* raise above sibling cards so tooltip isn't painted over */
+}
+.preset-card.card-active {
+  border-color: rgba(255,255,255,0.35);
+  background: rgba(255,255,255,0.04);
+}
+.preset-card.card-active .card-accent {
+  opacity: 1;
+}
+.preset-card.card-deleting { opacity: 0.6; }
+
+/* Left color accent strip */
+.card-accent {
+  width: 3px;
+  flex-shrink: 0;
+  align-self: stretch;
+  opacity: 0.7;
+  transition: opacity 0.12s;
+  border-radius: var(--r-s) 0 0 var(--r-s);
+}
+.preset-card:hover .card-accent { opacity: 1; }
+
+/* Card body: text + action icons */
+.card-body {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center;
+  padding: 0 8px 0 10px;
+  gap: 8px;
+}
+
+.card-text {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; gap: 1px;
+}
+
+.card-name {
+  font-size: 12px; font-weight: 500; color: var(--text-2);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.card-rename-input {
+  font-family: var(--font); font-size: 12px; font-weight: 500;
+  color: var(--text);
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 3px;
+  padding: 1px 5px; outline: none;
+  width: 100%; min-width: 0;
+}
+
+.card-age {
+  font-size: 10px; color: var(--text-3);
+}
+
+/* Icon row — fades in on hover */
+.card-actions {
+  display: flex; gap: 3px; align-items: center;
+  flex-shrink: 0;
+  opacity: 0; transition: opacity 0.15s;
+}
+.preset-card:hover .card-actions { opacity: 1; }
+
+/* CSS tooltip suppressed for card buttons — JS tooltip handles them instead */
+.card-action-btn[data-tooltip]::after { content: none; }
+
+/* JS-driven fixed tooltip (escapes all overflow/scroll containers) */
+.card-tt {
+  position: fixed;
+  z-index: 9000;
+  background: #141416;
+  color: var(--text);
+  padding: 5px 9px;
+  border: 1px solid var(--border-hi);
+  border-radius: var(--r-s);
+  font-size: 11px;
+  font-family: var(--font);
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.45);
+}
+.card-tt[hidden] { display: none; }
+
+.card-action-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 4px;
+  color: var(--text-3);
+  cursor: pointer; transition: all 0.12s;
+}
+.card-action-btn:hover {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.28);
+  color: var(--text);
+}
+.card-edit-btn:hover {
+  border-color: rgba(120,180,255,0.5);
+  color: rgba(160,210,255,0.9);
+}
+.card-delete-btn:hover {
+  border-color: rgba(220,60,60,0.6);
+  color: rgba(255,110,110,0.9);
+}
+
+/* Soft-delete countdown overlay */
+.card-delete-overlay {
+  position: absolute; inset: 0;
+  background: rgba(160,20,20,0.88);
+  border-radius: var(--r-s);   /* re-clips corners since card is overflow:visible */
+  display: flex; flex-direction: row;
+  align-items: center; justify-content: center; gap: 10px;
+  padding: 0 12px;
+}
+.card-delete-overlay[hidden] { display: none; }
+
+.card-delete-countdown {
+  font-size: 11px; font-weight: 500; color: rgba(255,255,255,0.85);
+  flex: 1;
+}
+
+.card-delete-undo {
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 4px;
+  color: #fff; font-family: var(--font);
+  font-size: 11px; font-weight: 500;
+  padding: 3px 10px; cursor: pointer; transition: background 0.12s;
+  flex-shrink: 0;
+}
+.card-delete-undo:hover { background: rgba(255,255,255,0.28); }
+
+/* ── Quick Look popover ── */
+
+.card-quicklook {
+  position: fixed;
+  z-index: 600;
+  width: 280px;
+  background: var(--bg-3);
+  border: 1px solid var(--border-hi);
+  border-radius: var(--r-m);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.7);
+  overflow: hidden;
+  pointer-events: none;
+  animation: ql-in 0.15s ease;
+}
+.card-quicklook[hidden] { display: none; }
+
+@keyframes ql-in {
+  from { opacity: 0; transform: scale(0.97) translateY(4px); }
+  to   { opacity: 1; transform: scale(1)   translateY(0);    }
+}
+
+.ql-caption {
+  padding: 6px 10px;
+  font-size: 11.5px; font-weight: 500; color: var(--text-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ── Library footer ── */
+
+.library-footer {
+  display: flex; gap: 6px;
+  padding: 8px 10px 10px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.library-footer-btn {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r-s);
+  color: var(--text-2);
+  font-family: var(--font); font-size: 11.5px; font-weight: 500;
+  padding: 7px 10px; cursor: pointer; transition: all 0.15s;
+}
+.library-footer-btn:hover {
+  background: rgba(255,255,255,0.05);
+  border-color: var(--border-hi); color: var(--text);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
    RESPONSIVE
    ══════════════════════════════════════════════════════════════════════ */
 

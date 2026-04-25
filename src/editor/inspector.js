@@ -13,7 +13,7 @@
  *  All three swatches can be freely overridden after applying a palette.
  */
 
-import { createCustomPreset, storeImage, generateId } from '../customPresets.js';
+import { createCustomPreset, saveCustomPreset, getImage, storeImage, generateId } from '../customPresets.js';
 
 // ─── Phase 1: layer limits + upload resize ───────────────────────────────────
 // Cap surface area for Phase 1. Internals (shader builder, state array) are
@@ -337,6 +337,8 @@ export class EditorInspector {
         this._solidColor = BASE_VARIATIONS[0].solid || null;  // solid color base for first variation
         this._hdUploads = false;      // when true: next upload is resized to HD_MAX_DIM instead of STD_MAX_DIM
         this._lastBuildMs = 0;        // dev monitor: last shader rebuild time
+
+        this.onchange = null;   // set by main.js for dirty-state tracking
 
         this._buildBaseVariations();
         this._buildPaletteChips();
@@ -1468,15 +1470,26 @@ export class EditorInspector {
             lissPhase: 0.25,       // Lissajous X phase offset (0–1 cycles)
             strobeAmp: 0.00,       // Phase 6: hard beat-cut intensity (0=off, 1=full black)
             strobeThr: 0.40,       // audio threshold to trigger strobe
+            isHd: hdMode,          // badge shown in card header
         };
         this.currentState.images.push(entry);
 
-        // ── Build card ──────────────────────────────────────────────────────
+        const texObj = { data: resized.dataURL, width: resized.width, height: resized.height, isGif: resized.isGif || false };
+        this._mountLayerCard(entry, texObj);
+        if (!resized.resized) showToast('Image layer added');
+    }
+
+    // ─── Mount a layer card from an entry + texObj ─────────────────────────────
+    // Used by both _addImageLayer (new upload) and loadPresetData (library load).
+
+    _mountLayerCard(entry, texObj) {
         const layers = document.getElementById('image-layers');
         const card = document.createElement('div');
         card.className = 'image-layer-card';
 
-        const shortName = file.name.length > 24 ? file.name.slice(0, 22) + '…' : file.name;
+        const shortName = (entry.fileName || '').length > 24
+            ? (entry.fileName || '').slice(0, 22) + '…'
+            : (entry.fileName || '');
         const pct = (v, min, max) =>
             `${(((v - min) / (max - min)) * 100).toFixed(1)}%`;
 
@@ -1500,7 +1513,7 @@ export class EditorInspector {
             <div class="layer-meta">
               <div class="layer-meta-top">
                 <span class="layer-index-badge" aria-hidden="true">#1</span>
-                ${hdMode ? '<span class="layer-hd-badge" data-tooltip="Uploaded at HD (2048px). Re-upload to change.">HD</span>' : ''}
+                ${entry.isHd ? '<span class="layer-hd-badge" data-tooltip="Uploaded at HD (2048px). Re-upload to change.">HD</span>' : ''}
               </div>
               <input type="text" class="layer-name-input" maxlength="32" spellcheck="false"
                      aria-label="Layer name" />
@@ -1745,7 +1758,7 @@ export class EditorInspector {
         // Populate the editable name input (value-set is safe — no innerHTML path)
         const nameInput = card.querySelector('.layer-name-input');
         nameInput.value = entry.name;
-        nameInput.title = `Filename: ${file.name}`;
+        nameInput.title = `Filename: ${entry.fileName || ''}`;
 
         // ── Wire controls ───────────────────────────────────────────────────
         const refresh = () => { this._buildCompShader(); this._applyToEngine(); };
@@ -2017,7 +2030,7 @@ export class EditorInspector {
         const removeBtn = card.querySelector('.layer-remove');
         removeBtn.addEventListener('click', (e) => {
             e.stopPropagation();   // don't trigger header toggle
-            this._confirmDeleteLayer(entry, card, texName);
+            this._confirmDeleteLayer(entry, card, entry.texName);
         });
 
         // Collapse / expand via the whole header strip (but not the drag handle / delete)
@@ -2038,7 +2051,7 @@ export class EditorInspector {
         });
 
         // ── Phase 2: drag-to-reorder (handle-only initiator) ─────────────────
-        card.dataset.texName = texName;  // lets _reorderImage resync DOM → array
+        card.dataset.texName = entry.texName;  // lets _reorderImage resync DOM → array
         const dragHandle = card.querySelector('.layer-drag-handle');
         this._wireDragReorder(card, entry, dragHandle);
 
@@ -2102,16 +2115,12 @@ export class EditorInspector {
         this._updateLayersBar();
         this._updateLayerIndices();
 
-        // Texture load — resized.dataURL is already decoded from the resize step
-        const texObj = { data: resized.dataURL, width: resized.width, height: resized.height, isGif: resized.isGif || false };
-        this._imageTextures[texName] = texObj;
-        this.engine.setUserTexture(texName, texObj);
+        this._imageTextures[entry.texName] = texObj;
+        this.engine.setUserTexture(entry.texName, texObj);
         this._buildCompShader();
         this._applyToEngine();
-        if (!resized.resized) showToast('Image layer added');
 
-        // Phase 4: render the static thumbnail into the header canvas.
-        // Letterbox the image into the 48×48 slot so aspect is preserved.
+        // Render the static thumbnail into the header canvas (letterboxed).
         const thumbCanvas = card.querySelector('.layer-thumb');
         if (thumbCanvas) {
             const thumbImg = new Image();
@@ -2127,8 +2136,12 @@ export class EditorInspector {
                 else { dh = H; dw = H * srcAR; dy = 0; dx = (W - dw) / 2; }
                 ctx.drawImage(thumbImg, dx, dy, dw, dh);
             };
-            thumbImg.src = resized.dataURL;
-            thumbCanvas.setAttribute('data-tooltip', entry.fileName);
+            thumbImg.src = texObj.data;
+            thumbCanvas.setAttribute('data-tooltip', entry.fileName || '');
+        }
+        if (entry.collapsed) {
+            card.classList.add('collapsed');
+            card.querySelector('.layer-header')?.setAttribute('aria-expanded', 'false');
         }
     }
 
@@ -2207,6 +2220,7 @@ export class EditorInspector {
         for (const [name, texObj] of Object.entries(this._imageTextures)) {
             this.engine.setUserTexture(name, texObj);
         }
+        this.onchange?.();
     }
 
     /**
@@ -2641,6 +2655,133 @@ export class EditorInspector {
         input.value = value;
         if (valEl) valEl.textContent = Number(value).toFixed(decimals);
         input.style.setProperty('--pct', `${((value - min) / (max - min)) * 100}%`);
+    }
+
+    // ─── Public: save current state (overwrite or new) ────────────────────────
+
+    /**
+     * Save the current editor state.
+     * @param {string}      name         - preset name to save under
+     * @param {string|null} id           - if set, overwrite that preset; if null, create new
+     * @param {string|null} thumbDataUrl - JPEG data URL for the thumbnail (optional)
+     * @returns {object} the saved preset record
+     */
+    saveCurrent(name, id, thumbDataUrl = null) {
+        const presetNameInput = document.getElementById('preset-name-input');
+        if (presetNameInput) presetNameInput.value = name;
+
+        const data = {
+            name,
+            ...this.currentState,
+            ...(thumbDataUrl ? { thumbnailDataUrl: thumbDataUrl } : {}),
+        };
+
+        let record;
+        if (id) {
+            record = saveCustomPreset({ ...data, id, updatedAt: Date.now() });
+        } else {
+            record = createCustomPreset(data);
+        }
+
+        this.originalState = deepClone(this.currentState);
+        return record;
+    }
+
+    // ─── Fill missing numeric fields on a loaded image entry ─────────────────
+    // Presets saved before a field was added will be missing it; calling
+    // .toFixed() on undefined throws. Merge against the same defaults used
+    // when _addImageLayer creates a fresh entry.
+
+    _normalizeImageEntry(entry) {
+        const D = {
+            opacity: 0.80, opacityPulse: 0.00, size: 0.25, spinSpeed: 0.00,
+            orbitRadius: 0.00, bounceAmp: 0.00, tunnelSpeed: 0.00,
+            spacing: 0.00, cx: 0.50, cy: 0.50,
+            swayAmt: 0.00, swaySpeed: 1.00, wanderAmt: 0.00, wanderSpeed: 0.50,
+            mirror: 'none', mirrorScope: 'tile',
+            isGif: false, gifSpeed: 1.0,
+            reactSource: 'bass', reactCurve: 'linear',
+            orbitMode: 'circle', lissFreqX: 0.50, lissFreqY: 0.75, lissPhase: 0.25,
+            strobeAmp: 0.00, strobeThr: 0.40,
+            audioPulse: 0.00, pulseInvert: false,
+            blendMode: 'overlay', tile: true, groupSpin: false,
+            hueSpinSpeed: 0.00, tintR: 1.0, tintG: 1.0, tintB: 1.0,
+            name: 'Layer', fileName: '', collapsed: false,
+            isHd: false, solo: false, muted: false,
+        };
+        return { ...D, ...entry };
+    }
+
+    // ─── Public: load a saved preset into the editor ──────────────────────────
+
+    /**
+     * Load a full custom preset object (from customPresets.js) into the editor.
+     * Restores baseVals, shapes, waves, and image layers (fetching blobs from IndexedDB).
+     * @param {object} presetData - preset object as returned by loadAllCustomPresets()
+     */
+    async loadPresetData(presetData) {
+        // 1. Clear existing image layers
+        const layersEl = document.getElementById('image-layers');
+        if (layersEl) layersEl.innerHTML = '';
+        for (const texName of Object.keys(this._imageTextures)) {
+            this.engine.removeGifAnimation?.(texName);
+        }
+        this._imageTextures = {};
+
+        // 2. Set state from preset (strip library-only metadata)
+        const { id: _id, name: _name, schemaVersion: _sv, createdAt: _ca, updatedAt: _ua,
+                thumbnailDataUrl: _th, ...stateFields } = presetData;
+        this.currentState = deepClone({ ...stateFields, images: [] });
+        this.originalState = deepClone(this.currentState);
+
+        // 3. Sync all non-image controls
+        this._buildCompShader();
+        this._syncAllControls();
+
+        // 4. Restore image layers (async — fetch blobs from IndexedDB)
+        const savedImages = stateFields.images || [];
+        for (const savedEntry of savedImages) {
+            try {
+                const blob = await getImage(savedEntry.imageId);
+                if (!blob) continue;
+
+                const dataUrl = await new Promise((res, rej) => {
+                    const reader = new FileReader();
+                    reader.onload = e => res(e.target.result);
+                    reader.onerror = rej;
+                    reader.readAsDataURL(blob);
+                });
+
+                const { width, height } = await new Promise((res, rej) => {
+                    const img = new Image();
+                    img.onload = () => res({ width: img.naturalWidth, height: img.naturalHeight });
+                    img.onerror = rej;
+                    img.src = dataUrl;
+                });
+
+                const entry = this._normalizeImageEntry(deepClone(savedEntry));
+                const texObj = { data: dataUrl, width, height, isGif: !!entry.isGif };
+
+                this.currentState.images.push(entry);
+                this._mountLayerCard(entry, texObj);
+            } catch (err) {
+                console.warn('[Studio] Could not restore image layer:', savedEntry.imageId, err.message);
+            }
+        }
+
+        this._applyToEngine();
+        this._updateLayersBar();
+        this._updateLayerIndices();
+
+        // Sync scene mirror segment
+        const smSeg = document.querySelectorAll('#scene-mirror-seg .seg');
+        const sm = this.currentState.sceneMirror || 'none';
+        smSeg.forEach(s => s.classList.toggle('active', s.dataset.smirror === sm));
+
+        // Sync Images Only toggle
+        const ioToggle = document.getElementById('toggle-images-only');
+        if (ioToggle) ioToggle.checked = !!this.currentState.imagesOnly;
+        this._imagesOnly = !!this.currentState.imagesOnly;
     }
 }
 

@@ -426,6 +426,17 @@ export class VisualizerEngine {
     this.visualizer.setRendererSize(width, height);
   }
 
+  /**
+   * Capture the canvas on the very next rendered frame — called right after
+   * visualizer.render() so the WebGL buffer is still populated.
+   * Returns a Promise<string|null> (JPEG data URL at 320×180, q 0.7).
+   */
+  captureNextFrame() {
+    return new Promise(resolve => {
+      this._pendingCapture = resolve;
+    });
+  }
+
   startRenderLoop() {
     if (this.isRunning) return;
     this.isRunning = true;
@@ -455,6 +466,19 @@ export class VisualizerEngine {
 
       this._tickGifAnimations();
       this.visualizer.render();
+
+      // Capture hook: resolve immediately after render() while buffer is live
+      if (this._pendingCapture) {
+        const cb = this._pendingCapture;
+        this._pendingCapture = null;
+        try {
+          const off = document.createElement('canvas');
+          off.width = 320; off.height = 180;
+          off.getContext('2d').drawImage(this.canvas, 0, 0, 320, 180);
+          cb(off.toDataURL('image/jpeg', 0.7));
+        } catch { cb(null); }
+      }
+
       this.animFrameId = requestAnimationFrame(render);
     };
     render();

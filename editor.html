@@ -77,7 +77,30 @@
             <canvas id="editor-canvas" class="editor-canvas"></canvas>
 
             <!-- Right panel -->
-            <aside id="editor-panel" class="editor-panel" aria-label="Preset controls">
+            <aside id="editor-panel" class="editor-panel" data-mode="edit" aria-label="Preset controls">
+
+                <!-- Mode toggle: Edit | Library -->
+                <div class="mode-toggle" id="mode-toggle" role="group" aria-label="Panel mode">
+                    <button class="mode-seg active" data-mode="edit">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                        Edit
+                    </button>
+                    <button class="mode-seg" data-mode="library" data-tooltip="My Presets (P)">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                            <rect x="3" y="3" width="7" height="7" rx="1"/>
+                            <rect x="14" y="3" width="7" height="7" rx="1"/>
+                            <rect x="14" y="14" width="7" height="7" rx="1"/>
+                            <rect x="3" y="14" width="7" height="7" rx="1"/>
+                        </svg>
+                        Library
+                    </button>
+                </div>
+
+                <!-- Edit mode content -->
+                <div class="panel-edit-content">
 
                 <!-- Header: name input + undo / redo / A/B -->
                 <header class="panel-header">
@@ -346,6 +369,39 @@
                     <button id="btn-reset" class="reset-btn" type="button">Reset</button>
                 </footer>
 
+                </div><!-- /panel-edit-content -->
+
+                <!-- Library mode content -->
+                <div class="panel-library-content">
+                    <div id="library-panel" class="library-panel">
+                        <div class="library-topbar">
+                            <span id="library-count" class="library-count">0 presets</span>
+                            <div class="library-topbar-right">
+                                <button id="btn-new-preset" class="library-new-btn" data-tooltip="Start a new preset">+ New</button>
+                                <select id="library-sort" class="library-sort-select" aria-label="Sort presets">
+                                    <option value="recent">Recent</option>
+                                    <option value="oldest">Oldest</option>
+                                    <option value="az">A–Z</option>
+                                    <option value="za">Z–A</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="library-search-wrap">
+                            <svg class="library-search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <circle cx="11" cy="11" r="8"/>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                            </svg>
+                            <input id="library-search" class="library-search-input" type="text" placeholder="Search presets…" aria-label="Search presets" />
+                        </div>
+                        <div id="library-grid" class="library-grid"></div>
+                        <div class="library-footer">
+                            <button id="btn-export-all" class="library-footer-btn">Export All</button>
+                            <button id="btn-import" class="library-footer-btn">Import</button>
+                            <input type="file" id="import-file-input" accept=".json" hidden />
+                        </div>
+                    </div>
+                </div><!-- /panel-library-content -->
+
             </aside>
         </div>
 
@@ -360,6 +416,19 @@
                 <div class="save-modal-actions">
                     <button id="save-modal-confirm" class="save-btn" type="button">Save</button>
                     <button id="save-modal-cancel" class="reset-btn" type="button">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Unsaved changes confirmation modal -->
+        <div id="dirty-modal" class="save-modal" hidden role="dialog" aria-modal="true"
+            aria-labelledby="dirty-modal-title">
+            <div class="save-modal-card">
+                <h2 id="dirty-modal-title" class="save-modal-title">Unsaved Changes</h2>
+                <p class="layer-delete-msg">Your current edits haven't been saved. Load the new preset anyway?</p>
+                <div class="save-modal-actions">
+                    <button id="dirty-modal-confirm" class="danger-btn" type="button">Load anyway</button>
+                    <button id="dirty-modal-cancel" class="reset-btn" type="button">Keep editing</button>
                 </div>
             </div>
         </div>
@@ -403,7 +472,7 @@
                     <svg id="mp-icon-play" viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
                         <path d="M8 5v14l11-7z" />
                     </svg>
-                    <svg id="mp-icon-pause" viewBox="0 0 24 24" fill="currentColor" width="14" height="14" hidden>
+                    <svg id="mp-icon-pause" viewBox="0 0 24 24" fill="currentColor" width="14" height="14" style="display:none">
                         <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
                     </svg>
                 </button>
@@ -411,6 +480,12 @@
                     style="--pct:0%">
                 <input id="mp-vol" class="mp-vol slider" type="range" min="0" max="1" step="0.01" value="1"
                     title="Volume" style="--pct:100%">
+                <button id="mp-load" class="mp-btn" type="button" data-tooltip="Load audio file">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13">
+                        <path d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z"/>
+                    </svg>
+                </button>
+                <input id="mp-file-input" type="file" accept="audio/*" hidden>
             </div>
         </div>
 
