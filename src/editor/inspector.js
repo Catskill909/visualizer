@@ -1462,6 +1462,12 @@ export class EditorInspector {
             gifSpeed: 1.0,      // playback multiplier: 2 = twice as fast, 0.5 = half speed
             reactSource: 'bass',   // Phase 5: 'bass' | 'mid' | 'treb' | 'vol'
             reactCurve: 'linear',  // Phase 5: 'linear' | 'squared' | 'cubed' | 'threshold'
+            orbitMode: 'circle',   // Phase 6: 'circle' | 'lissajous'
+            lissFreqX: 0.50,       // Lissajous X-axis frequency (Hz)
+            lissFreqY: 0.75,       // Lissajous Y-axis frequency (Hz) — 3:2 ratio default
+            lissPhase: 0.25,       // Lissajous X phase offset (0–1 cycles)
+            strobeAmp: 0.00,       // Phase 6: hard beat-cut intensity (0=off, 1=full black)
+            strobeThr: 0.40,       // audio threshold to trigger strobe
         };
         this.currentState.images.push(entry);
 
@@ -1549,6 +1555,18 @@ export class EditorInspector {
                 value="${entry.opacityPulse}" style="--pct:${pct(entry.opacityPulse, 0, 1)}">
               <span class="lsv">${entry.opacityPulse.toFixed(2)}</span>
             </div>
+            <div class="layer-row-inline">
+              <span class="layer-ctrl-label" data-tooltip="Hard opacity cut when audio crosses threshold — instant strobe flash">Strobe</span>
+              <input type="range" class="slider layer-slider-inline layer-strobe-sl" min="0" max="1" step="0.01"
+                value="${entry.strobeAmp}" style="--pct:${pct(entry.strobeAmp, 0, 1)}">
+              <span class="lsv layer-strobe-amp-val">${entry.strobeAmp.toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row layer-strobe-thr-row"${entry.strobeAmp <= 0 ? ' style="display:none"' : ''}>
+              <span class="layer-ctrl-label">Threshold</span>
+              <input type="range" class="slider layer-strobe-thr-sl" min="0.1" max="0.9" step="0.05"
+                value="${entry.strobeThr}" style="--pct:${pct(entry.strobeThr, 0.1, 0.9)}">
+              <span class="lsv layer-strobe-thr-val">${entry.strobeThr.toFixed(2)}</span>
+            </div>
             <div class="layer-slider-row">
               <span class="layer-ctrl-label">Size</span>
               <input type="range" class="slider layer-size-sl" min="0" max="1" step="0.01"
@@ -1588,6 +1606,31 @@ export class EditorInspector {
               <input type="range" class="slider" min="0" max="0.45" step="0.01"
                 value="${entry.orbitRadius}" style="--pct:${pct(entry.orbitRadius, 0, 0.45)}">
               <span class="lsv">${entry.orbitRadius.toFixed(2)}</span>
+            </div>
+            <div class="layer-row-inline layer-orbit-mode-row">
+              <span class="layer-ctrl-label" data-tooltip="Circle: uniform orbit · Lissajous: figure-8 / clover paths via independent X/Y frequencies">Path</span>
+              <div class="layer-orbit-mode" role="group" aria-label="Orbit path shape">
+                <button class="lseg${entry.orbitMode !== 'lissajous' ? ' active' : ''}" data-orbit-mode="circle">Circle</button>
+                <button class="lseg${entry.orbitMode === 'lissajous' ? ' active' : ''}" data-orbit-mode="lissajous">Lissajous</button>
+              </div>
+            </div>
+            <div class="layer-slider-row layer-liss-row"${entry.orbitMode !== 'lissajous' ? ' style="display:none"' : ''}>
+              <span class="layer-ctrl-label" data-tooltip="X-axis frequency (Hz) — try 2:3, 3:4 ratios with Freq Y">Freq X</span>
+              <input type="range" class="slider layer-liss-sl layer-liss-fx-sl" min="0.25" max="4" step="0.25"
+                value="${entry.lissFreqX}" style="--pct:${pct(entry.lissFreqX, 0.25, 4)}">
+              <span class="lsv layer-liss-fx-val">${entry.lissFreqX.toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row layer-liss-row"${entry.orbitMode !== 'lissajous' ? ' style="display:none"' : ''}>
+              <span class="layer-ctrl-label" data-tooltip="Y-axis frequency (Hz) — ratio to Freq X sets the figure shape">Freq Y</span>
+              <input type="range" class="slider layer-liss-sl layer-liss-fy-sl" min="0.25" max="4" step="0.25"
+                value="${entry.lissFreqY}" style="--pct:${pct(entry.lissFreqY, 0.25, 4)}">
+              <span class="lsv layer-liss-fy-val">${entry.lissFreqY.toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row layer-liss-row"${entry.orbitMode !== 'lissajous' ? ' style="display:none"' : ''}>
+              <span class="layer-ctrl-label" data-tooltip="Phase offset on X axis — rotates the figure">Phase</span>
+              <input type="range" class="slider layer-liss-sl layer-liss-ph-sl" min="0" max="1" step="0.05"
+                value="${entry.lissPhase}" style="--pct:${pct(entry.lissPhase, 0, 1)}">
+              <span class="lsv layer-liss-ph-val">${entry.lissPhase.toFixed(2)}</span>
             </div>
             <div class="layer-slider-row">
               <span class="layer-ctrl-label">Bounce</span>
@@ -1675,10 +1718,11 @@ export class EditorInspector {
               <span class="lsv">${entry.hueSpinSpeed.toFixed(2)}</span>
             </div>
             <div class="layer-section-divider"></div>
-            <p class="layer-section-label">Reactivity</p>
-            <p class="layer-section-sub">Drives Pulse · Bounce · Beat Fade</p>
+            <p class="layer-section-label">Audio Reactivity</p>
+            <p class="layer-section-sub">Source &amp; Curve shape the audio signal that powers all sound-driven animation on this layer.</p>
+            <p class="layer-section-sub" style="margin-top:-3px;margin-bottom:8px;color:var(--text-2)">↳ Pulse · Bounce · Beat Fade · Strobe</p>
             <div class="layer-row-inline" style="gap:8px;margin-bottom:6px">
-              <span class="layer-ctrl-label" data-tooltip="Which audio band drives all reactive controls on this layer">Source</span>
+              <span class="layer-ctrl-label" data-tooltip="Which frequency band drives this layer — Bass = kicks, Mid = melody/snare, Treble = hi-hats, Volume = overall mix loudness">Source</span>
               <select class="layer-react-source">
                 <option value="bass" selected>Bass</option>
                 <option value="mid">Mid</option>
@@ -1687,7 +1731,7 @@ export class EditorInspector {
               </select>
             </div>
             <div class="layer-row-inline" style="gap:8px;margin-bottom:4px">
-              <span class="layer-ctrl-label" data-tooltip="Response curve applied to the audio signal before driving reactive controls">Curve</span>
+              <span class="layer-ctrl-label" data-tooltip="How the signal is shaped before reaching controls — Squared suppresses quiet hits, Cubed reserves reaction for the very loudest peaks, Gate flips binary on/off at 30%">Curve</span>
               <div class="layer-react-curve" role="group" aria-label="Reactivity curve">
                 <button class="lseg active" data-curve="linear">Linear</button>
                 <button class="lseg" data-curve="squared">Squared</button>
@@ -1772,7 +1816,7 @@ export class EditorInspector {
         const sliderMins = [0, 0, 0, 0, -2, 0, 0, 0, 0, 0];
         const sliderMaxes = [1, 1, 0.8, 0.45, 2, 0.4, 4, 0.4, 2, 2];
 
-        card.querySelectorAll('.layer-slider-row input[type=range]:not(.layer-bounce-sl):not(.layer-size-sl)').forEach((sl, i) => {
+        card.querySelectorAll('.layer-slider-row input[type=range]:not(.layer-bounce-sl):not(.layer-size-sl):not(.layer-liss-sl):not(.layer-strobe-thr-sl)').forEach((sl, i) => {
             const valEl = sl.nextElementSibling;
             sl.addEventListener('input', () => {
                 const v = parseFloat(sl.value);
@@ -1859,6 +1903,63 @@ export class EditorInspector {
                 entry.reactCurve = btn.dataset.curve;
                 refresh();
             });
+        });
+
+        // Phase 6: Strobe
+        const strobeSlider = card.querySelector('.layer-strobe-sl');
+        const strobeAmpVal = card.querySelector('.layer-strobe-amp-val');
+        const strobeThrRow = card.querySelector('.layer-strobe-thr-row');
+        const strobeThrSl = card.querySelector('.layer-strobe-thr-sl');
+        const strobeThrVal = card.querySelector('.layer-strobe-thr-val');
+        strobeSlider.addEventListener('input', () => {
+            entry.strobeAmp = parseFloat(strobeSlider.value);
+            strobeAmpVal.textContent = entry.strobeAmp.toFixed(2);
+            strobeSlider.style.setProperty('--pct', `${pct(entry.strobeAmp, 0, 1)}`);
+            strobeThrRow.style.display = entry.strobeAmp > 0 ? '' : 'none';
+            refresh();
+        });
+        strobeThrSl.addEventListener('input', () => {
+            entry.strobeThr = parseFloat(strobeThrSl.value);
+            strobeThrVal.textContent = entry.strobeThr.toFixed(2);
+            strobeThrSl.style.setProperty('--pct', `${pct(entry.strobeThr, 0.1, 0.9)}`);
+            refresh();
+        });
+
+        // Phase 6: Lissajous orbit mode
+        const orbitModeBtns = card.querySelectorAll('.layer-orbit-mode .lseg');
+        const lissRows = card.querySelectorAll('.layer-liss-row');
+        orbitModeBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                orbitModeBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                entry.orbitMode = btn.dataset.orbitMode;
+                lissRows.forEach(r => { r.style.display = entry.orbitMode === 'lissajous' ? '' : 'none'; });
+                refresh();
+            });
+        });
+        const lissFxSl = card.querySelector('.layer-liss-fx-sl');
+        const lissFxVal = card.querySelector('.layer-liss-fx-val');
+        lissFxSl.addEventListener('input', () => {
+            entry.lissFreqX = parseFloat(lissFxSl.value);
+            lissFxVal.textContent = entry.lissFreqX.toFixed(2);
+            lissFxSl.style.setProperty('--pct', `${pct(entry.lissFreqX, 0.25, 4)}`);
+            refresh();
+        });
+        const lissFySl = card.querySelector('.layer-liss-fy-sl');
+        const lissFyVal = card.querySelector('.layer-liss-fy-val');
+        lissFySl.addEventListener('input', () => {
+            entry.lissFreqY = parseFloat(lissFySl.value);
+            lissFyVal.textContent = entry.lissFreqY.toFixed(2);
+            lissFySl.style.setProperty('--pct', `${pct(entry.lissFreqY, 0.25, 4)}`);
+            refresh();
+        });
+        const lissPhSl = card.querySelector('.layer-liss-ph-sl');
+        const lissPhVal = card.querySelector('.layer-liss-ph-val');
+        lissPhSl.addEventListener('input', () => {
+            entry.lissPhase = parseFloat(lissPhSl.value);
+            lissPhVal.textContent = entry.lissPhase.toFixed(2);
+            lissPhSl.style.setProperty('--pct', `${pct(entry.lissPhase, 0, 1)}`);
+            refresh();
         });
 
         // XY Pad — anchor / center point
@@ -2226,6 +2327,13 @@ export class EditorInspector {
         const tintG = (img.tintG !== undefined ? img.tintG : 1.0).toFixed(4);
         const tintB = (img.tintB !== undefined ? img.tintB : 1.0).toFixed(4);
         const hueSpin = (img.hueSpinSpeed || 0).toFixed(4);
+        const orbitMode = img.orbitMode || 'circle';
+        const lissFreqX = (img.lissFreqX !== undefined ? img.lissFreqX : 0.5).toFixed(4);
+        const lissFreqY = (img.lissFreqY !== undefined ? img.lissFreqY : 0.75).toFixed(4);
+        const lissPhase = (img.lissPhase !== undefined ? img.lissPhase : 0.25).toFixed(4);
+        const stbAmp = (img.strobeAmp || 0).toFixed(4);
+        const stbThr = (img.strobeThr !== undefined ? img.strobeThr : 0.4).toFixed(4);
+        const hasStrobe = parseFloat(stbAmp) !== 0;
         const tex = `sampler_${img.texName}`;
         const imgAsp = (img.texW && img.texH) ? (img.texW / img.texH).toFixed(4) : '1.0000';
 
@@ -2247,6 +2355,7 @@ export class EditorInspector {
         const pulseSign = img.pulseInvert ? '-' : '+';
         const hasSpin = parseFloat(sp) !== 0;
         const hasOrbit = parseFloat(orb) !== 0;
+        const hasLissajous = hasOrbit && orbitMode === 'lissajous';
         const hasBounce = parseFloat(bnc) !== 0;
         const hasTunnel = parseFloat(ts) !== 0 && img.tile;
         const hasSway = parseFloat(swayAmt) !== 0;
@@ -2268,7 +2377,7 @@ export class EditorInspector {
         }
 
         let angLines = '';
-        if (hasOrbit) angLines += `    float _orbAng = time * 0.5;\n`;
+        if (hasOrbit && !hasLissajous) angLines += `    float _orbAng = time * 0.5;\n`;
         if (hasSpin) angLines += `    float _spinAng = time * ${sp};\n`;
 
         // Image centre (anchor + orbit + bounce + sway + wander)
@@ -2305,7 +2414,13 @@ export class EditorInspector {
         }
 
         let centerLines;
-        if (hasOrbit) {
+        if (hasLissajous) {
+            const bncPart = hasBounce ? ` - _r * ${bnc}` : '';
+            centerLines =
+                `    vec2 _c = vec2(${cxExpr} + sin(time * ${lissFreqX} * 6.28318 + ${lissPhase} * 6.28318) * ${orb},\n` +
+                `                  ${cyExpr} + cos(time * ${lissFreqY} * 6.28318) * ${orb} / aspect.y${bncPart});\n` +
+                `    vec2 _u = _uvf - _c;\n`;
+        } else if (hasOrbit) {
             const bncPart = hasBounce ? ` - _r * ${bnc}` : '';
             centerLines =
                 `    vec2 _c = vec2(${cxExpr} + cos(_orbAng) * ${orb},\n` +
@@ -2481,7 +2596,7 @@ export class EditorInspector {
                     return `    _src *= vec3(${tintR}, ${tintG}, ${tintB});\n`;
                 }
             })() : '') +
-            `    float _op = _t.w * _gapMask * clamp(${op} + _r * ${opa}, 0.0, 1.0);
+            `    float _op = _t.w * _gapMask * clamp(${op} + _r * ${opa}, 0.0, 1.0)${hasStrobe ? ` * (1.0 - ${stbAmp} * step(${stbThr}, _r_raw))` : ''};
 ` +
             `    ${blendLine}\n` +
             `  }\n`

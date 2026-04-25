@@ -1,6 +1,6 @@
 # Preset Image Tools — Phased Dev Plan
 
-> **Status:** Phase 1 ✅ · Phase 2 ✅ · Phase 3 ✅ (delivered early during Phase 1 polish) · Phase 4 ✅ · Phase 5 ✅
+> **Status:** Phase 1 ✅ · Phase 2 ✅ · Phase 3 ✅ (delivered early during Phase 1 polish) · Phase 4 ✅ · Phase 5 ✅ · Phase 6 ✅ (Lissajous + Strobe shipped)
 > Companion to [custom-preset-editor.md](custom-preset-editor.md).
 > Each phase below is independently shippable. We pause after each to review before starting the next.
 
@@ -179,7 +179,7 @@ The "per-image canvas mirror" goal is effectively met by the Mirror scope toggle
 - **FPS readout polish** (red-under-30fps) — the dev HUD exists already; promoting it to a user-facing pill is a small follow-up.
 - **Live per-frame thumbnails** — requires offscreen rendering of each layer, too expensive for a Phase 4 landing. Deferred as a Phase 9 "render quality" item if demand appears.
 - **Thumbnail scrubbing** (hover to solo temporarily) — deferred until solo-via-button is proven. Can add as `Alt + hover` later.
-- Copy-between-layers and layer "Looks" (Phase 6).
+- Copy-between-layers and layer "Looks" (Phase 7).
 
 **Decisions (settled for Phase 4 build):**
 - **Solo model: multi-select switches, not radio.** Confirmed with user. If any layer has `solo=true`, only soloed layers render; otherwise all non-muted layers render.
@@ -208,7 +208,7 @@ The "per-image canvas mirror" goal is effectively met by the Mirror scope toggle
 - **Reactivity curve picker** — linear / squared / cubed / thresholded. Squared matches what our main sliders already use.
 
 **Out of scope:**
-- Any new animation primitives themselves — those come in Phase 7.
+- Any new animation primitives themselves — those come in Phase 6.
 - Beat divider — deferred to Phase 5b (requires CPU-side beat tracking; not achievable with baked GLSL literals).
 
 **Decisions (settled for Phase 5 build):**
@@ -251,7 +251,31 @@ The "per-image canvas mirror" goal is effectively met by the Mirror scope toggle
 
 ---
 
-## Phase 6 — Layer templates ("Looks")
+## Phase 6 — New animation primitives  *(shipped ✅)*
+
+**Goal:** expand what a single layer can *do*. Ship these individually in priority order.
+
+**Priority order (first two shipped):**
+1. **Lissajous path** ✅ — Path toggle on the Orbit section: `Circle` | `Lissajous`. Lissajous mode reveals Freq X, Freq Y, and Phase sliders. The ratio between Freq X and Freq Y determines the figure shape (2:3 = figure-8, 3:4 = four-leaf clover, etc.). Orbit amplitude slider controls path size. Backward-compatible: `orbitMode` absent → defaults to `'circle'`.
+2. **Strobe / Blink** ✅ — Strobe slider in the opacity section (below Beat Fade). Hard binary cut using `step(threshold, _r_raw)` in GLSL — reads the *raw* audio signal (pre-curve) so the trigger is absolute, not shaped. Threshold row auto-shows when Strobe > 0.
+
+Remaining candidates (pick order based on demand after first two land):
+- **Independent tile X / Y scale** — separate Width and Height sliders for tiled images so the tile cell can be given an explicit aspect ratio instead of inheriting the screen ratio. Pairs with the current cover-crop behaviour: if Width < Height the tile is portrait-shaped and the image fills it exactly with no crop. Requested after Phase 5 portrait-image aspect fix.
+- **Beat Shake / Jitter** — omnidirectional displacement spike on kick, decays over ~4 frames. Different feel from the directional Bounce.
+- **Depth Stack (Z-phase offset)** — in tunnel mode, offset each layer's phase so they feel at different depths — genuine parallax during zoom.
+- **Scatter / Radial Clone** — draw N copies in a ring around the anchor. Count (2–12) × Ring Radius. Each clone can spin in place.
+- **Path recording** — drag the anchor dot for 4 seconds, record it as a looping path the layer follows.
+- **Chromatic aberration** — per-layer RGB-channel UV offset. Two extra samples, huge payoff.
+- **Edge / Sobel mode** — replace sampled pixel with its edge detection. Any image → neon line art.
+- **Posterize / Threshold** — bucket colors to N levels. Pairs with tint + hue spin we already have.
+- **Displacement mapping** — use Layer 2 as a UV displacement source for Layer 1. Rippling, heat-haze, glitch.
+
+**Open questions:**
+- Some of these (Displacement, Scatter) will change the shader builder shape. Schedule those later in the phase.
+
+---
+
+## Phase 7 — Layer templates ("Looks")
 
 **Goal:** build a vocabulary of reusable layer configurations.
 
@@ -267,29 +291,6 @@ The "per-image canvas mirror" goal is effectively met by the Mirror scope toggle
 
 **Success criteria:**
 - Tuning 5 layers feels like composing from blocks, not dialing each one from zero.
-
----
-
-## Phase 7 — New animation primitives
-
-**Goal:** expand what a single layer can *do*. Ship these individually, pick order based on what's most wanted after Phase 1–6.
-
-Candidates:
-- **Independent tile X / Y scale** — separate Width and Height sliders for tiled images so the tile cell can be given an explicit aspect ratio instead of inheriting the screen ratio. Pairs with the current cover-crop behaviour: if Width < Height the tile is portrait-shaped and the image fills it exactly with no crop. Requested after Phase 5 portrait-image aspect fix.
-- **Lissajous path** — replace/supplement Orbit with freq-x, freq-y, phase. Ratios like 3:2 give bow-ties; 3:4 four-leaf clovers.
-- **Beat Shake / Jitter** — omnidirectional displacement spike on kick, decays over ~4 frames. Different feel from the directional Bounce.
-- **Strobe / Blink** — hard binary opacity cut driven by a bass threshold. Distinct from smooth Beat Fade.
-- **Depth Stack (Z-phase offset)** — in tunnel mode, offset each layer's phase so they feel at different depths — genuine parallax during zoom.
-- **Scatter / Radial Clone** — draw N copies in a ring around the anchor. Count (2–12) × Ring Radius. Each clone can spin in place.
-- **Path recording** — drag the anchor dot for 4 seconds, record it as a looping path the layer follows.
-- **Chromatic aberration** — per-layer RGB-channel UV offset. Two extra samples, huge payoff.
-- **Edge / Sobel mode** — replace sampled pixel with its edge detection. Any image → neon line art.
-- **Posterize / Threshold** — bucket colors to N levels. Pairs with tint + hue spin we already have.
-- **Displacement mapping** — use Layer 2 as a UV displacement source for Layer 1. Rippling, heat-haze, glitch.
-
-**Open questions:**
-- Order matters — pick the two highest-impact first (Lissajous + Strobe are my vote).
-- Some of these (Displacement, Scatter) will change the shader builder shape. Schedule those later in the phase.
 
 ---
 
@@ -348,5 +349,5 @@ These apply across multiple phases; worth deciding once rather than re-litigatin
 
 - **Mobile policy** — silently cap mobile at 3 layers, or expose a "Performance mode" switch and let users opt into 5?
 - **Schema versioning** — `schemaVersion: 1` today. Moving from "fixed 2 images" to "array of up to N" is technically already supported (the schema stores `images` as an array), so we likely don't need a `v2` bump. Confirm in Phase 1.
-- **Export size** — a single preset with 5 × 2048² images can serialize to 100+MB. Options: cap export resolution, strip images and re-prompt on import, or keep full-fat and accept the size. Decide before Phase 8 (new sources make this worse).
+- **Export size** — a single preset with 5 × 2048² images can serialize to 100+MB. Options: cap export resolution, strip images and re-prompt on import, or keep full-fat and accept the size. Decide before Phase 9 (new sources make this worse).
 - **Undo/redo granularity** — every phase adds new controls. Confirm each lands as a single history step, not per-keystroke.

@@ -459,6 +459,7 @@
           <button class="welcome-rail-btn" type="button" role="tab" data-section="cycling">Auto-Cycling</button>
           <button class="welcome-rail-btn" type="button" role="tab" data-section="performance">Live Performance</button>
           <button class="welcome-rail-btn" type="button" role="tab" data-section="studio">Preset Studio</button>
+          <button class="welcome-rail-btn" type="button" role="tab" data-section="reactivity">Reactivity</button>
           <button class="welcome-rail-btn" type="button" role="tab" data-section="shortcuts">Shortcuts</button>
           <button class="welcome-rail-btn" type="button" role="tab" data-section="tips">Tips</button>
         </nav>
@@ -592,8 +593,8 @@
               <p>Add up to 5 image or GIF layers in a collapsible smart-accordion stack. Drag any card to reorder. Each layer has:</p>
               <ul class="welcome-list">
                 <li><strong>Solo / Mute</strong> — audition one layer in isolation or hide it without deleting.</li>
-                <li><strong>Animation</strong> — Tile, Spin, Orbit, Tunnel zoom, Bounce (beat-lift), Sway, Wander, and a draggable XY anchor point.</li>
-                <li><strong>Beat Fade / Pulse</strong> — bass drives opacity or size on every kick.</li>
+                <li><strong>Animation</strong> — Tile, Spin, Orbit (Circle or Lissajous path), Tunnel zoom, Bounce (beat-lift), Sway, Wander, and a draggable XY anchor point.</li>
+                <li><strong>Beat Fade / Pulse / Strobe</strong> — audio drives opacity (smooth fade or hard strobe cut) and size on every beat.</li>
                 <li><strong>Mirror</strong> — Off, Horizontal, Vertical, Quad, or Kaleido (6-slice polar fold). Apply per tile or across the whole field.</li>
                 <li><strong>Canvas Mirror</strong> — folds the entire rendered scene horizontally, vertically, or both.</li>
                 <li><strong>Tint &amp; Hue Spin</strong> — colorize any layer and animate it through a spinning hue cycle.</li>
@@ -611,6 +612,57 @@
                 <li><strong>Dev HUD</strong> — press <kbd>`</kbd> (backtick) to overlay frame time, estimated VRAM, active layer count, and last shader rebuild time.</li>
               </ul>
             </div>
+          </section>
+
+          <!-- Reactivity -->
+          <section class="welcome-section" data-section="reactivity" role="tabpanel">
+            <h4>Reactivity &amp; Audio Controls</h4>
+            <p>Every image layer has a <strong>Reactivity</strong> panel at the bottom of its card. The two settings there — <em>Source</em> and <em>Curve</em> — are the dial behind the dial. They shape the single audio signal that drives <strong>all four reactive controls</strong> on that layer: Pulse, Bounce, Beat Fade, and Strobe.</p>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Step 1 — Pick a Source</div>
+              <p>Which frequency band feeds this layer's reactivity:</p>
+              <ul class="welcome-list">
+                <li><strong>Bass</strong> (default) — sub and kick frequencies. The most punch-per-beat; most presets start here.</li>
+                <li><strong>Mid</strong> — snare, vocals, guitars. Reacts on melodic and rhythmic hits mid-song.</li>
+                <li><strong>Treble</strong> — hi-hats, cymbals, air. Fast and bright; great for sparkle layers.</li>
+                <li><strong>Volume</strong> — total loudness across all bands. Tracks the overall energy of the mix.</li>
+              </ul>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Step 2 — Shape the Curve</div>
+              <p>The curve transforms the raw signal before it reaches any control. A gentle signal becomes more dramatic — or more surgical:</p>
+              <ul class="welcome-list">
+                <li><strong>Linear</strong> — signal passed as-is. Controls scale directly and evenly with audio level.</li>
+                <li><strong>Squared</strong> — quiet moments are suppressed; loud peaks hit harder. The most musical curve for most layers.</li>
+                <li><strong>Cubed</strong> — extreme contrast. Only the very loudest peaks drive any visible reaction.</li>
+                <li><strong>Gate</strong> — binary on/off at 30%. Below the threshold: zero. Above it: full signal. Controls either stay still or snap to maximum.</li>
+              </ul>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">What Each Control Does With the Signal</div>
+              <ul class="welcome-list">
+                <li><strong>Pulse</strong> — grows the layer size on every peak. The curve determines whether small beats cause any growth at all — Squared suppresses gentle hits, Cubed reserves the swell for the loudest moments only.</li>
+                <li><strong>Bounce</strong> — lifts the layer upward on beat. With a Gate curve it snaps up hard on kicks and drops instantly between them. With Linear it floats up and down with the groove.</li>
+                <li><strong>Beat Fade</strong> — adds opacity on beat. The layer appears or brightens with the audio, then fades back when the signal drops. Combines beautifully with low base Opacity so the layer is normally invisible and only materialises on hits.</li>
+                <li><strong>Strobe</strong> — unlike the others, Strobe reads the <em>raw</em> audio signal directly (before the Curve is applied) and compares it to its own Threshold slider. When the audio crosses the threshold, the layer's opacity hard-cuts to black — instantly. When the beat fades, it returns. This is a true strobe: no smooth ramp, just a sharp on/off flash driven by real beats.</li>
+              </ul>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Example Combos</div>
+              <ul class="welcome-list">
+                <li><strong>Kick-lock flash</strong> — Source: Bass · Curve: Gate · Strobe: 1.0 · Threshold: 0.4 · Base Opacity: 0. The layer is invisible except on every hard kick, where it flashes at full opacity. Zero ambient light between beats.</li>
+                <li><strong>Melodic drift</strong> — Source: Mid · Curve: Squared · Bounce: medium. The layer lifts on snare or vocal hits, barely moves between them. Feels tied to the melody rather than the kick.</li>
+                <li><strong>Ambient breathing</strong> — Source: Volume · Curve: Linear · Beat Fade: 0.6 · Base Opacity: 0.2. The layer's opacity tracks the mix energy — bright during builds, dim during breakdowns. Feels alive without being distracting.</li>
+                <li><strong>Treble sparkle</strong> — Source: Treble · Curve: Cubed · Pulse: high. The layer explodes in size on hi-hat and cymbal peaks only. Everything below that frequency is invisible to it.</li>
+                <li><strong>Multi-layer stack</strong> — put two layers side by side: one on Bass/Squared driving Bounce, one on Treble/Cubed driving Pulse. They react to completely different parts of the music and never compete.</li>
+              </ul>
+            </div>
+
+            <p class="welcome-hint">Tip: a layer with <strong>Strobe on and Beat Fade off</strong> feels like a strobe light. Flip it — <strong>Beat Fade on and Strobe off</strong> — and it feels like a soft glow that pulses with the music. Both use the same Reactivity panel; only the control you turn up changes the personality.</p>
           </section>
 
           <!-- Keyboard Shortcuts -->
