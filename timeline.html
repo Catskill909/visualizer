@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Timeline Editor — DiscoCast Visualizer</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/timeline/style.css" />
+</head>
+<body>
+
+<!-- ════════════════════ START SCREEN ════════════════════ -->
+<div id="tl-start" class="tl-start">
+    <div class="start-rings" aria-hidden="true">
+        <div class="ring ring-1"></div>
+        <div class="ring ring-2"></div>
+        <div class="ring ring-3"></div>
+    </div>
+    <div class="start-card">
+        <div class="start-brand">
+            <svg class="start-logo" width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+                <circle cx="13" cy="13" r="12" stroke="white" stroke-width="1" stroke-opacity="0.35" />
+                <circle cx="13" cy="13" r="7.5" stroke="white" stroke-width="1.5" />
+                <circle cx="13" cy="13" r="2.5" fill="white" />
+            </svg>
+            <span>Timeline Editor</span>
+        </div>
+        <p class="start-tagline">Sequence presets into a live show.</p>
+        <div class="start-actions">
+            <button id="start-mic" class="start-btn start-btn--primary" type="button">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                    <rect x="9" y="2" width="6" height="11" rx="3" />
+                    <path d="M5 10a7 7 0 0 0 14 0" />
+                    <line x1="12" y1="19" x2="12" y2="22" />
+                    <line x1="8" y1="22" x2="16" y2="22" />
+                </svg>
+                Live Audio
+            </button>
+            <button id="start-file" class="start-btn start-btn--secondary" type="button">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                    <path d="M9 18V5l12-2v13" />
+                    <circle cx="6" cy="18" r="3" />
+                    <circle cx="18" cy="16" r="3" />
+                </svg>
+                Load Track
+            </button>
+        </div>
+        <input type="file" id="start-file-input" accept="audio/*" hidden />
+        <a href="/index.html" class="start-back">← Back to DiscoCast Visualizer</a>
+    </div>
+</div>
+
+<!-- ════════════════════ MAIN SHELL ════════════════════ -->
+<div id="tl-shell" hidden>
+
+    <!-- Zone canvases injected here by JS -->
+    <div id="tl-canvas-container"></div>
+
+    <!-- ─── TOPBAR ─── -->
+    <header id="tl-topbar" class="tl-overlay">
+        <a href="/index.html" class="tl-back">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                <polyline points="15 18 9 12 15 6" />
+            </svg>
+            DiscoCast
+        </a>
+        <div class="tl-topbar-sep"></div>
+        <span class="tl-topbar-title">Timeline</span>
+        <div class="tl-topbar-sep"></div>
+
+        <select id="tl-timeline-select" aria-label="Select timeline">
+            <option value="">— No timelines —</option>
+        </select>
+
+        <div class="tl-name-wrap">
+            <input type="text" id="tl-name-input" placeholder="Untitled Timeline"
+                   maxlength="80" spellcheck="false" aria-label="Timeline name" />
+            <span id="tl-dirty-dot" class="tl-dirty-dot" hidden></span>
+        </div>
+
+        <div class="tl-spacer"></div>
+
+        <div class="tl-topbar-actions">
+            <button id="tl-btn-new"    class="tl-btn"           type="button">+ New</button>
+            <button id="tl-btn-save"   class="tl-btn tl-btn--primary" type="button">Save</button>
+            <button id="tl-btn-copy"   class="tl-btn tl-btn--icon" type="button" title="Copy timeline as JSON">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>
+                Copy JSON
+            </button>
+            <button id="tl-btn-paste"  class="tl-btn tl-btn--icon" type="button" title="Paste timeline from JSON">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+                    <rect x="8" y="2" width="8" height="4" rx="1"/>
+                </svg>
+                Paste JSON
+            </button>
+            <button id="tl-btn-delete" class="tl-btn tl-btn--danger tl-btn--icon" type="button" title="Delete this timeline">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                    <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- ─── TRANSPORT ─── -->
+    <div id="tl-transport" class="tl-overlay">
+        <button id="tl-btn-playstop" class="tl-play-btn" type="button">
+            <svg id="tl-ps-play-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+            <svg id="tl-ps-stop-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="display:none"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
+            <span id="tl-ps-label">Play</span>
+        </button>
+        <button id="tl-btn-loop" type="button" title="Loop">⟳ Loop</button>
+
+        <div class="tl-transport-sep"></div>
+
+        <span id="tl-time-display">00:00 / 00:00</span>
+
+        <div class="tl-spacer"></div>
+
+        <div class="tl-zoom-wrap">
+            <span>Zoom</span>
+            <input id="tl-zoom" type="range" min="4" max="40" value="12" step="1" aria-label="Zoom" />
+        </div>
+
+        <div class="tl-snap-wrap">
+            <span>Snap</span>
+            <select id="tl-snap" aria-label="Snap to grid">
+                <option value="0">Off</option>
+                <option value="5">5s</option>
+                <option value="10">10s</option>
+                <option value="30">30s</option>
+                <option value="60">1min</option>
+            </select>
+        </div>
+
+        <div class="tl-transport-sep"></div>
+
+        <button id="tl-btn-zones" class="tl-btn" type="button">⊞ Zones</button>
+    </div>
+
+    <!-- ─── TIMELINE STRIP ─── -->
+    <div id="tl-strip">
+        <div id="tl-scroll">
+            <div id="tl-inner">
+                <div id="tl-ruler"></div>
+                <div id="tl-tracks"></div>
+                <div id="tl-playhead" style="left:0; display:none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── PRESET PICKER MODAL ─── -->
+    <div id="tl-picker" class="tl-modal-backdrop" hidden role="dialog" aria-modal="true" aria-label="Pick a preset">
+        <div class="tl-modal-card">
+            <div class="tl-modal-header">
+                <span class="tl-modal-title">Add Preset</span>
+                <button class="tl-modal-close" id="tl-picker-close" type="button" aria-label="Close">×</button>
+            </div>
+            <div id="tl-picker-tabs" class="tl-picker-tabs" role="tablist">
+                <button class="tl-picker-tab active" data-tab="all"       type="button" role="tab">All</button>
+                <button class="tl-picker-tab"         data-tab="favorites" type="button" role="tab">Favorites</button>
+                <button class="tl-picker-tab"         data-tab="custom"    type="button" role="tab">My Presets</button>
+            </div>
+            <div class="tl-picker-search-wrap">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                <input id="tl-picker-search" type="text" placeholder="Search presets…" autocomplete="off" spellcheck="false" />
+            </div>
+            <div class="tl-picker-count" id="tl-picker-count"></div>
+            <div id="tl-picker-list" role="listbox"></div>
+        </div>
+    </div>
+
+    <!-- ─── QUICK EDIT POPOVER ─── -->
+    <div id="tl-quick-edit" hidden role="dialog" aria-label="Edit entry">
+        <div class="qe-title" id="qe-title">Preset Name</div>
+        <div class="qe-row">
+            <span class="qe-label">Duration</span>
+            <input id="qe-dur" class="qe-input" type="number" min="5" max="600" step="1" />
+            <span class="qe-suffix">s</span>
+        </div>
+        <div class="qe-row">
+            <span class="qe-label">Blend</span>
+            <input id="qe-blend" class="qe-input" type="number" min="0" max="10" step="0.5" />
+            <span class="qe-suffix">s</span>
+        </div>
+        <div class="qe-row">
+            <span class="qe-label">Label</span>
+            <input id="qe-label" class="qe-input" type="text" placeholder="Optional…" maxlength="40" />
+        </div>
+        <div class="qe-actions">
+            <button id="qe-apply" class="tl-btn tl-btn--primary" type="button">Apply</button>
+            <button id="qe-cancel" class="tl-btn" type="button">Cancel</button>
+        </div>
+    </div>
+
+    <!-- ─── CONTEXT MENU ─── -->
+    <div id="tl-ctx-menu" hidden role="menu">
+        <div class="tl-ctx-item" data-action="duplicate" role="menuitem">Duplicate</div>
+        <div class="tl-ctx-sep"></div>
+        <div class="tl-ctx-item danger" data-action="delete" role="menuitem">Delete</div>
+    </div>
+
+    <!-- ─── SAVE TIMELINE MODAL ─── -->
+    <div id="tl-save-modal" class="tl-modal-backdrop" hidden role="dialog" aria-modal="true" aria-labelledby="tl-save-modal-title">
+        <div class="tl-confirm-card">
+            <div class="tl-confirm-title" id="tl-save-modal-title">Save Timeline</div>
+            <label class="tl-save-name-label" for="tl-save-name">Name</label>
+            <input type="text" id="tl-save-name" class="tl-save-name-input"
+                   maxlength="80" spellcheck="false" placeholder="Timeline name" autocomplete="off" />
+            <div class="tl-confirm-actions" style="margin-top:16px">
+                <button id="tl-save-confirm" class="tl-btn tl-btn--primary" type="button">Save</button>
+                <button id="tl-save-cancel"  class="tl-btn" type="button">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── DELETE BLOCK CONFIRM MODAL ─── -->
+    <div id="tl-entry-delete-modal" class="tl-modal-backdrop" hidden role="dialog" aria-modal="true">
+        <div class="tl-confirm-card">
+            <div class="tl-confirm-title">Remove Block?</div>
+            <p class="tl-confirm-msg" id="tl-entry-delete-msg">This block will be removed from the timeline.</p>
+            <div class="tl-confirm-actions">
+                <button id="tl-entry-delete-confirm" class="tl-btn tl-btn--danger" type="button">Remove</button>
+                <button id="tl-entry-delete-cancel"  class="tl-btn" type="button">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── DELETE CONFIRM MODAL ─── -->
+    <div id="tl-delete-modal" class="tl-modal-backdrop" hidden role="dialog" aria-modal="true">
+        <div class="tl-confirm-card">
+            <div class="tl-confirm-title">Delete Timeline?</div>
+            <p class="tl-confirm-msg" id="tl-delete-msg">This will permanently delete this timeline. This can't be undone.</p>
+            <div class="tl-confirm-actions">
+                <button id="tl-delete-confirm" class="tl-btn tl-btn--danger" type="button">Delete</button>
+                <button id="tl-delete-cancel"  class="tl-btn" type="button">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── ZONE MANAGER MODAL ─── -->
+    <div id="tl-zone-mgr" class="tl-modal-backdrop" hidden role="dialog" aria-modal="true" aria-label="Screen layout">
+        <div class="tl-zone-mgr-card">
+            <div class="tl-modal-header">
+                <span class="tl-modal-title">Screen Layout</span>
+                <button class="tl-modal-close" id="tl-zone-mgr-close" type="button" aria-label="Close">×</button>
+            </div>
+            <div id="tl-zone-layouts" class="tl-zone-layouts"></div>
+        </div>
+    </div>
+
+    <!-- ─── TOGGLE UI BUTTON (always visible) ─── -->
+    <button id="tl-toggle-ui" class="tl-toggle-ui" type="button" title="Pin controls visible (T)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="6"  x2="21" y2="6"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+    </button>
+
+    <!-- ─── TOAST ─── -->
+    <div id="tl-toast" hidden role="status" aria-live="polite"></div>
+
+    <!-- ─── MINI PLAYER ─── -->
+    <div id="mini-player" class="mini-player tl-overlay" hidden>
+        <div class="mp-track">
+            <span id="mp-filename" class="mp-filename">—</span>
+            <span id="mp-time" class="mp-time">0:00 / 0:00</span>
+        </div>
+        <div class="mp-controls">
+            <button id="mp-play" class="mp-btn" type="button" title="Play / Pause">
+                <svg id="mp-icon-play"  viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M8 5v14l11-7z"/></svg>
+                <svg id="mp-icon-pause" viewBox="0 0 24 24" fill="currentColor" width="14" height="14" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+            </button>
+            <input id="mp-seek" class="mp-seek slider" type="range" min="0" max="1" step="0.001" value="0" style="--pct:0%" aria-label="Seek" />
+            <input id="mp-vol"  class="mp-vol  slider" type="range" min="0" max="1" step="0.01"  value="1" style="--pct:100%" title="Volume" />
+            <button id="mp-load" class="mp-btn" type="button" title="Load audio file">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13">
+                    <path d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z"/>
+                </svg>
+            </button>
+            <input id="mp-file-input" type="file" accept="audio/*" hidden />
+        </div>
+    </div>
+
+</div><!-- /tl-shell -->
+
+<script type="module" src="/src/timeline/main.js"></script>
+</body>
+</html>

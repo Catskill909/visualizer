@@ -213,6 +213,7 @@ export class ControlPanel {
       els.tabAll.classList.add('active');
       els.tabFavorites.classList.remove('active');
       els.tabCustom.classList.remove('active');
+
       this.syncBackupBar();
       this.filterPresets();
     });
@@ -222,6 +223,7 @@ export class ControlPanel {
       els.tabFavorites.classList.add('active');
       els.tabAll.classList.remove('active');
       els.tabCustom.classList.remove('active');
+
       this.syncBackupBar();
       this.filterPresets();
     });
@@ -231,6 +233,7 @@ export class ControlPanel {
       els.tabCustom.classList.add('active');
       els.tabAll.classList.remove('active');
       els.tabFavorites.classList.remove('active');
+
       this.syncBackupBar();
       this.filterPresets();
     });
@@ -1255,6 +1258,10 @@ export class ControlPanel {
       case 'e':
       case 'E':
         window.location.href = '/editor.html';
+        break;
+      case 'l':
+      case 'L':
+        window.open('/timeline.html');
         break;
       case 'Escape':
         if (!this.els.welcomeGuide.classList.contains('hidden')) this.closeWelcomeGuide();

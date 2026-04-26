@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DiscoCast Visualizer — Real-Time MilkDrop Visuals for macOS</title>
+  <meta name="description" content="DiscoCast Visualizer brings 1,144 MilkDrop presets to your Mac with live audio reactivity, a custom preset studio with image layers, and projector-ready performance.">
+  <link rel="icon" href="../public/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="ambient-bg"></div>
+
+<!-- ── Navigation ── -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="#" class="nav-brand">
+      <img src="../public/logo.png" alt="DiscoCast" class="nav-logo">
+      <span class="nav-title">DiscoCast Visualizer</span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#features">Features</a></li>
+      <li><a href="#studio">Studio</a></li>
+      <li><a href="#shortcuts">Controls</a></li>
+      <li><a href="#download" class="nav-cta">Download</a></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- ── Hero ── -->
+<section class="hero" id="hero">
+  <div class="container">
+    <div class="hero-content">
+      <img src="../public/logo.png" alt="DiscoCast Visualizer" class="hero-logo">
+      <h1>Your music,<br>actually visible.</h1>
+      <p class="hero-subtitle">
+        DiscoCast is a real-time MilkDrop visualizer for macOS. It ships with
+        1,144 presets, a custom preset studio with image layers, and a timeline
+        editor for sequencing shows. It uses Butterchurn's WebGL 2 renderer
+        and runs entirely offline.
+      </p>
+      <div class="hero-actions">
+        <a href="#download" class="btn btn-primary" id="hero-download-btn">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download for macOS
+        </a>
+        <a href="#features" class="btn btn-secondary">
+          See what it does
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<!-- ── Features Grid ── -->
+<section class="section" id="features">
+  <div class="container">
+    <div class="section-header fade-in">
+      <div class="section-label">Overview</div>
+      <h2 class="section-title">What's in the app</h2>
+      <p class="section-desc">
+        DiscoCast is a macOS desktop app built with Electron and Vite.
+        It runs locally — no accounts, no server, no internet connection needed.
+        Audio comes in through the Web Audio API from any connected input device.
+      </p>
+    </div>
+
+    <div class="features-grid">
+      <div class="feature-card fade-in">
+        <div class="feature-icon">🎨</div>
+        <h3>1,144 MilkDrop Presets</h3>
+        <p>The full Butterchurn library plus the community-curated Baron pack — all bundled locally, no network calls needed.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <div class="feature-icon">🎤</div>
+        <h3>Live Audio Input</h3>
+        <p>Mic, USB DJ controller, external sound card — pick your device from a native dropdown and the visuals follow whatever you're playing.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <div class="feature-icon">⚡</div>
+        <h3>Auto-Gain &amp; Kick-Lock</h3>
+        <p>AGC keeps the visuals consistently punchy regardless of volume. Kick-Lock isolates the low end so everything syncs to the kick drum.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <div class="feature-icon">📽️</div>
+        <h3>Projector Ready</h3>
+        <p>Screen Wake Lock, auto-hiding cursor, and Zen Mode (press H) for zero-UI projection. Built for live events and installations.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <div class="feature-icon">🔥</div>
+        <h3>Live Performance Keys</h3>
+        <p>One-key strobe, blackout, and color inversion. Hold Shift for a 2× intensity boost. Fast enough for live DJ sets.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <div class="feature-icon">🔍</div>
+        <h3>Preset Browser</h3>
+        <p>Searchable drawer across all 1,144 presets. Heart your favorites, hide the ones you don't want, and cycle through only the good stuff.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ── Showcase: Preset Studio with Image Layers ── -->
+<section class="section" id="studio">
+  <div class="container">
+    <div class="showcase reverse fade-in">
+      <div class="showcase-visual">
+        <div class="showcase-placeholder">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-3.086-3.086a2 2 0 00-2.828 0L6 21"/></svg>
+          Screenshot
+        </div>
+      </div>
+      <div class="showcase-content">
+        <div class="section-label">Preset Studio</div>
+        <h2 class="section-title">Make your own visuals</h2>
+        <p class="section-desc">
+          The Preset Studio is where you build custom presets from scratch.
+          Pick a color palette, tweak the motion and wave controls, then
+          layer in your own images and make them react to the music.
+        </p>
+        <ul class="feature-list">
+          <li>
+            <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            12 one-click palettes with 3 independent color swatches
+          </li>
+          <li>
+            <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            5 tabbed sections: Palette, Motion, Wave, Feel, Images
+          </li>
+          <li>
+            <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            50-deep undo/redo and A/B comparison
+          </li>
+          <li>
+            <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            Saves to localStorage — your presets are always there
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Image Layers Deep Dive -->
+    <div class="image-layers fade-in">
+      <h4>Image Layers — the fun part</h4>
+      <p class="section-desc" style="margin-bottom: 20px; max-width: 100%;">
+        You can add up to 5 image layers to any custom preset. Upload your own photos, textures, or artwork
+        and the visualizer composites them into the scene in real-time. Each layer has independent controls,
+        so you can build complex layered visuals that react differently to bass, mids, or treble.
+      </p>
+      <div class="image-layers-grid">
+        <div class="il-item">
+          <span class="il-dot"></span>
+          Drag-to-reorder layer stack with per-layer solo &amp; mute
+        </div>
+        <div class="il-item">
+          <span class="il-dot"></span>
+          Per-layer audio reactivity — choose Bass, Mid, Treble, or Volume
+        </div>
+        <div class="il-item">
+          <span class="il-dot"></span>
+          Response curves: Linear, Squared, Cubed, or Gate
+        </div>
+        <div class="il-item">
+          <span class="il-dot"></span>
+          UV mirror with Per Tile or Whole Image scope
+        </div>
+        <div class="il-item">
+          <span class="il-dot"></span>
+          Auto-resize on upload (1024px standard / 2048px HD toggle)
+        </div>
+        <div class="il-item">
+          <span class="il-dot"></span>
+          Aspect-correct tiling — portrait, square, or landscape images tile without distortion
+        </div>
+        <div class="il-item">
+          <span class="il-dot"></span>
+          Per-layer rename with static thumbnail preview
+        </div>
+        <div class="il-item">
+          <span class="il-dot"></span>
+          Scene-level Canvas Mirror for global symmetry effects
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ── Showcase: Timeline ── -->
+<section class="section">
+  <div class="container">
+    <div class="showcase fade-in">
+      <div class="showcase-visual">
+        <div class="showcase-placeholder">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-3.086-3.086a2 2 0 00-2.828 0L6 21"/></svg>
+          Screenshot
+        </div>
+      </div>
+      <div class="showcase-content">
+        <div class="section-label">Timeline Editor</div>
+        <h2 class="section-title">Plan a whole show</h2>
+        <p class="section-desc">
+          Arrange presets on a timeline, set durations and blend times,
+          then hit play. The Zone Compositor lets you run multiple presets
+          in different screen regions at the same time.
+        </p>
+        <ul class="feature-list">
+          <li>
+            <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            Multi-track strip with drag-to-reorder and snap-to-grid
+          </li>
+          <li>
+            <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            Zone Compositor — quadrant, banner, center, custom rect
+          </li>
+          <li>
+            <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            Per-zone opacity, blend mode, and gap behavior
+          </li>
+          <li>
+            <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            JSON export/import — share shows with other DJs
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ── Controls ── -->
+<section class="section" id="shortcuts">
+  <div class="container">
+    <div class="showcase fade-in">
+      <div class="showcase-visual">
+        <div class="showcase-placeholder">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-3.086-3.086a2 2 0 00-2.828 0L6 21"/></svg>
+          Screenshot
+        </div>
+      </div>
+      <div class="showcase-content">
+        <div class="section-label">Controls</div>
+        <h2 class="section-title">Everything is one key away</h2>
+        <p class="section-desc">
+          The whole UI is designed to stay out of your way — glassmorphic controls
+          auto-hide after 3 seconds, and every action has a keyboard shortcut.
+          No menus to dig through.
+        </p>
+        <ul class="feature-list">
+          <li>
+            <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            Live hype keys — strobe, blackout, invert, and Shift for 2× boost
+          </li>
+          <li>
+            <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            Audio tuning — AGC and Kick-Lock toggle with one key
+          </li>
+          <li>
+            <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            Preset nav — arrows, random, favorites, hide unwanted presets
+          </li>
+          <li>
+            <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            Zen Mode — press H to hide all UI for clean projection
+          </li>
+          <li>
+            <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            Quick launch — E for Preset Studio, L for Timeline Editor
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Download & About ── -->
+<section class="cta-section" id="download">
+  <div class="container">
+    <div class="cta-card fade-in">
+      <h2>Download</h2>
+      <p>
+        DiscoCast is a signed and notarized macOS app packaged as a .dmg.
+        It's built with Electron 28, Vite, and Butterchurn (WebGL 2).
+        Requires macOS 10.15 Catalina or later.
+      </p>
+      <div class="hero-actions">
+        <a href="#" class="btn btn-primary" id="download-btn">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download for macOS
+        </a>
+      </div>
+      <div class="macos-note">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+        macOS 10.15+ · Electron 28 · Butterchurn WebGL 2
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Footer ── -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-brand">
+      <img src="../public/logo.png" alt="DiscoCast" class="footer-logo">
+      <span class="footer-name">DiscoCast Visualizer</span>
+    </div>
+    <p class="footer-sub">Built with Butterchurn · MilkDrop WebGL · Vite</p>
+    <ul class="footer-links">
+      <li><a href="#features">Features</a></li>
+      <li><a href="#studio">Studio</a></li>
+      <li><a href="#shortcuts">Controls</a></li>
+      <li><a href="#download">Download</a></li>
+    </ul>
+  </div>
+</footer>
+
+<script>
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+  document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+</script>
+
+</body>
+</html>

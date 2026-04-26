@@ -176,6 +176,43 @@ export class VisualizerEngine {
     return this;
   }
 
+  /**
+   * Initialise a slave engine that renders on `canvas` but shares the
+   * primary engine's AudioContext and audio graph — no new AudioContext
+   * is created, so all canvases react to the same audio signal.
+   */
+  initSlave(canvas, primaryEngine, autoStart = true) {
+    this.canvas = canvas;
+
+    // Share the primary's audio graph — do NOT create new nodes
+    this.audioContext       = primaryEngine.audioContext;
+    this.analyser           = primaryEngine.analyser;
+    this.kickFilter         = primaryEngine.kickFilter;
+    this.visualizerGainNode = primaryEngine.visualizerGainNode;
+    this.agcDataArray       = primaryEngine.agcDataArray;
+
+    // Share preset registry (read-only — no copy needed)
+    this.presets      = primaryEngine.presets;
+    this.presetNames  = primaryEngine.presetNames;
+    this.favoritePool = primaryEngine.favoritePool;
+    this.hiddenPool   = primaryEngine.hiddenPool;
+    this.favoritesOnly = primaryEngine.favoritesOnly;
+
+    const w = canvas.width  || window.innerWidth;
+    const h = canvas.height || window.innerHeight;
+
+    const butterchurnLib = resolveModule(butterchurnImport, 'butterchurn', 'createVisualizer');
+    this.visualizer = butterchurnLib.createVisualizer(this.audioContext, canvas, {
+      width: w, height: h, pixelRatio: window.devicePixelRatio || 1,
+    });
+    this.visualizer.connectAudio(this.visualizerGainNode);
+    // Flag so the render loop skips gain management — primary handles it
+    this._isSlaveEngine = true;
+    this.randomPreset();
+    if (autoStart) this.startRenderLoop();
+    return this;
+  }
+
   async connectMicrophone(deviceId = null) {
     try {
       if (this.audioContext.state === 'suspended') await this.audioContext.resume();
@@ -443,25 +480,27 @@ export class VisualizerEngine {
     const render = () => {
       if (!this.isRunning) return;
 
-      // --- Performance Logic ---
-      if (this.agcEnabled) {
-        this.updateAGC();
-      } else {
-        // Reset to manual energy + base
-        const targetGain = this.baseSensitivity * this.energyMultiplier * (this.boostActive ? 2.0 : 1.0);
-        // Smoothly transition gain
-        this.visualizerGainNode.gain.setTargetAtTime(targetGain, this.audioContext.currentTime, 0.1);
+      // --- Performance Logic (primary engine only) ---
+      if (!this._isSlaveEngine) {
+        if (this.agcEnabled) {
+          this.updateAGC();
+        } else {
+          // Reset to manual energy + base
+          const targetGain = this.baseSensitivity * this.energyMultiplier * (this.boostActive ? 2.0 : 1.0);
+          // Smoothly transition gain
+          this.visualizerGainNode.gain.setTargetAtTime(targetGain, this.audioContext.currentTime, 0.1);
 
-        // Update hype level for UI
-        this.analyser.getByteTimeDomainData(this.agcDataArray);
-        let max = 0;
-        for (let i = 0; i < this.agcDataArray.length; i++) {
-          const val = Math.abs(this.agcDataArray[i] - 128);
-          if (val > max) max = val;
+          // Update hype level for UI
+          this.analyser.getByteTimeDomainData(this.agcDataArray);
+          let max = 0;
+          for (let i = 0; i < this.agcDataArray.length; i++) {
+            const val = Math.abs(this.agcDataArray[i] - 128);
+            if (val > max) max = val;
+          }
+          const peak = max / 128;
+          // Map 0-1 to a more visible 0-1 range for the UI meter
+          this.hypeLevel = Math.min((peak * targetGain) / 5.0, 1.2);
         }
-        const peak = max / 128;
-        // Map 0-1 to a more visible 0-1 range for the UI meter
-        this.hypeLevel = Math.min((peak * targetGain) / 5.0, 1.2);
       }
 
       this._tickGifAnimations();

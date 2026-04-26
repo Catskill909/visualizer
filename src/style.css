@@ -374,6 +374,7 @@ body.force-hide-ui, body.controls-hidden {
 .drawer-tab:hover { background: var(--hover-subtle); color: var(--text-primary); }
 .drawer-tab.active { background: var(--text-primary); color: var(--bg-primary); border-color: var(--text-primary); }
 
+
 .drawer-count {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   padding: 0 20px 10px; font-size: 0.72rem; color: var(--text-muted);
@@ -709,6 +710,7 @@ kbd {
   .welcome-content { padding: 20px 20px; }
   .welcome-shortcuts { grid-template-columns: 1fr; gap: 4px; }
 }
+
 
 /* TOAST */
 #toast {
