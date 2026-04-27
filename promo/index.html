@@ -373,66 +373,68 @@
   </footer>
 
   <script>
-    const betaModal = document.getElementById('beta-modal');
-    const betaModalDismiss = document.getElementById('beta-modal-dismiss');
-    const betaModalStorageKey = 'discocast-beta-modal-dismissed';
+    document.addEventListener('DOMContentLoaded', () => {
+      const betaModal = document.getElementById('beta-modal');
+      const betaModalDismiss = document.getElementById('beta-modal-dismiss');
+      const betaModalStorageKey = 'discocast-beta-modal-dismissed';
 
-    let betaModalDismissed = false;
+      let betaModalDismissed = false;
 
-    try {
-      betaModalDismissed = window.localStorage.getItem(betaModalStorageKey) === 'true';
-    } catch (error) {
-      betaModalDismissed = false;
-    }
+      try {
+        betaModalDismissed = window.localStorage.getItem(betaModalStorageKey) === 'true';
+      } catch (error) {
+        betaModalDismissed = false;
+      }
 
-    if (betaModal && !betaModalDismissed) {
-      betaModal.classList.add('is-open');
-      document.body.classList.add('beta-modal-open');
-    }
+      if (betaModal && !betaModalDismissed) {
+        betaModal.classList.add('is-open');
+        document.body.classList.add('beta-modal-open');
+      }
 
-    if (betaModal && betaModalDismiss) {
-      betaModalDismiss.addEventListener('click', () => {
-        betaModal.classList.remove('is-open');
-        document.body.classList.remove('beta-modal-open');
+      if (betaModal && betaModalDismiss) {
+        betaModalDismiss.addEventListener('click', () => {
+          betaModal.classList.remove('is-open');
+          document.body.classList.remove('beta-modal-open');
 
-        try {
-          window.localStorage.setItem(betaModalStorageKey, 'true');
-        } catch (error) {
-          // Ignore storage failures and allow the modal to behave as session-only.
-        }
-      });
-    }
-
-    // ── Lightbox ──
-    const lb = document.getElementById('lightbox');
-    const lbImg = document.getElementById('lightbox-img');
-
-    if (lb && lbImg) {
-      document.querySelectorAll('.lightbox-trigger').forEach(img => {
-        img.addEventListener('click', () => {
-          lbImg.src = img.src;
-          lbImg.alt = img.alt;
-          lb.classList.add('open');
-          document.body.style.overflow = 'hidden';
+          try {
+            window.localStorage.setItem(betaModalStorageKey, 'true');
+          } catch (error) {
+            // Ignore storage failures and allow the modal to behave as session-only.
+          }
         });
-      });
+      }
 
-      lb.addEventListener('click', e => {
-        if (e.target === lb || e.target.classList.contains('lightbox-close')) {
-          lb.classList.remove('open');
-          document.body.style.overflow = '';
-          setTimeout(() => { lbImg.src = ''; }, 300);
-        }
-      });
+      // ── Lightbox ──
+      const lb = document.getElementById('lightbox');
+      const lbImg = document.getElementById('lightbox-img');
 
-      document.addEventListener('keydown', e => {
-        if (e.key === 'Escape' && lb.classList.contains('open')) {
-          lb.classList.remove('open');
-          document.body.style.overflow = '';
-          setTimeout(() => { lbImg.src = ''; }, 300);
-        }
-      });
-    }
+      if (lb && lbImg) {
+        document.querySelectorAll('.lightbox-trigger').forEach(img => {
+          img.addEventListener('click', () => {
+            lbImg.src = img.src;
+            lbImg.alt = img.alt;
+            lb.classList.add('open');
+            document.body.style.overflow = 'hidden';
+          });
+        });
+
+        lb.addEventListener('click', e => {
+          if (e.target === lb || e.target.classList.contains('lightbox-close')) {
+            lb.classList.remove('open');
+            document.body.style.overflow = '';
+            setTimeout(() => { lbImg.src = ''; }, 300);
+          }
+        });
+
+        document.addEventListener('keydown', e => {
+          if (e.key === 'Escape' && lb.classList.contains('open')) {
+            lb.classList.remove('open');
+            document.body.style.overflow = '';
+            setTimeout(() => { lbImg.src = ''; }, 300);
+          }
+        });
+      }
+    });
   </script>
 
   <!-- ── Lightbox Overlay ── -->
