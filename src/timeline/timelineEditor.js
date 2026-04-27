@@ -1253,19 +1253,23 @@ export class TimelineEditor {
     }
 
     // Schedule all entries for a zone from `fromTime` seconds.
-    // Entry active at fromTime is loaded immediately; future entries are scheduled.
+    // The entry active at fromTime is loaded immediately (instant, no blend).
+    // All future entries are scheduled and use butterchurn's crossfade via blendTime.
+    // Covers are never shown mid-playback — last frame holds between entries.
     _playZone(zoneId, fromTime = 0) {
         const entries = this._zoneEntriesFor(zoneId);
         const zd      = this._zoneMap.get(zoneId);
         if (!zd || !entries.length) return;
 
-        const zone   = this._tl.zones.find(z => z.id === zoneId) || {};
         const timers = [];
 
-        // Load the entry that's active right now (if any) with instant blend
+        // Load the entry active right now (if any) instantly, then skip it in
+        // the scheduling loop below so it isn't loaded a second time.
+        let immediateEntryId = null;
         for (const entry of entries) {
             const st = entry.startTime ?? 0;
             if (st <= fromTime && fromTime < st + entry.duration) {
+                immediateEntryId = entry.id;
                 const cover = this._zoneCovers.get(zoneId);
                 if (cover) cover.style.display = 'none';
                 zd.engine.loadPreset(entry.presetName, 0).catch(() => {});
@@ -1275,32 +1279,21 @@ export class TimelineEditor {
 
         for (let i = 0; i < entries.length; i++) {
             const entry = entries[i];
-            const next  = entries[i + 1] ?? null;
             const st    = entry.startTime ?? 0;
-            const end   = st + entry.duration;
 
-            // Schedule entry start (only for entries that begin at or after fromTime)
-            if (st >= fromTime) {
-                const delay = (st - fromTime) * 1000;
-                timers.push(setTimeout(() => {
-                    if (!this._playing) return;
-                    const cover = this._zoneCovers.get(zoneId);
-                    if (cover) cover.style.display = 'none';
-                    zd.engine.loadPreset(entry.presetName, entry.blendTime).catch(() => {});
-                }, delay));
-            }
+            // Skip entries already handled by the immediate-load above
+            if (entry.id === immediateEntryId) continue;
 
-            // Schedule entry end — black out zone when this entry expires.
-            // Only needed when there is a gap before the next entry (or no next entry).
-            // 'hold' gapBehavior keeps the last frame visible instead.
-            const gapAfter = !next || next.startTime > end;
-            if (gapAfter && end > fromTime && zone.gapBehavior !== 'hold') {
-                timers.push(setTimeout(() => {
-                    if (!this._playing) return;
-                    const cover = this._zoneCovers.get(zoneId);
-                    if (cover) cover.style.display = '';
-                }, (end - fromTime) * 1000));
-            }
+            // Only schedule entries that haven't started yet
+            if (st < fromTime) continue;
+
+            const delay = (st - fromTime) * 1000;
+            timers.push(setTimeout(() => {
+                if (!this._playing) return;
+                const cover = this._zoneCovers.get(zoneId);
+                if (cover) cover.style.display = 'none';
+                zd.engine.loadPreset(entry.presetName, entry.blendTime).catch(() => {});
+            }, delay));
         }
 
         this._zoneTimers.set(zoneId, timers);

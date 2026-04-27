@@ -309,15 +309,13 @@ export class VisualizerEngine {
     // For custom presets: pre-bind images from IndexedDB BEFORE telling
     // butterchurn to load the preset so the first rendered frame already
     // has the correct textures (avoids the clouds2 fallback flash).
-    // Use blendTime=0 for instant switch — 2-second cross-fade is too slow
-    // and makes the preset appear to do nothing.
     if (name.startsWith(CUSTOM_PREFIX)) {
       await this._bindCustomPresetImages(preset);
-      // Near-zero (not 0) — butterchurn's blendProgress = elapsed / blendDuration
-      // produces NaN/Infinity at 0, which keeps it stuck in permanent-blend state
-      // and the new preset never actually takes over.
-      blendTime = 0.001;
     }
+
+    // Butterchurn's blendProgress = elapsed / blendDuration produces NaN/Infinity
+    // at blendTime=0, keeping it stuck in a permanent-blend state.
+    if (blendTime < 0.001) blendTime = 0.001;
 
     try {
       this.visualizer.loadPreset(JSON.parse(JSON.stringify(preset)), blendTime);
