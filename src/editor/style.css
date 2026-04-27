@@ -302,7 +302,7 @@ html, body {
 .tab-panel[hidden] { display: none; }
 
 .tab-scroll {
-  flex: 1; overflow-y: auto;
+  flex: 1; overflow-y: auto; overflow-x: hidden;
   padding: 16px 14px 20px;
   scrollbar-width: thin;
   scrollbar-color: rgba(255,255,255,0.09) transparent;

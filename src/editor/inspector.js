@@ -1461,7 +1461,7 @@ export class EditorInspector {
             muted: false,       // Phase 4: hide this layer unless another layer is solo'd
             name: file.name.replace(/\.[^.]+$/, '') || 'Layer',  // Phase 4: user-editable display name
             isGif: resized.isGif || false,
-            gifSpeed: 1.0,      // playback multiplier: 2 = twice as fast, 0.5 = half speed
+            gifSpeed: 1.2,      // playback multiplier: 2 = twice as fast, 0.5 = half speed
             reactSource: 'bass',   // Phase 5: 'bass' | 'mid' | 'treb' | 'vol'
             reactCurve: 'linear',  // Phase 5: 'linear' | 'squared' | 'cubed' | 'threshold'
             orbitMode: 'circle',   // Phase 6: 'circle' | 'lissajous'
@@ -1474,7 +1474,7 @@ export class EditorInspector {
         };
         this.currentState.images.push(entry);
 
-        const texObj = { data: resized.dataURL, width: resized.width, height: resized.height, isGif: resized.isGif || false };
+        const texObj = { data: resized.dataURL, width: resized.width, height: resized.height, isGif: resized.isGif || false, gifSpeed: entry.gifSpeed };
         this._mountLayerCard(entry, texObj);
         if (!resized.resized) showToast('Image layer added');
     }
@@ -1542,6 +1542,16 @@ export class EditorInspector {
             </div>
           </div>
           <div class="layer-controls">
+            ${entry.isGif ? `
+            <p class="layer-section-label">Animation</p>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="GIF playback speed (0.25× to 4×). Default 1.2× — most GIFs feel a touch slow at native speed.">Speed</span>
+              <input type="range" class="slider layer-gif-speed-sl" min="0.25" max="4" step="0.05"
+                value="${entry.gifSpeed}" style="--pct:${pct(entry.gifSpeed, 0.25, 4)}">
+              <span class="lsv layer-gif-speed-val">${entry.gifSpeed.toFixed(2)}×</span>
+            </div>
+            <div class="layer-section-divider"></div>
+            ` : ''}
             <div class="layer-row-inline">
               <span class="layer-ctrl-label">Blend</span>
               <select class="layer-blend">
@@ -1705,16 +1715,6 @@ export class EditorInspector {
               <button class="lseg lseg-scope active" data-scope="tile" data-tooltip="Fold inside each tile">Per Tile</button>
               <button class="lseg lseg-scope" data-scope="field" data-tooltip="Fold the whole tiled group">Whole Image</button>
             </div>
-            ${entry.isGif ? `
-            <div class="layer-section-divider"></div>
-            <p class="layer-section-label">Animation</p>
-            <div class="layer-slider-row">
-              <span class="layer-ctrl-label">Speed</span>
-              <input type="range" class="slider layer-gif-speed-sl" min="0.25" max="4" step="0.05"
-                value="1" style="--pct:${pct(1, 0.25, 4)}">
-              <span class="lsv layer-gif-speed-val">1.00×</span>
-            </div>
-            ` : ''}
             <div class="layer-section-divider"></div>
             <p class="layer-section-label">Tint</p>
             <div class="layer-row-inline" style="gap:8px;margin-bottom:6px">
