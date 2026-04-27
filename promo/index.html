@@ -15,6 +15,24 @@
 
   <div class="ambient-bg"></div>
 
+  <!-- ── Early Beta Modal ── -->
+  <div class="promo-modal-backdrop" id="beta-modal" role="dialog" aria-modal="true" aria-labelledby="beta-modal-title"
+    aria-describedby="beta-modal-copy">
+    <div class="promo-modal-card">
+      <div class="promo-modal-eyebrow">Early Beta Preview</div>
+      <h2 id="beta-modal-title">Thanks for helping test The DiscoCast Visualizer.</h2>
+      <p id="beta-modal-copy">
+        This is an early beta build, so you may run into bugs, rough edges, or features that are still being tuned.
+        If you spot an issue or have a feature request, send feedback to
+        <a href="mailto:paul@rarefunk.com">paul@rarefunk.com</a>.
+      </p>
+      <p class="promo-modal-note">
+        Your feedback helps shape the public release.
+      </p>
+      <button type="button" class="btn btn-primary promo-modal-button" id="beta-modal-dismiss">OK</button>
+    </div>
+  </div>
+
   <!-- ── Navigation ── -->
   <nav class="nav">
     <div class="nav-inner">
@@ -355,6 +373,9 @@
   </footer>
 
   <script>
+    const betaModal = document.getElementById('beta-modal');
+    const betaModalDismiss = document.getElementById('beta-modal-dismiss');
+    const betaModalStorageKey = 'discocast-beta-modal-dismissed';
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
@@ -365,6 +386,30 @@
     }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
 
     document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+
+    let betaModalDismissed = false;
+
+    try {
+      betaModalDismissed = window.localStorage.getItem(betaModalStorageKey) === 'true';
+    } catch (error) {
+      betaModalDismissed = false;
+    }
+
+    if (!betaModalDismissed) {
+      betaModal.classList.add('is-open');
+      document.body.classList.add('beta-modal-open');
+    }
+
+    betaModalDismiss.addEventListener('click', () => {
+      betaModal.classList.remove('is-open');
+      document.body.classList.remove('beta-modal-open');
+
+      try {
+        window.localStorage.setItem(betaModalStorageKey, 'true');
+      } catch (error) {
+        // Ignore storage failures and allow the modal to behave as session-only.
+      }
+    });
 
     // ── Lightbox ──
     const lb = document.getElementById('lightbox');
