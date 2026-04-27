@@ -255,9 +255,10 @@ The "per-image canvas mirror" goal is effectively met by the Mirror scope toggle
 
 **Goal:** expand what a single layer can *do*. Ship these individually in priority order.
 
-**Priority order (first two shipped):**
+**Priority order (first three shipped):**
 1. **Lissajous path** ✅ — Path toggle on the Orbit section: `Circle` | `Lissajous`. Lissajous mode reveals Freq X, Freq Y, and Phase sliders. The ratio between Freq X and Freq Y determines the figure shape (2:3 = figure-8, 3:4 = four-leaf clover, etc.). Orbit amplitude slider controls path size. Backward-compatible: `orbitMode` absent → defaults to `'circle'`.
 2. **Strobe / Blink** ✅ — Strobe slider in the opacity section (below Beat Fade). Hard binary cut using `step(threshold, _r_raw)` in GLSL — reads the *raw* audio signal (pre-curve) so the trigger is absolute, not shaped. Threshold row auto-shows when Strobe > 0.
+3. **Pan** ✅ — Whole-group Left/Right and Up/Down translation. Three modes: Off, Drift (continuous linear travel — endless tile scroll or logo crawl), Bounce (ping-pong around anchor with independent X/Y rates and a Range half-amplitude slider). Applies at the group anchor level, so tiled layers scroll the entire grid as one unit with seamless wrap. Composes additively with Sway, Wander, and Orbit. State: `panMode` (`'off'|'drift'|'bounce'`), `panSpeedX`, `panSpeedY` (±2 UV/sec signed), `panRange` (0–1). See [preset-image-pan-dev.md](preset-image-pan-dev.md) for full architecture notes.
 
 Remaining candidates (pick order based on demand after first two land):
 - **Independent tile X / Y scale** — separate Width and Height sliders for tiled images so the tile cell can be given an explicit aspect ratio instead of inheriting the screen ratio. Pairs with the current cover-crop behaviour: if Width < Height the tile is portrait-shaped and the image fills it exactly with no crop. Requested after Phase 5 portrait-image aspect fix.

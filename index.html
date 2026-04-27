@@ -612,7 +612,7 @@
               <p>Add up to 5 image or GIF layers in a collapsible smart-accordion stack. Drag any card to reorder. Each layer has:</p>
               <ul class="welcome-list">
                 <li><strong>Solo / Mute</strong> — audition one layer in isolation or hide it without deleting.</li>
-                <li><strong>Animation</strong> — Tile, Spin, Orbit (Circle or Lissajous path), Tunnel zoom, Bounce (beat-lift), Sway, Wander, and a draggable XY anchor point.</li>
+                <li><strong>Animation</strong> — Tile, Spin, Orbit (Circle or Lissajous path), Tunnel zoom, Bounce (beat-lift), Sway, Wander, <strong>Pan</strong>, and a draggable XY anchor point.</li>
                 <li><strong>Beat Fade / Pulse / Strobe</strong> — audio drives opacity (smooth fade or hard strobe cut) and size on every beat.</li>
                 <li><strong>Mirror</strong> — Off, Horizontal, Vertical, Quad, or Kaleido (6-slice polar fold). Apply per tile or across the whole field.</li>
                 <li><strong>Canvas Mirror</strong> — folds the entire rendered scene horizontally, vertically, or both.</li>
@@ -631,6 +631,17 @@
                 <li><strong>Stack with effects</strong> — try a GIF with Tile + Mirror Kaleido + Hue Spin for psychedelic results, or pair Beat Fade with a low speed for a strobe-feel.</li>
                 <li><strong>Saved with the preset</strong> — speed is persisted, so loading a saved preset restores the exact playback rate you set.</li>
                 <li><strong>File size</strong> — GIFs are stored uncompressed once decoded; very large or long GIFs can use significant memory. Trim or downsize beforehand if you hit limits.</li>
+              </ul>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Pan — Left/Right &amp; Up/Down Translation</div>
+              <p>Each image layer has a <strong>Pan</strong> section (below Wander) for deliberate whole-group translation. When a layer is tiled, Pan always moves the entire grid as one — the pattern scrolls seamlessly at the wrap edge, never individual tiles.</p>
+              <ul class="welcome-list">
+                <li><strong>Drift</strong> — continuous linear travel. Set X and/or Y speed (−2 to +2 UV/sec, signed so negative reverses direction). With Tile ON this creates an endless scroll — logo parade, star-field drift, ticker. With Tile OFF the image slides off-canvas.</li>
+                <li><strong>Bounce</strong> — ping-pong between extremes. X and Y speeds set the oscillation rate independently; Range sets the half-amplitude. Effectively a 2D Sway with full axis control.</li>
+                <li><strong>Composes freely</strong> — Pan stacks additively on top of Sway, Wander, and Orbit. Try Drift X + Orbit for a spiraling scroll, or Bounce Y + Sway for a figure-eight wobble.</li>
+                <li><strong>Saved with the preset</strong> — mode, speeds, and range all persist in the preset JSON.</li>
               </ul>
             </div>
 

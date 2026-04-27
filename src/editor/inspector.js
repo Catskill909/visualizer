@@ -1442,6 +1442,10 @@ export class EditorInspector {
             swaySpeed: 1.00,    // sway cycles per second
             wanderAmt: 0.00,    // organic random drift amplitude
             wanderSpeed: 0.50,  // wander drift rate
+            panMode: 'off',     // 'off' | 'drift' | 'bounce' — whole-group L/R + U/D translation
+            panSpeedX: 0.00,    // drift: UV/sec along X (signed). bounce: cycles/sec
+            panSpeedY: 0.00,    // ditto for Y
+            panRange: 0.20,     // bounce only: half-amplitude in UV units
             mirror: 'none',     // 'none' | 'h' | 'v' | 'quad' | 'kaleido'
             mirrorScope: 'tile',  // 'tile' = fold inside each tile, 'field' = fold the whole tiled group
             tintR: 1.00,        // tint color red (1=white = no tint)
@@ -1703,6 +1707,34 @@ export class EditorInspector {
               <span class="lsv">${entry.wanderSpeed.toFixed(2)}</span>
             </div>
             <div class="layer-section-divider"></div>
+            <p class="layer-section-label" data-tooltip="Whole-group L/R + U/D translation. Drift = continuous travel (pairs with Tile ON for endless scroll). Bounce = ping-pong around anchor.">Pan</p>
+            <div class="layer-row-inline layer-pan-mode-row">
+              <span class="layer-ctrl-label">Mode</span>
+              <div class="layer-pan-mode" role="group" aria-label="Pan mode">
+                <button class="lseg${(entry.panMode || 'off') === 'off' ? ' active' : ''}" data-pan-mode="off">Off</button>
+                <button class="lseg${entry.panMode === 'drift' ? ' active' : ''}" data-pan-mode="drift">Drift</button>
+                <button class="lseg${entry.panMode === 'bounce' ? ' active' : ''}" data-pan-mode="bounce">Bounce</button>
+              </div>
+            </div>
+            <div class="layer-slider-row layer-pan-row"${(entry.panMode || 'off') === 'off' ? ' style="display:none"' : ''}>
+              <span class="layer-ctrl-label">X</span>
+              <input type="range" class="slider layer-pan-x-sl" min="-2" max="2" step="0.01"
+                value="${entry.panSpeedX}" style="--pct:${pct(entry.panSpeedX, -2, 2)}">
+              <span class="lsv layer-pan-x-val">${entry.panSpeedX.toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row layer-pan-row"${(entry.panMode || 'off') === 'off' ? ' style="display:none"' : ''}>
+              <span class="layer-ctrl-label">Y</span>
+              <input type="range" class="slider layer-pan-y-sl" min="-2" max="2" step="0.01"
+                value="${entry.panSpeedY}" style="--pct:${pct(entry.panSpeedY, -2, 2)}">
+              <span class="lsv layer-pan-y-val">${entry.panSpeedY.toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row layer-pan-range-row"${entry.panMode !== 'bounce' ? ' style="display:none"' : ''}>
+              <span class="layer-ctrl-label">Range</span>
+              <input type="range" class="slider layer-pan-range-sl" min="0" max="1" step="0.01"
+                value="${entry.panRange}" style="--pct:${pct(entry.panRange, 0, 1)}">
+              <span class="lsv layer-pan-range-val">${entry.panRange.toFixed(2)}</span>
+            </div>
+            <div class="layer-section-divider"></div>
             <p class="layer-section-label">Mirror <span class="lseg-status">Off</span></p>
             <div class="layer-mirror-seg" role="group">
               <button class="lseg active" data-mirror="none">Off</button>
@@ -1829,7 +1861,7 @@ export class EditorInspector {
         const sliderMins = [0, 0, 0, 0, -2, 0, 0, 0, 0, 0];
         const sliderMaxes = [1, 1, 0.8, 0.45, 2, 0.4, 4, 0.4, 2, 2];
 
-        card.querySelectorAll('.layer-slider-row input[type=range]:not(.layer-bounce-sl):not(.layer-size-sl):not(.layer-liss-sl):not(.layer-strobe-thr-sl)').forEach((sl, i) => {
+        card.querySelectorAll('.layer-slider-row input[type=range]:not(.layer-bounce-sl):not(.layer-size-sl):not(.layer-liss-sl):not(.layer-strobe-thr-sl):not(.layer-pan-x-sl):not(.layer-pan-y-sl):not(.layer-pan-range-sl)').forEach((sl, i) => {
             const valEl = sl.nextElementSibling;
             sl.addEventListener('input', () => {
                 const v = parseFloat(sl.value);
@@ -1972,6 +2004,49 @@ export class EditorInspector {
             entry.lissPhase = parseFloat(lissPhSl.value);
             lissPhVal.textContent = entry.lissPhase.toFixed(2);
             lissPhSl.style.setProperty('--pct', `${pct(entry.lissPhase, 0, 1)}`);
+            refresh();
+        });
+
+        // Pan — whole-group L/R + U/D translation
+        const panModeBtns = card.querySelectorAll('.layer-pan-mode .lseg');
+        const panRows = card.querySelectorAll('.layer-pan-row');
+        const panRangeRow = card.querySelector('.layer-pan-range-row');
+        const updatePanVisibility = () => {
+            const m = entry.panMode || 'off';
+            panRows.forEach(r => { r.style.display = m === 'off' ? 'none' : ''; });
+            panRangeRow.style.display = m === 'bounce' ? '' : 'none';
+        };
+        panModeBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                panModeBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                entry.panMode = btn.dataset.panMode;
+                updatePanVisibility();
+                refresh();
+            });
+        });
+        const panXSl = card.querySelector('.layer-pan-x-sl');
+        const panXVal = card.querySelector('.layer-pan-x-val');
+        panXSl.addEventListener('input', () => {
+            entry.panSpeedX = parseFloat(panXSl.value);
+            panXVal.textContent = entry.panSpeedX.toFixed(2);
+            panXSl.style.setProperty('--pct', `${pct(entry.panSpeedX, -2, 2)}`);
+            refresh();
+        });
+        const panYSl = card.querySelector('.layer-pan-y-sl');
+        const panYVal = card.querySelector('.layer-pan-y-val');
+        panYSl.addEventListener('input', () => {
+            entry.panSpeedY = parseFloat(panYSl.value);
+            panYVal.textContent = entry.panSpeedY.toFixed(2);
+            panYSl.style.setProperty('--pct', `${pct(entry.panSpeedY, -2, 2)}`);
+            refresh();
+        });
+        const panRangeSl = card.querySelector('.layer-pan-range-sl');
+        const panRangeVal = card.querySelector('.layer-pan-range-val');
+        panRangeSl.addEventListener('input', () => {
+            entry.panRange = parseFloat(panRangeSl.value);
+            panRangeVal.textContent = entry.panRange.toFixed(2);
+            panRangeSl.style.setProperty('--pct', `${pct(entry.panRange, 0, 1)}`);
             refresh();
         });
 
@@ -2335,6 +2410,10 @@ export class EditorInspector {
         const swaySpd = (img.swaySpeed !== undefined ? img.swaySpeed : 1.0).toFixed(4);
         const wanderAmt = (img.wanderAmt || 0).toFixed(4);
         const wanderSpd = (img.wanderSpeed !== undefined ? img.wanderSpeed : 0.5).toFixed(4);
+        const panMode = img.panMode || 'off';
+        const panSx = (img.panSpeedX || 0).toFixed(4);
+        const panSy = (img.panSpeedY || 0).toFixed(4);
+        const panRng = (img.panRange !== undefined ? img.panRange : 0.2).toFixed(4);
         const mirror = img.mirror || 'none';
         const mirrorScope = img.mirrorScope || 'tile';
         const tintR = (img.tintR !== undefined ? img.tintR : 1.0).toFixed(4);
@@ -2374,6 +2453,8 @@ export class EditorInspector {
         const hasTunnel = parseFloat(ts) !== 0 && img.tile;
         const hasSway = parseFloat(swayAmt) !== 0;
         const hasWander = parseFloat(wanderAmt) !== 0;
+        const hasPanDrift = panMode === 'drift' && (parseFloat(panSx) !== 0 || parseFloat(panSy) !== 0);
+        const hasPanBounce = panMode === 'bounce' && (parseFloat(panSx) !== 0 || parseFloat(panSy) !== 0) && parseFloat(panRng) !== 0;
         const hasMirror = mirror !== 'none';
         const fieldMirror = hasMirror && mirrorScope === 'field';
         const tileMirror = hasMirror && mirrorScope === 'tile';
@@ -2401,6 +2482,13 @@ export class EditorInspector {
         if (hasWander) {
             cxExpr = `(${cxExpr}) + (sin(time*${wanderSpd}*0.7+1.3)*0.6 + sin(time*${wanderSpd}*1.3+2.7)*0.4) * ${wanderAmt}`;
             cyExpr = `${cyExpr} + (sin(time*${wanderSpd}*0.9+0.5)*0.6 + sin(time*${wanderSpd}*1.7+3.1)*0.4) * ${wanderAmt}`;
+        }
+        if (hasPanDrift) {
+            cxExpr = `(${cxExpr}) + time * ${panSx}`;
+            cyExpr = `(${cyExpr}) + time * ${panSy}`;
+        } else if (hasPanBounce) {
+            cxExpr = `(${cxExpr}) + sin(time * ${panSx} * 6.28318) * ${panRng}`;
+            cyExpr = `(${cyExpr}) + sin(time * ${panSy} * 6.28318) * ${panRng}`;
         }
 
         // Image UV source — either straight uv_m, or uv_m with a whole-group
@@ -2698,6 +2786,7 @@ export class EditorInspector {
             orbitRadius: 0.00, bounceAmp: 0.00, tunnelSpeed: 0.00,
             spacing: 0.00, cx: 0.50, cy: 0.50,
             swayAmt: 0.00, swaySpeed: 1.00, wanderAmt: 0.00, wanderSpeed: 0.50,
+            panMode: 'off', panSpeedX: 0.00, panSpeedY: 0.00, panRange: 0.20,
             mirror: 'none', mirrorScope: 'tile',
             isGif: false, gifSpeed: 1.0,
             reactSource: 'bass', reactCurve: 'linear',
