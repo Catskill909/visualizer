@@ -278,6 +278,15 @@ async function boot(connectAudioFn) {
         onNew:  handleLibraryNew,
     });
 
+    // Wire New Preset button in the Edit panel footer
+    document.getElementById('btn-new-preset-footer')?.addEventListener('click', async () => {
+        if (isDirty) {
+            const proceed = await confirmDirty();
+            if (!proceed) return;
+        }
+        handleLibraryNew();
+    });
+
     // Wire mode toggle
     initModeToggle();
 
