@@ -174,7 +174,14 @@ body.force-hide-ui, body.controls-hidden {
   box-shadow: var(--shadow-soft); animation: slideUp 0.7s ease;
 }
 
-.start-logo { margin-bottom: 36px; }
+.start-logo { margin-bottom: 24px; }
+.custom-logo {
+  width: 260px;
+  max-width: 72vw;
+  height: auto;
+  display: block;
+  margin: 0 auto 10px;
+}
 .logo-icon { width: 72px; height: 72px; margin-bottom: 16px; animation: logoPulse 3s ease-in-out infinite; filter: drop-shadow(0 0 8px rgba(255,255,255,0.3)); }
 
 .start-card h1 {
@@ -1117,6 +1124,7 @@ kbd {
 /* RESPONSIVE */
 @media (max-width: 600px) {
   .start-card { padding: 32px 24px; }
+  .custom-logo { width: 220px; max-width: 78vw; margin-bottom: 8px; }
   .start-card h1 { font-size: 1.8rem; }
   .start-sources-grid { grid-template-columns: 1fr; }
   .control-bar-inner { gap: 4px; padding: 8px 10px; }
