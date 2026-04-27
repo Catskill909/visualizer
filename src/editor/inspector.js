@@ -1585,7 +1585,7 @@ export class EditorInspector {
             <div class="layer-row-inline">
               <span class="layer-ctrl-label" data-tooltip="Hard opacity cut when audio crosses threshold — instant strobe flash">Strobe</span>
               <input type="range" class="slider layer-slider-inline layer-strobe-sl" min="0" max="1" step="0.01"
-                value="${entry.strobeAmp}" style="--pct:${pct(entry.strobeAmp, 0, 1)}">
+                value="${Math.sqrt(entry.strobeAmp).toFixed(4)}" style="--pct:${pct(Math.sqrt(entry.strobeAmp), 0, 1)}">
               <span class="lsv layer-strobe-amp-val">${entry.strobeAmp.toFixed(2)}</span>
             </div>
             <div class="layer-slider-row layer-strobe-thr-row"${entry.strobeAmp <= 0 ? ' style="display:none"' : ''}>
@@ -1608,7 +1608,7 @@ export class EditorInspector {
             </div>
             <div class="layer-row-inline">
               <span class="layer-ctrl-label">Pulse</span>
-              <input type="range" class="slider layer-slider-inline" min="0" max="1" step="0.01"
+              <input type="range" class="slider layer-slider-inline layer-pulse-sl" min="0" max="1" step="0.01"
                 value="${Math.sqrt(entry.audioPulse / 2).toFixed(3)}" style="--pct:${(Math.sqrt(entry.audioPulse / 2) * 100).toFixed(1)}%">
               <span class="lsv layer-pulse-val">${entry.audioPulse.toFixed(2)}</span>
               <span class="layer-ctrl-label" style="margin-left:8px;width:auto" data-tooltip="Shrink on beat instead of grow">Shrink</span>
@@ -1716,17 +1716,10 @@ export class EditorInspector {
                 <button class="lseg${entry.panMode === 'bounce' ? ' active' : ''}" data-pan-mode="bounce">Bounce</button>
               </div>
             </div>
-            <div class="layer-slider-row layer-pan-row"${(entry.panMode || 'off') === 'off' ? ' style="display:none"' : ''}>
-              <span class="layer-ctrl-label">X</span>
-              <input type="range" class="slider layer-pan-x-sl" min="-2" max="2" step="0.01"
-                value="${entry.panSpeedX}" style="--pct:${pct(entry.panSpeedX, -2, 2)}">
-              <span class="lsv layer-pan-x-val">${entry.panSpeedX.toFixed(2)}</span>
-            </div>
-            <div class="layer-slider-row layer-pan-row"${(entry.panMode || 'off') === 'off' ? ' style="display:none"' : ''}>
-              <span class="layer-ctrl-label">Y</span>
-              <input type="range" class="slider layer-pan-y-sl" min="-2" max="2" step="0.01"
-                value="${entry.panSpeedY}" style="--pct:${pct(entry.panSpeedY, -2, 2)}">
-              <span class="lsv layer-pan-y-val">${entry.panSpeedY.toFixed(2)}</span>
+            <div class="layer-pan-pad-wrap layer-pan-row"${(entry.panMode || 'off') === 'off' ? ' style="display:none"' : ''}>
+              <canvas class="pan-pad" width="96" height="96" data-tooltip="Drag to set direction &amp; speed — distance from center = speed"></canvas>
+              <button class="xy-reset pan-pad-reset" data-tooltip="Reset to stopped">↺</button>
+              <span class="pan-pad-readout">${entry.panSpeedX.toFixed(2)} / ${entry.panSpeedY.toFixed(2)}</span>
             </div>
             <div class="layer-slider-row layer-pan-range-row"${entry.panMode !== 'bounce' ? ' style="display:none"' : ''}>
               <span class="layer-ctrl-label">Range</span>
@@ -1818,7 +1811,7 @@ export class EditorInspector {
         });
 
         // Pulse inline slider — squared curve for more subtle range at low end
-        const pulseSlider = card.querySelector('.layer-slider-inline');
+        const pulseSlider = card.querySelector('.layer-pulse-sl');
         const pulseVal = card.querySelector('.layer-pulse-val');
         pulseSlider.addEventListener('input', () => {
             const pos = parseFloat(pulseSlider.value);
@@ -1957,9 +1950,10 @@ export class EditorInspector {
         const strobeThrSl = card.querySelector('.layer-strobe-thr-sl');
         const strobeThrVal = card.querySelector('.layer-strobe-thr-val');
         strobeSlider.addEventListener('input', () => {
-            entry.strobeAmp = parseFloat(strobeSlider.value);
+            const t = parseFloat(strobeSlider.value);
+            entry.strobeAmp = t * t;  // power curve: fine control at low intensities
             strobeAmpVal.textContent = entry.strobeAmp.toFixed(2);
-            strobeSlider.style.setProperty('--pct', `${pct(entry.strobeAmp, 0, 1)}`);
+            strobeSlider.style.setProperty('--pct', `${pct(t, 0, 1)}`);
             strobeThrRow.style.display = entry.strobeAmp > 0 ? '' : 'none';
             refresh();
         });
@@ -2025,22 +2019,82 @@ export class EditorInspector {
                 refresh();
             });
         });
-        const panXSl = card.querySelector('.layer-pan-x-sl');
-        const panXVal = card.querySelector('.layer-pan-x-val');
-        panXSl.addEventListener('input', () => {
-            entry.panSpeedX = parseFloat(panXSl.value);
-            panXVal.textContent = entry.panSpeedX.toFixed(2);
-            panXSl.style.setProperty('--pct', `${pct(entry.panSpeedX, -2, 2)}`);
+        // Pan joystick pad — center = stopped, direction = pan dir, distance = speed (max ±2)
+        // Power curve (^2) on input gives 4× more physical travel in the slow/medium range.
+        // Forward:  t ∈ [-1,1] (normalized pad pos) → speed = sign(t) * t² * PAN_MAX
+        // Inverse:  speed → t = sign(speed) * sqrt(|speed| / PAN_MAX)  (for dot placement)
+        const panPad = card.querySelector('.pan-pad');
+        const panPadReset = card.querySelector('.pan-pad-reset');
+        const panPadReadout = card.querySelector('.pan-pad-readout');
+        const panPadCtx = panPad.getContext('2d');
+        const PAN_PAD = 96;
+        const PAN_MAX = 2.0;
+        const panCurve    = (t) => Math.sign(t) * t * t * PAN_MAX;          // pos → speed
+        const panCurveInv = (s) => { const f = s / PAN_MAX; return Math.sign(f) * Math.sqrt(Math.abs(f)); }; // speed → pos
+
+        const drawPanPad = () => {
+            panPadCtx.clearRect(0, 0, PAN_PAD, PAN_PAD);
+            // background
+            panPadCtx.fillStyle = 'rgba(255,255,255,0.04)';
+            panPadCtx.beginPath();
+            panPadCtx.roundRect(0, 0, PAN_PAD, PAN_PAD, 4);
+            panPadCtx.fill();
+            // speed rings at 33% and 66% radius
+            const cx = PAN_PAD / 2, cy = PAN_PAD / 2;
+            panPadCtx.strokeStyle = 'rgba(255,255,255,0.07)';
+            panPadCtx.lineWidth = 1;
+            [0.33, 0.66].forEach(r => {
+                panPadCtx.beginPath();
+                panPadCtx.arc(cx, cy, r * PAN_PAD / 2, 0, Math.PI * 2);
+                panPadCtx.stroke();
+            });
+            // crosshair
+            panPadCtx.strokeStyle = 'rgba(255,255,255,0.10)';
+            panPadCtx.beginPath(); panPadCtx.moveTo(cx, 0); panPadCtx.lineTo(cx, PAN_PAD); panPadCtx.stroke();
+            panPadCtx.beginPath(); panPadCtx.moveTo(0, cy); panPadCtx.lineTo(PAN_PAD, cy); panPadCtx.stroke();
+            // border
+            panPadCtx.strokeStyle = 'rgba(255,255,255,0.10)';
+            panPadCtx.strokeRect(0.5, 0.5, PAN_PAD - 1, PAN_PAD - 1);
+            // dot — inverse curve maps stored speed back to physical pad position
+            const tx = panCurveInv(entry.panSpeedX);
+            const ty = panCurveInv(entry.panSpeedY);
+            const dx = cx + tx * (PAN_PAD / 2);
+            const dy = cy + ty * (PAN_PAD / 2);
+            panPadCtx.beginPath();
+            panPadCtx.arc(dx, dy, 5, 0, Math.PI * 2);
+            panPadCtx.fillStyle = '#ffffff';
+            panPadCtx.fill();
+            panPadCtx.strokeStyle = 'rgba(0,0,0,0.5)';
+            panPadCtx.lineWidth = 1.5;
+            panPadCtx.stroke();
+        };
+        drawPanPad();
+
+        const onPanPadMove = (e) => {
+            const rect = panPad.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            const tx = Math.max(-1, Math.min(1, ((clientX - rect.left) / rect.width  - 0.5) * 2));
+            const ty = Math.max(-1, Math.min(1, ((clientY - rect.top)  / rect.height - 0.5) * 2));
+            entry.panSpeedX = panCurve(tx);
+            entry.panSpeedY = panCurve(ty);
+            panPadReadout.textContent = `${entry.panSpeedX.toFixed(2)} / ${entry.panSpeedY.toFixed(2)}`;
+            drawPanPad();
             refresh();
+        };
+        let draggingPanPad = false;
+        panPad.addEventListener('mousedown', (e) => { draggingPanPad = true; onPanPadMove(e); });
+        panPad.addEventListener('touchstart', (e) => { draggingPanPad = true; onPanPadMove(e); e.preventDefault(); }, { passive: false });
+        window.addEventListener('mousemove', (e) => { if (draggingPanPad) onPanPadMove(e); });
+        window.addEventListener('mouseup', () => { draggingPanPad = false; });
+        window.addEventListener('touchmove', (e) => { if (draggingPanPad) onPanPadMove(e); }, { passive: true });
+        window.addEventListener('touchend', () => { draggingPanPad = false; });
+        panPadReset.addEventListener('click', () => {
+            entry.panSpeedX = 0; entry.panSpeedY = 0;
+            panPadReadout.textContent = '0.00 / 0.00';
+            drawPanPad(); refresh();
         });
-        const panYSl = card.querySelector('.layer-pan-y-sl');
-        const panYVal = card.querySelector('.layer-pan-y-val');
-        panYSl.addEventListener('input', () => {
-            entry.panSpeedY = parseFloat(panYSl.value);
-            panYVal.textContent = entry.panSpeedY.toFixed(2);
-            panYSl.style.setProperty('--pct', `${pct(entry.panSpeedY, -2, 2)}`);
-            refresh();
-        });
+
         const panRangeSl = card.querySelector('.layer-pan-range-sl');
         const panRangeVal = card.querySelector('.layer-pan-range-val');
         panRangeSl.addEventListener('input', () => {

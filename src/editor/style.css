@@ -915,6 +915,25 @@ html, body {
 }
 .xy-reset:hover { border-color: var(--border-hi); color: var(--text); }
 
+.layer-pan-pad-wrap {
+  display: flex; align-items: flex-start; gap: 6px;
+  padding: 4px 0 2px;
+}
+.pan-pad {
+  width: 96px; height: 96px;
+  border-radius: var(--r-s);
+  cursor: crosshair;
+  flex-shrink: 0;
+  display: block;
+}
+.pan-pad-reset { align-self: flex-end; }
+.pan-pad-readout {
+  font-size: 10px; color: var(--text-3);
+  align-self: flex-end; line-height: 1;
+  font-variant-numeric: tabular-nums;
+  padding-bottom: 4px;
+}
+
 /* ── Layer section dividers + labels ──────────────────────────────────── */
 .layer-section-divider {
   height: 1px;
