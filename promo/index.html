@@ -4,7 +4,6 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script>document.documentElement.classList.add('js');</script>
   <title>DiscoCast Visualizer — Real-Time MilkDrop Visuals for macOS</title>
   <meta name="description"
     content="DiscoCast Visualizer brings 1,144 MilkDrop presets to your Mac with live audio reactivity, a custom preset studio with image layers, and projector-ready performance.">
@@ -377,30 +376,6 @@
     const betaModal = document.getElementById('beta-modal');
     const betaModalDismiss = document.getElementById('beta-modal-dismiss');
     const betaModalStorageKey = 'discocast-beta-modal-dismissed';
-    const fadeInElements = document.querySelectorAll('.fade-in');
-    const revealAllFadeIns = () => {
-      fadeInElements.forEach(el => el.classList.add('visible'));
-    };
-
-    if ('IntersectionObserver' in window) {
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('visible');
-            observer.unobserve(entry.target);
-          }
-        });
-      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
-
-      fadeInElements.forEach(el => observer.observe(el));
-
-      // Safety net for mobile browsers where observer callbacks can be delayed or skipped.
-      window.setTimeout(revealAllFadeIns, 1200);
-      window.addEventListener('load', revealAllFadeIns, { once: true });
-    } else {
-      // Fallback for older mobile browsers: show all content immediately.
-      revealAllFadeIns();
-    }
 
     let betaModalDismissed = false;
 
@@ -410,21 +385,23 @@
       betaModalDismissed = false;
     }
 
-    if (!betaModalDismissed) {
+    if (betaModal && !betaModalDismissed) {
       betaModal.classList.add('is-open');
       document.body.classList.add('beta-modal-open');
     }
 
-    betaModalDismiss.addEventListener('click', () => {
-      betaModal.classList.remove('is-open');
-      document.body.classList.remove('beta-modal-open');
+    if (betaModal && betaModalDismiss) {
+      betaModalDismiss.addEventListener('click', () => {
+        betaModal.classList.remove('is-open');
+        document.body.classList.remove('beta-modal-open');
 
-      try {
-        window.localStorage.setItem(betaModalStorageKey, 'true');
-      } catch (error) {
-        // Ignore storage failures and allow the modal to behave as session-only.
-      }
-    });
+        try {
+          window.localStorage.setItem(betaModalStorageKey, 'true');
+        } catch (error) {
+          // Ignore storage failures and allow the modal to behave as session-only.
+        }
+      });
+    }
 
     // ── Lightbox ──
     const lb = document.getElementById('lightbox');
