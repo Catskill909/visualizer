@@ -42,5 +42,8 @@ macos-app-generate.md
 build-log.txt
 src-tauri/target/
 
+# Allow the stable download in promo/ (served to users via Coolify)
+!promo/DiscoCast-Visualizer.dmg
+
 # Keep Tauri config, ignore only build output
 # (src-tauri/tauri.conf.json, Cargo.toml, etc. should be committed)
