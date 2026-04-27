@@ -377,6 +377,9 @@
     const betaModalDismiss = document.getElementById('beta-modal-dismiss');
     const betaModalStorageKey = 'discocast-beta-modal-dismissed';
     const fadeInElements = document.querySelectorAll('.fade-in');
+    const revealAllFadeIns = () => {
+      fadeInElements.forEach(el => el.classList.add('visible'));
+    };
 
     if ('IntersectionObserver' in window) {
       const observer = new IntersectionObserver((entries) => {
@@ -389,9 +392,13 @@
       }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
 
       fadeInElements.forEach(el => observer.observe(el));
+
+      // Safety net for mobile browsers where observer callbacks can be delayed or skipped.
+      window.setTimeout(revealAllFadeIns, 1200);
+      window.addEventListener('load', revealAllFadeIns, { once: true });
     } else {
       // Fallback for older mobile browsers: show all content immediately.
-      fadeInElements.forEach(el => el.classList.add('visible'));
+      revealAllFadeIns();
     }
 
     let betaModalDismissed = false;
