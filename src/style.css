@@ -168,7 +168,7 @@ body.force-hide-ui, body.controls-hidden {
 }
 
 .start-card {
-  text-align: center; max-width: 440px; width: 90%; padding: 48px 36px;
+  text-align: center; max-width: 660px; width: 90%; padding: 48px 36px;
   background: var(--bg-secondary);
   border: 1px solid var(--border-subtle); border-radius: var(--radius-xl);
   box-shadow: var(--shadow-soft); animation: slideUp 0.7s ease;
@@ -193,9 +193,17 @@ body.force-hide-ui, body.controls-hidden {
 }
 .start-sources { margin-bottom: 24px; }
 .start-sources h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 16px; font-weight: 500; }
+.start-sources-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.start-grid-divider {
+  grid-column: 1 / -1;
+  font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--text-muted); font-weight: 500; text-align: center;
+  padding-top: 14px; margin-top: 4px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
 
 .source-btn {
-  display: flex; align-items: center; gap: 14px; width: 100%; padding: 16px 20px; margin-bottom: 10px;
+  display: flex; align-items: center; gap: 12px; width: 100%; padding: 16px 16px; margin-bottom: 0;
   background: var(--bg-elevated); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
   color: var(--text-primary); cursor: pointer; transition: all var(--transition-normal); text-align: left; font-family: var(--font);
 }
@@ -1110,6 +1118,7 @@ kbd {
 @media (max-width: 600px) {
   .start-card { padding: 32px 24px; }
   .start-card h1 { font-size: 1.8rem; }
+  .start-sources-grid { grid-template-columns: 1fr; }
   .control-bar-inner { gap: 4px; padding: 8px 10px; }
   .preset-info { display: none; }
   .ctrl-btn { padding: 6px; }

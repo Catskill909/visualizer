@@ -36,27 +36,43 @@
       <div class="start-sources">
         <h2>Choose Audio Source</h2>
 
-        <button id="btn-mic" class="source-btn" type="button">
-          <span class="source-icon">🎙️</span>
-          <span class="source-label">Live Audio</span>
-          <span class="source-desc">Mic, Line-In, or USB Controller</span>
-        </button>
+        <div class="start-sources-grid">
+          <button id="btn-mic" class="source-btn" type="button">
+            <span class="source-icon">🎙️</span>
+            <div>
+              <span class="source-label">Live Audio</span>
+              <span class="source-desc">Mic, Line-In, or USB Controller</span>
+            </div>
+          </button>
 
-        <button id="btn-file" class="source-btn" type="button">
-          <span class="source-icon">🎵</span>
-          <span class="source-label">Audio File</span>
-          <span class="source-desc">Load an MP3, WAV, or FLAC</span>
-        </button>
+          <button id="btn-file" class="source-btn" type="button">
+            <span class="source-icon">🎵</span>
+            <div>
+              <span class="source-label">Audio File</span>
+              <span class="source-desc">Load an MP3, WAV, or FLAC</span>
+            </div>
+          </button>
+
+          <div class="start-grid-divider">Creative Tools</div>
+
+          <button id="btn-preset-studio" class="source-btn source-btn--studio" type="button">
+            <span class="source-icon">🎛️</span>
+            <div>
+              <span class="source-label">Preset Studio</span>
+              <span class="source-desc">Build audio-reactive visuals from scratch</span>
+            </div>
+          </button>
+
+          <button id="btn-timeline" class="source-btn source-btn--studio" type="button">
+            <span class="source-icon">🎬</span>
+            <div>
+              <span class="source-label">Timeline Editor</span>
+              <span class="source-desc">Sequence presets into a live show</span>
+            </div>
+          </button>
+        </div>
 
         <input type="file" id="file-input" accept="audio/*" hidden />
-      </div>
-
-      <div class="start-sources" style="margin-top:12px;border-top:1px solid rgba(255,255,255,0.08);padding-top:16px">
-        <button id="btn-preset-studio" class="source-btn source-btn--studio" type="button">
-          <span class="source-icon">🎛️</span>
-          <span class="source-label">Preset Studio</span>
-          <span class="source-desc">Build audio-reactive visuals from scratch</span>
-        </button>
       </div>
 
       <p class="start-hint">Requires WebGL 2 • Works best in Chrome or Firefox</p>
@@ -460,6 +476,7 @@
           <button class="welcome-rail-btn" type="button" role="tab" data-section="cycling">Auto-Cycling</button>
           <button class="welcome-rail-btn" type="button" role="tab" data-section="performance">Live Performance</button>
           <button class="welcome-rail-btn" type="button" role="tab" data-section="studio">Preset Studio</button>
+          <button class="welcome-rail-btn" type="button" role="tab" data-section="timeline">Timeline Editor</button>
           <button class="welcome-rail-btn" type="button" role="tab" data-section="reactivity">Reactivity</button>
           <button class="welcome-rail-btn" type="button" role="tab" data-section="shortcuts">Shortcuts</button>
           <button class="welcome-rail-btn" type="button" role="tab" data-section="tips">Tips</button>
@@ -474,6 +491,7 @@
               <li><strong>1,144 bundled presets</strong> — from subtle ambient washes to peak-hour chaos.</li>
               <li><strong>Live performance suite</strong> — Auto-Gain, Kick-Lock, Energy slider, and instant "Hype Keys" for DJs and VJs.</li>
               <li><strong>Build your own visuals</strong> — the Preset Studio lets you design reactive presets from scratch, no code.</li>
+              <li><strong>Sequence a live show</strong> — the Timeline Editor lets you arrange presets across time and across multiple screen zones, then play them back as a scripted performance.</li>
             </ul>
             <p class="welcome-note">Pick a section on the left to dive deeper, or press a button on the start screen to jump in.</p>
           </section>
@@ -612,6 +630,51 @@
                 <li><strong>Save</strong> — writes to your browser (localStorage + IndexedDB for images). Saved presets appear in the <em>My Presets</em> tab of the main app.</li>
                 <li><strong>Dev HUD</strong> — press <kbd>`</kbd> (backtick) to overlay frame time, estimated VRAM, active layer count, and last shader rebuild time.</li>
               </ul>
+            </div>
+          </section>
+
+          <!-- Timeline Editor -->
+          <section class="welcome-section" data-section="timeline" role="tabpanel">
+            <h4>Timeline Editor</h4>
+            <p>A dedicated page for scripting a full live show. Arrange presets into timed blocks on a horizontal strip, then hit Play — the visualizer runs your sequence automatically. Launch it from the start screen or press <kbd>L</kbd> from inside the main app.</p>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Timelines & Blocks</div>
+              <p>A timeline is a playlist of preset blocks, each with a fixed start time, duration, and blend-in transition. Blocks sit on a scrollable strip — drag them to any position, resize their right edge to change duration, or drop them into any gap. Multiple timelines can be saved and switched between.</p>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Zones — Multiple Screen Regions</div>
+              <p>Split the canvas into up to four simultaneous regions, each running its own preset independently. Six predefined layouts are available:</p>
+              <ul class="welcome-list">
+                <li><strong>Full Screen</strong> — single zone, whole canvas.</li>
+                <li><strong>Left | Right</strong> — two side-by-side halves.</li>
+                <li><strong>Top / Bottom</strong> — two stacked halves.</li>
+                <li><strong>4 Quadrants</strong> — four equal tiles.</li>
+                <li><strong>Center + Frame</strong> — a framing overlay blended over the main canvas.</li>
+                <li><strong>Top Banner</strong> — a horizontal strip blended above the main canvas.</li>
+              </ul>
+              <p>Click <strong>⊞ Zones</strong> in the transport bar to pick a layout. Each zone gets its own row in the strip. All zones share the same audio signal.</p>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Playback & Seeking</div>
+              <p>Press Play to start all zones simultaneously from t=0. Click anywhere on the ruler to seek — all zones restart from that point in sync. Enable Loop to repeat the full sequence automatically. The playhead advances in real time and can be watched while the visualizer plays full-screen behind the strip.</p>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Adding & Editing Blocks</div>
+              <p>Click <strong>+ Add Preset</strong> in the transport, or the <strong>+</strong> button on any zone row, to open the preset picker (All / Favorites / My Presets tabs with search). Each block has three inline action buttons on hover — Edit, Duplicate, Delete — plus a right-click context menu. The Edit popover lets you set Duration (5–600 s), Blend time (0–10 s), and an optional text Label.</p>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Saving & Managing Timelines</div>
+              <p>New timelines are held in memory until you click <strong>Save</strong>. Once saved, the button dims to <em>Saved</em> and shows a dot whenever you have unsaved changes. Use <strong>+ New</strong> to start fresh, or the dropdown to switch between saved timelines (a discard prompt fires if you have unsaved edits). Copy / Paste JSON buttons let you back up or share a timeline as text.</p>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Controls & Auto-hide</div>
+              <p>All overlays (topbar, transport, timeline strip) fade after 3.5 s of inactivity — the same pattern as the main app. The <strong>≡</strong> button in the top-right corner pins them permanently; click again to unpin. Press <kbd>T</kbd> to toggle the strip panel on and off without touching the mouse.</p>
             </div>
           </section>
 

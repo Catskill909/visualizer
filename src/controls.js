@@ -60,6 +60,7 @@ export class ControlPanel {
       presetCount: document.getElementById('preset-count'),
       btnCloseDrawer: document.getElementById('btn-close-drawer'),
       btnPresetStudio: document.getElementById('btn-preset-studio'),
+      btnTimeline: document.getElementById('btn-timeline'),
       btnOpenEditor: document.getElementById('btn-open-editor'),
       tabAll: document.getElementById('tab-all'),
       tabFavorites: document.getElementById('tab-favorites'),
@@ -197,6 +198,11 @@ export class ControlPanel {
     if (els.btnPresetStudio) {
       els.btnPresetStudio.addEventListener('click', () => {
         window.location.href = '/editor.html';
+      });
+    }
+    if (els.btnTimeline) {
+      els.btnTimeline.addEventListener('click', () => {
+        window.location.href = '/timeline.html';
       });
     }
     // --- Preset Studio (editor) --- control bar button
