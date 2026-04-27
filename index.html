@@ -77,10 +77,11 @@
       <p class="start-hint">Requires WebGL 2 • Works best in Chrome or Firefox</p>
 
       <button id="btn-welcome-help" class="welcome-help-btn" type="button">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
-          <circle cx="12" cy="12" r="10"/>
-          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
-          <line x1="12" y1="17" x2="12.01" y2="17"/>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+          stroke-linejoin="round" width="14" height="14">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
         </svg>
         <span>User Guide</span>
       </button>
@@ -252,7 +253,8 @@
       <div class="control-section">
         <button id="btn-open-editor" class="ctrl-btn" data-tooltip="Open Preset Studio (E)" type="button">
           <svg viewBox="0 0 24 24" fill="currentColor">
-            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+            <path
+              d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
           </svg>
         </button>
       </div>
@@ -333,12 +335,20 @@
       </div>
     </div>
     <div id="backup-bar" class="backup-bar hidden">
-      <button id="btn-export-all" class="backup-btn" type="button" data-tooltip="Download a JSON backup of every custom preset (images included)">
-        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3a1 1 0 0 1 1 1v9.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42L11 13.6V4a1 1 0 0 1 1-1zM5 19a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H6a1 1 0 0 1-1-1z"/></svg>
+      <button id="btn-export-all" class="backup-btn" type="button"
+        data-tooltip="Download a JSON backup of every custom preset (images included)">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path
+            d="M12 3a1 1 0 0 1 1 1v9.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42L11 13.6V4a1 1 0 0 1 1-1zM5 19a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H6a1 1 0 0 1-1-1z" />
+        </svg>
         <span>Back up <span id="backup-count">0</span></span>
       </button>
-      <button id="btn-import-presets" class="backup-btn" type="button" data-tooltip="Restore presets from a backup file">
-        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21a1 1 0 0 1-1-1v-9.59l-3.3 3.3a1 1 0 1 1-1.4-1.42l5-5a1 1 0 0 1 1.4 0l5 5a1 1 0 1 1-1.4 1.42L13 10.4V20a1 1 0 0 1-1 1zM5 5a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H6a1 1 0 0 1-1-1z"/></svg>
+      <button id="btn-import-presets" class="backup-btn" type="button"
+        data-tooltip="Restore presets from a backup file">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path
+            d="M12 21a1 1 0 0 1-1-1v-9.59l-3.3 3.3a1 1 0 1 1-1.4-1.42l5-5a1 1 0 0 1 1.4 0l5 5a1 1 0 1 1-1.4 1.42L13 10.4V20a1 1 0 0 1-1 1zM5 5a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H6a1 1 0 0 1-1-1z" />
+        </svg>
         <span>Restore</span>
       </button>
       <input id="import-file-input" type="file" accept="application/json,.json" class="hidden" />
@@ -362,7 +372,8 @@
   <div id="delete-preset-modal" class="modal hidden">
     <div class="modal-dialog">
       <h3>Delete preset?</h3>
-      <p>"<span id="delete-preset-name"></span>" will be permanently removed, along with any images it references. This can't be undone.</p>
+      <p>"<span id="delete-preset-name"></span>" will be permanently removed, along with any images it references. This
+        can't be undone.</p>
       <div class="modal-actions">
         <button id="btn-cancel-delete-preset" class="text-btn" type="button">Cancel</button>
         <button id="btn-confirm-delete-preset" class="primary-btn" type="button">Delete</button>
@@ -462,7 +473,8 @@
         </div>
         <button id="btn-close-welcome" class="ctrl-btn" type="button" data-tooltip="Close (Esc)">
           <svg viewBox="0 0 24 24" fill="currentColor">
-            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+            <path
+              d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
           </svg>
         </button>
       </div>
@@ -485,14 +497,19 @@
           <!-- Welcome -->
           <section class="welcome-section active" data-section="welcome" role="tabpanel">
             <h4>Welcome to The DiscoCast Visualizer</h4>
-            <p>A modern browser-based music visualizer powered by the Winamp MilkDrop engine (Butterchurn / WebGL). Turn any audio source into a full-screen reactive light show.</p>
+            <p>A modern browser-based music visualizer powered by the Winamp MilkDrop engine (Butterchurn / WebGL). Turn
+              any audio source into a full-screen reactive light show.</p>
             <ul class="welcome-list">
               <li><strong>1,144 bundled presets</strong> — from subtle ambient washes to peak-hour chaos.</li>
-              <li><strong>Live performance suite</strong> — Auto-Gain, Kick-Lock, Energy slider, and instant "Hype Keys" for DJs and VJs.</li>
-              <li><strong>Build your own visuals</strong> — the Preset Studio lets you design reactive presets from scratch, no code.</li>
-              <li><strong>Sequence a live show</strong> — the Timeline Editor lets you arrange presets across time and across multiple screen zones, then play them back as a scripted performance.</li>
+              <li><strong>Live performance suite</strong> — Auto-Gain, Kick-Lock, Energy slider, and instant "Hype Keys"
+                for DJs and VJs.</li>
+              <li><strong>Build your own visuals</strong> — the Preset Studio lets you design reactive presets from
+                scratch, no code.</li>
+              <li><strong>Sequence a live show</strong> — the Timeline Editor lets you arrange presets across time and
+                across multiple screen zones, then play them back as a scripted performance.</li>
             </ul>
-            <p class="welcome-note">Pick a section on the left to dive deeper, or press a button on the start screen to jump in.</p>
+            <p class="welcome-note">Pick a section on the left to dive deeper, or press a button on the start screen to
+              jump in.</p>
           </section>
 
           <!-- Audio Sources -->
@@ -502,25 +519,31 @@
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Live Audio</div>
-              <p>Uses your microphone, line-in, or any connected USB device (DJ controllers, audio interfaces). When you pick Live Audio, a device selector appears so you can choose the exact input.</p>
-              <p class="welcome-hint">Requires <strong>localhost</strong> or <strong>HTTPS</strong> and microphone permission in your browser.</p>
+              <p>Uses your microphone, line-in, or any connected USB device (DJ controllers, audio interfaces). When you
+                pick Live Audio, a device selector appears so you can choose the exact input.</p>
+              <p class="welcome-hint">Requires <strong>localhost</strong> or <strong>HTTPS</strong> and microphone
+                permission in your browser.</p>
             </div>
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Audio File</div>
-              <p>Load a local <strong>MP3, WAV, or FLAC</strong>. You get a transport bar with play/pause, seek, and volume. File audio is split two ways: one path to your speakers, one to the visualizer (with a 5× sensitivity boost to make visuals pop).</p>
+              <p>Load a local <strong>MP3, WAV, or FLAC</strong>. You get a transport bar with play/pause, seek, and
+                volume. File audio is split two ways: one path to your speakers, one to the visualizer (with a 5×
+                sensitivity boost to make visuals pop).</p>
             </div>
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Preset Studio</div>
-              <p>Skip the visualizer entirely and go straight into the creative editor to design your own presets from scratch. See the <em>Preset Studio</em> section for details.</p>
+              <p>Skip the visualizer entirely and go straight into the creative editor to design your own presets from
+                scratch. See the <em>Preset Studio</em> section for details.</p>
             </div>
           </section>
 
           <!-- Browsing Presets -->
           <section class="welcome-section" data-section="presets" role="tabpanel">
             <h4>Browsing the Preset Library</h4>
-            <p>Open the drawer with the list icon in the bottom bar or press <kbd>P</kbd>. Everything about the library lives here.</p>
+            <p>Open the drawer with the list icon in the bottom bar or press <kbd>P</kbd>. Everything about the library
+              lives here.</p>
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Search &amp; Tabs</div>
@@ -534,28 +557,36 @@
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Favorites &amp; Hiding</div>
-              <p>Hover a row in the drawer to reveal two icons: a <span class="welcome-swatch welcome-swatch--heart">♥</span> heart (favorite) and a <span class="welcome-swatch welcome-swatch--hide">⊘</span> eye-slash (hide). On the currently-playing preset, press <kbd>S</kbd> to favorite or <kbd>X</kbd> to hide.</p>
-              <p>Hidden presets disappear from the All tab, random picks, and auto-cycle. Toggle <em>Show hidden</em> at the top of the drawer to bring them back — individually, or via <em>Unhide all</em>.</p>
+              <p>Hover a row in the drawer to reveal two icons: a <span
+                  class="welcome-swatch welcome-swatch--heart">♥</span> heart (favorite) and a <span
+                  class="welcome-swatch welcome-swatch--hide">⊘</span> eye-slash (hide). On the currently-playing
+                preset, press <kbd>S</kbd> to favorite or <kbd>X</kbd> to hide.</p>
+              <p>Hidden presets disappear from the All tab, random picks, and auto-cycle. Toggle <em>Show hidden</em> at
+                the top of the drawer to bring them back — individually, or via <em>Unhide all</em>.</p>
             </div>
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Navigating</div>
-              <p><kbd>←</kbd> / <kbd>→</kbd> step through the full library. Arrow keys always navigate the complete library, even when favorites-only cycling is on — so you can always explore.</p>
+              <p><kbd>←</kbd> / <kbd>→</kbd> step through the full library. Arrow keys always navigate the complete
+                library, even when favorites-only cycling is on — so you can always explore.</p>
             </div>
           </section>
 
           <!-- Auto-Cycling -->
           <section class="welcome-section" data-section="cycling" role="tabpanel">
             <h4>Auto-Cycling</h4>
-            <p>Let the app rotate through presets automatically. Click the cycle icon in the control bar (or press <kbd>C</kbd>) to open the Cycling popover.</p>
+            <p>Let the app rotate through presets automatically. Click the cycle icon in the control bar (or press
+              <kbd>C</kbd>) to open the Cycling popover.</p>
 
             <ul class="welcome-list">
               <li><strong>Auto-cycle</strong> — on/off. Default interval is 30s.</li>
               <li><strong>Random order</strong> — shuffle vs. sequential.</li>
-              <li><strong>Favorites only</strong> — restrict the cycle pool to your hearted presets. Perfect for live sets — curate once, cycle through the night.</li>
+              <li><strong>Favorites only</strong> — restrict the cycle pool to your hearted presets. Perfect for live
+                sets — curate once, cycle through the night.</li>
               <li><strong>Blend time</strong> — how long transitions take.</li>
             </ul>
-            <p class="welcome-hint">If <em>Favorites only</em> is on but you haven't saved any, the cycle silently falls back to the full library so you're never stuck on a blank screen.</p>
+            <p class="welcome-hint">If <em>Favorites only</em> is on but you haven't saved any, the cycle silently falls
+              back to the full library so you're never stuck on a blank screen.</p>
           </section>
 
           <!-- Live Performance -->
@@ -567,8 +598,10 @@
               <div class="welcome-feature-title">Audio Tuning (press <kbd>T</kbd>)</div>
               <ul class="welcome-list">
                 <li><strong>Energy slider</strong> — master visual sensitivity, 0.2× to 5×.</li>
-                <li><strong>Auto-Gain (AGC)</strong> — dynamic normalization so visuals stay "hype" regardless of input volume. <kbd>A</kbd> toggles it. On by default.</li>
-                <li><strong>Kick-Lock</strong> — low-pass filter at 150 Hz locks visuals to the kick drum only. <kbd>K</kbd> toggles it.</li>
+                <li><strong>Auto-Gain (AGC)</strong> — dynamic normalization so visuals stay "hype" regardless of input
+                  volume. <kbd>A</kbd> toggles it. On by default.</li>
+                <li><strong>Kick-Lock</strong> — low-pass filter at 150 Hz locks visuals to the kick drum only.
+                  <kbd>K</kbd> toggles it.</li>
                 <li><strong>Hold Shift</strong> — momentary 2× boost for drops. Silent — doesn't reveal the UI.</li>
               </ul>
             </div>
@@ -586,61 +619,90 @@
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Auto-hiding control bar</div>
-              <p>The bottom bar fades after 3 seconds of inactivity but stays visible while you hover or while a popover is open. Move the mouse to bring it back.</p>
+              <p>The bottom bar fades after 3 seconds of inactivity but stays visible while you hover or while a popover
+                is open. Move the mouse to bring it back.</p>
             </div>
           </section>
 
           <!-- Preset Studio -->
           <section class="welcome-section" data-section="studio" role="tabpanel">
             <h4>Preset Studio</h4>
-            <p>A standalone creative editor for building your own audio-reactive visuals. Launch it from the start screen — it opens on its own page with a live canvas on the left and an inspector panel on the right. Every control is live; no page reload.</p>
+            <p>A standalone creative editor for building your own audio-reactive visuals. Launch it from the start
+              screen — it opens on its own page with a live canvas on the left and an inspector panel on the right.
+              Every control is live; no page reload.</p>
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Five tabs</div>
               <ul class="welcome-list">
-                <li><strong>Palette</strong> — base variations (Color, Solid Color, Pulse/Breath, Color Shift, Clear, Drift, and more), 12 one-click color palettes, three independent color swatches (Wave / Glow / Accent).</li>
+                <li><strong>Palette</strong> — base variations (Color, Solid Color, Pulse/Breath, Color Shift, Clear,
+                  Drift, and more), 12 one-click color palettes, three independent color swatches (Wave / Glow /
+                  Accent).</li>
                 <li><strong>Motion</strong> — Zoom, Rotation, Warp amount &amp; speed, Echo controls.</li>
                 <li><strong>Wave</strong> — 8 wave shapes, size, opacity, thickness, dots, additive blend.</li>
                 <li><strong>Feel</strong> — Decay (trail length), Gamma (brightness), warp scale/speed.</li>
-                <li><strong>Images</strong> — up to 5 animated image or GIF layers with full reactivity and mirror controls (see below).</li>
+                <li><strong>Images</strong> — up to 5 animated image or GIF layers with full reactivity and mirror
+                  controls (see below).</li>
               </ul>
             </div>
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Image Layers</div>
-              <p>Add up to 5 image or GIF layers in a collapsible smart-accordion stack. Drag any card to reorder. Each layer has:</p>
+              <p>Add up to 5 image or GIF layers in a collapsible smart-accordion stack. Drag any card to reorder. Each
+                layer has:</p>
               <ul class="welcome-list">
                 <li><strong>Solo / Mute</strong> — audition one layer in isolation or hide it without deleting.</li>
-                <li><strong>Animation</strong> — Tile, Spin, Orbit (Circle or Lissajous path), Tunnel zoom, Bounce (beat-lift), Sway, Wander, <strong>Pan</strong>, and a draggable XY anchor point.</li>
-                <li><strong>Beat Fade / Pulse / Strobe</strong> — audio drives opacity (smooth fade or hard strobe cut) and size on every beat.</li>
-                <li><strong>Mirror</strong> — Off, Horizontal, Vertical, Quad, or Kaleido (6-slice polar fold). Apply per tile or across the whole field.</li>
-                <li><strong>Canvas Mirror</strong> — folds the entire rendered scene horizontally, vertically, or both.</li>
-                <li><strong>Tint &amp; Hue Spin</strong> — colorize any layer and animate it through a spinning hue cycle.</li>
-                <li><strong>Audio Reactivity</strong> — per layer, choose which audio band drives reactive controls: Bass, Mid, Treble, or Volume. Shape the response with Linear, Squared, Cubed, or Gate curves.</li>
-                <li><strong>HD uploads</strong> — toggle before uploading to resize at 2048 px (default is 1024 px).</li>
+                <li><strong>Animation</strong> — Tile, Spin, Orbit (Circle or Lissajous path), Tunnel zoom, Bounce
+                  (beat-lift), Sway, Wander, <strong>Pan</strong>, and a draggable XY anchor point.</li>
+                <li><strong>Beat Fade / Pulse / Strobe</strong> — audio drives opacity (smooth fade or hard strobe cut)
+                  and size on every beat.</li>
+                <li><strong>Mirror</strong> — Off, Horizontal, Vertical, Quad, or Kaleido (6-slice polar fold). Apply
+                  per tile or across the whole field.</li>
+                <li><strong>Canvas Mirror</strong> — folds the entire rendered scene horizontally, vertically, or both.
+                </li>
+                <li><strong>Tint &amp; Hue Spin</strong> — colorize any layer and animate it through a spinning hue
+                  cycle.</li>
+                <li><strong>Audio Reactivity</strong> — per layer, choose which audio band drives reactive controls:
+                  Bass, Mid, Treble, or Volume. Shape the response with Linear, Squared, Cubed, or Gate curves.</li>
+                <li><strong>HD uploads</strong> — toggle before uploading to resize at 2048 px (default is 1024 px).
+                </li>
               </ul>
             </div>
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Animated GIFs</div>
-              <p>Drop a <strong>.gif</strong> file into any image-layer slot and it animates inside the visualizer — not as an overlay, but as a real texture, so every layer effect (tile, mirror, spin, orbit, beat-pulse, hue spin, blend mode, etc.) applies to the GIF on every frame.</p>
+              <p>Drop a <strong>.gif</strong> file into any image-layer slot and it animates inside the visualizer — not
+                as an overlay, but as a real texture, so every layer effect (tile, mirror, spin, orbit, beat-pulse, hue
+                spin, blend mode, etc.) applies to the GIF on every frame.</p>
               <ul class="welcome-list">
-                <li><strong>Speed slider</strong> — top of every GIF layer card. Range 0.25× to 4×; default 1.2× (most GIFs feel a touch slow at native speed). Drag live, no reload.</li>
-                <li><strong>Native frame timing</strong> — each GIF's per-frame delays are honoured at 1×, then divided by the speed multiplier. Long-delay GIFs (10 fps memes) and short-delay ones (smooth animation) both behave naturally.</li>
-                <li><strong>Stack with effects</strong> — try a GIF with Tile + Mirror Kaleido + Hue Spin for psychedelic results, or pair Beat Fade with a low speed for a strobe-feel.</li>
-                <li><strong>Saved with the preset</strong> — speed is persisted, so loading a saved preset restores the exact playback rate you set.</li>
-                <li><strong>File size</strong> — GIFs are stored uncompressed once decoded; very large or long GIFs can use significant memory. Trim or downsize beforehand if you hit limits.</li>
+                <li><strong>Speed slider</strong> — top of every GIF layer card. Range 0.25× to 4×; default 1.2× (most
+                  GIFs feel a touch slow at native speed). Drag live, no reload.</li>
+                <li><strong>Native frame timing</strong> — each GIF's per-frame delays are honoured at 1×, then divided
+                  by the speed multiplier. Long-delay GIFs (10 fps memes) and short-delay ones (smooth animation) both
+                  behave naturally.</li>
+                <li><strong>Stack with effects</strong> — try a GIF with Tile + Mirror Kaleido + Hue Spin for
+                  psychedelic results, or pair Beat Fade with a low speed for a strobe-feel.</li>
+                <li><strong>Saved with the preset</strong> — speed is persisted, so loading a saved preset restores the
+                  exact playback rate you set.</li>
+                <li><strong>File size</strong> — GIFs are stored uncompressed once decoded; very large or long GIFs can
+                  use significant memory. Trim or downsize beforehand if you hit limits.</li>
               </ul>
             </div>
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Pan — Left/Right &amp; Up/Down Translation</div>
-              <p>Each image layer has a <strong>Pan</strong> section (below Wander) for deliberate whole-group translation. When a layer is tiled, Pan always moves the entire grid as one — the pattern scrolls seamlessly at the wrap edge, never individual tiles.</p>
+              <p>Each image layer has a <strong>Pan</strong> section (below Wander) for deliberate whole-group
+                translation. When a layer is tiled, Pan always moves the entire grid as one — the pattern scrolls
+                seamlessly at the wrap edge, never individual tiles.</p>
               <ul class="welcome-list">
-                <li><strong>Drift</strong> — continuous linear travel. Set X and/or Y speed (−2 to +2 UV/sec, signed so negative reverses direction). With Tile ON this creates an endless scroll — logo parade, star-field drift, ticker. With Tile OFF the image slides off-canvas.</li>
-                <li><strong>Bounce</strong> — ping-pong between extremes. X and Y speeds set the oscillation rate independently; Range sets the half-amplitude. Effectively a 2D Sway with full axis control.</li>
-                <li><strong>Composes freely</strong> — Pan stacks additively on top of Sway, Wander, and Orbit. Try Drift X + Orbit for a spiraling scroll, or Bounce Y + Sway for a figure-eight wobble.</li>
-                <li><strong>Saved with the preset</strong> — mode, speeds, and range all persist in the preset JSON.</li>
+                <li><strong>Drift</strong> — continuous linear travel. Set X and/or Y speed (−2 to +2 UV/sec, signed so
+                  negative reverses direction). With Tile ON this creates an endless scroll — logo parade, star-field
+                  drift, ticker. With Tile OFF the image slides off-canvas.</li>
+                <li><strong>Bounce</strong> — ping-pong between extremes. X and Y speeds set the oscillation rate
+                  independently; Range sets the half-amplitude. Effectively a 2D Sway with full axis control.</li>
+                <li><strong>Composes freely</strong> — Pan stacks additively on top of Sway, Wander, and Orbit. Try
+                  Drift X + Orbit for a spiraling scroll, or Bounce Y + Sway for a figure-eight wobble.</li>
+                <li><strong>Saved with the preset</strong> — mode, speeds, and range all persist in the preset JSON.
+                </li>
               </ul>
             </div>
 
@@ -649,8 +711,10 @@
               <ul class="welcome-list">
                 <li><strong>Undo / Redo</strong> — 50-deep stack. <kbd>⌘Z</kbd> / <kbd>⌘⇧Z</kbd>.</li>
                 <li><strong>A/B compare</strong> — hold the button to preview the saved state; release to restore.</li>
-                <li><strong>Save</strong> — writes to your browser (localStorage + IndexedDB for images). Saved presets appear in the <em>My Presets</em> tab of the main app.</li>
-                <li><strong>Dev HUD</strong> — press <kbd>`</kbd> (backtick) to overlay frame time, estimated VRAM, active layer count, and last shader rebuild time.</li>
+                <li><strong>Save</strong> — writes to your browser (localStorage + IndexedDB for images). Saved presets
+                  appear in the <em>My Presets</em> tab of the main app.</li>
+                <li><strong>Dev HUD</strong> — press <kbd>`</kbd> (backtick) to overlay frame time, estimated VRAM,
+                  active layer count, and last shader rebuild time.</li>
               </ul>
             </div>
           </section>
@@ -658,16 +722,21 @@
           <!-- Timeline Editor -->
           <section class="welcome-section" data-section="timeline" role="tabpanel">
             <h4>Timeline Editor</h4>
-            <p>A dedicated page for scripting a full live show. Arrange presets into timed blocks on a horizontal strip, then hit Play — the visualizer runs your sequence automatically. Launch it from the start screen or press <kbd>L</kbd> from inside the main app.</p>
+            <p>A dedicated page for scripting a full live show. Arrange presets into timed blocks on a horizontal strip,
+              then hit Play — the visualizer runs your sequence automatically. Launch it from the start screen or press
+              <kbd>L</kbd> from inside the main app.</p>
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Timelines & Blocks</div>
-              <p>A timeline is a playlist of preset blocks, each with a fixed start time, duration, and blend-in transition. Blocks sit on a scrollable strip — drag them to any position, resize their right edge to change duration, or drop them into any gap. Multiple timelines can be saved and switched between.</p>
+              <p>A timeline is a playlist of preset blocks, each with a fixed start time, duration, and blend-in
+                transition. Blocks sit on a scrollable strip — drag them to any position, resize their right edge to
+                change duration, or drop them into any gap. Multiple timelines can be saved and switched between.</p>
             </div>
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Zones — Multiple Screen Regions</div>
-              <p>Split the canvas into up to four simultaneous regions, each running its own preset independently. Six predefined layouts are available:</p>
+              <p>Split the canvas into up to four simultaneous regions, each running its own preset independently. Six
+                predefined layouts are available:</p>
               <ul class="welcome-list">
                 <li><strong>Full Screen</strong> — single zone, whole canvas.</li>
                 <li><strong>Left | Right</strong> — two side-by-side halves.</li>
@@ -676,79 +745,119 @@
                 <li><strong>Center + Frame</strong> — a framing overlay blended over the main canvas.</li>
                 <li><strong>Top Banner</strong> — a horizontal strip blended above the main canvas.</li>
               </ul>
-              <p>Click <strong>⊞ Zones</strong> in the transport bar to pick a layout. Each zone gets its own row in the strip. All zones share the same audio signal.</p>
+              <p>Click <strong>⊞ Zones</strong> in the transport bar to pick a layout. Each zone gets its own row in the
+                strip. All zones share the same audio signal.</p>
             </div>
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Playback & Seeking</div>
-              <p>Press Play to start all zones simultaneously from t=0. Click anywhere on the ruler to seek — all zones restart from that point in sync. Enable Loop to repeat the full sequence automatically. The playhead advances in real time and can be watched while the visualizer plays full-screen behind the strip.</p>
+              <p>Press Play to start all zones simultaneously from t=0. Click anywhere on the ruler to seek — all zones
+                restart from that point in sync. Enable Loop to repeat the full sequence automatically. The playhead
+                advances in real time and can be watched while the visualizer plays full-screen behind the strip.</p>
             </div>
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Adding & Editing Blocks</div>
-              <p>Click <strong>+ Add Preset</strong> in the transport, or the <strong>+</strong> button on any zone row, to open the preset picker (All / Favorites / My Presets tabs with search). Each block has three inline action buttons on hover — Edit, Duplicate, Delete — plus a right-click context menu. The Edit popover lets you set Duration (5–600 s), Blend time (0–10 s), and an optional text Label.</p>
+              <p>Click <strong>+ Add Preset</strong> in the transport, or the <strong>+</strong> button on any zone row,
+                to open the preset picker (All / Favorites / My Presets tabs with search). Each block has three inline
+                action buttons on hover — Edit, Duplicate, Delete — plus a right-click context menu. The Edit popover
+                lets you set Duration (5–600 s), Blend time (0–10 s), and an optional text Label.</p>
             </div>
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Saving & Managing Timelines</div>
-              <p>New timelines are held in memory until you click <strong>Save</strong>. Once saved, the button dims to <em>Saved</em> and shows a dot whenever you have unsaved changes. Use <strong>+ New</strong> to start fresh, or the dropdown to switch between saved timelines (a discard prompt fires if you have unsaved edits). Copy / Paste JSON buttons let you back up or share a timeline as text.</p>
+              <p>New timelines are held in memory until you click <strong>Save</strong>. Once saved, the button dims to
+                <em>Saved</em> and shows a dot whenever you have unsaved changes. Use <strong>+ New</strong> to start
+                fresh, or the dropdown to switch between saved timelines (a discard prompt fires if you have unsaved
+                edits). Copy / Paste JSON buttons let you back up or share a timeline as text.</p>
             </div>
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Controls & Auto-hide</div>
-              <p>All overlays (topbar, transport, timeline strip) fade after 3.5 s of inactivity — the same pattern as the main app. The <strong>≡</strong> button in the top-right corner pins them permanently; click again to unpin. Press <kbd>T</kbd> to toggle the strip panel on and off without touching the mouse.</p>
+              <p>All overlays (topbar, transport, timeline strip) fade after 3.5 s of inactivity — the same pattern as
+                the main app. The <strong>≡</strong> button in the top-right corner pins them permanently; click again
+                to unpin. Press <kbd>T</kbd> to toggle the strip panel on and off without touching the mouse.</p>
             </div>
           </section>
 
           <!-- Reactivity -->
           <section class="welcome-section" data-section="reactivity" role="tabpanel">
             <h4>Reactivity &amp; Audio Controls</h4>
-            <p>Every image layer has a <strong>Reactivity</strong> panel at the bottom of its card. The two settings there — <em>Source</em> and <em>Curve</em> — are the dial behind the dial. They shape the single audio signal that drives <strong>all four reactive controls</strong> on that layer: Pulse, Bounce, Beat Fade, and Strobe.</p>
+            <p>Every image layer has a <strong>Reactivity</strong> panel at the bottom of its card. The two settings
+              there — <em>Source</em> and <em>Curve</em> — are the dial behind the dial. They shape the single audio
+              signal that drives <strong>all four reactive controls</strong> on that layer: Pulse, Bounce, Beat Fade,
+              and Strobe.</p>
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Step 1 — Pick a Source</div>
               <p>Which frequency band feeds this layer's reactivity:</p>
               <ul class="welcome-list">
-                <li><strong>Bass</strong> (default) — sub and kick frequencies. The most punch-per-beat; most presets start here.</li>
+                <li><strong>Bass</strong> (default) — sub and kick frequencies. The most punch-per-beat; most presets
+                  start here.</li>
                 <li><strong>Mid</strong> — snare, vocals, guitars. Reacts on melodic and rhythmic hits mid-song.</li>
                 <li><strong>Treble</strong> — hi-hats, cymbals, air. Fast and bright; great for sparkle layers.</li>
-                <li><strong>Volume</strong> — total loudness across all bands. Tracks the overall energy of the mix.</li>
+                <li><strong>Volume</strong> — total loudness across all bands. Tracks the overall energy of the mix.
+                </li>
               </ul>
             </div>
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Step 2 — Shape the Curve</div>
-              <p>The curve transforms the raw signal before it reaches any control. A gentle signal becomes more dramatic — or more surgical:</p>
+              <p>The curve transforms the raw signal before it reaches any control. A gentle signal becomes more
+                dramatic — or more surgical:</p>
               <ul class="welcome-list">
-                <li><strong>Linear</strong> — signal passed as-is. Controls scale directly and evenly with audio level.</li>
-                <li><strong>Squared</strong> — quiet moments are suppressed; loud peaks hit harder. The most musical curve for most layers.</li>
-                <li><strong>Cubed</strong> — extreme contrast. Only the very loudest peaks drive any visible reaction.</li>
-                <li><strong>Gate</strong> — binary on/off at 30%. Below the threshold: zero. Above it: full signal. Controls either stay still or snap to maximum.</li>
+                <li><strong>Linear</strong> — signal passed as-is. Controls scale directly and evenly with audio level.
+                </li>
+                <li><strong>Squared</strong> — quiet moments are suppressed; loud peaks hit harder. The most musical
+                  curve for most layers.</li>
+                <li><strong>Cubed</strong> — extreme contrast. Only the very loudest peaks drive any visible reaction.
+                </li>
+                <li><strong>Gate</strong> — binary on/off at 30%. Below the threshold: zero. Above it: full signal.
+                  Controls either stay still or snap to maximum.</li>
               </ul>
             </div>
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">What Each Control Does With the Signal</div>
               <ul class="welcome-list">
-                <li><strong>Pulse</strong> — grows the layer size on every peak. The curve determines whether small beats cause any growth at all — Squared suppresses gentle hits, Cubed reserves the swell for the loudest moments only.</li>
-                <li><strong>Bounce</strong> — lifts the layer upward on beat. With a Gate curve it snaps up hard on kicks and drops instantly between them. With Linear it floats up and down with the groove.</li>
-                <li><strong>Beat Fade</strong> — adds opacity on beat. The layer appears or brightens with the audio, then fades back when the signal drops. Combines beautifully with low base Opacity so the layer is normally invisible and only materialises on hits.</li>
-                <li><strong>Strobe</strong> — unlike the others, Strobe reads the <em>raw</em> audio signal directly (before the Curve is applied) and compares it to its own Threshold slider. When the audio crosses the threshold, the layer's opacity hard-cuts to black — instantly. When the beat fades, it returns. This is a true strobe: no smooth ramp, just a sharp on/off flash driven by real beats.</li>
+                <li><strong>Pulse</strong> — grows the layer size on every peak. The curve determines whether small
+                  beats cause any growth at all — Squared suppresses gentle hits, Cubed reserves the swell for the
+                  loudest moments only.</li>
+                <li><strong>Bounce</strong> — lifts the layer upward on beat. With a Gate curve it snaps up hard on
+                  kicks and drops instantly between them. With Linear it floats up and down with the groove.</li>
+                <li><strong>Beat Fade</strong> — adds opacity on beat. The layer appears or brightens with the audio,
+                  then fades back when the signal drops. Combines beautifully with low base Opacity so the layer is
+                  normally invisible and only materialises on hits.</li>
+                <li><strong>Strobe</strong> — unlike the others, Strobe reads the <em>raw</em> audio signal directly
+                  (before the Curve is applied) and compares it to its own Threshold slider. When the audio crosses the
+                  threshold, the layer's opacity hard-cuts to black — instantly. When the beat fades, it returns. This
+                  is a true strobe: no smooth ramp, just a sharp on/off flash driven by real beats.</li>
               </ul>
             </div>
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Example Combos</div>
               <ul class="welcome-list">
-                <li><strong>Kick-lock flash</strong> — Source: Bass · Curve: Gate · Strobe: 1.0 · Threshold: 0.4 · Base Opacity: 0. The layer is invisible except on every hard kick, where it flashes at full opacity. Zero ambient light between beats.</li>
-                <li><strong>Melodic drift</strong> — Source: Mid · Curve: Squared · Bounce: medium. The layer lifts on snare or vocal hits, barely moves between them. Feels tied to the melody rather than the kick.</li>
-                <li><strong>Ambient breathing</strong> — Source: Volume · Curve: Linear · Beat Fade: 0.6 · Base Opacity: 0.2. The layer's opacity tracks the mix energy — bright during builds, dim during breakdowns. Feels alive without being distracting.</li>
-                <li><strong>Treble sparkle</strong> — Source: Treble · Curve: Cubed · Pulse: high. The layer explodes in size on hi-hat and cymbal peaks only. Everything below that frequency is invisible to it.</li>
-                <li><strong>Multi-layer stack</strong> — put two layers side by side: one on Bass/Squared driving Bounce, one on Treble/Cubed driving Pulse. They react to completely different parts of the music and never compete.</li>
+                <li><strong>Kick-lock flash</strong> — Source: Bass · Curve: Gate · Strobe: 1.0 · Threshold: 0.4 · Base
+                  Opacity: 0. The layer is invisible except on every hard kick, where it flashes at full opacity. Zero
+                  ambient light between beats.</li>
+                <li><strong>Melodic drift</strong> — Source: Mid · Curve: Squared · Bounce: medium. The layer lifts on
+                  snare or vocal hits, barely moves between them. Feels tied to the melody rather than the kick.</li>
+                <li><strong>Ambient breathing</strong> — Source: Volume · Curve: Linear · Beat Fade: 0.6 · Base Opacity:
+                  0.2. The layer's opacity tracks the mix energy — bright during builds, dim during breakdowns. Feels
+                  alive without being distracting.</li>
+                <li><strong>Treble sparkle</strong> — Source: Treble · Curve: Cubed · Pulse: high. The layer explodes in
+                  size on hi-hat and cymbal peaks only. Everything below that frequency is invisible to it.</li>
+                <li><strong>Multi-layer stack</strong> — put two layers side by side: one on Bass/Squared driving
+                  Bounce, one on Treble/Cubed driving Pulse. They react to completely different parts of the music and
+                  never compete.</li>
               </ul>
             </div>
 
-            <p class="welcome-hint">Tip: a layer with <strong>Strobe on and Beat Fade off</strong> feels like a strobe light. Flip it — <strong>Beat Fade on and Strobe off</strong> — and it feels like a soft glow that pulses with the music. Both use the same Reactivity panel; only the control you turn up changes the personality.</p>
+            <p class="welcome-hint">Tip: a layer with <strong>Strobe on and Beat Fade off</strong> feels like a strobe
+              light. Flip it — <strong>Beat Fade on and Strobe off</strong> — and it feels like a soft glow that pulses
+              with the music. Both use the same Reactivity panel; only the control you turn up changes the personality.
+            </p>
           </section>
 
           <!-- Keyboard Shortcuts -->
@@ -793,27 +902,33 @@
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Browser support</div>
-              <p>DiscoCast Visualizer needs <strong>WebGL 2</strong> and the <strong>Web Audio API</strong>. Works best in <strong>Chrome</strong> or <strong>Firefox</strong>. Safari works but some presets may render differently.</p>
+              <p>DiscoCast Visualizer needs <strong>WebGL 2</strong> and the <strong>Web Audio API</strong>. Works best
+                in <strong>Chrome</strong> or <strong>Firefox</strong>. Safari works but some presets may render
+                differently.</p>
             </div>
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Microphone access</div>
-              <p>Browsers only allow mic access on <strong>localhost</strong> or <strong>HTTPS</strong>. If the mic button fails, check the address bar for a blocked-permission icon and re-allow.</p>
+              <p>Browsers only allow mic access on <strong>localhost</strong> or <strong>HTTPS</strong>. If the mic
+                button fails, check the address bar for a blocked-permission icon and re-allow.</p>
             </div>
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Your data stays local</div>
-              <p>Favorites, hidden presets, and saved custom presets are all stored in your browser's localStorage (and IndexedDB for images). Nothing is uploaded — clearing site data resets everything.</p>
+              <p>Favorites, hidden presets, and saved custom presets are all stored in your browser's localStorage (and
+                IndexedDB for images). Nothing is uploaded — clearing site data resets everything.</p>
             </div>
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Performance</div>
-              <p>For the smoothest visuals on older machines, use <kbd>F</kbd> for fullscreen, close other tabs running video or WebGL, and prefer <em>file</em> input over <em>live</em> (less processing overhead).</p>
+              <p>For the smoothest visuals on older machines, use <kbd>F</kbd> for fullscreen, close other tabs running
+                video or WebGL, and prefer <em>file</em> input over <em>live</em> (less processing overhead).</p>
             </div>
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Projector / VJ setup</div>
-              <p>Press <kbd>H</kbd> to hide the UI completely for a clean feed, then <kbd>F</kbd> for fullscreen. Move the mouse to bring controls back.</p>
+              <p>Press <kbd>H</kbd> to hide the UI completely for a clean feed, then <kbd>F</kbd> for fullscreen. Move
+                the mouse to bring controls back.</p>
             </div>
           </section>
         </div>
