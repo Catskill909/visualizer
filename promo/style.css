@@ -258,6 +258,8 @@ a { color: inherit; text-decoration: none; }
 /* ── Hero ── */
 .hero {
   min-height: 100vh;
+  min-height: 100svh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;

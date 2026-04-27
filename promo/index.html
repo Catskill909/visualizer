@@ -135,7 +135,7 @@
       <div class="showcase reverse fade-in">
         <div class="showcase-visual showcase-visual-image-frame">
           <img src="./preset-editor.png" alt="Preset Studio editor showing custom visual controls and image layers"
-            class="showcase-image lightbox-trigger" width="1320" height="787">
+            class="showcase-image lightbox-trigger" width="1320" height="787" loading="lazy" decoding="async">
         </div>
         <div class="showcase-content">
           <div class="section-label">Preset Studio</div>
@@ -228,7 +228,7 @@
       <div class="showcase fade-in">
         <div class="showcase-visual showcase-visual-image-frame">
           <img src="./timeline-editor.png" alt="Timeline editor showing preset sequencing and zone compositor"
-            class="showcase-image lightbox-trigger" width="1320" height="787">
+            class="showcase-image lightbox-trigger" width="1320" height="787" loading="lazy" decoding="async">
         </div>
         <div class="showcase-content">
           <div class="section-label">Timeline Editor</div>
@@ -277,7 +277,7 @@
       <div class="showcase fade-in">
         <div class="showcase-visual showcase-visual-image-frame">
           <img src="./keyboard-controls.png" alt="Keyboard controls reference showing all shortcut keys"
-            class="showcase-image lightbox-trigger" width="1320" height="787">
+            class="showcase-image lightbox-trigger" width="1320" height="787" loading="lazy" decoding="async">
         </div>
         <div class="showcase-content">
           <div class="section-label">Controls</div>
@@ -415,30 +415,32 @@
     const lb = document.getElementById('lightbox');
     const lbImg = document.getElementById('lightbox-img');
 
-    document.querySelectorAll('.lightbox-trigger').forEach(img => {
-      img.addEventListener('click', () => {
-        lbImg.src = img.src;
-        lbImg.alt = img.alt;
-        lb.classList.add('open');
-        document.body.style.overflow = 'hidden';
+    if (lb && lbImg) {
+      document.querySelectorAll('.lightbox-trigger').forEach(img => {
+        img.addEventListener('click', () => {
+          lbImg.src = img.src;
+          lbImg.alt = img.alt;
+          lb.classList.add('open');
+          document.body.style.overflow = 'hidden';
+        });
       });
-    });
 
-    lb.addEventListener('click', e => {
-      if (e.target === lb || e.target.classList.contains('lightbox-close')) {
-        lb.classList.remove('open');
-        document.body.style.overflow = '';
-        setTimeout(() => { lbImg.src = ''; }, 300);
-      }
-    });
+      lb.addEventListener('click', e => {
+        if (e.target === lb || e.target.classList.contains('lightbox-close')) {
+          lb.classList.remove('open');
+          document.body.style.overflow = '';
+          setTimeout(() => { lbImg.src = ''; }, 300);
+        }
+      });
 
-    document.addEventListener('keydown', e => {
-      if (e.key === 'Escape' && lb.classList.contains('open')) {
-        lb.classList.remove('open');
-        document.body.style.overflow = '';
-        setTimeout(() => { lbImg.src = ''; }, 300);
-      }
-    });
+      document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && lb.classList.contains('open')) {
+          lb.classList.remove('open');
+          document.body.style.overflow = '';
+          setTimeout(() => { lbImg.src = ''; }, 300);
+        }
+      });
+    }
   </script>
 
   <!-- ── Lightbox Overlay ── -->
