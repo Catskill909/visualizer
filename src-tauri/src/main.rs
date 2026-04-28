@@ -8,6 +8,21 @@ use std::sync::Mutex;
 
 struct CaffeinateState(Mutex<Option<Child>>);
 
+fn clear_webkit_cache() {
+    // WKWebView caches JS aggressively — wipe it on every launch so users
+    // always run the latest bundled code after an app update.
+    if let Some(home) = std::env::var_os("HOME") {
+        let base = std::path::Path::new(&home);
+        for subdir in &["Library/WebKit/app.discocast.visualizer",
+                        "Library/Caches/app.discocast.visualizer"] {
+            let path = base.join(subdir);
+            if path.exists() {
+                let _ = std::fs::remove_dir_all(&path);
+            }
+        }
+    }
+}
+
 #[tauri::command]
 fn get_fullscreen(window: tauri::Window) -> bool {
     window.is_fullscreen().unwrap_or(false)
@@ -39,6 +54,7 @@ fn caffeinate_stop(state: tauri::State<CaffeinateState>) {
 }
 
 fn main() {
+    clear_webkit_cache();
     tauri::Builder::default()
         .manage(CaffeinateState(Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![caffeinate_start, caffeinate_stop, toggle_fullscreen, get_fullscreen])
