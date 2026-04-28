@@ -17,7 +17,8 @@ A modern browser-based MilkDrop music visualizer powered by [Butterchurn](https:
 - **Auto-hiding controls** — glassmorphic control bar fades after 3 seconds of inactivity, but stays visible while hovered or while a popover is open; click outside a popover to dismiss it
 - **Material-style switches** — all toggles in the cycle and tuning popovers use clean sliding switch components
 - **Fullscreen mode** — native browser fullscreen support
-- **Projector Optimized** — automatic Screen Wake Lock prevents sleep, mouse cursor auto-hides with UI, and "Zen Mode" (H key) for zero-UI projection
+- **Projector Optimized** — automatic Screen Wake Lock prevents sleep (macOS app uses `caffeinate` fallback since WKWebView drops Wake Lock), mouse cursor auto-hides with UI, and "Zen Mode" (H key) for zero-UI projection
+- **Output Settings** (`O` key or monitor icon) — lock canvas render resolution (HD / Full HD / QHD / 4K / Custom), constrain aspect ratio (16:9, 4:3, 21:9, 1:1, 9:16 portrait), choose fill mode (Letterbox / Stretch / Crop); settings persist across reloads. **Virtual Camera** toggle streams the canvas as a system webcam source — pick it in OBS, Zoom, or any capture app with no additional driver install
 - **Responsive design** — works on desktop and mobile viewports
 - **Preset Studio** (`/editor.html` or press **E**) — standalone visual preset builder: 12 one-click palettes, 3 independent color swatches (Wave / Glow / Accent), 5 tabbed control sections (Palette / Motion / Wave / Feel / Images), undo/redo (50-deep), A/B comparison; **up to 5 image layers** in a collapsible smart-accordion stack with drag-to-reorder, per-layer solo / mute / rename / static thumbnail, image resize on upload (1024px standard / 2048px HD toggle), per-layer UV mirror with Per Tile · Whole Image scope, scene-level Canvas Mirror, per-layer audio reactivity (source: Bass / Mid / Treble / Volume; curve: Linear / Squared / Cubed / Gate), aspect-correct tiling (portrait · square · landscape images tile without distortion), **Pan** (whole-group L/R + U/D translation — Drift for continuous travel/endless tile scroll, Bounce for independent-axis ping-pong), dev performance HUD (`` ` `` key); saves to localStorage
 - **Timeline Editor** (`/timeline.html` or press **L**) — self-contained full-screen show sequencer: canvas fills the screen, glassmorphic controls float on top and auto-hide during playback; arrange presets on a proportional-width multi-track strip, set per-entry durations and blend times, play/stop/loop live; **Zone Compositor** assigns each entry to a named screen region (quadrant, banner, center square, custom rectangle) so multiple presets render simultaneously in different areas — each zone has independent opacity, blend mode (screen/overlay/multiply/add), and gap behavior; supports drag-to-reorder, snap-to-grid, waveform overlay, BPM grid, JSON export/import
@@ -183,6 +184,7 @@ Merge layer exposing bundled + custom presets under one API.
 | `B` | **Blackout** (Cut to Black) |
 | `I` | **Invert Colors** |
 | `H` | **Hide UI** instantly |
+| `O` | **Output Settings** (resolution lock, aspect ratio, virtual camera) |
 | `Shift` | **Hold for MAX Boost** |
 | `A` | Toggle Auto-Gain (AGC) |
 | `K` | Toggle Kick-Lock |
@@ -218,22 +220,47 @@ npm run build
 A standalone, signed, and notarized macOS app — fully working including mic and USB audio input.
 
 ### Install
-1. Open `DiscoCast Visualizer-1.0.YYYYMMDD.HHMM.dmg` from the project root
+1. Download `DiscoCast-Visualizer.dmg` from the [promo page](promo/index.html)
 2. Drag **DiscoCast Visualizer** → **Applications**
 3. Launch from Applications — no right-click needed (notarized)
 4. First time using mic/USB: macOS will prompt for microphone permission — click **Allow**
 
 ### Build from Source
 
+> ⚠️ **Always use `./build-and-sign.sh` — never run `npm run tauri-build` directly.**
+> The script is the true build process. Running Tauri directly produces an unsigned, unnotarized DMG with no Applications folder shortcut that will be blocked by Gatekeeper.
+
 ```bash
 ./build-and-sign.sh
 ```
 
-Outputs `DiscoCast Visualizer-1.0.YYYYMMDD.HHMM.dmg` to the project root. Each build gets a unique date-stamped name.
+The script does everything in one pass:
+1. Builds the Vite web app
+2. Builds unsigned `.app` with Tauri (target: `app` only)
+3. Injects `NSMicrophoneUsageDescription` into `Info.plist`
+4. Signs with `Developer ID Application: Paul Henshaw (3UT7698LZ6)` + hardened runtime
+5. Notarizes with Apple (`xcrun notarytool`) and staples the ticket
+6. Verifies: `source=Notarized Developer ID`
+7. Creates HFS+ drag-to-install DMG with Applications folder shortcut
+8. Signs and clears quarantine from the DMG
+9. Copies versioned DMG to `promo/DiscoCast Visualizer-1.0.YYYYMMDD.HHMM.dmg`
+10. Updates `promo/DiscoCast-Visualizer.dmg` (the canonical download link)
 
-Requires: Apple Developer account (`3UT7698LZ6`), Rust/Cargo, Xcode tools.
+Requires: Apple Developer account (`3UT7698LZ6`), credentials in `.build-credentials` (gitignored), Rust/Cargo, Xcode tools.
 
-See `macos-app-generate.md` for full details.
+### Releasing a Build
+
+After `./build-and-sign.sh` completes, commit and push `promo/` to deploy:
+
+```bash
+git add promo/
+git commit -m "build: release 1.0.YYYYMMDD.HHMM"
+git push
+```
+
+Coolify picks up the push automatically — the promo page immediately serves the new DMG. Older versioned builds are retained in `promo/` for rollback: copy any older DMG over `promo/DiscoCast-Visualizer.dmg`, commit, and push.
+
+See `macos-app-generate.md` for full packaging details and `app-output-dev.md` § 7 for the complete distribution workflow.
 
 ## Deployment (Coolify)
 

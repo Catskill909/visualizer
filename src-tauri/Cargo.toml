@@ -7,7 +7,7 @@ edition = "2021"
 tauri-build = { version = "1.5", features = [] }
 
 [dependencies]
-tauri = { version = "1.5", features = [] }
+tauri = { version = "1.5", features = [ "window-set-fullscreen", "shell-execute"] }
 
 [features]
 default = ["custom-protocol"]

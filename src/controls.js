@@ -24,6 +24,8 @@ export class ControlPanel {
     this.tuningOpen = false;
     this.hoveringControls = false;
     this.wakeLock = null;
+    this.outputOpen = false;
+    this.outputSettings = this._loadOutputSettings();
     this.favorites = this.loadFavorites();
     this.hidden = this.loadHidden();
     this.showHidden = false; // maintenance mode — resets to off on every load
@@ -109,6 +111,19 @@ export class ControlPanel {
       permissionError: document.getElementById('permission-error'),
       btnRetryPermission: document.getElementById('btn-retry-permission'),
       btnClosePermission: document.getElementById('btn-close-permission'),
+      btnOutput: document.getElementById('btn-output'),
+      outputPanel: document.getElementById('output-panel'),
+      outputStatusDot: document.getElementById('output-status-dot'),
+      outputResolution: document.getElementById('output-resolution'),
+      outputCustomFields: document.getElementById('output-custom-fields'),
+      outputCustomW: document.getElementById('output-custom-w'),
+      outputCustomH: document.getElementById('output-custom-h'),
+      btnOutputCustomApply: document.getElementById('btn-output-custom-apply'),
+      outputAspect: document.getElementById('output-aspect'),
+      outputFill: document.getElementById('output-fill'),
+      toggleVirtualCamera: document.getElementById('toggle-virtual-camera'),
+      virtualCameraHint: document.getElementById('virtual-camera-hint'),
+      canvasWrapper: document.getElementById('canvas-wrapper'),
     };
 
     this.bindEvents();
@@ -360,6 +375,11 @@ export class ControlPanel {
         && !els.btnAudioTuning.contains(e.target)) {
         this.closeTuningPanel();
       }
+      if (this.outputOpen
+        && els.outputPanel && !els.outputPanel.contains(e.target)
+        && els.btnOutput && !els.btnOutput.contains(e.target)) {
+        this.closeOutputPanel();
+      }
     });
 
     // --- Keyboard shortcuts ---
@@ -375,6 +395,50 @@ export class ControlPanel {
     window.addEventListener('presetChanged', (e) => {
       this.updatePresetName(e.detail.name);
     });
+
+    // --- Output panel ---
+    if (els.btnOutput) {
+      els.btnOutput.addEventListener('click', () => this.toggleOutputPanel());
+    }
+
+    if (els.outputResolution) {
+      els.outputResolution.addEventListener('change', () => {
+        const val = els.outputResolution.value;
+        els.outputCustomFields.classList.toggle('hidden', val !== 'custom');
+        if (val !== 'custom') this.applyOutputSettings();
+      });
+    }
+
+    if (els.btnOutputCustomApply) {
+      els.btnOutputCustomApply.addEventListener('click', () => this.applyOutputSettings());
+    }
+
+    if (els.outputAspect) {
+      els.outputAspect.addEventListener('change', () => this.applyOutputSettings());
+    }
+
+    if (els.outputFill) {
+      els.outputFill.addEventListener('change', () => this.applyOutputSettings());
+    }
+
+    if (els.toggleVirtualCamera) {
+      els.toggleVirtualCamera.addEventListener('change', (e) => {
+        if (e.target.checked) {
+          this.engine.startVirtualCamera(60);
+          els.virtualCameraHint.textContent = 'LIVE — select this window in OBS / Zoom';
+          els.outputStatusDot.classList.add('active');
+          this.showToast('📷 Virtual Camera ON — pick this window in OBS/Zoom');
+        } else {
+          this.engine.stopVirtualCamera();
+          els.virtualCameraHint.textContent = 'Stream canvas to OBS / Zoom';
+          this._updateOutputDot();
+          this.showToast('📷 Virtual Camera OFF');
+        }
+      });
+    }
+
+    // Apply saved output settings on boot
+    this._restoreOutputSettings();
 
     // Sync cycle UI to engine defaults
     this.syncCyclePanel();
@@ -1109,6 +1173,15 @@ export class ControlPanel {
   }
 
   async requestWakeLock() {
+    if (typeof window.__TAURI__ !== 'undefined') {
+      try {
+        await window.__TAURI__.invoke('caffeinate_start');
+        console.log('Wake Lock active (caffeinate)');
+      } catch (err) {
+        console.warn('caffeinate_start failed:', err);
+      }
+      return;
+    }
     if (!('wakeLock' in navigator)) return;
     try {
       this.wakeLock = await navigator.wakeLock.request('screen');
@@ -1119,9 +1192,19 @@ export class ControlPanel {
     }
   }
 
+  async releaseWakeLock() {
+    if (typeof window.__TAURI__ !== 'undefined') {
+      try { await window.__TAURI__.invoke('caffeinate_stop'); } catch (e) { /* ignore */ }
+      return;
+    }
+    if (this.wakeLock) { try { await this.wakeLock.release(); } catch (e) { /* ignore */ } this.wakeLock = null; }
+  }
+
   async handleVisibilityChange() {
-    if (this.wakeLock !== null && document.visibilityState === 'visible') {
+    if (document.visibilityState === 'visible') {
       await this.requestWakeLock();
+    } else if (typeof window.__TAURI__ === 'undefined' && this.wakeLock === null) {
+      // Browser wake lock is already released by the browser on hide
     }
   }
 
@@ -1130,7 +1213,114 @@ export class ControlPanel {
       || this.drawerOpen
       || this.guideOpen
       || this.cycleOpen
-      || this.tuningOpen;
+      || this.tuningOpen
+      || this.outputOpen;
+  }
+
+  // ===================== OUTPUT PANEL =====================
+
+  _loadOutputSettings() {
+    try {
+      const s = localStorage.getItem('discocast_output');
+      return s ? JSON.parse(s) : { resolution: 'free', aspect: 'free', fill: 'letterbox', customW: 1920, customH: 1080 };
+    } catch { return { resolution: 'free', aspect: 'free', fill: 'letterbox', customW: 1920, customH: 1080 }; }
+  }
+
+  _saveOutputSettings() {
+    localStorage.setItem('discocast_output', JSON.stringify(this.outputSettings));
+  }
+
+  _restoreOutputSettings() {
+    const s = this.outputSettings;
+    const { els } = this;
+    if (els.outputResolution) els.outputResolution.value = s.resolution;
+    if (els.outputAspect) els.outputAspect.value = s.aspect;
+    if (els.outputFill) els.outputFill.value = s.fill;
+    if (els.outputCustomW) els.outputCustomW.value = s.customW || 1920;
+    if (els.outputCustomH) els.outputCustomH.value = s.customH || 1080;
+    if (s.resolution === 'custom' && els.outputCustomFields) els.outputCustomFields.classList.remove('hidden');
+    this.applyOutputSettings();
+  }
+
+  applyOutputSettings() {
+    const { els, engine } = this;
+    const resolution = els.outputResolution ? els.outputResolution.value : 'free';
+    const aspect = els.outputAspect ? els.outputAspect.value : 'free';
+    const fill = els.outputFill ? els.outputFill.value : 'letterbox';
+
+    // Persist
+    this.outputSettings.resolution = resolution;
+    this.outputSettings.aspect = aspect;
+    this.outputSettings.fill = fill;
+    if (resolution === 'custom') {
+      this.outputSettings.customW = parseInt(els.outputCustomW.value, 10) || 1920;
+      this.outputSettings.customH = parseInt(els.outputCustomH.value, 10) || 1080;
+    }
+    this._saveOutputSettings();
+
+    // Fill mode — apply CSS class to wrapper
+    const wrapper = els.canvasWrapper;
+    if (wrapper) {
+      wrapper.classList.remove('fill-letterbox', 'fill-stretch', 'fill-crop');
+      wrapper.classList.add('fill-' + fill);
+    }
+
+    // Resolve target render dimensions
+    let w, h;
+    if (resolution === 'free') {
+      // Aspect ratio constraint on window size
+      if (aspect !== 'free') {
+        const [aw, ah] = aspect.split(':').map(Number);
+        const ratio = aw / ah;
+        if (window.innerWidth / window.innerHeight > ratio) {
+          h = window.innerHeight;
+          w = Math.round(h * ratio);
+        } else {
+          w = window.innerWidth;
+          h = Math.round(w / ratio);
+        }
+        engine.lockResolution(w, h);
+      } else {
+        engine.unlockResolution();
+      }
+    } else {
+      // Fixed resolution preset or custom
+      if (resolution === 'custom') {
+        w = this.outputSettings.customW;
+        h = this.outputSettings.customH;
+      } else {
+        [w, h] = resolution.split('x').map(Number);
+      }
+      engine.lockResolution(w, h);
+    }
+
+    this._updateOutputDot();
+  }
+
+  _updateOutputDot() {
+    const { els, engine } = this;
+    const active = engine.lockedResolution !== null || engine.isVirtualCameraActive();
+    if (els.outputStatusDot) els.outputStatusDot.classList.toggle('active', active);
+    if (els.btnOutput) els.btnOutput.classList.toggle('accent', active);
+  }
+
+  toggleOutputPanel() {
+    const isHidden = this.els.outputPanel.classList.toggle('hidden');
+    this.outputOpen = !isHidden;
+    if (this.outputOpen) {
+      if (this.drawerOpen) this.closeDrawer();
+      if (this.guideOpen) this.closeGuide();
+      if (this.cycleOpen) this.closeCyclePanel();
+      if (this.tuningOpen) this.closeTuningPanel();
+    } else {
+      this.showControls();
+    }
+  }
+
+  closeOutputPanel() {
+    this.els.outputPanel.classList.add('hidden');
+    this.outputOpen = false;
+    this.showControls();
   }
 
   showToast(msg) {
@@ -1146,7 +1336,18 @@ export class ControlPanel {
     }, 2000);
   }
 
-  toggleFullscreen() {
+  async toggleFullscreen() {
+    if (typeof window.__TAURI__ !== 'undefined') {
+      try {
+        const win = window.__TAURI__.window.getCurrent();
+        const isFs = await win.isFullscreen();
+        await win.setFullscreen(!isFs);
+      } catch (err) {
+        console.warn('Tauri setFullscreen failed:', err);
+        try { await window.__TAURI__.invoke('toggle_fullscreen'); } catch (e) { /* ignore */ }
+      }
+      return;
+    }
     if (document.fullscreenElement) {
       document.exitFullscreen();
     } else {
@@ -1261,6 +1462,10 @@ export class ControlPanel {
       case 'P':
         this.toggleDrawer();
         break;
+      case 'o':
+      case 'O':
+        this.toggleOutputPanel();
+        break;
       case 'e':
       case 'E':
         window.location.href = '/editor.html';
@@ -1276,6 +1481,7 @@ export class ControlPanel {
         if (this.drawerOpen) this.closeDrawer();
         if (this.guideOpen) this.closeGuide();
         if (this.cycleOpen) this.closeCyclePanel();
+        if (this.outputOpen) this.closeOutputPanel();
         break;
     }
 

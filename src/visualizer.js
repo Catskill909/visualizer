@@ -80,6 +80,10 @@ export class VisualizerEngine {
     // GIF animation state: texName → { frames, delays, uploadCanvas, uploadCtx, frameIndex, nextFrameAt, width, height }
     this._gifAnimations = new Map();
     this._audioConfirmed = false;
+
+    // Output: resolution lock + virtual camera
+    this.lockedResolution = null; // null = free, or { w, h }
+    this._captureStream = null;
   }
 
   init(canvas) {
@@ -456,9 +460,39 @@ export class VisualizerEngine {
 
   setSize(width, height) {
     if (!this.canvas || !this.visualizer) return;
-    this.canvas.width = width;
-    this.canvas.height = height;
-    this.visualizer.setRendererSize(width, height);
+    const w = this.lockedResolution ? this.lockedResolution.w : width;
+    const h = this.lockedResolution ? this.lockedResolution.h : height;
+    this.canvas.width = w;
+    this.canvas.height = h;
+    this.visualizer.setRendererSize(w, h);
+  }
+
+  lockResolution(w, h) {
+    this.lockedResolution = { w: Math.round(w), h: Math.round(h) };
+    this.setSize(w, h);
+  }
+
+  unlockResolution() {
+    this.lockedResolution = null;
+    this.setSize(window.innerWidth, window.innerHeight);
+  }
+
+  startVirtualCamera(fps = 60) {
+    if (!this.canvas) return null;
+    if (this._captureStream) this.stopVirtualCamera();
+    this._captureStream = this.canvas.captureStream(fps);
+    return this._captureStream;
+  }
+
+  stopVirtualCamera() {
+    if (this._captureStream) {
+      this._captureStream.getTracks().forEach(t => t.stop());
+      this._captureStream = null;
+    }
+  }
+
+  isVirtualCameraActive() {
+    return this._captureStream !== null;
   }
 
   /**
@@ -837,6 +871,7 @@ export class VisualizerEngine {
     this.stopRenderLoop();
     this.stopAutoCycle();
     this.disconnectSource();
+    this.stopVirtualCamera();
     if (this.audioContext) this.audioContext.close();
   }
 }

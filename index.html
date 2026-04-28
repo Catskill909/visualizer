@@ -17,7 +17,9 @@
 <body style="background-color: #000; color: #fff; margin: 0; overflow: hidden;">
 
   <!-- Visualizer Canvas (fullscreen, behind everything) -->
-  <canvas id="visualizer-canvas"></canvas>
+  <div id="canvas-wrapper">
+    <canvas id="visualizer-canvas"></canvas>
+  </div>
 
   <!-- Flash/Strobe Overlay (sits above canvas, below UI) -->
   <div id="flash-overlay"></div>
@@ -249,6 +251,74 @@
         </button>
       </div>
 
+      <!-- Output Settings -->
+      <div class="control-section" style="position: relative;">
+        <button id="btn-output" class="ctrl-btn" data-tooltip="Output Settings (O)" type="button">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/>
+          </svg>
+          <span id="output-status-dot" class="status-dot"></span>
+        </button>
+
+        <!-- Output Popover -->
+        <div id="output-panel" class="popover hidden">
+          <div class="popover-header">
+            <h4>Output Settings</h4>
+          </div>
+          <div class="popover-content">
+
+            <div class="tuning-group">
+              <label>Render Resolution</label>
+              <select id="output-resolution" class="ctrl-select output-select">
+                <option value="free">Match window</option>
+                <option value="1280x720">1280 × 720 (HD)</option>
+                <option value="1920x1080">1920 × 1080 (Full HD)</option>
+                <option value="2560x1440">2560 × 1440 (QHD)</option>
+                <option value="3840x2160">3840 × 2160 (4K)</option>
+                <option value="custom">Custom…</option>
+              </select>
+              <div id="output-custom-fields" class="output-custom-fields hidden">
+                <input type="number" id="output-custom-w" class="output-custom-input" placeholder="Width" min="320" max="7680" value="1920" />
+                <span class="output-custom-sep">×</span>
+                <input type="number" id="output-custom-h" class="output-custom-input" placeholder="Height" min="240" max="4320" value="1080" />
+                <button id="btn-output-custom-apply" class="output-apply-btn" type="button">Apply</button>
+              </div>
+            </div>
+
+            <div class="tuning-group">
+              <label>Aspect Ratio</label>
+              <select id="output-aspect" class="ctrl-select output-select">
+                <option value="free">Free (window)</option>
+                <option value="16:9">16:9 (Widescreen)</option>
+                <option value="4:3">4:3 (Classic)</option>
+                <option value="21:9">21:9 (Ultra-wide)</option>
+                <option value="1:1">1:1 (Square)</option>
+                <option value="9:16">9:16 (Portrait / LED)</option>
+              </select>
+            </div>
+
+            <div class="tuning-group">
+              <label>Fill Mode</label>
+              <select id="output-fill" class="ctrl-select output-select">
+                <option value="letterbox">Letterbox (contain)</option>
+                <option value="stretch">Stretch (fill)</option>
+                <option value="crop">Crop (cover)</option>
+              </select>
+            </div>
+
+            <div class="switch-row" style="border-top: 1px solid var(--border-subtle); padding-top: 10px; margin-top: 4px;">
+              <label class="switch-label" for="toggle-virtual-camera">Virtual Camera</label>
+              <label class="switch">
+                <input type="checkbox" id="toggle-virtual-camera" />
+                <span class="switch-track"></span>
+              </label>
+            </div>
+            <p id="virtual-camera-hint" class="popover-hint">Stream canvas to OBS / Zoom</p>
+
+          </div>
+        </div>
+      </div>
+
       <!-- Preset Studio (Editor) -->
       <div class="control-section">
         <button id="btn-open-editor" class="ctrl-btn" data-tooltip="Open Preset Studio (E)" type="button">
@@ -454,6 +524,7 @@
           <div class="guide-row"><kbd>S</kbd> <span>Toggle Favorite</span></div>
           <div class="guide-row"><kbd>X</kbd> <span>Hide Current Preset</span></div>
           <div class="guide-row"><kbd>P</kbd> <span>Open Presets Drawer</span></div>
+          <div class="guide-row"><kbd>O</kbd> <span>Output Settings</span></div>
           <div class="guide-row"><kbd>E</kbd> <span>Open Preset Studio</span></div>
           <div class="guide-row"><kbd>?</kbd> / <kbd>/</kbd> <span>Toggle This Guide</span></div>
           <div class="guide-row"><kbd>F</kbd> <span>Fullscreen</span></div>
@@ -486,6 +557,7 @@
           <button class="welcome-rail-btn" type="button" role="tab" data-section="presets">Browsing Presets</button>
           <button class="welcome-rail-btn" type="button" role="tab" data-section="cycling">Auto-Cycling</button>
           <button class="welcome-rail-btn" type="button" role="tab" data-section="performance">Live Performance</button>
+          <button class="welcome-rail-btn" type="button" role="tab" data-section="output">Output Settings</button>
           <button class="welcome-rail-btn" type="button" role="tab" data-section="studio">Preset Studio</button>
           <button class="welcome-rail-btn" type="button" role="tab" data-section="timeline">Timeline Editor</button>
           <button class="welcome-rail-btn" type="button" role="tab" data-section="reactivity">Reactivity</button>
@@ -621,6 +693,95 @@
               <div class="welcome-feature-title">Auto-hiding control bar</div>
               <p>The bottom bar fades after 3 seconds of inactivity but stays visible while you hover or while a popover
                 is open. Move the mouse to bring it back.</p>
+            </div>
+          </section>
+
+          <!-- Output Settings -->
+          <section class="welcome-section" data-section="output" role="tabpanel">
+            <h4>Output Settings</h4>
+            <p>Control exactly how and where the visualizer renders. Open the Output panel with the monitor icon in the
+              control bar, or press <kbd>O</kbd>. Settings are saved and restored automatically on every load.</p>
+
+            <div class="welcome-feature" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 14px 16px;">
+              <div class="welcome-feature-title">Default settings (out of the box)</div>
+              <ul class="welcome-list" style="margin-top: 6px;">
+                <li><strong>Resolution</strong> &mdash; Match window. Canvas always fills whatever size the browser window or app is.</li>
+                <li><strong>Aspect Ratio</strong> &mdash; Free. No constraint; proportions follow the window.</li>
+                <li><strong>Fill Mode</strong> &mdash; Letterbox. If a resolution is locked, black bars appear rather than stretching or cropping.</li>
+                <li><strong>Virtual Camera</strong> &mdash; Off. No stream is started until you turn it on.</li>
+              </ul>
+              <p class="welcome-hint" style="margin-top: 8px;">Nothing to configure for normal use &mdash; defaults give you a clean full-window visualizer. Only open Output Settings when you need a specific projector resolution or want to feed the canvas into OBS.</p>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Render Resolution</div>
+              <p>Pin the canvas to a fixed pixel size regardless of the browser window. Choose from the dropdown or enter
+                a custom width &times; height and click <strong>Apply</strong>.</p>
+              <ul class="welcome-list">
+                <li><strong>Match window</strong> (default) &mdash; canvas always fills the window at its natural size.
+                </li>
+                <li><strong>1280&times;720</strong> &mdash; HD. Good for older projectors or lower-spec machines.</li>
+                <li><strong>1920&times;1080</strong> &mdash; Full HD. Most common projector native resolution.</li>
+                <li><strong>2560&times;1440</strong> &mdash; QHD. High-end displays and LED walls.</li>
+                <li><strong>3840&times;2160</strong> &mdash; 4K. GPU-intensive; test performance before a live show.
+                </li>
+                <li><strong>Custom&hellip;</strong> &mdash; type any width and height and press Apply. Useful for
+                  non-standard LED panel dimensions or portrait columns.</li>
+              </ul>
+              <p class="welcome-hint">When a resolution is locked, the canvas renders at that size regardless of how
+                large or small the window is. The Fill Mode setting below controls how it fits inside the window.</p>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Aspect Ratio</div>
+              <p>Constrain the canvas proportions without fixing the pixel count. Useful when the window size changes but
+                you always want a specific shape.</p>
+              <ul class="welcome-list">
+                <li><strong>Free</strong> &mdash; no constraint; canvas matches the window exactly.</li>
+                <li><strong>16:9</strong> &mdash; standard widescreen. Most projectors and TVs.</li>
+                <li><strong>4:3</strong> &mdash; classic square-ish format. Older projectors.</li>
+                <li><strong>21:9</strong> &mdash; ultra-wide / cinema. LED banners and wide screens.</li>
+                <li><strong>1:1</strong> &mdash; perfect square. Club screens, Instagram-format content.</li>
+                <li><strong>9:16</strong> &mdash; portrait. Vertical LED columns, phone-format screens.</li>
+              </ul>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Fill Mode</div>
+              <p>How the locked canvas is positioned inside the window when its ratio doesn&rsquo;t match:</p>
+              <ul class="welcome-list">
+                <li><strong>Letterbox</strong> (default) &mdash; canvas is centered with black bars filling the gaps.
+                  Nothing is cropped or distorted. Best for projectors where accurate proportions matter.</li>
+                <li><strong>Stretch</strong> &mdash; canvas fills the window completely, ignoring proportions. Use when
+                  the output device matches the render resolution exactly.</li>
+                <li><strong>Crop</strong> &mdash; canvas fills the window and any overflow is hidden. No black bars, no
+                  distortion, but the edges are cut.</li>
+              </ul>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Virtual Camera</div>
+              <p>Toggle the <strong>Virtual Camera</strong> switch to stream the visualizer canvas as a live video
+                source. Once active, open OBS, Zoom, Teams, or any video software and select the browser window or tab
+                as a camera input &mdash; the visualizer appears as a live feed.</p>
+              <ul class="welcome-list">
+                <li><strong>Status hint</strong> &mdash; turns <em>LIVE &mdash; select this window in OBS / Zoom</em>
+                  while active; the monitor button dot turns green.</li>
+                <li><strong>OBS Browser Source</strong> &mdash; an alternative: point OBS at the app URL as a Browser
+                  Source. No toggle needed &mdash; OBS captures the page directly at any resolution.</li>
+                <li><strong>macOS app note</strong> &mdash; the stream is available in the WKWebView, but routing it to
+                  a system-level virtual camera requires the OBS Virtual Camera driver to be installed separately.</li>
+              </ul>
+              <p class="welcome-hint">The virtual camera stream runs at 60 fps and matches the current render
+                resolution. Stopping it releases all tracks automatically.</p>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Projector workflow tip</div>
+              <p>For a live show: set <strong>Resolution to 1920&times;1080</strong>, <strong>Aspect to
+                  16:9</strong>, <strong>Fill Mode to Letterbox</strong>, then press <kbd>H</kbd> to hide the UI and
+                <kbd>F</kbd> for fullscreen. The canvas renders at the exact projector native resolution regardless of
+                what your laptop screen does.</p>
             </div>
           </section>
 
@@ -884,6 +1045,7 @@
                 <div class="guide-row"><kbd>R</kbd><span>Toggle auto-cycle</span></div>
                 <div class="guide-row"><kbd>C</kbd><span>Open cycle settings</span></div>
                 <div class="guide-row"><kbd>P</kbd><span>Open presets drawer</span></div>
+                <div class="guide-row"><kbd>O</kbd><span>Output settings</span></div>
                 <div class="guide-row"><kbd>E</kbd><span>Open Preset Studio</span></div>
                 <div class="guide-row"><kbd>S</kbd><span>Toggle favorite</span></div>
                 <div class="guide-row"><kbd>X</kbd><span>Hide current preset</span></div>
@@ -927,8 +1089,10 @@
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Projector / VJ setup</div>
-              <p>Press <kbd>H</kbd> to hide the UI completely for a clean feed, then <kbd>F</kbd> for fullscreen. Move
-                the mouse to bring controls back.</p>
+              <p>Press <kbd>H</kbd> to hide the UI completely for a clean feed, then <kbd>F</kbd> for fullscreen. For a
+                locked projector resolution, press <kbd>O</kbd> to open Output Settings &mdash; set your projector&rsquo;s
+                native resolution (e.g. 1920&times;1080), pick Letterbox, and the canvas renders at that size regardless
+                of your laptop screen. Move the mouse to bring controls back.</p>
             </div>
           </section>
         </div>

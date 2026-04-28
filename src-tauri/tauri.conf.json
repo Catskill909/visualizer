@@ -7,11 +7,19 @@
     "beforeBuildCommand": "npm run build",
     "beforeDevCommand": "npm run dev",
     "devPath": "http://localhost:5173",
-    "distDir": "../dist"
+    "distDir": "../dist",
+    "withGlobalTauri": true
   },
   "tauri": {
     "allowlist": {
-      "all": false
+      "all": false,
+      "shell": {
+        "execute": true,
+        "sidecar": false
+      },
+      "window": {
+        "setFullscreen": true
+      }
     },
     "bundle": {
       "active": true,

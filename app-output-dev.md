@@ -1,16 +1,16 @@
 # DiscoCast Visualizer — Output / Projection Brainstorm
 
-> **No code.** This is an audit and ideation document only.
+> Audit, ideation, and implementation reference.
 > Stack: Butterchurn / WebGL 2 canvas · Vite / Vanilla JS · Tauri v1.5 (macOS app) · served via Nginx/Coolify
 
 ---
 
 ## Recommended Path Forward
 
-### Phase 1 — Do These Now (low effort, works on both builds)
-1. **Resolution / aspect ratio lock** — pure `engine.setSize()` + CSS wrapper. No dependencies, works everywhere. Unblocks proper projector output immediately.
-2. **Wake Lock fix for macOS app** — `caffeinate` sidecar via Tauri. Screen sleeping mid-set is a real bug right now. Small Rust change, big practical impact.
-3. **`captureStream()` virtual camera toggle** — one button, ~10 lines. Immediately lets OBS/Zoom/etc. pick up the canvas as a camera source. Works on web and Tauri.
+### Phase 1 — ✅ SHIPPED
+1. **Resolution / aspect ratio lock** — `engine.lockResolution()` + `#canvas-wrapper` fill-mode CSS. Output popover (`O` key). Settings persist to `localStorage`.
+2. **Wake Lock fix for macOS app** — `caffeinate -d` spawned via Tauri command; `requestWakeLock()` branches on `window.__TAURI__`. `tauri.conf.json` allowlist updated.
+3. **`captureStream()` virtual camera toggle** — `engine.startVirtualCamera(60)` / `stopVirtualCamera()`. Toggle in Output popover; status dot turns green when live.
 
 ### Phase 2 — High-Value, Moderate Work
 4. **Output window (second display)** — Start with `window.open()` + `screen.availLeft` on web (works today), then gate behind `window.__TAURI__` to use `WebviewWindow::builder()` for the macOS app. Biggest real-world VJ win.
@@ -24,6 +24,133 @@
 
 ### Skip for now
 **ffmpeg.wasm** — heavy (~30MB), slow on GPU machines, `MediaRecorder` gives good-enough quality at a fraction of the complexity.
+
+---
+
+## Phase 1 — Implementation Plan
+
+> Concrete, file-level spec. No new dependencies for items 1 and 3. Item 2 (Wake Lock fix) requires one small Rust change.
+
+---
+
+### Item 1 — Resolution / Aspect Ratio Lock
+
+**Goal:** Let the user pin the canvas render size independently of the browser window, with a fill mode (letterbox, stretch, crop). Essential for projection at 1080p/4K or portrait LED columns.
+
+**How the engine works today:**
+- `engine.setSize(w, h)` in `visualizer.js:457` sets `canvas.width/height` and calls `visualizer.setRendererSize(w, h)`.
+- `controls.js:371` calls `engine.setSize(window.innerWidth, window.innerHeight)` on every `resize` event. This is the only caller.
+- The `<canvas id="visualizer-canvas">` is full-viewport via CSS.
+
+**What to add:**
+
+*`src/visualizer.js`*
+- Add `this.lockedResolution = null` to the constructor (`{ w, h }` or `null` for free).
+- Add `lockResolution(w, h)` / `unlockResolution()` methods. When locked, `setSize()` ignores the incoming dimensions and uses the locked values instead.
+
+*`src/controls.js`*
+- Add `this.outputSettings = { resolution: 'free', aspectRatio: 'free', fillMode: 'letterbox' }` to the constructor.
+- Add a method `applyOutputSettings()` that:
+  - If `resolution` is not `'free'`, calls `engine.lockResolution(w, h)` with the chosen pixel dimensions.
+  - If `aspectRatio` is not `'free'`, derives dimensions from the window size constrained to the ratio.
+  - Sets CSS on a new `#canvas-wrapper` div: `object-fit: contain | fill | cover` to letterbox / stretch / crop.
+- The `resize` listener calls `applyOutputSettings()` instead of `engine.setSize()` directly.
+
+*`index.html`*
+- Wrap `<canvas id="visualizer-canvas">` in `<div id="canvas-wrapper">`. Canvas gets `width: 100%; height: 100%; display: block;` inside it.
+
+*UI — new "Output" popover in the control bar (new button `btn-output`):*
+- **Render Resolution** — `<select>`: "Match window" / 1280×720 / 1920×1080 / 2560×1440 / 3840×2160 / Custom (W×H text inputs).
+- **Aspect Ratio** — `<select>`: Free / 16:9 / 4:3 / 21:9 / 1:1 / 9:16.
+- **Fill Mode** — radio or `<select>`: Letterbox / Stretch / Crop.
+- These settings persist to `localStorage` under key `discocast_output`.
+
+**No new npm packages required.**
+
+---
+
+### Item 2 — Wake Lock Fix for macOS App
+
+**Goal:** Prevent display sleep mid-set in the Tauri macOS build. `navigator.wakeLock` is already called in `requestWakeLock()` (`controls.js:1111`) but WKWebView silently ignores it.
+
+**Detection:** `typeof window.__TAURI__ !== 'undefined'` — already used in `showPermissionError()` at `controls.js:749`.
+
+**Approach — `caffeinate` sidecar (simplest path):**
+
+*`src-tauri/src/main.rs`*
+- Add a `#[tauri::command]` `caffeinate_start()` that spawns `caffeinate -d -w <PID>` as a child process and stores the `Child` handle in a `Mutex<Option<Child>>` in Tauri state.
+- Add `caffeinate_stop()` command that kills the stored child.
+- Register both commands with `.invoke_handler(tauri::generate_handler![...])`.
+
+*`src-tauri/tauri.conf.json`*
+- Add `"shell": { "execute": true, "sidecar": false }` to the allowlist so Tauri permits the `Command::new("caffeinate")` call.
+
+*`src/controls.js`*
+- In `requestWakeLock()`: if `window.__TAURI__` is present, call `window.__TAURI__.invoke('caffeinate_start')` instead of `navigator.wakeLock.request()`.
+- In `handleVisibilityChange()`: same branch — re-invoke on tab visibility restore.
+- On `engine.destroy()` / page unload: call `caffeinate_stop`.
+
+**Files touched:** `src-tauri/src/main.rs`, `src-tauri/tauri.conf.json`, `src/controls.js`. No JS dependencies added.
+
+---
+
+### Item 3 — `captureStream()` Virtual Camera Toggle
+
+**Goal:** Expose the visualizer canvas as a virtual camera source so OBS, Zoom, Teams, etc. can pick it up as a webcam input.
+
+**How it works:** `HTMLCanvasElement.captureStream(fps)` returns a `MediaStream`. The user then selects "DiscoCast Virtual Camera" (or whatever the system names the tab/window) inside their capture software. No driver install needed — the browser/WKWebView exposes the stream automatically as a selectable source in other apps when the stream is active.
+
+**What to add:**
+
+*`src/visualizer.js`*
+- Add `this.captureStream = null` to the constructor.
+- Add `startVirtualCamera(fps = 60)` — calls `this.canvas.captureStream(fps)`, stores the result, returns it.
+- Add `stopVirtualCamera()` — stops all tracks on the stored stream, nulls it.
+- Add `isVirtualCameraActive()` getter.
+
+*`src/controls.js`*
+- Add `this.virtualCameraActive = false`.
+- In the Output popover (same one from Item 1), add a **Virtual Camera** toggle row with a status note: "Stream is live — select this window/tab as a camera source in OBS or Zoom."
+- On toggle ON: call `engine.startVirtualCamera(60)`, show toast "📷 Virtual Camera ON — pick this window in OBS/Zoom", update toggle state.
+- On toggle OFF: call `engine.stopVirtualCamera()`, show toast "📷 Virtual Camera OFF".
+- Tauri caveat: add a note in the UI tooltip that on the macOS app, routing to a system virtual camera requires an additional driver (e.g. OBS Virtual Camera); the stream is still available for OBS Browser Source.
+
+**No new npm packages required.**
+
+---
+
+### Shared UI — Output Popover
+
+Items 1 and 3 both live in the same new **Output popover**, keeping the control bar footprint small. Suggested control bar placement: between the Preset Studio button and the Help button.
+
+Button: `btn-output` with a monitor/display icon SVG.
+
+Popover sections:
+```
+[ Output Settings ]
+  Resolution:   [ Match window ▾ ]
+  Aspect Ratio: [ Free ▾ ]
+  Fill Mode:    [ Letterbox ▾ ]
+
+[ Virtual Camera ]
+  [ toggle ] Stream canvas as camera
+  Status: "OFF" / "LIVE — select in OBS"
+```
+
+Popover follows the same `.popover` CSS pattern already used by Cycle and Audio Tuning panels. No new CSS classes needed beyond a `popover--output` modifier for sizing.
+
+---
+
+### Build / Test Checklist
+
+| Test | Web (Chrome) | macOS App |
+|---|---|---|
+| Canvas renders at locked 1920×1080 on a 1280×800 window | Letterboxed ✓ | Letterboxed ✓ |
+| Canvas re-locks after window resize | ✓ | ✓ |
+| Display does not sleep after 5 min with audio playing | Wake Lock ✓ | caffeinate ✓ |
+| Virtual Camera toggle ON → OBS sees the stream | ✓ | Needs OBS Virtual Camera driver |
+| Virtual Camera toggle OFF → stream stops | ✓ | ✓ |
+| Output settings survive page reload | localStorage ✓ | localStorage ✓ |
 
 ---
 
@@ -198,7 +325,47 @@ Broadcasting the visualizer live.
 
 ---
 
-## 7. macOS App Build — Context & Constraints
+## 7. Build Distribution Workflow
+
+### Overview
+After every build, the DMG is copied into `promo/` with a versioned filename. This folder is tracked by git, pushed to the repo, and Coolify serves it live — so users always download the latest build from the promo page, and older builds are retained for rollback.
+
+### Steps
+
+1. **Run the build script** — do not run `npm run tauri-build` directly:
+   ```bash
+   ./build-and-sign.sh
+   ```
+   The script handles everything automatically:
+   - Builds Vite + Tauri (target: `app` only, not `dmg`)
+   - Injects `NSMicrophoneUsageDescription` into `Info.plist`
+   - Signs with Developer ID + hardened runtime
+   - Notarizes + staples (app, then DMG)
+   - Creates HFS+ drag-to-install DMG with Applications folder shortcut
+   - Signs and clears quarantine from DMG
+   - Copies versioned DMG to `promo/DiscoCast Visualizer-1.0.YYYYMMDD.HHMM.dmg`
+   - Updates `promo/DiscoCast-Visualizer.dmg` (the canonical promo page link)
+
+2. **Commit and push:**
+   ```bash
+   git add promo/
+   git commit -m "build: release 1.0.YYYYMMDD.HHMM"
+   git push
+   ```
+   Coolify picks up the push and redeploys automatically. Users downloading from the promo page immediately get the new build.
+
+### Rollback
+To roll back: copy an older versioned DMG over `DiscoCast-Visualizer.dmg`, commit, and push. The older builds are preserved in `promo/` for exactly this purpose.
+
+### Current builds in `promo/`
+| File | Notes |
+|---|---|
+| `DiscoCast-Visualizer.dmg` | Always the latest — what the promo page links to |
+| `DiscoCast Visualizer-1.0.YYYYMMDD.HHMM.dmg` | Versioned archive — retained for rollback |
+
+---
+
+## 8. macOS App Build — Context & Constraints
 
 ### What it is
 The macOS app is a **Tauri v1.5** wrapper — a Rust shell (`src-tauri/src/main.rs`) that opens a `WebviewWindow` pointing at the same Vite-built front-end. The app bundles as a signed/notarized `.app` / `.dmg` via `build-and-sign.sh`.

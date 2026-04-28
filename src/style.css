@@ -38,12 +38,80 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
+#canvas-wrapper {
+  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg-primary);
+}
+
+#canvas-wrapper.fill-letterbox { align-items: center; justify-content: center; }
+#canvas-wrapper.fill-stretch #visualizer-canvas { width: 100% !important; height: 100% !important; }
+#canvas-wrapper.fill-crop { overflow: hidden; }
+#canvas-wrapper.fill-crop #visualizer-canvas { min-width: 100%; min-height: 100%; object-fit: cover; }
+
 #visualizer-canvas {
-  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0; background: var(--bg-primary);
-  transition: filter 0.1s ease;
+  position: relative; z-index: 0; background: var(--bg-primary);
+  transition: filter 0.1s ease; display: block;
+  max-width: 100vw; max-height: 100vh;
+}
+
+#canvas-wrapper.fill-letterbox #visualizer-canvas {
+  width: auto !important; height: auto !important;
+  max-width: 100vw; max-height: 100vh;
 }
 
 #visualizer-canvas.invert-colors { filter: invert(1); }
+
+/* Output popover selects */
+.output-select {
+  width: 100%;
+  margin-top: 6px;
+  background: rgba(255,255,255,0.06);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 5px 8px;
+  font-size: 0.75rem;
+  font-family: var(--font);
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.output-select:focus { outline: none; border-color: var(--border-highlight); }
+
+.output-custom-fields {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.output-custom-fields.hidden { display: none; }
+.output-custom-input {
+  width: 70px;
+  background: rgba(255,255,255,0.06);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 4px 6px;
+  font-size: 0.75rem;
+  font-family: var(--font);
+  text-align: center;
+}
+.output-custom-input:focus { outline: none; border-color: var(--border-highlight); }
+.output-custom-sep { color: var(--text-muted); font-size: 0.75rem; }
+.output-apply-btn {
+  flex: 1;
+  background: rgba(255,255,255,0.1);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  font-size: 0.72rem;
+  font-family: var(--font);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.output-apply-btn:hover { background: rgba(255,255,255,0.18); }
 
 /* Flash Overlay */
 #flash-overlay {
