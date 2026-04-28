@@ -310,13 +310,6 @@ export class VisualizerEngine {
     // even while the async image-bind is in flight.
     this.currentPresetIndex = this.presetNames.indexOf(name);
 
-    // For custom presets: pre-bind images from IndexedDB BEFORE telling
-    // butterchurn to load the preset so the first rendered frame already
-    // has the correct textures (avoids the clouds2 fallback flash).
-    if (name.startsWith(CUSTOM_PREFIX)) {
-      await this._bindCustomPresetImages(preset);
-    }
-
     // Butterchurn's blendProgress = elapsed / blendDuration produces NaN/Infinity
     // at blendTime=0, keeping it stuck in a permanent-blend state.
     if (blendTime < 0.001) blendTime = 0.001;
@@ -327,6 +320,14 @@ export class VisualizerEngine {
       console.warn('[DiscoCast Visualizer] loadPreset failed:', e.message, e);
       return false;
     }
+
+    // Bind custom preset images AFTER butterchurn loadPreset — butterchurn resets
+    // its internal sampler state on loadPreset, wiping any textures bound before it.
+    // The editor works correctly because _applyToEngine() always re-binds after loading.
+    if (name.startsWith(CUSTOM_PREFIX)) {
+      await this._bindCustomPresetImages(preset);
+    }
+
     return true;
   }
 
