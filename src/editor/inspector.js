@@ -1585,7 +1585,7 @@ export class EditorInspector {
             <div class="layer-row-inline">
               <span class="layer-ctrl-label" data-tooltip="Hard opacity cut when audio crosses threshold — instant strobe flash">Strobe</span>
               <input type="range" class="slider layer-slider-inline layer-strobe-sl" min="0" max="1" step="0.01"
-                value="${Math.sqrt(entry.strobeAmp).toFixed(4)}" style="--pct:${pct(Math.sqrt(entry.strobeAmp), 0, 1)}">
+                value="${entry.strobeAmp}" style="--pct:${pct(entry.strobeAmp, 0, 1)}">
               <span class="lsv layer-strobe-amp-val">${entry.strobeAmp.toFixed(2)}</span>
             </div>
             <div class="layer-slider-row layer-strobe-thr-row"${entry.strobeAmp <= 0 ? ' style="display:none"' : ''}>
@@ -1950,11 +1950,11 @@ export class EditorInspector {
         const strobeThrSl = card.querySelector('.layer-strobe-thr-sl');
         const strobeThrVal = card.querySelector('.layer-strobe-thr-val');
         strobeSlider.addEventListener('input', () => {
-            const t = parseFloat(strobeSlider.value);
-            entry.strobeAmp = t * t;  // power curve: fine control at low intensities
+            entry.strobeAmp = parseFloat(strobeSlider.value);
             strobeAmpVal.textContent = entry.strobeAmp.toFixed(2);
-            strobeSlider.style.setProperty('--pct', `${pct(t, 0, 1)}`);
+            strobeSlider.style.setProperty('--pct', `${pct(entry.strobeAmp, 0, 1)}`);
             strobeThrRow.style.display = entry.strobeAmp > 0 ? '' : 'none';
+            console.log('[STROBE]', { strobeAmp: entry.strobeAmp, opacity: entry.opacity });
             refresh();
         });
         strobeThrSl.addEventListener('input', () => {
@@ -2493,11 +2493,16 @@ export class EditorInspector {
             case 'threshold': curveExpr = 'step(0.3, _r_raw)'; break;
             default:          curveExpr = '_r_raw'; // linear
         }
+        const strobeLines = hasStrobe
+            ? `    float _strobeFq = ${stbThr} * 6.0 * (1.0 + _r_raw * 2.0);\n` +
+              `    float _strobeWave = step(0.5, fract(time * _strobeFq));\n`
+            : '';
         const reactLines =
             `    float _r_raw = ${reactSrc};
 ` +
             `    float _r = ${curveExpr};
-`;
+` +
+            strobeLines;
 
         const pulseSign = img.pulseInvert ? '-' : '+';
         const hasSpin = parseFloat(sp) !== 0;
@@ -2641,7 +2646,9 @@ export class EditorInspector {
         const aspectPreScale = (varName) =>
             `    ${varName}.x /= ${imgAsp} * aspect.y;\n`;
 
-        const sizeBase = `${sz} * (1.0 ${pulseSign} _r * ${pu})`;
+        const sizeBase = hasStrobe
+            ? `${sz} * (1.0 ${pulseSign} _r * ${pu}) * mix(1.0, _strobeWave, ${stbAmp})`
+            : `${sz} * (1.0 ${pulseSign} _r * ${pu})`;
 
         // Mirror UV fold helper — generates GLSL to fold a vec2 variable in-place.
         // Only emits for the per-tile scope; whole-group scope already folded _uvf upstream.
@@ -2752,8 +2759,7 @@ export class EditorInspector {
                     return `    _src *= vec3(${tintR}, ${tintG}, ${tintB});\n`;
                 }
             })() : '') +
-            `    float _op = _t.w * _gapMask * clamp(${op} + _r * ${opa}, 0.0, 1.0)${hasStrobe ? ` * (1.0 - ${stbAmp} * step(${stbThr}, _r_raw))` : ''};
-` +
+            `    float _op = _t.w * _gapMask * clamp(${op} + _r * ${opa}, 0.0, 1.0);\n` +
             `    ${blendLine}\n` +
             `  }\n`
         );
