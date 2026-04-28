@@ -20,8 +20,7 @@ dist-ssr
 # macOS signing credentials — local only, never push
 .build-credentials
 
-# macOS build scripts and docs — not needed by Coolify web deployment
-build-and-sign.sh
+# macOS build docs — not needed by Coolify web deployment
 macos-app-generate.md
 
 # Editor directories and files

@@ -177,6 +177,7 @@ export class VisualizerEngine {
     this.visualizer.connectAudio(this.visualizerGainNode);
     this.randomPreset();
     this.startRenderLoop(); // Force start the loop immediately
+    this.startAutoCycle();
     return this;
   }
 
@@ -336,16 +337,8 @@ export class VisualizerEngine {
     return this.loadPreset(this.presetNames[index], blendTime);
   }
 
-  // Visible pool for manual navigation — all names minus hidden, fallback to full list
-  // if everything is hidden (so the app never locks up on a 100%-hidden library).
-  _visibleNames() {
-    if (this.hiddenPool.size === 0) return this.presetNames;
-    const visible = this.presetNames.filter(n => !this.hiddenPool.has(n));
-    return visible.length > 0 ? visible : this.presetNames;
-  }
-
   nextPreset(blendTime = 2.0) {
-    const pool = this._visibleNames();
+    const pool = this._cyclePool();
     if (pool.length === 0) return '';
     const current = this.getCurrentPresetName();
     const idx = pool.indexOf(current);
@@ -356,7 +349,7 @@ export class VisualizerEngine {
   }
 
   prevPreset(blendTime = 2.0) {
-    const pool = this._visibleNames();
+    const pool = this._cyclePool();
     if (pool.length === 0) return '';
     const current = this.getCurrentPresetName();
     const idx = pool.indexOf(current);
@@ -367,7 +360,7 @@ export class VisualizerEngine {
   }
 
   randomPreset(blendTime = 2.0) {
-    const pool = this._visibleNames();
+    const pool = this._cyclePool();
     if (pool.length === 0) return '';
     const current = this.getCurrentPresetName();
     let pick;
@@ -570,6 +563,10 @@ export class VisualizerEngine {
     }, this.autoCycleInterval);
   }
 
+  stopAutoCycle() {
+    if (this.autoCycleTimer) { clearInterval(this.autoCycleTimer); this.autoCycleTimer = null; }
+  }
+
   _cyclePool() {
     // Hide wins over favorite: any pool below excludes hidden names.
     // Fallback to full list only if everything ends up filtered out.
@@ -603,10 +600,6 @@ export class VisualizerEngine {
     this.loadPreset(pick, blendTime);
     this.resetAutoCycle();
     return pick;
-  }
-
-  stopAutoCycle() {
-    if (this.autoCycleTimer) { clearInterval(this.autoCycleTimer); this.autoCycleTimer = null; }
   }
 
   resetAutoCycle() { if (this.autoCycleEnabled) this.startAutoCycle(); }

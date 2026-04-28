@@ -25,7 +25,7 @@
         This is an early beta build, so you may run into bugs, rough edges, or features that are still being tuned.
         If you spot an issue or have a feature request, send feedback to
         <a href="mailto:paul@rarefunk.com">paul@rarefunk.com</a>.
-        <p>Current release is Beta 0.8. Sent me your email if you want notice of app updates</p>
+        <p>Current release is <span id="app-version">…</span>. Send me your email if you want notice of app updates.</p>
       </p>
       <p class="promo-modal-note">
         Your feedback helps shape the public release.
@@ -375,6 +375,15 @@
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
+      // Inject version from build-written version.json — no manual HTML edits needed
+      fetch('./version.json?v=' + Date.now())
+        .then(r => r.json())
+        .then(d => {
+          const el = document.getElementById('app-version');
+          if (el && d.version) el.textContent = d.version;
+        })
+        .catch(() => {});
+
       const betaModal = document.getElementById('beta-modal');
       const betaModalDismiss = document.getElementById('beta-modal-dismiss');
       const betaModalStorageKey = 'discocast-beta-modal-dismissed';

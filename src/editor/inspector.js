@@ -1577,24 +1577,6 @@ export class EditorInspector {
               <span class="lsv">${entry.opacity.toFixed(2)}</span>
             </div>
             <div class="layer-slider-row">
-              <span class="layer-ctrl-label">Beat Fade</span>
-              <input type="range" class="slider" min="0" max="1" step="0.01"
-                value="${entry.opacityPulse}" style="--pct:${pct(entry.opacityPulse, 0, 1)}">
-              <span class="lsv">${entry.opacityPulse.toFixed(2)}</span>
-            </div>
-            <div class="layer-row-inline">
-              <span class="layer-ctrl-label" data-tooltip="Hard opacity cut when audio crosses threshold — instant strobe flash">Strobe</span>
-              <input type="range" class="slider layer-slider-inline layer-strobe-sl" min="0" max="1" step="0.01"
-                value="${entry.strobeAmp}" style="--pct:${pct(entry.strobeAmp, 0, 1)}">
-              <span class="lsv layer-strobe-amp-val">${entry.strobeAmp.toFixed(2)}</span>
-            </div>
-            <div class="layer-slider-row layer-strobe-thr-row"${entry.strobeAmp <= 0 ? ' style="display:none"' : ''}>
-              <span class="layer-ctrl-label">Threshold</span>
-              <input type="range" class="slider layer-strobe-thr-sl" min="0.1" max="0.9" step="0.05"
-                value="${entry.strobeThr}" style="--pct:${pct(entry.strobeThr, 0.1, 0.9)}">
-              <span class="lsv layer-strobe-thr-val">${entry.strobeThr.toFixed(2)}</span>
-            </div>
-            <div class="layer-slider-row">
               <span class="layer-ctrl-label">Size</span>
               <input type="range" class="slider layer-size-sl" min="0" max="1" step="0.01"
                 value="${Math.sqrt((entry.size - 0.05) / 1.45).toFixed(3)}" style="--pct:${(Math.sqrt((entry.size - 0.05) / 1.45) * 100).toFixed(1)}%">
@@ -1605,17 +1587,6 @@ export class EditorInspector {
               <input type="range" class="slider" min="0" max="0.8" step="0.01"
                 value="${entry.spacing}" style="--pct:${pct(entry.spacing, 0, 0.8)}">
               <span class="lsv">${entry.spacing.toFixed(2)}</span>
-            </div>
-            <div class="layer-row-inline">
-              <span class="layer-ctrl-label">Pulse</span>
-              <input type="range" class="slider layer-slider-inline layer-pulse-sl" min="0" max="1" step="0.01"
-                value="${Math.sqrt(entry.audioPulse / 2).toFixed(3)}" style="--pct:${(Math.sqrt(entry.audioPulse / 2) * 100).toFixed(1)}%">
-              <span class="lsv layer-pulse-val">${entry.audioPulse.toFixed(2)}</span>
-              <span class="layer-ctrl-label" style="margin-left:8px;width:auto" data-tooltip="Shrink on beat instead of grow">Shrink</span>
-              <label class="toggle-switch toggle-switch--sm">
-                <input type="checkbox" class="layer-pulse-inv" />
-                <span class="toggle-track"><span class="toggle-thumb"></span></span>
-              </label>
             </div>
             <div class="layer-row-inline">
               <span class="layer-ctrl-label">Spin</span>
@@ -1658,12 +1629,6 @@ export class EditorInspector {
               <input type="range" class="slider layer-liss-sl layer-liss-ph-sl" min="0" max="1" step="0.05"
                 value="${entry.lissPhase}" style="--pct:${pct(entry.lissPhase, 0, 1)}">
               <span class="lsv layer-liss-ph-val">${entry.lissPhase.toFixed(2)}</span>
-            </div>
-            <div class="layer-slider-row">
-              <span class="layer-ctrl-label">Bounce</span>
-              <input type="range" class="slider layer-bounce-sl" min="0" max="1" step="0.01"
-                value="${Math.sqrt(entry.bounceAmp / 0.4).toFixed(3)}" style="--pct:${(Math.sqrt(entry.bounceAmp / 0.4) * 100).toFixed(1)}%">
-              <span class="lsv layer-bounce-val">${entry.bounceAmp.toFixed(2)}</span>
             </div>
             <div class="layer-slider-row">
               <span class="layer-ctrl-label">Tunnel</span>
@@ -1757,8 +1722,7 @@ export class EditorInspector {
             </div>
             <div class="layer-section-divider"></div>
             <p class="layer-section-label">Audio Reactivity</p>
-            <p class="layer-section-sub">Source &amp; Curve shape the audio signal that powers all sound-driven animation on this layer.</p>
-            <p class="layer-section-sub" style="margin-top:-3px;margin-bottom:8px;color:var(--text-2)">↳ Pulse · Bounce · Beat Fade · Strobe</p>
+            <p class="layer-section-sub">Source &amp; Curve shape the audio signal that powers all sound-driven effects on this layer.</p>
             <div class="layer-row-inline" style="gap:8px;margin-bottom:6px">
               <span class="layer-ctrl-label" data-tooltip="Which frequency band drives this layer — Bass = kicks, Mid = melody/snare, Treble = hi-hats, Volume = overall mix loudness">Source</span>
               <select class="layer-react-source">
@@ -1768,7 +1732,7 @@ export class EditorInspector {
                 <option value="vol">Volume</option>
               </select>
             </div>
-            <div class="layer-row-inline" style="gap:8px;margin-bottom:4px">
+            <div class="layer-row-inline" style="gap:8px;margin-bottom:8px">
               <span class="layer-ctrl-label" data-tooltip="How the signal is shaped before reaching controls — Squared suppresses quiet hits, Cubed reserves reaction for the very loudest peaks, Gate flips binary on/off at 30%">Curve</span>
               <div class="layer-react-curve" role="group" aria-label="Reactivity curve">
                 <button class="lseg active" data-curve="linear">Linear</button>
@@ -1776,6 +1740,41 @@ export class EditorInspector {
                 <button class="lseg" data-curve="cubed">Cubed</button>
                 <button class="lseg" data-curve="threshold">Gate</button>
               </div>
+            </div>
+            <div class="layer-row-inline">
+              <span class="layer-ctrl-label" data-tooltip="Beat-driven size pulse — image grows (or shrinks) on every hit">Pulse</span>
+              <input type="range" class="slider layer-slider-inline layer-pulse-sl" min="0" max="1" step="0.01"
+                value="${Math.cbrt(entry.audioPulse / 2).toFixed(3)}" style="--pct:${(Math.cbrt(entry.audioPulse / 2) * 100).toFixed(1)}%">
+              <span class="lsv layer-pulse-val">${entry.audioPulse.toFixed(2)}</span>
+              <span class="layer-ctrl-label" style="margin-left:8px;width:auto" data-tooltip="Shrink on beat instead of grow">Shrink</span>
+              <label class="toggle-switch toggle-switch--sm">
+                <input type="checkbox" class="layer-pulse-inv" />
+                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+              </label>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Bass pushes the image upward on every beat">Bounce</span>
+              <input type="range" class="slider layer-bounce-sl" min="0" max="1" step="0.01"
+                value="${Math.cbrt(entry.bounceAmp / 0.4).toFixed(3)}" style="--pct:${(Math.cbrt(entry.bounceAmp / 0.4) * 100).toFixed(1)}%">
+              <span class="lsv layer-bounce-val">${entry.bounceAmp.toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Fades opacity in on every beat — layer pulses in and out with the music">Beat Fade</span>
+              <input type="range" class="slider layer-beat-fade-sl" min="0" max="1" step="0.01"
+                value="${Math.cbrt(entry.opacityPulse).toFixed(3)}" style="--pct:${(Math.cbrt(entry.opacityPulse) * 100).toFixed(1)}%">
+              <span class="lsv layer-beat-fade-val">${entry.opacityPulse.toFixed(2)}</span>
+            </div>
+            <div class="layer-row-inline">
+              <span class="layer-ctrl-label" data-tooltip="Hard opacity cut when audio crosses threshold — instant strobe flash">Strobe</span>
+              <input type="range" class="slider layer-slider-inline layer-strobe-sl" min="0" max="1" step="0.01"
+                value="${Math.cbrt(entry.strobeAmp).toFixed(3)}" style="--pct:${(Math.cbrt(entry.strobeAmp) * 100).toFixed(1)}%">
+              <span class="lsv layer-strobe-amp-val">${entry.strobeAmp.toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row layer-strobe-thr-row"${entry.strobeAmp <= 0 ? ' style="display:none"' : ''}>
+              <span class="layer-ctrl-label">Threshold</span>
+              <input type="range" class="slider layer-strobe-thr-sl" min="0.1" max="0.9" step="0.05"
+                value="${entry.strobeThr}" style="--pct:${pct(entry.strobeThr, 0.1, 0.9)}">
+              <span class="lsv layer-strobe-thr-val">${entry.strobeThr.toFixed(2)}</span>
             </div>
           </div>
         `;
@@ -1810,24 +1809,24 @@ export class EditorInspector {
             refresh();
         });
 
-        // Pulse inline slider — squared curve for more subtle range at low end
+        // Pulse inline slider — cubic curve: fine control in low end, extreme at top quarter
         const pulseSlider = card.querySelector('.layer-pulse-sl');
         const pulseVal = card.querySelector('.layer-pulse-val');
         pulseSlider.addEventListener('input', () => {
             const pos = parseFloat(pulseSlider.value);
-            const stored = pos * pos * 2;
+            const stored = pos * pos * pos * 2;
             entry.audioPulse = stored;
             pulseVal.textContent = stored.toFixed(2);
             pulseSlider.style.setProperty('--pct', `${(pos * 100).toFixed(1)}%`);
             refresh();
         });
 
-        // Bounce slider — squared curve for more subtle range at low end
+        // Bounce slider — cubic curve: fine control in low end, extreme at top quarter
         const bounceSlider = card.querySelector('.layer-bounce-sl');
         const bounceVal = card.querySelector('.layer-bounce-val');
         bounceSlider.addEventListener('input', () => {
             const pos = parseFloat(bounceSlider.value);
-            const stored = pos * pos * 0.4;
+            const stored = pos * pos * pos * 0.4;
             entry.bounceAmp = stored;
             bounceVal.textContent = stored.toFixed(2);
             bounceSlider.style.setProperty('--pct', `${(pos * 100).toFixed(1)}%`);
@@ -1847,14 +1846,14 @@ export class EditorInspector {
         });
 
         // Remaining slider rows — DOM order must match sliderKeys exactly:
-        // opacity, opacityPulse, spacing, orbitRadius, tunnelSpeed,
+        // opacity, spacing, orbitRadius, tunnelSpeed,
         // swayAmt, swaySpeed, wanderAmt, wanderSpeed, hueSpinSpeed
-        const sliderKeys = ['opacity', 'opacityPulse', 'spacing', 'orbitRadius', 'tunnelSpeed',
+        const sliderKeys = ['opacity', 'spacing', 'orbitRadius', 'tunnelSpeed',
             'swayAmt', 'swaySpeed', 'wanderAmt', 'wanderSpeed', 'hueSpinSpeed'];
-        const sliderMins = [0, 0, 0, 0, -2, 0, 0, 0, 0, 0];
-        const sliderMaxes = [1, 1, 0.8, 0.45, 2, 0.4, 4, 0.4, 2, 2];
+        const sliderMins = [0, 0, 0, -2, 0, 0, 0, 0, 0];
+        const sliderMaxes = [1, 0.8, 0.45, 2, 0.4, 4, 0.4, 2, 2];
 
-        card.querySelectorAll('.layer-slider-row input[type=range]:not(.layer-bounce-sl):not(.layer-size-sl):not(.layer-liss-sl):not(.layer-strobe-thr-sl):not(.layer-pan-x-sl):not(.layer-pan-y-sl):not(.layer-pan-range-sl)').forEach((sl, i) => {
+        card.querySelectorAll('.layer-slider-row input[type=range]:not(.layer-bounce-sl):not(.layer-size-sl):not(.layer-liss-sl):not(.layer-strobe-thr-sl):not(.layer-pan-x-sl):not(.layer-pan-y-sl):not(.layer-pan-range-sl):not(.layer-beat-fade-sl)').forEach((sl, i) => {
             const valEl = sl.nextElementSibling;
             sl.addEventListener('input', () => {
                 const v = parseFloat(sl.value);
@@ -1949,12 +1948,25 @@ export class EditorInspector {
         const strobeThrRow = card.querySelector('.layer-strobe-thr-row');
         const strobeThrSl = card.querySelector('.layer-strobe-thr-sl');
         const strobeThrVal = card.querySelector('.layer-strobe-thr-val');
+        // Beat Fade slider — cubic curve
+        const beatFadeSlider = card.querySelector('.layer-beat-fade-sl');
+        const beatFadeVal = card.querySelector('.layer-beat-fade-val');
+        beatFadeSlider.addEventListener('input', () => {
+            const pos = parseFloat(beatFadeSlider.value);
+            const stored = pos * pos * pos;
+            entry.opacityPulse = stored;
+            beatFadeVal.textContent = stored.toFixed(2);
+            beatFadeSlider.style.setProperty('--pct', `${(pos * 100).toFixed(1)}%`);
+            refresh();
+        });
+
         strobeSlider.addEventListener('input', () => {
-            entry.strobeAmp = parseFloat(strobeSlider.value);
-            strobeAmpVal.textContent = entry.strobeAmp.toFixed(2);
-            strobeSlider.style.setProperty('--pct', `${pct(entry.strobeAmp, 0, 1)}`);
+            const pos = parseFloat(strobeSlider.value);
+            const stored = pos * pos * pos;
+            entry.strobeAmp = stored;
+            strobeAmpVal.textContent = stored.toFixed(2);
+            strobeSlider.style.setProperty('--pct', `${(pos * 100).toFixed(1)}%`);
             strobeThrRow.style.display = entry.strobeAmp > 0 ? '' : 'none';
-            console.log('[STROBE]', { strobeAmp: entry.strobeAmp, opacity: entry.opacity });
             refresh();
         });
         strobeThrSl.addEventListener('input', () => {

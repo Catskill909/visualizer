@@ -17,7 +17,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     engine.init(canvas);
 
     // Initialize the control panel (binds all UI events)
-    new ControlPanel(engine);
+    const controls = new ControlPanel(engine);
+
+    // Load custom presets into engine.presets immediately so favorites cycling
+    // works from startup without requiring the drawer to be opened first.
+    // Re-sync the favorite pool after so custom-preset favorites pass the
+    // this.presets[n] check in _cyclePool (ControlPanel syncs before refresh).
+    engine.refreshCustomPresets();
+    controls.syncFavoritePool();
 
     // Initial canvas sizing
     engine.setSize(window.innerWidth, window.innerHeight);
