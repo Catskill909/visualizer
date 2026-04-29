@@ -91,6 +91,11 @@ Up to **5 image layers** in a collapsible smart-accordion stack. Adding a new la
 | **Hue Spin** | 0–2 | Rotates tint hue through full color wheel per second |
 | **Chromatic Aberration** | 0–1 | RGB channel split — animates red and blue in opposite directions for a glitchy color-fringe effect. Speed slider appears when Chromatic > 0. |
 | **Chromatic Speed** | 0–4 | Animation speed for the chromatic offset (cycles/sec). Hidden when Chromatic = 0. |
+| **Angle** | −180 to +180° | Static rotation offset — tilts the image at a fixed angle. When Spin is also non-zero, Angle acts as the starting/offset angle of the spin. Inline row directly below Spin. |
+| **Skew X** | −1 to +1 | Horizontal shear — slides the top edge left/right relative to the bottom, making tiles parallelogram-shaped. Applied after rotation, before tiling. |
+| **Skew Y** | −1 to +1 | Vertical shear — slides the right edge up/down relative to the left. Combine with Skew X for diamond / rhombus tile grids. |
+| **Tile Width** | 0.25–4.0 | Tile cell width multiplier. 1.0 = native image aspect (default). Values <1 narrow the cells; >1 widen them. Hidden when Tile is OFF. |
+| **Tile Height** | 0.25–4.0 | Tile cell height multiplier. 1.0 = native image aspect (default). Values <1 shorten the cells; >1 stretch them. Hidden when Tile is OFF. |
 | **Reactivity Source** | Bass / Mid / Treble / Volume | Which audio band drives all reactive controls (Pulse, Bounce, Beat Fade) on this layer. Default: Bass. A subtitle in the UI reads “Drives Pulse · Bounce · Beat Fade” as a reminder. |
 | **Reactivity Curve** | Linear / Squared / Cubed / Gate | Transform applied to the raw signal before driving reactive controls. Gate = hard on/off at 30% threshold. Default: Linear. |
 | **Aspect-correct tiling** | Automatic | Portrait, square, and landscape images tile without distortion. The GLSL pre-scales `_u.x` by `imgAsp × aspect.y` before the tile UV pipeline, so tile cells match the image’s native aspect ratio in screen pixels. No cropping, no letterboxing. |

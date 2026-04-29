@@ -791,6 +791,9 @@
             <p>A standalone creative editor for building your own audio-reactive visuals. Launch it from the start
               screen — it opens on its own page with a live canvas on the left and an inspector panel on the right.
               Every control is live; no page reload.</p>
+            <p class="welcome-note">📋 <strong>Note:</strong> This section is growing fast — many new controls have been
+              added and the help content hasn't caught up yet. A structured, searchable help UI is planned. For now,
+              controls are documented in the order they were shipped.</p>
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Five tabs</div>
@@ -812,8 +815,9 @@
                 layer has:</p>
               <ul class="welcome-list">
                 <li><strong>Solo / Mute</strong> — audition one layer in isolation or hide it without deleting.</li>
-                <li><strong>Animation</strong> — Tile, Spin, Orbit (Circle or Lissajous path), Tunnel zoom, Bounce
-                  (beat-lift), Sway, Wander, <strong>Pan</strong>, <strong>Chromatic Aberration</strong>, and a draggable XY anchor point.</li>
+                <li><strong>Animation</strong> — Tile, Spin, <strong>Angle</strong>, <strong>Skew X/Y</strong>, Orbit (Circle or Lissajous path), Tunnel zoom, Bounce
+                  (beat-lift), Sway, Wander, <strong>Pan</strong>, <strong>Chromatic Aberration</strong>,
+                  <strong>Tile Width &amp; Height</strong>, and a draggable XY anchor point.</li>
                 <li><strong>Beat Fade / Pulse / Strobe</strong> — audio drives opacity (smooth fade or hard strobe cut)
                   and size on every beat.</li>
                 <li><strong>Mirror</strong> — Off, Horizontal, Vertical, Quad, or Kaleido (6-slice polar fold). Apply
@@ -884,12 +888,67 @@
             </div>
 
             <div class="welcome-feature">
+              <div class="welcome-feature-title">Angle (Static Tilt)</div>
+              <p>An <strong>Angle</strong> slider (directly below Spin on each layer card) sets a fixed rotation offset
+                from −180° to +180° without any continuous spinning.</p>
+              <ul class="welcome-list">
+                <li><strong>Pure tilt</strong> — set Spin to 0 and drag Angle to lock the image at any diagonal. Great
+                  for logos at a jaunty angle or diagonal tile grids.</li>
+                <li><strong>Spin offset</strong> — when Spin is also non-zero, Angle acts as the starting angle of the
+                  rotation, so the spin begins from your chosen tilt rather than 0°.</li>
+                <li><strong>Works in all modes</strong> — tiled (rotates per tile), non-tiled (rotates the whole
+                  image), and tunnel.</li>
+                <li><strong>Saved with the preset</strong> — persists in the preset JSON. Presets without an Angle
+                  field default to 0° (no change).</li>
+              </ul>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Skew X / Y</div>
+              <p>Two sliders directly below Angle that apply a 2D shear transform — sliding opposite edges in
+                opposite directions to make tiles and images parallelogram-shaped.</p>
+              <ul class="welcome-list">
+                <li><strong>Skew X</strong> (−1 to +1) — slides the top edge left or right relative to the bottom.
+                  Positive values lean the image to the right; negative lean it to the left.</li>
+                <li><strong>Skew Y</strong> (−1 to +1) — slides the right edge up or down relative to the left.
+                  Combine both axes for diamond or rhombus-shaped tile grids.</li>
+                <li><strong>Pairs with Angle and Width/Height</strong> — together these four controls give you a
+                  complete 2D affine toolkit: rotate, scale, and shear any image independently.</li>
+                <li><strong>Works in all modes</strong> — tiled, non-tiled, and tunnel. Applied after rotation,
+                  before sizing, in every pipeline path.</li>
+                <li><strong>Saved with the preset</strong> — both values persist. Older presets default to 0 (no
+                  skew).</li>
+              </ul>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Tile Width &amp; Height</div>
+              <p>Two sliders in each image layer card (visible only when <strong>Tile</strong> is ON, sitting below
+                Spacing) that let you independently control the shape of each tile cell.</p>
+              <ul class="welcome-list">
+                <li><strong>Width</strong> (0.25–4.0) — stretches or squashes tile cells horizontally. 1.0 = native
+                  image aspect ratio (the default). Push below 1.0 for narrow portrait-style cells, above 1.0 for
+                  wide panoramic ones.</li>
+                <li><strong>Height</strong> (0.25–4.0) — same control on the vertical axis. Combine with Width to
+                  make square cells from a landscape image, or tall slivers from a square one.</li>
+                <li><strong>Squared curve</strong> — both sliders use a squared response so the 1.0 default lands at
+                  roughly mid-travel. Fine adjustments in the lower half, big stretches at the top.</li>
+                <li><strong>Composes with Spacing</strong> — changing cell shape doesn't affect gap size. Spacing
+                  still controls the gap between tiles as a fraction of each cell.</li>
+                <li><strong>Saved with the preset</strong> — both values persist in the preset JSON. Presets saved
+                  before this control existed default to 1.0 and render identically.</li>
+              </ul>
+            </div>
+
+            <div class="welcome-feature">
               <div class="welcome-feature-title">Workflow</div>
               <ul class="welcome-list">
                 <li><strong>Undo / Redo</strong> — 50-deep stack. <kbd>⌘Z</kbd> / <kbd>⌘⇧Z</kbd>.</li>
                 <li><strong>A/B compare</strong> — hold the button to preview the saved state; release to restore.</li>
                 <li><strong>Save</strong> — writes to your browser (localStorage + IndexedDB for images). Saved presets
                   appear in the <em>My Presets</em> tab of the main app.</li>
+                <li><strong>Reset a slider</strong> — double-click its label to snap it back to the default
+                  value instantly. Works on every slider in every layer card.</li>
                 <li><strong>Dev HUD</strong> — press <kbd>`</kbd> (backtick) to overlay frame time, estimated VRAM,
                   active layer count, and last shader rebuild time.</li>
               </ul>

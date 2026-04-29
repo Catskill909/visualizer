@@ -859,7 +859,9 @@ html, body {
 .layer-ctrl-label {
   font-size: 10px; color: var(--text-3); white-space: nowrap; flex-shrink: 0;
   width: 42px;
+  user-select: none; cursor: default;
 }
+.layer-ctrl-label.is-resettable { cursor: pointer; border-bottom: 1px dashed rgba(255,255,255,0.12); }
 .layer-row-inline .layer-ctrl-label { width: auto; }
 
 /* Slider rows inside a card */
@@ -1190,6 +1192,32 @@ html, body {
 @keyframes toast-in {
   from { transform: translateX(-50%) translateY(6px); opacity: 0; }
   to   { transform: translateX(-50%) translateY(0);   opacity: 1; }
+}
+
+/* First-use hint — larger, accent-tinted, distinct from system toasts */
+.hint {
+  position: fixed; bottom: 68px; left: 50%;
+  transform: translateX(-50%);
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 20px;
+  background: rgba(14,14,18,0.97);
+  border: 1px solid rgba(120,100,255,0.35);
+  border-radius: 14px;
+  font-size: 13px; color: rgba(200,195,255,0.92);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(120,100,255,0.08);
+  z-index: 301;
+  animation: hint-in 0.28s cubic-bezier(0.22,1,0.36,1);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.hint[hidden] { display: none; }
+.hint-icon { font-size: 16px; flex-shrink: 0; }
+.hint-text strong { color: rgba(180,170,255,1); font-weight: 600; }
+
+@keyframes hint-in {
+  from { transform: translateX(-50%) translateY(10px); opacity: 0; }
+  to   { transform: translateX(-50%) translateY(0);    opacity: 1; }
 }
 
 /* ══════════════════════════════════════════════════════════════════════

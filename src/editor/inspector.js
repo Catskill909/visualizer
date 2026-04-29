@@ -1476,6 +1476,11 @@ export class EditorInspector {
             strobeThr: 0.40,       // audio threshold to trigger strobe
             chromaticAberration: 0.00,  // RGB split amount (0-1)
             chromaticSpeed: 1.00,       // animation speed multiplier
+            tileScaleX: 1.00,      // independent tile cell width multiplier (1 = auto/native aspect)
+            tileScaleY: 1.00,      // independent tile cell height multiplier (1 = auto/native aspect)
+            angle: 0.00,           // static rotation offset in degrees (−180 to +180); added to _spinAng
+            skewX: 0.00,           // horizontal shear (−1 to +1); applied after rotation
+            skewY: 0.00,           // vertical shear (−1 to +1); applied after rotation
             isHd: hdMode,          // badge shown in card header
         };
         this.currentState.images.push(entry);
@@ -1483,6 +1488,7 @@ export class EditorInspector {
         const texObj = { data: resized.dataURL, width: resized.width, height: resized.height, isGif: resized.isGif || false, gifSpeed: entry.gifSpeed };
         this._mountLayerCard(entry, texObj);
         if (!resized.resized) showToast('Image layer added');
+        if (this.currentState.images.length === 1) showHint();
     }
 
     // ─── Mount a layer card from an entry + texObj ─────────────────────────────
@@ -1590,6 +1596,18 @@ export class EditorInspector {
                 value="${entry.spacing}" style="--pct:${pct(entry.spacing, 0, 0.8)}">
               <span class="lsv layer-spacing-val">${entry.spacing.toFixed(2)}</span>
             </div>
+            <div class="layer-slider-row layer-tile-scale-row"${entry.tile ? '' : ' style="display:none"'}>
+              <span class="layer-ctrl-label">Width</span>
+              <input type="range" class="slider layer-tile-sx-sl" min="0" max="1" step="0.01"
+                value="${Math.sqrt((entry.tileScaleX - 0.25) / 3.75).toFixed(3)}" style="--pct:${(Math.sqrt((entry.tileScaleX - 0.25) / 3.75) * 100).toFixed(1)}%">
+              <span class="lsv layer-tile-sx-val">${entry.tileScaleX.toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row layer-tile-scale-row"${entry.tile ? '' : ' style="display:none"'}>
+              <span class="layer-ctrl-label">Height</span>
+              <input type="range" class="slider layer-tile-sy-sl" min="0" max="1" step="0.01"
+                value="${Math.sqrt((entry.tileScaleY - 0.25) / 3.75).toFixed(3)}" style="--pct:${(Math.sqrt((entry.tileScaleY - 0.25) / 3.75) * 100).toFixed(1)}%">
+              <span class="lsv layer-tile-sy-val">${entry.tileScaleY.toFixed(2)}</span>
+            </div>
             <div class="layer-row-inline">
               <span class="layer-ctrl-label">Spin</span>
               <input type="range" class="slider layer-slider-inline layer-spin-sl" min="-3" max="3" step="0.05"
@@ -1602,6 +1620,24 @@ export class EditorInspector {
                   <span class="toggle-track"><span class="toggle-thumb"></span></span>
                 </label>
               </span>
+            </div>
+            <div class="layer-row-inline">
+              <span class="layer-ctrl-label">Angle</span>
+              <input type="range" class="slider layer-slider-inline layer-angle-sl" min="-180" max="180" step="1"
+                value="${(entry.angle || 0).toFixed(0)}" style="--pct:${pct(entry.angle || 0, -180, 180)}">
+              <span class="lsv layer-angle-val">${(entry.angle || 0).toFixed(0)}°</span>
+            </div>
+            <div class="layer-row-inline">
+              <span class="layer-ctrl-label">Skew X</span>
+              <input type="range" class="slider layer-slider-inline layer-skewx-sl" min="-1" max="1" step="0.01"
+                value="${(entry.skewX || 0).toFixed(2)}" style="--pct:${pct(entry.skewX || 0, -1, 1)}">
+              <span class="lsv layer-skewx-val">${(entry.skewX || 0).toFixed(2)}</span>
+            </div>
+            <div class="layer-row-inline">
+              <span class="layer-ctrl-label">Skew Y</span>
+              <input type="range" class="slider layer-slider-inline layer-skewy-sl" min="-1" max="1" step="0.01"
+                value="${(entry.skewY || 0).toFixed(2)}" style="--pct:${pct(entry.skewY || 0, -1, 1)}">
+              <span class="lsv layer-skewy-val">${(entry.skewY || 0).toFixed(2)}</span>
             </div>
             <div class="layer-slider-row">
               <span class="layer-ctrl-label">Orbit</span>
@@ -1686,7 +1722,7 @@ export class EditorInspector {
               </div>
             </div>
             <div class="layer-pan-pad-wrap layer-pan-row"${(entry.panMode || 'off') === 'off' ? ' style="display:none"' : ''}>
-              <canvas class="pan-pad" width="96" height="96" data-tooltip="Drag to set direction &amp; speed — distance from center = speed"></canvas>
+              <canvas class="pan-pad" width="96" height="96" data-tooltip="Drag to set direction & speed — distance from center = speed"></canvas>
               <button class="xy-reset pan-pad-reset" data-tooltip="Reset to stopped">↺</button>
               <span class="pan-pad-readout">${entry.panSpeedX.toFixed(2)} / ${entry.panSpeedY.toFixed(2)}</span>
             </div>
@@ -1817,12 +1853,14 @@ export class EditorInspector {
         const spacingRow = card.querySelector('.layer-spacing-row');
         const groupSpinWrap = card.querySelector('.layer-group-spin-wrap');
         const mirrorScopeRow = card.querySelector('.layer-mirror-scope');
+        const tileScaleRows = card.querySelectorAll('.layer-tile-scale-row');
         tileCb.addEventListener('change', () => {
             entry.tile = tileCb.checked;
             if (tunnelRow) tunnelRow.style.display = entry.tile ? '' : 'none';
             if (spacingRow) spacingRow.style.display = entry.tile ? '' : 'none';
             if (groupSpinWrap) groupSpinWrap.style.display = entry.tile ? '' : 'none';
             if (mirrorScopeRow && entry.mirror !== 'none') mirrorScopeRow.style.display = entry.tile ? '' : 'none';
+            tileScaleRows.forEach(r => { r.style.display = entry.tile ? '' : 'none'; });
             refresh();
         });
         pulseInvCb.addEventListener('change', () => { entry.pulseInvert = pulseInvCb.checked; refresh(); });
@@ -1836,6 +1874,37 @@ export class EditorInspector {
             entry.spinSpeed = v;
             spinVal.textContent = v.toFixed(2);
             spinSlider.style.setProperty('--pct', `${(((v - -3) / 6) * 100).toFixed(1)}%`);
+            refresh();
+        });
+
+        // Angle inline slider — linear, degrees displayed with ° suffix
+        const angleSlider = card.querySelector('.layer-angle-sl');
+        const angleVal = card.querySelector('.layer-angle-val');
+        angleSlider.addEventListener('input', () => {
+            const v = parseFloat(angleSlider.value);
+            entry.angle = v;
+            angleVal.textContent = `${v.toFixed(0)}°`;
+            angleSlider.style.setProperty('--pct', `${(((v - -180) / 360) * 100).toFixed(1)}%`);
+            refresh();
+        });
+
+        // Skew X/Y sliders — linear, range −1 to +1
+        const skewXSl = card.querySelector('.layer-skewx-sl');
+        const skewXVal = card.querySelector('.layer-skewx-val');
+        skewXSl.addEventListener('input', () => {
+            const v = parseFloat(skewXSl.value);
+            entry.skewX = v;
+            skewXVal.textContent = v.toFixed(2);
+            skewXSl.style.setProperty('--pct', `${(((v + 1) / 2) * 100).toFixed(1)}%`);
+            refresh();
+        });
+        const skewYSl = card.querySelector('.layer-skewy-sl');
+        const skewYVal = card.querySelector('.layer-skewy-val');
+        skewYSl.addEventListener('input', () => {
+            const v = parseFloat(skewYSl.value);
+            entry.skewY = v;
+            skewYVal.textContent = v.toFixed(2);
+            skewYSl.style.setProperty('--pct', `${(((v + 1) / 2) * 100).toFixed(1)}%`);
             refresh();
         });
 
@@ -1875,6 +1944,28 @@ export class EditorInspector {
             refresh();
         });
 
+        // Tile scale X/Y sliders — squared curve: pos² maps [0,1] → [0.25,4.0]
+        const tileSxSl = card.querySelector('.layer-tile-sx-sl');
+        const tileSxVal = card.querySelector('.layer-tile-sx-val');
+        tileSxSl.addEventListener('input', () => {
+            const pos = parseFloat(tileSxSl.value);
+            const stored = 0.25 + 3.75 * pos * pos;
+            entry.tileScaleX = stored;
+            tileSxVal.textContent = stored.toFixed(2);
+            tileSxSl.style.setProperty('--pct', `${(pos * 100).toFixed(1)}%`);
+            refresh();
+        });
+        const tileSySl = card.querySelector('.layer-tile-sy-sl');
+        const tileSyVal = card.querySelector('.layer-tile-sy-val');
+        tileSySl.addEventListener('input', () => {
+            const pos = parseFloat(tileSySl.value);
+            const stored = 0.25 + 3.75 * pos * pos;
+            entry.tileScaleY = stored;
+            tileSyVal.textContent = stored.toFixed(2);
+            tileSySl.style.setProperty('--pct', `${(pos * 100).toFixed(1)}%`);
+            refresh();
+        });
+
         // Remaining slider rows — DOM order must match sliderKeys exactly:
         // opacity, spacing, orbitRadius, tunnelSpeed,
         // swayAmt, swaySpeed, wanderAmt, wanderSpeed, hueSpinSpeed
@@ -1883,7 +1974,7 @@ export class EditorInspector {
         const sliderMins = [0, 0, 0, -2, 0, 0, 0, 0, 0];
         const sliderMaxes = [1, 0.8, 0.45, 2, 0.4, 4, 0.4, 2, 2];
 
-        card.querySelectorAll('.layer-slider-row input[type=range]:not(.layer-bounce-sl):not(.layer-size-sl):not(.layer-liss-sl):not(.layer-strobe-thr-sl):not(.layer-pan-x-sl):not(.layer-pan-y-sl):not(.layer-pan-range-sl):not(.layer-beat-fade-sl)').forEach((sl, i) => {
+        card.querySelectorAll('.layer-slider-row input[type=range]:not(.layer-bounce-sl):not(.layer-size-sl):not(.layer-liss-sl):not(.layer-strobe-thr-sl):not(.layer-pan-x-sl):not(.layer-pan-y-sl):not(.layer-pan-range-sl):not(.layer-beat-fade-sl):not(.layer-tile-sx-sl):not(.layer-tile-sy-sl)').forEach((sl, i) => {
             const valEl = sl.nextElementSibling;
             sl.addEventListener('input', () => {
                 const v = parseFloat(sl.value);
@@ -2304,6 +2395,29 @@ export class EditorInspector {
             this._resetImageLayer(entry, card);
         });
 
+        // ── Double-click label to reset slider ──────────────────────────────
+        // Stamp each range input with its initial pos+val so we can restore without
+        // knowing the per-slider curve. Then one delegated dblclick on any label
+        // finds its sibling slider and fires a synthetic 'input' event to trigger
+        // all the existing handler logic (entry update, display, --pct, refresh).
+        card.querySelectorAll('.layer-row-inline, .layer-slider-row').forEach(row => {
+            const sl = row.querySelector('input[type=range]');
+            if (!sl) return;
+            sl.dataset.defaultPos = sl.value;
+            const label = row.querySelector('.layer-ctrl-label');
+            if (label) label.classList.add('is-resettable');
+        });
+        card.addEventListener('dblclick', (e) => {
+            const label = e.target.closest('.is-resettable');
+            if (!label) return;
+            const row = label.closest('.layer-row-inline, .layer-slider-row');
+            if (!row) return;
+            const sl = row.querySelector('input[type=range]');
+            if (!sl || sl.dataset.defaultPos === undefined) return;
+            sl.value = sl.dataset.defaultPos;
+            sl.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+
         layers.appendChild(card);
         this._updateLayersBar();
         this._updateLayerIndices();
@@ -2548,6 +2662,14 @@ export class EditorInspector {
         const chromAmt = (img.chromaticAberration || 0).toFixed(4);
         const chromSpd = (img.chromaticSpeed !== undefined ? img.chromaticSpeed : 1.0).toFixed(4);
         const hasChromatic = parseFloat(chromAmt) > 0.001;
+        const tileScaleX = (img.tileScaleX !== undefined ? img.tileScaleX : 1.0).toFixed(4);
+        const tileScaleY = (img.tileScaleY !== undefined ? img.tileScaleY : 1.0).toFixed(4);
+        const angleDeg = (img.angle || 0);
+        const angleRad = (angleDeg * Math.PI / 180).toFixed(6);
+        const hasAngle = Math.abs(angleDeg) > 0.01;
+        const skewX = (img.skewX || 0).toFixed(4);
+        const skewY = (img.skewY || 0).toFixed(4);
+        const hasSkew = Math.abs(img.skewX || 0) > 0.001 || Math.abs(img.skewY || 0) > 0.001;
         const tex = `sampler_${img.texName}`;
         const imgAsp = (img.texW && img.texH) ? (img.texW / img.texH).toFixed(4) : '1.0000';
 
@@ -2572,7 +2694,7 @@ export class EditorInspector {
             strobeLines;
 
         const pulseSign = img.pulseInvert ? '-' : '+';
-        const hasSpin = parseFloat(sp) !== 0;
+        const hasSpin = parseFloat(sp) !== 0 || hasAngle;
         const hasOrbit = parseFloat(orb) !== 0;
         const hasLissajous = hasOrbit && orbitMode === 'lissajous';
         const hasBounce = parseFloat(bnc) !== 0;
@@ -2586,7 +2708,7 @@ export class EditorInspector {
         const tileMirror = hasMirror && mirrorScope === 'tile';
         const hasTint = parseFloat(hueSpin) !== 0 || parseFloat(tintR) !== 1 || parseFloat(tintG) !== 1 || parseFloat(tintB) !== 1;
         const groupSpin = img.tile && hasSpin && !!img.groupSpin;
-        const perTileSpin = img.tile && hasSpin && !img.groupSpin;
+        const perTileSpin = img.tile && hasSpin && !img.groupSpin && (parseFloat(sp) !== 0 || hasAngle);
         const fwd = (img.tunnelSpeed || 0) >= 0;
 
         let blendLine;
@@ -2599,7 +2721,12 @@ export class EditorInspector {
 
         let angLines = '';
         if (hasOrbit && !hasLissajous) angLines += `    float _orbAng = time * 0.5;\n`;
-        if (hasSpin) angLines += `    float _spinAng = time * ${sp};\n`;
+        if (hasSpin) {
+            const spinExpr = parseFloat(sp) !== 0
+                ? (hasAngle ? `time * ${sp} + ${angleRad}` : `time * ${sp}`)
+                : angleRad;
+            angLines += `    float _spinAng = ${spinExpr};\n`;
+        }
 
         // Image centre (anchor + orbit + bounce + sway + wander)
         let cxExpr = cx;
@@ -2706,12 +2833,32 @@ export class EditorInspector {
             return s;
         };
 
-        // Aspect-correct tiling: pre-scale _u.x by (imgAsp * aspect.y) BEFORE applyTileUV so
-        // the tile cells themselves have the image's native aspect ratio in screen pixels.
-        // Portrait image → portrait-shaped tiles; square → square tiles; 16:9 image on 16:9 → no-op.
+        // Skew (2×2 shear) — applied after rotation, before tiling/sizing.
+        // u.x += skewX * u.y;  u.y += skewY * u_x_orig
+        // Only emitted when at least one skew value is non-zero.
+        const applySkew = (varName) => {
+            if (!hasSkew) return '';
+            let s = `    { float _sx = ${varName}.x;
+`;
+            if (Math.abs(img.skewX || 0) > 0.001) s += `      ${varName}.x += ${skewX} * ${varName}.y;\n`;
+            if (Math.abs(img.skewY || 0) > 0.001) s += `      ${varName}.y += ${skewY} * _sx;\n`;
+            s += `    }\n`;
+            return s;
+        };
+
+        // Aspect-correct tiling: pre-scale _u.x by (imgAsp * aspect.y * tileScaleX) and
+        // _u.y by tileScaleY BEFORE applyTileUV so tile cells have the correct shape.
+        // tileScaleX/Y default to 1.0 → same output as before (fully backward-compatible).
         // Must be applied to each UV variable (or copy) just before its applyTileUV call.
-        const aspectPreScale = (varName) =>
-            `    ${varName}.x /= ${imgAsp} * aspect.y;\n`;
+        const tscXIsDefault = parseFloat(tileScaleX) === 1.0;
+        const tscYIsDefault = parseFloat(tileScaleY) === 1.0;
+        const aspectPreScale = (varName) => {
+            let s = `    ${varName}.x /= ${imgAsp} * aspect.y`;
+            if (!tscXIsDefault) s += ` * ${tileScaleX}`;
+            s += `;\n`;
+            if (!tscYIsDefault) s += `    ${varName}.y /= ${tileScaleY};\n`;
+            return s;
+        };
 
         const sizeBase = hasStrobe
             ? `${sz} * (1.0 ${pulseSign} _r * ${pu}) * mix(1.0, _strobeWave, ${stbAmp})`
@@ -2750,6 +2897,7 @@ export class EditorInspector {
             const tz2Expr = fwd ? `pow(2.0, _tp - 1.0)` : `pow(2.0, 1.0 - _tp)`;
             pipeline =
                 groupSpinLines +
+                applySkew('_u') +
                 `    float _tp = fract(time * ${ts});\n` +
                 `    float _tz1 = ${tz1Expr};\n` +
                 `    float _tz2 = ${tz2Expr};\n` +
@@ -2771,6 +2919,7 @@ export class EditorInspector {
         } else if (img.tile) {
             // Plain tiled — group spin rotates field first, then tile (with optional per-tile spin)
             pipeline = groupSpinLines +
+                applySkew('_u') +
                 `    float _gapMask = 1.0;\n` +
                 aspectPreScale('_u') +
                 applyTileUV('_u', sizeBase, '_gapMask', '_dx', '_dy') +
@@ -2781,13 +2930,14 @@ export class EditorInspector {
             // After scaling, check if UV is within [0,1] range of the first image instance
             const rotLines = hasSpin
                 ? `    float _ca = cos(_spinAng); float _sa = sin(_spinAng);\n` +
-                `    _u = vec2(_ca*_u.x - _sa*_u.y, _sa*_u.x + _ca*_u.y);\n`
+                  `    _u = vec2(_ca*_u.x - _sa*_u.y, _sa*_u.x + _ca*_u.y);\n`
                 : '';
             pipeline =
                 `    float _gapMask = 1.0;\n` +
                 aspectPreScale('_u') +  // Same as tiled: _u.x /= imgAsp * aspect.y
                 `    _u /= ${sizeBase};\n` +
                 rotLines +
+                applySkew('_u') +
                 `    vec2 _uInstanced = _u + 0.5;\n` +  // Center the UV (now range depends on aspect)
                 `    float _inBounds = step(0.0, _uInstanced.x) * step(_uInstanced.x, 1.0) * step(0.0, _uInstanced.y) * step(_uInstanced.y, 1.0);\n` +
                 `    _gapMask = _inBounds;\n` +  // Mask out-of-bounds pixels
@@ -2963,6 +3113,8 @@ export class EditorInspector {
             orbitMode: 'circle', lissFreqX: 0.50, lissFreqY: 0.75, lissPhase: 0.25,
             strobeAmp: 0.00, strobeThr: 0.40,
             chromaticAberration: 0.00, chromaticSpeed: 1.0,
+            tileScaleX: 1.00, tileScaleY: 1.00,
+            angle: 0.00, skewX: 0.00, skewY: 0.00,
             audioPulse: 0.00, pulseInvert: false,
             blendMode: 'overlay', tile: true, groupSpin: false,
             hueSpinSpeed: 0.00, tintR: 1.0, tintG: 1.0, tintB: 1.0,
@@ -3046,6 +3198,17 @@ export class EditorInspector {
 }
 
 // ─── Toast (exported for main.js) ────────────────────────────────────────────
+
+const HINT_KEY = 'discocast_hint_slider_reset_seen';
+export function showHint() {
+    if (localStorage.getItem(HINT_KEY)) return;
+    localStorage.setItem(HINT_KEY, '1');
+    const el = document.getElementById('hint');
+    if (!el) return;
+    el.hidden = false;
+    clearTimeout(el._t);
+    el._t = setTimeout(() => { el.hidden = true; }, 5000);
+}
 
 export function showToast(msg, isError = false) {
     const el = document.getElementById('toast');

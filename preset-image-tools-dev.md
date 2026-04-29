@@ -262,19 +262,52 @@ The "per-image canvas mirror" goal is effectively met by the Mirror scope toggle
 4. **Chromatic Aberration** ✅ — New "Visual Effects" section between Tint and Audio Reactivity. RGB channel split with animated offset. Speed slider appears when Chromatic > 0. GLSL resamples R and B channels with offset UVs (sinusoidally animated) while keeping G from original sample. Works in all modes (tunnel, tiled, non-tiled). Entry fields: `chromaticAberration` (0-1, **squared** UI curve for responsive low-end), `chromaticSpeed` (0-4).
    - **Implementation notes:** Uses `textureGrad()` for clean edge sampling. Offset UVs are clamped to [0,1] to prevent edge streaking. In non-tiled mode, chromatic respects the `_gapMask` so effect only applies within image bounds. GLSL offset multiplier set to 0.08 for visibility at low slider values.
 
+Difficulty key: 🟢 Low (< 1 hr, 1–2 fields + 1 slider) · 🟡 Medium (2–4 hrs, new GLSL pattern) · 🔴 High (4+ hrs, structural shader change or new pipeline stage)
+
 Remaining candidates (pick order based on demand after first two land):
-- **Independent tile X / Y scale** — separate Width and Height sliders for tiled images so the tile cell can be given an explicit aspect ratio instead of inheriting the screen ratio. Pairs with the current cover-crop behaviour: if Width < Height the tile is portrait-shaped and the image fills it exactly with no crop. Requested after Phase 5 portrait-image aspect fix.
-- **Beat Shake / Jitter** — omnidirectional displacement spike on kick, decays over ~4 frames. Different feel from the directional Bounce.
-- **Depth Stack (Z-phase offset)** — in tunnel mode, offset each layer's phase so they feel at different depths — genuine parallax during zoom.
-- **Scatter / Radial Clone** — draw N copies in a ring around the anchor. Count (2–12) × Ring Radius. Each clone can spin in place.
-- **Path recording** — drag the anchor dot for 4 seconds, record it as a looping path the layer follows.
+- **Independent tile X / Y scale** ✅ — **Shipped.** Two new tile-only slider rows **Width** and **Height** in each layer card, below Spacing. Range 0.25–4.0 with a squared UI curve (same feel as the Size slider). Entry fields: `tileScaleX` and `tileScaleY` (both default 1.0 → fully backward-compatible). GLSL: `aspectPreScale()` now divides `_u.x` by `imgAsp * aspect.y * tileScaleX` and optionally `_u.y` by `tileScaleY`; the Y line is omitted when `tileScaleY === 1.0` so generated shaders stay minimal. Rows auto-hide when Tile is OFF. Both sliders are excluded from the generic `sliderKeys[]` loop and wired individually (same pattern as Size, Pulse, Bounce).
+- **Static Angle / Tilt** ✅ 🟢 — **Shipped.** `angle` field (degrees, −180 to +180). Inline slider row directly below Spin. GLSL: `_spinAng` expression becomes `time * sp + angleRad` when both are set, or just `angleRad` when Spin = 0 (pure tilt). `hasSpin` flag now true whenever `sp ≠ 0 || hasAngle`, so the rotation matrix always emits when either is non-zero. `perTileSpin` retains the original guard so a pure tilt on a tiled layer rotates per-tile as expected. Backward-compatible: `angle` absent → defaults to `0.00` (no-op).
+- **Skew X / Y** ✅ 🟢 — **Shipped.** Two inline sliders (Skew X and Skew Y, −1 to +1) directly below Angle. Applied as a 2×2 shear matrix to `_u` in all three pipeline paths (tiled, non-tiled, tunnel) — after group spin / rotation, before `aspectPreScale` and sizing. `applySkew(varName)` helper emits only when non-zero (zero cost at default). `skewX`/`skewY` fields, both default 0.00. Makes tiles parallelogram-shaped — slanted logos, diagonal grids, italic-style strips. Composes with Angle, Width/Height to give a full 2D affine toolkit.
+- **Perspective tilt** 🟡 — Simulate a card receding into distance on one axis (floor-tile or billboard lean). Implemented as a projective UV warp: divide by a depth term that varies linearly across the image. Two sliders: Perspective X and Perspective Y (how much the near/far edge scales). Visually distinct from skew — skew keeps parallel lines parallel; perspective makes them converge. Requires careful handling of the depth=0 singularity at extreme values.
+- **Beat Shake / Jitter** 🟢 — Omnidirectional UV displacement spike on kick, decays over ~4 frames. Different feel from the directional Bounce. One `shakeAmp` field, simple per-frame impulse in GLSL.
+- **Depth Stack (Z-phase offset)** 🟡 — In tunnel mode, offset each layer's zoom phase so they feel at different depths — genuine parallax during zoom. One `depthOffset` field (0–1), added to the tunnel `fract()` phase. Tunnel-only; no-op otherwise.
+- **Scatter / Radial Clone** 🔴 — Draw N copies in a ring around the anchor. Count (2–12) × Ring Radius. Each clone can spin in place. Requires looping UV sampling in the shader (unrollable but verbose) — structural change to the sample pipeline.
+- **Path recording** 🔴 — Drag the anchor dot for 4 seconds, record it as a looping path the layer follows. Requires a path data structure in the preset JSON and a playback interpolator in GLSL (texture-based LUT or polynomial fit).
 - ~~**Chromatic aberration**~~ ✅ **Shipped** — See Phase 6 shipped list above.
-- **Edge / Sobel mode** — replace sampled pixel with its edge detection. Any image → neon line art.
-- **Posterize / Threshold** — bucket colors to N levels. Pairs with tint + hue spin we already have.
-- **Displacement mapping** — use Layer 2 as a UV displacement source for Layer 1. Rippling, heat-haze, glitch.
+- **Edge / Sobel mode** 🟡 — Replace sampled pixel with its edge detection result. Any image → neon line art. Requires a 3×3 Sobel kernel sample (9 texture reads per pixel) — cost is real but acceptable for one layer.
+- **Posterize / Threshold** 🟢 — Bucket colors to N levels. One `posterize` int field (2–16 steps), one line of GLSL (`floor(c * n) / n`). Pairs with tint + hue spin.
+- **Displacement mapping** 🔴 — Use Layer 2 as a UV displacement source for Layer 1. Rippling, heat-haze, glitch. Requires cross-layer sampling and a defined layer evaluation order — significant shader builder change.
 
 **Open questions:**
 - Some of these (Displacement, Scatter) will change the shader builder shape. Schedule those later in the phase.
+
+---
+
+## Onboarding — First-use tips modal
+
+**Goal:** Replace the transient hint toast with a proper modal that gives new users a real orientation to the editor.
+
+**Design decisions (settled):**
+- Shows automatically on first editor open (localStorage flag `discocast_onboarding_seen`)
+- Shows every session **until** the user clicks **"Never show again"** — so curious users who dismiss it early can still see it on the next visit
+- "Never show again" sets the flag permanently; a reset link buried in settings can clear it
+- Modal is dismissible via backdrop click / Escape (but does NOT set the permanent flag — only the explicit button does)
+
+**Content (first pass):**
+- **Double-click any slider label** to reset it to default
+- **Drag the anchor dot** on the canvas to reposition a layer
+- **Undo / Redo** — ⌘Z / ⌘⇧Z, 50-step history
+- **Collapse layer cards** by clicking the header strip — keeps the panel tidy with multiple layers
+- **Save** writes to your browser; open the main app → My Presets to play it back
+- Link to open the full in-app Help guide
+
+**Implementation notes:**
+- Reuse the existing modal backdrop + `.save-modal` style — no new CSS infrastructure needed
+- One `<div id="onboarding-modal">` in `editor.html`, hidden by default
+- `showOnboarding()` exported from `inspector.js` alongside `showToast` / `showHint`
+- Remove the current `showHint()` toast once this lands (it's a stopgap)
+
+**Priority:** Medium — ship after the next 1–2 feature additions so the tips list is more complete.
 
 ---
 
