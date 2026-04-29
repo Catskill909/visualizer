@@ -205,10 +205,16 @@ STABLE_DMG="promo/DiscoCast-Visualizer.dmg"
 cp "$FINAL_DMG" "$STABLE_DMG"
 echo -e "${GREEN}Stable copy: ${STABLE_DMG}${NC}"
 
-# Step 9: Write version.json — promo page fetches this, no HTML edits needed
+# Step 9: Write version.json — promo page fetches this when served over HTTP
 echo -e "${YELLOW}Step 9: Writing promo/version.json (${APP_VERSION})...${NC}"
 printf '{"version": "%s"}\n' "${APP_VERSION}" > promo/version.json
 echo -e "${GREEN}promo/version.json → ${APP_VERSION}${NC}"
+
+# Step 9b: Patch the inline span fallback in promo/index.html so the version
+# shows correctly even when the file is opened locally (file:// blocks fetch).
+echo -e "${YELLOW}Step 9b: Patching version span in promo/index.html...${NC}"
+sed -i '' "s|<span id=\"app-version\">[^<]*</span>|<span id=\"app-version\">${APP_VERSION}</span>|" promo/index.html
+echo -e "${GREEN}promo/index.html span → ${APP_VERSION}${NC}"
 
 echo ""
 echo -e "${GREEN}✅ Build complete!${NC}"
