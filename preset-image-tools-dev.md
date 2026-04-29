@@ -1,6 +1,6 @@
 # Preset Image Tools — Phased Dev Plan
 
-> **Status:** Phase 1 ✅ · Phase 2 ✅ · Phase 3 ✅ (delivered early during Phase 1 polish) · Phase 4 ✅ · Phase 5 ✅ · Phase 6 ✅ (Lissajous + Strobe shipped)
+> **Status:** Phase 1 ✅ · Phase 2 ✅ · Phase 3 ✅ (delivered early during Phase 1 polish) · Phase 4 ✅ · Phase 5 ✅ · Phase 6 ✅ (Lissajous + Strobe + Pan + Chromatic Aberration shipped)
 > Companion to [custom-preset-editor.md](custom-preset-editor.md).
 > Each phase below is independently shippable. We pause after each to review before starting the next.
 
@@ -255,10 +255,12 @@ The "per-image canvas mirror" goal is effectively met by the Mirror scope toggle
 
 **Goal:** expand what a single layer can *do*. Ship these individually in priority order.
 
-**Priority order (first three shipped):**
+**Priority order (shipped):**
 1. **Lissajous path** ✅ — Path toggle on the Orbit section: `Circle` | `Lissajous`. Lissajous mode reveals Freq X, Freq Y, and Phase sliders. The ratio between Freq X and Freq Y determines the figure shape (2:3 = figure-8, 3:4 = four-leaf clover, etc.). Orbit amplitude slider controls path size. Backward-compatible: `orbitMode` absent → defaults to `'circle'`.
 2. **Strobe / Blink** ✅ — Strobe slider in the opacity section (below Beat Fade). Hard binary cut using `step(threshold, _r_raw)` in GLSL — reads the *raw* audio signal (pre-curve) so the trigger is absolute, not shaped. Threshold row auto-shows when Strobe > 0.
 3. **Pan** ✅ — Whole-group Left/Right and Up/Down translation. Three modes: Off, Drift (continuous linear travel — endless tile scroll or logo crawl), Bounce (ping-pong around anchor with independent X/Y rates and a Range half-amplitude slider). Applies at the group anchor level, so tiled layers scroll the entire grid as one unit with seamless wrap. Composes additively with Sway, Wander, and Orbit. State: `panMode` (`'off'|'drift'|'bounce'`), `panSpeedX`, `panSpeedY` (±2 UV/sec signed), `panRange` (0–1). See [preset-image-pan-dev.md](preset-image-pan-dev.md) for full architecture notes.
+4. **Chromatic Aberration** ✅ — New "Visual Effects" section between Tint and Audio Reactivity. RGB channel split with animated offset. Speed slider appears when Chromatic > 0. GLSL resamples R and B channels with offset UVs (sinusoidally animated) while keeping G from original sample. Works in all modes (tunnel, tiled, non-tiled). Entry fields: `chromaticAberration` (0-1, **squared** UI curve for responsive low-end), `chromaticSpeed` (0-4).
+   - **Implementation notes:** Uses `textureGrad()` for clean edge sampling. Offset UVs are clamped to [0,1] to prevent edge streaking. In non-tiled mode, chromatic respects the `_gapMask` so effect only applies within image bounds. GLSL offset multiplier set to 0.08 for visibility at low slider values.
 
 Remaining candidates (pick order based on demand after first two land):
 - **Independent tile X / Y scale** — separate Width and Height sliders for tiled images so the tile cell can be given an explicit aspect ratio instead of inheriting the screen ratio. Pairs with the current cover-crop behaviour: if Width < Height the tile is portrait-shaped and the image fills it exactly with no crop. Requested after Phase 5 portrait-image aspect fix.
@@ -266,7 +268,7 @@ Remaining candidates (pick order based on demand after first two land):
 - **Depth Stack (Z-phase offset)** — in tunnel mode, offset each layer's phase so they feel at different depths — genuine parallax during zoom.
 - **Scatter / Radial Clone** — draw N copies in a ring around the anchor. Count (2–12) × Ring Radius. Each clone can spin in place.
 - **Path recording** — drag the anchor dot for 4 seconds, record it as a looping path the layer follows.
-- **Chromatic aberration** — per-layer RGB-channel UV offset. Two extra samples, huge payoff.
+- ~~**Chromatic aberration**~~ ✅ **Shipped** — See Phase 6 shipped list above.
 - **Edge / Sobel mode** — replace sampled pixel with its edge detection. Any image → neon line art.
 - **Posterize / Threshold** — bucket colors to N levels. Pairs with tint + hue spin we already have.
 - **Displacement mapping** — use Layer 2 as a UV displacement source for Layer 1. Rippling, heat-haze, glitch.

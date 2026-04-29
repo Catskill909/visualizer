@@ -1474,6 +1474,8 @@ export class EditorInspector {
             lissPhase: 0.25,       // Lissajous X phase offset (0–1 cycles)
             strobeAmp: 0.00,       // Phase 6: hard beat-cut intensity (0=off, 1=full black)
             strobeThr: 0.40,       // audio threshold to trigger strobe
+            chromaticAberration: 0.00,  // RGB split amount (0-1)
+            chromaticSpeed: 1.00,       // animation speed multiplier
             isHd: hdMode,          // badge shown in card header
         };
         this.currentState.images.push(entry);
@@ -1582,22 +1584,24 @@ export class EditorInspector {
                 value="${Math.sqrt((entry.size - 0.05) / 1.45).toFixed(3)}" style="--pct:${(Math.sqrt((entry.size - 0.05) / 1.45) * 100).toFixed(1)}%">
               <span class="lsv layer-size-val">${entry.size.toFixed(2)}</span>
             </div>
-            <div class="layer-slider-row">
+            <div class="layer-slider-row layer-spacing-row"${entry.tile ? '' : ' style="display:none"'}>
               <span class="layer-ctrl-label">Spacing</span>
-              <input type="range" class="slider" min="0" max="0.8" step="0.01"
+              <input type="range" class="slider layer-spacing-sl" min="0" max="0.8" step="0.01"
                 value="${entry.spacing}" style="--pct:${pct(entry.spacing, 0, 0.8)}">
-              <span class="lsv">${entry.spacing.toFixed(2)}</span>
+              <span class="lsv layer-spacing-val">${entry.spacing.toFixed(2)}</span>
             </div>
             <div class="layer-row-inline">
               <span class="layer-ctrl-label">Spin</span>
               <input type="range" class="slider layer-slider-inline layer-spin-sl" min="-3" max="3" step="0.05"
                 value="${entry.spinSpeed}" style="--pct:${pct(entry.spinSpeed, -3, 3)}">
               <span class="lsv layer-spin-val">${entry.spinSpeed.toFixed(2)}</span>
-              <span class="layer-ctrl-label" style="margin-left:8px;width:auto" data-tooltip="Rotate the whole tile grid instead of each tile">Group</span>
-              <label class="toggle-switch toggle-switch--sm">
-                <input type="checkbox" class="layer-group-spin" />
-                <span class="toggle-track"><span class="toggle-thumb"></span></span>
-              </label>
+              <span class="layer-group-spin-wrap"${entry.tile ? '' : ' style="display:none"'}>
+                <span class="layer-ctrl-label" style="margin-left:8px;width:auto" data-tooltip="Rotate the whole tile grid instead of each tile">Group</span>
+                <label class="toggle-switch toggle-switch--sm">
+                  <input type="checkbox" class="layer-group-spin" />
+                  <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                </label>
+              </span>
             </div>
             <div class="layer-slider-row">
               <span class="layer-ctrl-label">Orbit</span>
@@ -1630,11 +1634,11 @@ export class EditorInspector {
                 value="${entry.lissPhase}" style="--pct:${pct(entry.lissPhase, 0, 1)}">
               <span class="lsv layer-liss-ph-val">${entry.lissPhase.toFixed(2)}</span>
             </div>
-            <div class="layer-slider-row">
+            <div class="layer-slider-row layer-tunnel-row"${entry.tile ? '' : ' style="display:none"'}>
               <span class="layer-ctrl-label">Tunnel</span>
-              <input type="range" class="slider" min="-2" max="2" step="0.05"
+              <input type="range" class="slider layer-tunnel-sl" min="-2" max="2" step="0.05"
                 value="${entry.tunnelSpeed}" style="--pct:${pct(entry.tunnelSpeed, -2, 2)}">
-              <span class="lsv">${entry.tunnelSpeed.toFixed(2)}</span>
+              <span class="lsv layer-tunnel-val">${entry.tunnelSpeed.toFixed(2)}</span>
             </div>
             <div class="layer-center-row">
               <span class="layer-ctrl-label" style="margin-bottom:5px">Center</span>
@@ -1701,7 +1705,7 @@ export class EditorInspector {
               <button class="lseg" data-mirror="quad">⊞ Quad</button>
               <button class="lseg" data-mirror="kaleido">✦ Kaleido</button>
             </div>
-            <div class="layer-mirror-scope" role="group" aria-label="Mirror scope" hidden>
+            <div class="layer-mirror-scope" role="group" aria-label="Mirror scope" hidden${entry.tile ? '' : ' style="display:none"'}>
               <button class="lseg lseg-scope active" data-scope="tile" data-tooltip="Fold inside each tile">Per Tile</button>
               <button class="lseg lseg-scope" data-scope="field" data-tooltip="Fold the whole tiled group">Whole Image</button>
             </div>
@@ -1719,6 +1723,21 @@ export class EditorInspector {
               <input type="range" class="slider" min="0" max="2" step="0.02"
                 value="${entry.hueSpinSpeed}" style="--pct:${pct(entry.hueSpinSpeed, 0, 2)}">
               <span class="lsv">${entry.hueSpinSpeed.toFixed(2)}</span>
+            </div>
+            <div class="layer-section-divider"></div>
+            <p class="layer-section-label">Visual Effects</p>
+            <p class="layer-section-sub">Fluid color effects independent of audio.</p>
+            <div class="layer-row-inline">
+              <span class="layer-ctrl-label" data-tooltip="RGB channel split — animates red and blue in opposite directions for a glitchy chromatic look">Chromatic</span>
+              <input type="range" class="slider layer-slider-inline layer-chromatic-sl" min="0" max="1" step="0.01"
+                value="${Math.sqrt(entry.chromaticAberration).toFixed(3)}" style="--pct:${(Math.sqrt(entry.chromaticAberration) * 100).toFixed(1)}%">
+              <span class="lsv layer-chromatic-val">${entry.chromaticAberration.toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row layer-chromatic-speed-row"${entry.chromaticAberration <= 0 ? ' style="display:none"' : ''}>
+              <span class="layer-ctrl-label">Speed</span>
+              <input type="range" class="slider layer-chromatic-speed-sl" min="0" max="4" step="0.1"
+                value="${entry.chromaticSpeed}" style="--pct:${pct(entry.chromaticSpeed, 0, 4)}">
+              <span class="lsv layer-chromatic-speed-val">${entry.chromaticSpeed.toFixed(1)}</span>
             </div>
             <div class="layer-section-divider"></div>
             <p class="layer-section-label">Audio Reactivity</p>
@@ -1794,7 +1813,18 @@ export class EditorInspector {
         const groupSpinCb = card.querySelector('.layer-group-spin');
 
         blendSel.addEventListener('change', () => { entry.blendMode = blendSel.value; refresh(); });
-        tileCb.addEventListener('change', () => { entry.tile = tileCb.checked; refresh(); });
+        const tunnelRow = card.querySelector('.layer-tunnel-row');
+        const spacingRow = card.querySelector('.layer-spacing-row');
+        const groupSpinWrap = card.querySelector('.layer-group-spin-wrap');
+        const mirrorScopeRow = card.querySelector('.layer-mirror-scope');
+        tileCb.addEventListener('change', () => {
+            entry.tile = tileCb.checked;
+            if (tunnelRow) tunnelRow.style.display = entry.tile ? '' : 'none';
+            if (spacingRow) spacingRow.style.display = entry.tile ? '' : 'none';
+            if (groupSpinWrap) groupSpinWrap.style.display = entry.tile ? '' : 'none';
+            if (mirrorScopeRow && entry.mirror !== 'none') mirrorScopeRow.style.display = entry.tile ? '' : 'none';
+            refresh();
+        });
         pulseInvCb.addEventListener('change', () => { entry.pulseInvert = pulseInvCb.checked; refresh(); });
         groupSpinCb.addEventListener('change', () => { entry.groupSpin = groupSpinCb.checked; refresh(); });
 
@@ -1973,6 +2003,28 @@ export class EditorInspector {
             entry.strobeThr = parseFloat(strobeThrSl.value);
             strobeThrVal.textContent = entry.strobeThr.toFixed(2);
             strobeThrSl.style.setProperty('--pct', `${pct(entry.strobeThr, 0.1, 0.9)}`);
+            refresh();
+        });
+
+        // Visual Effects: Chromatic Aberration
+        const chromaticSl = card.querySelector('.layer-chromatic-sl');
+        const chromaticVal = card.querySelector('.layer-chromatic-val');
+        const chromaticSpeedRow = card.querySelector('.layer-chromatic-speed-row');
+        const chromaticSpeedSl = card.querySelector('.layer-chromatic-speed-sl');
+        const chromaticSpeedVal = card.querySelector('.layer-chromatic-speed-val');
+        chromaticSl.addEventListener('input', () => {
+            const pos = parseFloat(chromaticSl.value);
+            const stored = pos * pos; // squared curve - more responsive at low end
+            entry.chromaticAberration = stored;
+            chromaticVal.textContent = stored.toFixed(2);
+            chromaticSl.style.setProperty('--pct', `${(pos * 100).toFixed(1)}%`);
+            chromaticSpeedRow.style.display = stored > 0 ? '' : 'none';
+            refresh();
+        });
+        chromaticSpeedSl.addEventListener('input', () => {
+            entry.chromaticSpeed = parseFloat(chromaticSpeedSl.value);
+            chromaticSpeedVal.textContent = entry.chromaticSpeed.toFixed(1);
+            chromaticSpeedSl.style.setProperty('--pct', `${pct(entry.chromaticSpeed, 0, 4)}`);
             refresh();
         });
 
@@ -2493,6 +2545,9 @@ export class EditorInspector {
         const stbAmp = (img.strobeAmp || 0).toFixed(4);
         const stbThr = (img.strobeThr !== undefined ? img.strobeThr : 0.4).toFixed(4);
         const hasStrobe = parseFloat(stbAmp) !== 0;
+        const chromAmt = (img.chromaticAberration || 0).toFixed(4);
+        const chromSpd = (img.chromaticSpeed !== undefined ? img.chromaticSpeed : 1.0).toFixed(4);
+        const hasChromatic = parseFloat(chromAmt) > 0.001;
         const tex = `sampler_${img.texName}`;
         const imgAsp = (img.texW && img.texH) ? (img.texW / img.texH).toFixed(4) : '1.0000';
 
@@ -2722,21 +2777,63 @@ export class EditorInspector {
                 applyMirrorUV('_u');
             sampleLine = `    vec4 _t = textureGrad(${tex}, _u, _dx, _dy);\n`;
         } else {
-            // Non-tiled: clamp edges, optional spin
+            // Non-tiled: use same aspectPreScale as tiled, but show single instance (no fract wrapping)
+            // After scaling, check if UV is within [0,1] range of the first image instance
             const rotLines = hasSpin
                 ? `    float _ca = cos(_spinAng); float _sa = sin(_spinAng);\n` +
                 `    _u = vec2(_ca*_u.x - _sa*_u.y, _sa*_u.x + _ca*_u.y);\n`
                 : '';
             pipeline =
                 `    float _gapMask = 1.0;\n` +
-                `    _u.x *= aspect.y;\n` +
+                aspectPreScale('_u') +  // Same as tiled: _u.x /= imgAsp * aspect.y
                 `    _u /= ${sizeBase};\n` +
                 rotLines +
-                `    _u.x /= aspect.y;\n` +
-                `    _u = clamp(_u + 0.5, 0.0, 1.0);\n` +
+                `    vec2 _uInstanced = _u + 0.5;\n` +  // Center the UV (now range depends on aspect)
+                `    float _inBounds = step(0.0, _uInstanced.x) * step(_uInstanced.x, 1.0) * step(0.0, _uInstanced.y) * step(_uInstanced.y, 1.0);\n` +
+                `    _gapMask = _inBounds;\n` +  // Mask out-of-bounds pixels
+                `    _u = clamp(_uInstanced, 0.0, 1.0);\n` +  // Clamp for texture sampling
                 applyMirrorUV('_u');
             sampleLine = `    vec4 _t = texture(${tex}, _u);\n`;
         }
+
+        // Chromatic aberration: generate offset UV sampling based on which mode we're in
+        const chromaticLines = hasChromatic
+            ? (() => {
+                const chromOffset = `${chromAmt} * 0.08`; // increased for more visible effect at low slider values
+                const chromPhase = `time * ${chromSpd}`;
+                // For tunnel mode, we apply chromatic to the final mixed _t by resampling both A and B (clamped)
+                if (hasTunnel) {
+                    return (
+                        `    float _caOff = sin(${chromPhase}) * ${chromOffset};\n` +
+                        `    vec2 _caU_ar = clamp(_uA + vec2(_caOff, 0.0), 0.0, 1.0);\n` +
+                        `    vec2 _caU_ab = clamp(_uA - vec2(_caOff, 0.0), 0.0, 1.0);\n` +
+                        `    vec2 _caU_br = clamp(_uB + vec2(_caOff, 0.0), 0.0, 1.0);\n` +
+                        `    vec2 _caU_bb = clamp(_uB - vec2(_caOff, 0.0), 0.0, 1.0);\n` +
+                        `    _t.x = mix(textureGrad(${tex}, _caU_ar, _dxA, _dyA).r, textureGrad(${tex}, _caU_br, _dxB, _dyB).r, _tf);\n` +
+                        `    _t.z = mix(textureGrad(${tex}, _caU_ab, _dxA, _dyA).b, textureGrad(${tex}, _caU_bb, _dxB, _dyB).b, _tf);\n`
+                    );
+                }
+                // For tiled mode, resample using the tiled UV in _u (clamped to prevent sampling neighboring tiles)
+                if (img.tile) {
+                    return (
+                        `    float _caOff = sin(${chromPhase}) * ${chromOffset};\n` +
+                        `    vec2 _caU_r = clamp(_u + vec2(_caOff, 0.0), 0.0, 1.0);\n` +
+                        `    vec2 _caU_b = clamp(_u - vec2(_caOff, 0.0), 0.0, 1.0);\n` +
+                        `    _t.x = textureGrad(${tex}, _caU_r, _dx, _dy).r;\n` +
+                        `    _t.z = textureGrad(${tex}, _caU_b, _dx, _dy).b;\n`
+                    );
+                }
+                // Non-tiled mode: apply chromatic within bounds only
+                return (
+                    `    float _caOff = sin(${chromPhase}) * ${chromOffset};\n` +
+                    `    vec2 _caDx = dFdx(_u); vec2 _caDy = dFdy(_u);\n` +
+                    `    vec2 _caU_r = clamp(_u + vec2(_caOff, 0.0), 0.0, 1.0);\n` +
+                    `    vec2 _caU_b = clamp(_u - vec2(_caOff, 0.0), 0.0, 1.0);\n` +
+                    `    _t.x = mix(_t.x, textureGrad(${tex}, _caU_r, _caDx, _caDy).r, _gapMask);\n` +
+                    `    _t.z = mix(_t.z, textureGrad(${tex}, _caU_b, _caDx, _caDy).b, _gapMask);\n`
+                );
+            })()
+            : '';
 
         return (
             `  {\n` +
@@ -2745,6 +2842,7 @@ export class EditorInspector {
             centerLines +
             pipeline +
             sampleLine +
+            chromaticLines +
             `    vec3 _src = _t.xyz;\n` +
             (hasTint ? (() => {
                 if (parseFloat(hueSpin) !== 0) {
@@ -2864,6 +2962,7 @@ export class EditorInspector {
             reactSource: 'bass', reactCurve: 'linear',
             orbitMode: 'circle', lissFreqX: 0.50, lissFreqY: 0.75, lissPhase: 0.25,
             strobeAmp: 0.00, strobeThr: 0.40,
+            chromaticAberration: 0.00, chromaticSpeed: 1.0,
             audioPulse: 0.00, pulseInvert: false,
             blendMode: 'overlay', tile: true, groupSpin: false,
             hueSpinSpeed: 0.00, tintR: 1.0, tintG: 1.0, tintB: 1.0,

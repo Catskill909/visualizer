@@ -813,7 +813,7 @@
               <ul class="welcome-list">
                 <li><strong>Solo / Mute</strong> — audition one layer in isolation or hide it without deleting.</li>
                 <li><strong>Animation</strong> — Tile, Spin, Orbit (Circle or Lissajous path), Tunnel zoom, Bounce
-                  (beat-lift), Sway, Wander, <strong>Pan</strong>, and a draggable XY anchor point.</li>
+                  (beat-lift), Sway, Wander, <strong>Pan</strong>, <strong>Chromatic Aberration</strong>, and a draggable XY anchor point.</li>
                 <li><strong>Beat Fade / Pulse / Strobe</strong> — audio drives opacity (smooth fade or hard strobe cut)
                   and size on every beat.</li>
                 <li><strong>Mirror</strong> — Off, Horizontal, Vertical, Quad, or Kaleido (6-slice polar fold). Apply
@@ -846,6 +846,22 @@
                   exact playback rate you set.</li>
                 <li><strong>File size</strong> — GIFs are stored uncompressed once decoded; very large or long GIFs can
                   use significant memory. Trim or downsize beforehand if you hit limits.</li>
+              </ul>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Chromatic Aberration</div>
+              <p>RGB channel split with animated offset — creates a glitchy color-fringe effect. Found in the <strong>Visual
+                  Effects</strong> section (between Tint and Audio Reactivity) on each image layer.</p>
+              <ul class="welcome-list">
+                <li><strong>Chromatic slider</strong> (0–1) — amount of red/blue offset. Uses a squared curve for
+                  responsive control at low values; you’ll see the effect within the first quarter of the slider.</li>
+                <li><strong>Speed slider</strong> (0–4) — animation rate of the offset. Appears automatically when
+                  Chromatic is greater than 0. Red and blue channels animate in opposite directions while green stays
+                  anchored.</li>
+                <li><strong>Works in all modes</strong> — tiled, non-tiled, and tunnel. The effect respects image bounds
+                  in non-tiled mode (no bleeding outside the image).</li>
+                <li><strong>Saved with the preset</strong> — both amount and speed persist in the preset JSON.</li>
               </ul>
             </div>
 
