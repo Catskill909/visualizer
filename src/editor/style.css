@@ -734,50 +734,68 @@ html, body {
   background: #18181a;                /* slightly dimmer when collapsed */
 }
 
-/* ── card header (Phase 4: taller to fit thumb + name + action buttons) ── */
+/* ── card header: two-row flex layout ────────────────────────────────────── */
 .layer-header {
-  display: flex; align-items: center; gap: 8px;
-  padding: 8px 10px;
+  display: flex; flex-direction: column;
+  padding: 0;
   border-bottom: 1px solid var(--border);
   cursor: pointer; user-select: none;
   transition: background 0.12s;
-  min-height: 64px;
 }
 .layer-header:hover { background: rgba(255,255,255,0.03); }
 .image-layer-card.collapsed .layer-header { border-bottom-color: transparent; }
 .image-layer-card.collapsed .layer-controls { display: none; }
 
-.layer-chevron {
-  flex-shrink: 0; color: var(--text-3);
-  transition: transform 0.18s ease;
+/* Row 1: drag · thumb · name · chevron */
+.layer-header-row1 {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 10px 6px;
 }
-.image-layer-card.collapsed .layer-chevron { transform: rotate(-90deg); }
 
-/* Static source-image thumbnail in header (Phase 4) */
+/* Row 2: action buttons — full width, standard padding, flush with card edges */
+.layer-header-row2 {
+  display: flex; align-items: center;
+  padding: 0 10px 9px;
+  gap: 5px;
+}
+.layer-header-row2-badges {
+  display: flex; align-items: center; gap: 5px; flex-shrink: 0;
+}
+.layer-header-row2-actions {
+  display: flex; align-items: center; gap: 5px;
+  margin-left: auto;
+}
+
+/* Static source-image thumbnail */
 .layer-thumb {
   flex-shrink: 0;
-  width: 48px; height: 48px;
-  border-radius: 4px;
+  width: 64px; height: 64px;
+  border-radius: 5px;
   background: #0a0a0a;
   border: 1px solid rgba(255,255,255,0.10);
   display: block;
 }
 
-/* Meta column: index/HD row + editable name input (Phase 4) */
+/* Chevron — far-right of row 1 */
+.layer-chevron {
+  flex-shrink: 0;
+  color: var(--text-3);
+  transition: transform 0.18s ease, color 0.12s;
+}
+.layer-header:hover .layer-chevron { color: var(--text); }
+.image-layer-card.collapsed .layer-chevron { transform: rotate(-90deg); }
+
+/* Name input — fills remaining row-1 space */
 .layer-meta {
   flex: 1; min-width: 0;
-  display: flex; flex-direction: column; gap: 3px;
-}
-.layer-meta-top {
-  display: flex; align-items: center; gap: 5px;
 }
 .layer-name-input {
   background: transparent;
   border: 1px solid transparent;
   border-radius: 3px;
   color: var(--text);
-  font-family: var(--font); font-size: 12px; font-weight: 500;
-  padding: 3px 5px;
+  font-family: var(--font); font-size: 13px; font-weight: 500;
+  padding: 4px 6px;
   outline: none;
   transition: background 0.12s, border-color 0.12s;
   width: 100%; min-width: 0;
@@ -791,20 +809,28 @@ html, body {
   border-color: rgba(255,255,255,0.22);
   cursor: text;
 }
+@keyframes layer-name-flash {
+  0%   { background: rgba(255,200,60,0.35); border-color: rgba(255,200,60,0.7); color: #ffe29a; }
+  60%  { background: rgba(255,200,60,0.18); border-color: rgba(255,200,60,0.4); color: #ffe29a; }
+  100% { background: transparent; border-color: transparent; color: var(--text); }
+}
+.layer-name-flash {
+  animation: layer-name-flash 2.5s ease-out forwards;
+}
 
-/* Right-side action buttons (Solo / Mute / Reset / Delete) */
+/* Action buttons in row-2 (Solo / Mute / Copy / Reset / Delete) */
 .layer-actions {
-  display: flex; align-items: center; gap: 4px;
+  display: flex; align-items: center; gap: 5px;
   flex-shrink: 0;
 }
 .layer-action-btn {
   background: transparent;
   border: 1px solid var(--border);
-  border-radius: 3px;
+  border-radius: 4px;
   color: var(--text-3);
   font-family: var(--font); font-size: 10px; font-weight: 600;
   letter-spacing: 0.04em;
-  padding: 4px 7px; line-height: 1;
+  padding: 5px 9px; line-height: 1;
   cursor: pointer;
   transition: all 0.12s;
   display: inline-flex; align-items: center; justify-content: center;
@@ -814,6 +840,19 @@ html, body {
 /* Solo active = warm accent, Mute active = cooler */
 .layer-action-btn.layer-solo.active  { background: rgba(255, 200, 60, 0.22); border-color: rgba(255, 200, 60, 0.55); color: #ffe29a; }
 .layer-action-btn.layer-mute.active  { background: rgba(160, 160, 160, 0.18); border-color: rgba(200, 200, 200, 0.35); color: #ccc; }
+/* Delete button — text style, destructive tint on hover */
+.layer-remove {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-3);
+  font-family: var(--font); font-size: 10px; font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 5px 9px; line-height: 1;
+  cursor: pointer;
+  transition: all 0.12s;
+  display: inline-flex; align-items: center; justify-content: center;
+}
 
 /* Visual state on the card itself when soloed / muted */
 .image-layer-card.layer-muted { opacity: 0.62; }
@@ -868,14 +907,7 @@ html, body {
   padding: 2px 5px; border-radius: 3px;
   background: rgba(255,255,255,0.10); color: var(--text-2);
 }
-.layer-remove {
-  background: transparent; border: none;
-  color: var(--text-3); cursor: pointer;
-  padding: 3px; border-radius: var(--r-s);
-  display: flex; align-items: center; justify-content: center;
-  transition: color 0.15s; flex-shrink: 0;
-}
-.layer-remove:hover { color: var(--text); }
+.layer-remove:hover { border-color: rgba(255,80,80,0.5); color: #ff8080; }
 
 /* ── control rows ── */
 .layer-controls {
@@ -1357,6 +1389,16 @@ html, body {
 [data-tooltip]:hover::after,
 [data-tooltip]:focus-visible::after {
   opacity: 1; visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+/* Tooltip above the element — use on items near the top edge */
+[data-tooltip].tooltip-up::after {
+  top: auto;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%) translateY(3px);
+}
+[data-tooltip].tooltip-up:hover::after,
+[data-tooltip].tooltip-up:focus-visible::after {
   transform: translateX(-50%) translateY(0);
 }
 

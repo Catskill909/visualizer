@@ -1525,50 +1525,42 @@ export class EditorInspector {
 
         card.innerHTML = `
           <div class="layer-header" role="button" aria-expanded="true" tabindex="0">
-            <span class="layer-drag-handle" data-tooltip="Drag to reorder (↑ / ↓ while focused)"
-                  tabindex="0" role="button" aria-label="Reorder layer">
-              <svg width="10" height="14" viewBox="0 0 10 14" aria-hidden="true">
-                <circle cx="3" cy="2"  r="1.1" fill="currentColor"/>
-                <circle cx="7" cy="2"  r="1.1" fill="currentColor"/>
-                <circle cx="3" cy="7"  r="1.1" fill="currentColor"/>
-                <circle cx="7" cy="7"  r="1.1" fill="currentColor"/>
-                <circle cx="3" cy="12" r="1.1" fill="currentColor"/>
-                <circle cx="7" cy="12" r="1.1" fill="currentColor"/>
+            <div class="layer-header-row1">
+              <span class="layer-drag-handle"
+                    tabindex="0" role="button" aria-label="Drag to reorder layer">
+                <svg width="10" height="14" viewBox="0 0 10 14" aria-hidden="true">
+                  <circle cx="3" cy="2"  r="1.1" fill="currentColor"/>
+                  <circle cx="7" cy="2"  r="1.1" fill="currentColor"/>
+                  <circle cx="3" cy="7"  r="1.1" fill="currentColor"/>
+                  <circle cx="7" cy="7"  r="1.1" fill="currentColor"/>
+                  <circle cx="3" cy="12" r="1.1" fill="currentColor"/>
+                  <circle cx="7" cy="12" r="1.1" fill="currentColor"/>
+                </svg>
+              </span>
+              <canvas class="layer-thumb" width="64" height="64" aria-hidden="true"></canvas>
+              <div class="layer-meta">
+                <input type="text" class="layer-name-input" maxlength="32" spellcheck="false"
+                       aria-label="Layer name" />
+              </div>
+              <svg class="layer-chevron" width="10" height="10" viewBox="0 0 12 12" aria-hidden="true">
+                <path d="M2 4 L6 8 L10 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
-            </span>
-            <svg class="layer-chevron" width="10" height="10" viewBox="0 0 12 12" aria-hidden="true">
-              <path d="M2 4 L6 8 L10 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <canvas class="layer-thumb" width="48" height="48" aria-hidden="true"></canvas>
-            <div class="layer-meta">
-              <div class="layer-meta-top">
-                <span class="layer-index-badge" aria-hidden="true">#1</span>
+            </div>
+            <div class="layer-header-row2">
+              <div class="layer-header-row2-badges">
                 ${entry.isHd ? '<span class="layer-hd-badge" data-tooltip="Uploaded at HD (2048px). Re-upload to change.">HD</span>' : ''}
               </div>
-              <input type="text" class="layer-name-input" maxlength="32" spellcheck="false"
-                     aria-label="Layer name" />
-            </div>
-            <div class="layer-actions">
-              <button class="layer-action-btn layer-solo" type="button"
-                      aria-pressed="false" data-tooltip="Solo (show only this layer)">Solo</button>
-              <button class="layer-action-btn layer-mute" type="button"
-                      aria-pressed="false" data-tooltip="Mute (hide this layer)">Mute</button>
-              <button class="layer-action-btn layer-reset" type="button"
-                      data-tooltip="Reset this layer (undoable)">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <polyline points="1 4 1 10 7 10"/>
-                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
-                </svg>
-              </button>
-              <button class="layer-remove" aria-label="Delete layer" data-tooltip="Delete layer">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="3 6 5 6 21 6"/>
-                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                  <path d="M10 11v6"/>
-                  <path d="M14 11v6"/>
-                  <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
-                </svg>
-              </button>
+              <div class="layer-header-row2-actions">
+                <button class="layer-action-btn layer-solo" type="button"
+                        aria-pressed="false" data-tooltip="Solo (show only this layer)">Solo</button>
+                <button class="layer-action-btn layer-mute" type="button"
+                        aria-pressed="false" data-tooltip="Mute (hide this layer)">Mute</button>
+                <button class="layer-action-btn layer-copy" type="button"
+                        data-tooltip="Duplicate this layer">Dupe</button>
+                <button class="layer-action-btn layer-reset" type="button"
+                        data-tooltip="Reset this layer (undoable)">Reset</button>
+                <button class="layer-remove" type="button" data-tooltip="Delete layer">Delete</button>
+              </div>
             </div>
           </div>
           <div class="layer-controls">
@@ -2438,6 +2430,7 @@ export class EditorInspector {
         header.addEventListener('click', (e) => {
             if (e.target.closest('.layer-remove')) return;
             if (e.target.closest('.layer-drag-handle')) return;
+            if (e.target.closest('.layer-action-btn')) return;
             toggleCollapse();
         });
         header.addEventListener('keydown', (e) => {
@@ -2504,6 +2497,11 @@ export class EditorInspector {
         resetBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             this._resetImageLayer(entry, card);
+        });
+        const copyBtn = card.querySelector('.layer-copy');
+        copyBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this._duplicateImageLayer(entry);
         });
 
         // ── Double-click label to reset slider ──────────────────────────────
@@ -2628,6 +2626,70 @@ export class EditorInspector {
         this._applyToEngine();
         this._postSnap();
         showToast(`Reset "${origName}"`);
+    }
+
+    // ─── Duplicate a layer ────────────────────────────────────────────────────
+
+    _duplicateImageLayer(entry) {
+        const texObj = this._imageTextures[entry.texName];
+        if (!texObj) return;
+        this._preSnap();
+
+        // Generate a smart name: "face" → "face 2", "face 2" → "face 3", etc.
+        const baseName = entry.name.replace(/ \d+$/, '');
+        const existingNums = this.currentState.images
+            .map(e => { const m = e.name.match(new RegExp(`^${baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} (\\d+)$`)); return m ? parseInt(m[1]) : (e.name === baseName ? 1 : 0); })
+            .filter(n => n > 0);
+        const nextNum = existingNums.length ? Math.max(...existingNums) + 1 : 2;
+        const newName = `${baseName} ${nextNum}`;
+
+        // Deep-copy entry state; give it a fresh unique texName; start collapsed
+        const newTexName = 'tex_' + Math.random().toString(36).slice(2, 9);
+        const newEntry = { ...entry, texName: newTexName, name: newName, collapsed: true };
+        this._imageTextures[newTexName] = texObj;
+
+        // Collapse the source card
+        entry.collapsed = true;
+        const srcCard = document.querySelector(`#image-layers .image-layer-card[data-tex-name="${entry.texName}"]`);
+        if (srcCard) {
+            srcCard.classList.add('collapsed');
+            srcCard.querySelector('.layer-header')?.setAttribute('aria-expanded', 'false');
+        }
+
+        // Insert into array right after the source entry
+        const srcIdx = this.currentState.images.indexOf(entry);
+        if (srcIdx !== -1) {
+            this.currentState.images.splice(srcIdx + 1, 0, newEntry);
+        } else {
+            this.currentState.images.push(newEntry);
+        }
+
+        // Mount the card (appends to DOM), then move it into position
+        this._mountLayerCard(newEntry, texObj);
+        const layers = document.getElementById('image-layers');
+        const byTex = new Map();
+        layers.querySelectorAll('.image-layer-card').forEach(c => byTex.set(c.dataset.texName, c));
+        this.currentState.images.forEach(e => {
+            const c = byTex.get(e.texName);
+            if (c) layers.appendChild(c);
+        });
+
+        // Scroll new card into view and flash its name
+        const newCard = document.querySelector(`#image-layers .image-layer-card[data-tex-name="${newTexName}"]`);
+        if (newCard) {
+            newCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            const nameInput = newCard.querySelector('.layer-name-input');
+            if (nameInput) {
+                nameInput.classList.add('layer-name-flash');
+                setTimeout(() => nameInput.classList.remove('layer-name-flash'), 2500);
+            }
+        }
+
+        this._updateLayerIndices();
+        this._buildCompShader();
+        this._applyToEngine();
+        this._postSnap();
+        showToast(`Duplicated as "${newName}"`);
     }
 
     // ─── Apply & sync ──────────────────────────────────────────────────────────
