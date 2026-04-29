@@ -932,12 +932,13 @@ export class ControlPanel {
   // ===================== WELCOME GUIDE (start screen) =====================
 
   openWelcomeGuide() {
-    window.open('/help.html', '_blank');
+    const modal = document.getElementById('help-modal');
+    if (modal) modal.hidden = false;
   }
 
   closeWelcomeGuide() {
-    this.welcomeOpen = false;
-    this.els.welcomeGuide.classList.add('hidden');
+    const modal = document.getElementById('help-modal');
+    if (modal) modal.hidden = true;
   }
 
   selectWelcomeSection(name) {

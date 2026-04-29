@@ -1266,6 +1266,180 @@
     </div>
   </div>
 
+  <!-- ════════════════════ HELP MODAL ════════════════════ -->
+  <div id="help-modal" class="help-modal-backdrop" hidden role="dialog" aria-modal="true" aria-label="User Guide">
+    <div class="help-modal-shell">
+      <div class="help-modal-sidebar">
+        <div class="help-modal-search-wrap">
+          <input type="search" id="hm-search" placeholder="Search…" autocomplete="off" spellcheck="false">
+        </div>
+        <div id="hm-search-results" class="hm-search-results" style="display:none"></div>
+        <div id="hm-nav-tree">
+        <div class="help-nav-group">
+          <div class="help-nav-label">Getting Started</div>
+          <a class="help-nav-link active" href="#hm-quick-start">Quick Start</a>
+          <a class="help-nav-link" href="#hm-shortcuts">Keyboard Shortcuts</a>
+        </div>
+        <div class="help-nav-group">
+          <div class="help-nav-label">Preset Studio</div>
+          <a class="help-nav-link" href="#hm-image-layers">Image Layers</a>
+          <a class="help-nav-link" href="#hm-transform">Transform</a>
+          <a class="help-nav-link" href="#hm-motion">Motion</a>
+          <a class="help-nav-link" href="#hm-tunnel">Tunnel &amp; Depth Stack</a>
+          <a class="help-nav-link" href="#hm-effects">Visual Effects</a>
+          <a class="help-nav-link" href="#hm-mirror">Mirror</a>
+          <a class="help-nav-link" href="#hm-reactivity">Audio Reactivity</a>
+          <a class="help-nav-link" href="#hm-workflow">Workflow</a>
+        </div>
+        <div class="help-nav-group">
+          <div class="help-nav-label">Tips &amp; Combos</div>
+          <a class="help-nav-link" href="#hm-tips">Curated Combos</a>
+        </div>
+        </div><!-- /hm-nav-tree -->
+      </div>
+      <div class="help-modal-content" id="help-modal-content">
+        <button class="help-modal-close" id="help-modal-close" aria-label="Close help">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+
+        <section class="hm-section" id="hm-quick-start">
+          <h2>Quick Start</h2>
+          <div class="hm-card"><h4>1 · Load a track</h4><p>Click the folder icon in the control bar or press <kbd>Space</kbd>. Supported: MP3, WAV, OGG, FLAC, AAC, M4A.</p></div>
+          <div class="hm-card"><h4>2 · Pick a preset</h4><p>Click the preset name to open the browser. Press <kbd>R</kbd> for random, <kbd>←</kbd> / <kbd>→</kbd> to step through.</p></div>
+          <div class="hm-card"><h4>3 · Add an image layer</h4><p>Click <strong>Add Layer</strong> and drop an image or GIF. It composites over the visualizer in real time.</p></div>
+          <div class="hm-card"><h4>4 · Preview full screen</h4><p>Press <kbd>F</kbd> for fullscreen. Press <kbd>H</kbd> to hide the UI for a clean VJ feed.</p></div>
+        </section>
+
+        <section class="hm-section" id="hm-shortcuts">
+          <h2>Keyboard Shortcuts</h2>
+          <table class="hm-table">
+            <thead><tr><th>Key</th><th>Action</th></tr></thead>
+            <tbody>
+              <tr><td><kbd>Space</kbd></td><td>Play / Pause</td></tr>
+              <tr><td><kbd>← →</kbd></td><td>Previous / Next preset</td></tr>
+              <tr><td><kbd>R</kbd></td><td>Toggle auto-cycle</td></tr>
+              <tr><td><kbd>E</kbd></td><td>Open Preset Studio</td></tr>
+              <tr><td><kbd>F</kbd></td><td>Fullscreen</td></tr>
+              <tr><td><kbd>H</kbd></td><td>Hide UI (clean feed)</td></tr>
+              <tr><td><kbd>S</kbd></td><td>Toggle favorite</td></tr>
+              <tr><td><kbd>X</kbd></td><td>Hide current preset</td></tr>
+              <tr><td><kbd>P</kbd></td><td>Open presets drawer</td></tr>
+              <tr><td><kbd>O</kbd></td><td>Output settings</td></tr>
+              <tr><td><kbd>T</kbd></td><td>Audio tuning panel</td></tr>
+              <tr><td><kbd>B</kbd></td><td>Blackout (hold)</td></tr>
+              <tr><td><kbd>I</kbd></td><td>Invert colors (hold)</td></tr>
+              <tr><td><kbd>Shift</kbd></td><td>Energy boost (hold)</td></tr>
+              <tr><td><kbd>? / /</kbd></td><td>Keyboard guide</td></tr>
+              <tr><td><kbd>Esc</kbd></td><td>Close drawers &amp; menus</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section class="hm-section" id="hm-image-layers">
+          <h2>Image Layers</h2>
+          <p>Up to 5 image or GIF layers, each compositing over the visualizer with its own blend mode and full animation controls.</p>
+          <ul class="hm-list">
+            <li><strong>Add Layer</strong> — accepts JPG, PNG, GIF, WebP, SVG, AVIF.</li>
+            <li><strong>Drag to reorder</strong> — grab the ⠿ handle. Top of list = drawn on top.</li>
+            <li><strong>Solo / Mute</strong> — audition one layer or hide it without deleting.</li>
+            <li><strong>Reset ↻</strong> — restores all animation fields to default, keeps the image. Undoable.</li>
+            <li><strong>HD toggle</strong> — enable before uploading for 2048 px (default 1024 px).</li>
+          </ul>
+        </section>
+
+        <section class="hm-section" id="hm-transform">
+          <h2>Transform</h2>
+          <ul class="hm-list">
+            <li><strong>Size</strong> — scales the image or each tile. Pulse adds audio-reactive size.</li>
+            <li><strong>Angle</strong> — static rotation offset, composes with Spin.</li>
+            <li><strong>Skew X / Y</strong> — shears the image into a parallelogram. Works in all modes.</li>
+            <li><strong>Persp X / Y</strong> — projective warp, lines converge to a vanishing point. Persp Y + Tile = infinite floor grid.</li>
+            <li><strong>Width / Height</strong> — independent tile cell shape (Tile mode only).</li>
+          </ul>
+        </section>
+
+        <section class="hm-section" id="hm-motion">
+          <h2>Motion</h2>
+          <ul class="hm-list">
+            <li><strong>Spin</strong> — continuous rotation. Per-tile when Tile ON.</li>
+            <li><strong>Orbit</strong> — circular path around anchor. Switch to Lissajous for figure-8 / clover paths.</li>
+            <li><strong>Bounce</strong> — bass-driven upward displacement on every beat.</li>
+            <li><strong>Beat Shake</strong> — random-direction UV impulse 24×/sec, scales with audio.</li>
+            <li><strong>Sway</strong> — sinusoidal horizontal pendulum.</li>
+            <li><strong>Wander</strong> — dual-sine organic drift in X and Y.</li>
+            <li><strong>Pan</strong> — Drift = continuous scroll; Bounce = ping-pong around anchor.</li>
+          </ul>
+        </section>
+
+        <section class="hm-section" id="hm-tunnel">
+          <h2>Tunnel &amp; Depth Stack</h2>
+          <ul class="hm-list">
+            <li><strong>Tunnel</strong> — seamless zoom-through animation. Tile must be ON. Negative = zoom out.</li>
+            <li><strong>Depth</strong> — offsets a layer's zoom phase. 0.5 = 180° = maximum parallax between layers.</li>
+          </ul>
+          <div class="hm-tip"><strong>Classic move:</strong> Two layers, same image, same Tunnel speed. Layer 1 Depth = 0, Layer 2 Depth = 0.5. Tiles zoom past each other at different Z depths.</div>
+        </section>
+
+        <section class="hm-section" id="hm-effects">
+          <h2>Visual Effects</h2>
+          <ul class="hm-list">
+            <li><strong>Tint + Hue Spin</strong> — colorize and cycle through the full spectrum continuously.</li>
+            <li><strong>Chromatic</strong> — RGB channel split with animated offset. Glitchy color fringe.</li>
+            <li><strong>Posterize</strong> — Off / 2 / 4 / 8 / 16 color steps. Pop-art quantize effect.</li>
+            <li><strong>Edge / Sobel</strong> — 3×3 Sobel kernel replaces image with luminance edge outline. Neon line-art. Best with Tint + Hue Spin.</li>
+          </ul>
+          <div class="hm-tip"><strong>Best combo:</strong> Edge ON · Tint = vivid color · Hue Spin = 0.3 · Blend = Additive.</div>
+        </section>
+
+        <section class="hm-section" id="hm-mirror">
+          <h2>Mirror</h2>
+          <ul class="hm-list">
+            <li><strong>Off / H / V / Quad / Kaleido</strong> — fold the image symmetrically.</li>
+            <li><strong>Per Tile</strong> — folds inside each tile cell.</li>
+            <li><strong>Whole Image</strong> — folds the entire tiled field as one unit.</li>
+          </ul>
+        </section>
+
+        <section class="hm-section" id="hm-reactivity">
+          <h2>Audio Reactivity</h2>
+          <ul class="hm-list">
+            <li><strong>Source</strong> — Bass / Mid / Treble / Volume. Drives Pulse, Bounce, Shake, Strobe, Opacity Pulse.</li>
+            <li><strong>Curve</strong> — Linear / Squared / Cubed / Gate. Shapes how the signal maps to motion.</li>
+            <li><strong>Strobe</strong> — hard binary opacity cut. Threshold sets the trigger level.</li>
+          </ul>
+          <div class="hm-tip"><strong>Tip:</strong> One layer on Bass, another on Treble — they react to different parts of the beat for automatic depth.</div>
+        </section>
+
+        <section class="hm-section" id="hm-workflow">
+          <h2>Workflow</h2>
+          <ul class="hm-list">
+            <li><strong>Undo / Redo</strong> — <kbd>⌘Z</kbd> / <kbd>⌘⇧Z</kbd>. 50-step history. Every action is undoable.</li>
+            <li><strong>A/B compare</strong> — hold the A/B button to preview the last saved state.</li>
+            <li><strong>Save</strong> — persists preset + images to browser storage. Appears in My Presets.</li>
+            <li><strong>Focus mode</strong> — expand icon (or <kbd>\</kbd>) hides the panel. Click canvas to restore.</li>
+          </ul>
+        </section>
+
+        <section class="hm-section" id="hm-tips">
+          <h2>Curated Combos</h2>
+          <div class="hm-combo"><h4>Neon Line-Art</h4><p>Edge ON · Tint → vivid color · Hue Spin → 0.3 · Blend → Additive.<br>Stack a second layer (Edge OFF) underneath at low opacity for a ghost fill behind the outlines.</p></div>
+          <div class="hm-combo"><h4>3D Parallax Tunnel</h4><p>Two layers, same image, same Tunnel speed.<br>Layer 1: Depth = 0. Layer 2: Depth = 0.5 + different Tint color.<br>Tiles zoom past each other at different Z depths — true parallax without any 3D math.</p></div>
+          <div class="hm-combo"><h4>Infinite Floor Grid</h4><p>Tile ON · Persp Y → 0.6 · Tunnel → 0.5 · Spin → 0.05 · Mirror → Quad.<br>Add Bounce → 0.15 (Bass) so the floor heaves on every kick.</p></div>
+          <div class="hm-combo"><h4>Pop-Art Pulse</h4><p>Posterize → 4 · Tint → bright primary · Hue Spin → 0.1 · Bounce → 0.3 · Curve → Cubed.<br>The Cubed curve means only hard hits trigger the jump — clean on sparse beats, explosive on drops.</p></div>
+          <div class="hm-combo"><h4>Glitch Stack</h4><p>Layer 1: Chromatic → 0.6 · Beat Shake → 0.08 · Blend → Overlay.<br>Layer 2: Edge ON · Strobe → 0.8 · Blend → Additive · Source → Treble.</p></div>
+          <div class="hm-combo"><h4>Kaleidoscope Vortex</h4><p>Tile ON · Mirror → Kaleido · Spin → 0.4 · Orbit radius → 0.08 · Hue Spin → 0.2.</p></div>
+          <div class="hm-combo"><h4>Breathing Logo</h4><p>Single image, Tile OFF · Size → 0.35 · Pulse → 0.25 · Bounce → 0.1 · Source → Bass · Curve → Squared.</p></div>
+          <div class="hm-combo"><h4>Warp Speed Stars</h4><p>Star field texture · Tile ON · Tunnel → 1.8 · Spacing → 0.3 · Size → 0.15 · Blend → Additive.</p></div>
+          <div class="hm-combo"><h4>Liquid Mirror</h4><p>Tile ON · Mirror → Quad, Scope → Whole Image · Sway Amt → 0.08 · Wander Amt → 0.04. No Tunnel.</p></div>
+          <div class="hm-combo"><h4>Diamond Tile Grid</h4><p>Tile ON · Angle → 45° · Skew X → 0.3 · Skew Y → −0.3 · Width → 0.7 · Height → 0.7 · Spin → 0.03.</p></div>
+          <div class="hm-combo"><h4>Depth Hue Shift</h4><p>Three layers, same image, Tunnel = 0.6.<br>Layer 1: Depth = 0 · Tint = cyan. Layer 2: Depth = 0.33 · Tint = magenta. Layer 3: Depth = 0.66 · Tint = yellow.</p></div>
+          <div class="hm-combo"><h4>Bass Strobe + Treble Shimmer</h4><p>Layer 1: Opacity Pulse → 0.6 · Source → Bass · Curve → Cubed.<br>Layer 2: Hue Spin → 1.0 · Chromatic → 0.2 · Source → Treble · Blend → Screen.</p></div>
+        </section>
+
+      </div>
+    </div>
+  </div>
+
   <script type="module" src="/src/main.js"></script>
 </body>
 

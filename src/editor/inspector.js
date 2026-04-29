@@ -3407,7 +3407,8 @@ export function showOnboarding() {
     document.getElementById('onboarding-help-btn')
         ?.addEventListener('click', () => {
             close(false);
-            window.open('/help.html', '_blank');
+            const modal = document.getElementById('help-modal');
+            if (modal) modal.hidden = false;
         }, { once: true });
 }
 
