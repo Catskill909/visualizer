@@ -5,7 +5,7 @@
  */
 
 import { VisualizerEngine } from '../visualizer.js';
-import { EditorInspector, showToast } from './inspector.js';
+import { EditorInspector, showToast, showOnboarding } from './inspector.js';
 import { PresetLibrary } from './presetLibrary.js';
 import { getCustomPreset, loadAllCustomPresets } from '../customPresets.js';
 import { initAuthGate } from '../auth-gate.js';
@@ -302,6 +302,9 @@ async function boot(connectAudioFn) {
         'color:#fff;font-weight:700',
         'color:#666'
     );
+
+    // Show onboarding tips modal (skipped if user clicked "Never show again")
+    showOnboarding();
 }
 
 // Override the inspector's default save modal confirm to route through our

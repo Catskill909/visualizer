@@ -3259,6 +3259,40 @@ export class EditorInspector {
 
 // ─── Toast (exported for main.js) ────────────────────────────────────────────
 
+const ONBOARDING_KEY = 'discocast_onboarding_never';
+export function showOnboarding() {
+    if (localStorage.getItem(ONBOARDING_KEY)) return;
+    const modal = document.getElementById('onboarding-modal');
+    if (!modal) return;
+    modal.hidden = false;
+
+    const close = (permanently) => {
+        modal.hidden = true;
+        if (permanently) localStorage.setItem(ONBOARDING_KEY, '1');
+        // clean up listeners
+        modal.removeEventListener('click', onBackdrop);
+        document.removeEventListener('keydown', onEsc);
+    };
+
+    const onBackdrop = (e) => { if (e.target === modal) close(false); };
+    const onEsc = (e) => { if (e.key === 'Escape') close(false); };
+
+    modal.addEventListener('click', onBackdrop);
+    document.addEventListener('keydown', onEsc);
+
+    document.getElementById('onboarding-got-it-btn')
+        ?.addEventListener('click', () => close(false), { once: true });
+    document.getElementById('onboarding-never-btn')
+        ?.addEventListener('click', () => close(true), { once: true });
+    document.getElementById('onboarding-help-btn')
+        ?.addEventListener('click', () => {
+            close(false);
+            // open the main app help modal if accessible, else open index in new tab
+            const helpBtn = document.getElementById('help-btn') || document.querySelector('[data-help]');
+            if (helpBtn) helpBtn.click();
+        }, { once: true });
+}
+
 const HINT_KEY = 'discocast_hint_slider_reset_seen';
 export function showHint() {
     if (localStorage.getItem(HINT_KEY)) return;

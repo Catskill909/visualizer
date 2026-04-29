@@ -451,6 +451,70 @@
         <!-- Toast -->
         <div id="toast" class="toast" hidden role="status" aria-live="polite"></div>
 
+        <!-- Onboarding modal — shows every session until "Never show again" -->
+        <div id="onboarding-modal" class="onboarding-modal" hidden role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
+          <div class="onboarding-card">
+            <div class="onboarding-header">
+              <div class="onboarding-logo">🎛️</div>
+              <div class="onboarding-header-text">
+                <h2 class="onboarding-title" id="onboarding-title">Welcome to Preset Studio</h2>
+                <p class="onboarding-subtitle">A few tips to get you moving fast</p>
+              </div>
+            </div>
+            <div class="onboarding-tips">
+              <div class="onboarding-tip">
+                <div class="onboarding-tip-icon">↩️</div>
+                <div>
+                  <p class="onboarding-tip-title">Double-click a label to reset</p>
+                  <p class="onboarding-tip-desc">Any slider label with a dashed underline snaps back to its default on double-click.</p>
+                </div>
+              </div>
+              <div class="onboarding-tip">
+                <div class="onboarding-tip-icon">🖱️</div>
+                <div>
+                  <p class="onboarding-tip-title">Drag the anchor dot</p>
+                  <p class="onboarding-tip-desc">Click the canvas to place the XY anchor — Orbit, Sway and Bounce all pivot around it.</p>
+                </div>
+              </div>
+              <div class="onboarding-tip">
+                <div class="onboarding-tip-icon">⌘Z</div>
+                <div>
+                  <p class="onboarding-tip-title">Undo / Redo</p>
+                  <p class="onboarding-tip-desc">50-step history. ⌘Z to undo, ⌘⇧Z to redo — every slider move is captured.</p>
+                </div>
+              </div>
+              <div class="onboarding-tip">
+                <div class="onboarding-tip-icon">📂</div>
+                <div>
+                  <p class="onboarding-tip-title">Collapse layer cards</p>
+                  <p class="onboarding-tip-desc">Click a layer header to collapse it. New layers auto-collapse the rest.</p>
+                </div>
+              </div>
+              <div class="onboarding-tip">
+                <div class="onboarding-tip-icon">💾</div>
+                <div>
+                  <p class="onboarding-tip-title">Save stays in your browser</p>
+                  <p class="onboarding-tip-desc">Hit Save, then open the main app → My Presets to play it back live.</p>
+                </div>
+              </div>
+              <div class="onboarding-tip">
+                <div class="onboarding-tip-icon">🔀</div>
+                <div>
+                  <p class="onboarding-tip-title">A/B compare</p>
+                  <p class="onboarding-tip-desc">Hold the A/B button to preview the last saved state. Release to return.</p>
+                </div>
+              </div>
+            </div>
+            <div class="onboarding-footer">
+              <button class="onboarding-help-link" id="onboarding-help-btn">Open full Help guide →</button>
+              <div class="onboarding-footer-btns">
+                <button class="onboarding-never-btn" id="onboarding-never-btn">Never show again</button>
+                <button class="onboarding-got-it-btn" id="onboarding-got-it-btn">Got it</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- First-use hint (distinct from system toasts) -->
         <div id="hint" class="hint" hidden role="status" aria-live="polite">
           <span class="hint-icon">💡</span>
