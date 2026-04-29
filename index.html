@@ -818,6 +818,7 @@
                 <li><strong>Animation</strong> — Tile, Spin, <strong>Angle</strong>, <strong>Skew X/Y</strong>, Orbit (Circle or Lissajous path), Tunnel zoom, Bounce
                   (beat-lift), Sway, Wander, <strong>Pan</strong>, <strong>Chromatic Aberration</strong>,
                   <strong>Tile Width &amp; Height</strong>, and a draggable XY anchor point.</li>
+                <li><strong>Beat Shake</strong> — omnidirectional random UV jolt on every beat. Pairs with Bounce for chaotic, energetic motion.</li>
                 <li><strong>Beat Fade / Pulse / Strobe</strong> — audio drives opacity (smooth fade or hard strobe cut)
                   and size on every beat.</li>
                 <li><strong>Mirror</strong> — Off, Horizontal, Vertical, Quad, or Kaleido (6-slice polar fold). Apply
@@ -918,6 +919,36 @@
                   before sizing, in every pipeline path.</li>
                 <li><strong>Saved with the preset</strong> — both values persist. Older presets default to 0 (no
                   skew).</li>
+              </ul>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Beat Shake</div>
+              <p>A <strong>Shake</strong> slider in the Audio Reactivity section (below Bounce) that jolts the image
+                in a random direction on every beat.</p>
+              <ul class="welcome-list">
+                <li><strong>Omnidirectional</strong> — unlike Bounce (always up), Shake fires in a new random
+                  direction each beat for a chaotic, glitchy energy.</li>
+                <li><strong>Scales with audio</strong> — uses the same shaped audio signal as Pulse and Bounce, so
+                  Reactivity Source and Curve both apply.</li>
+                <li><strong>Combine freely</strong> — stack with Bounce for upward-biased chaos, or with Sway for
+                  an organic tremor feel.</li>
+                <li><strong>Cubic curve</strong> — the slider gives fine control at low values; big jolts live at
+                  the top end.</li>
+              </ul>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Posterize</div>
+              <p>A segmented button row in the <strong>Visual Effects</strong> section (Off / 2 / 4 / 8 / 16) that
+                buckets each color channel into discrete steps — turning any photo into flat graphic art.</p>
+              <ul class="welcome-list">
+                <li><strong>2 steps</strong> — hard 2-tone silhouette. Graphic and bold.</li>
+                <li><strong>4 steps</strong> — classic pop-art look. Great with a bright Tint color.</li>
+                <li><strong>8 / 16 steps</strong> — subtle banding, still photographic but stylized.</li>
+                <li><strong>Pairs with Hue Spin</strong> — the limited palette cycles through hues for an animated
+                  retro palette effect.</li>
+                <li><strong>Off = zero cost</strong> — no shader code emitted when set to Off.</li>
               </ul>
             </div>
 

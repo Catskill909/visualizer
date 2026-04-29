@@ -91,6 +91,8 @@ Up to **5 image layers** in a collapsible smart-accordion stack. Adding a new la
 | **Hue Spin** | 0–2 | Rotates tint hue through full color wheel per second |
 | **Chromatic Aberration** | 0–1 | RGB channel split — animates red and blue in opposite directions for a glitchy color-fringe effect. Speed slider appears when Chromatic > 0. |
 | **Chromatic Speed** | 0–4 | Animation speed for the chromatic offset (cycles/sec). Hidden when Chromatic = 0. |
+| **Posterize** | Off / 2 / 4 / 8 / 16 | Buckets RGB channels into N discrete levels. Segmented button row — Off = no-op (zero shader cost), 2 = hard 2-tone, 4 = pop-art look, 8/16 = subtle banding. Applied after tint. Combines well with Hue Spin for animated retro palettes. |
+| **Shake** | 0–0.15 | Random 2D UV jolt on each beat. Omnidirectional — a different feel from the directional Bounce. Scales with the shaped audio signal (`_r`). Cubic UI curve for fine low-end control. |
 | **Angle** | −180 to +180° | Static rotation offset — tilts the image at a fixed angle. When Spin is also non-zero, Angle acts as the starting/offset angle of the spin. Inline row directly below Spin. |
 | **Skew X** | −1 to +1 | Horizontal shear — slides the top edge left/right relative to the bottom, making tiles parallelogram-shaped. Applied after rotation, before tiling. |
 | **Skew Y** | −1 to +1 | Vertical shear — slides the right edge up/down relative to the left. Combine with Skew X for diamond / rhombus tile grids. |

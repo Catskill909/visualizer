@@ -1481,6 +1481,8 @@ export class EditorInspector {
             angle: 0.00,           // static rotation offset in degrees (−180 to +180); added to _spinAng
             skewX: 0.00,           // horizontal shear (−1 to +1); applied after rotation
             skewY: 0.00,           // vertical shear (−1 to +1); applied after rotation
+            shakeAmp: 0.00,        // beat shake: random 2D UV impulse on each beat (0–1)
+            posterize: 0,          // color bucket count (0 = off, 2–16 steps)
             isHd: hdMode,          // badge shown in card header
         };
         this.currentState.images.push(entry);
@@ -1775,6 +1777,16 @@ export class EditorInspector {
                 value="${entry.chromaticSpeed}" style="--pct:${pct(entry.chromaticSpeed, 0, 4)}">
               <span class="lsv layer-chromatic-speed-val">${entry.chromaticSpeed.toFixed(1)}</span>
             </div>
+            <div class="layer-row-inline" style="margin-top:4px">
+              <span class="layer-ctrl-label">Posterize</span>
+              <div class="layer-posterize-seg" role="group" aria-label="Posterize levels">
+                <button class="lseg${(entry.posterize || 0) === 0  ? ' active' : ''}" data-posterize="0">Off</button>
+                <button class="lseg${(entry.posterize || 0) === 2  ? ' active' : ''}" data-posterize="2">2</button>
+                <button class="lseg${(entry.posterize || 0) === 4  ? ' active' : ''}" data-posterize="4">4</button>
+                <button class="lseg${(entry.posterize || 0) === 8  ? ' active' : ''}" data-posterize="8">8</button>
+                <button class="lseg${(entry.posterize || 0) === 16 ? ' active' : ''}" data-posterize="16">16</button>
+              </div>
+            </div>
             <div class="layer-section-divider"></div>
             <p class="layer-section-label">Audio Reactivity</p>
             <p class="layer-section-sub">Source &amp; Curve shape the audio signal that powers all sound-driven effects on this layer.</p>
@@ -1812,6 +1824,12 @@ export class EditorInspector {
               <input type="range" class="slider layer-bounce-sl" min="0" max="1" step="0.01"
                 value="${Math.cbrt(entry.bounceAmp / 0.4).toFixed(3)}" style="--pct:${(Math.cbrt(entry.bounceAmp / 0.4) * 100).toFixed(1)}%">
               <span class="lsv layer-bounce-val">${entry.bounceAmp.toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Random 2D jolt on each beat — omnidirectional impulse, different from the directional Bounce">Shake</span>
+              <input type="range" class="slider layer-shake-sl" min="0" max="1" step="0.01"
+                value="${Math.cbrt(entry.shakeAmp / 0.15).toFixed(3)}" style="--pct:${(Math.cbrt(entry.shakeAmp / 0.15) * 100).toFixed(1)}%">
+              <span class="lsv layer-shake-val">${entry.shakeAmp.toFixed(2)}</span>
             </div>
             <div class="layer-slider-row">
               <span class="layer-ctrl-label" data-tooltip="Fades opacity in on every beat — layer pulses in and out with the music">Beat Fade</span>
@@ -1932,6 +1950,18 @@ export class EditorInspector {
             refresh();
         });
 
+        // Shake slider — cubic curve: pos³ * 0.15 maps [0,1] → [0, 0.15] UV units
+        const shakeSlider = card.querySelector('.layer-shake-sl');
+        const shakeVal = card.querySelector('.layer-shake-val');
+        shakeSlider.addEventListener('input', () => {
+            const pos = parseFloat(shakeSlider.value);
+            const stored = pos * pos * pos * 0.15;
+            entry.shakeAmp = stored;
+            shakeVal.textContent = stored.toFixed(2);
+            shakeSlider.style.setProperty('--pct', `${(pos * 100).toFixed(1)}%`);
+            refresh();
+        });
+
         // Size slider — squared curve so value 1.0 lands near ~82% of travel
         const sizeSlider = card.querySelector('.layer-size-sl');
         const sizeVal = card.querySelector('.layer-size-val');
@@ -1974,7 +2004,7 @@ export class EditorInspector {
         const sliderMins = [0, 0, 0, -2, 0, 0, 0, 0, 0];
         const sliderMaxes = [1, 0.8, 0.45, 2, 0.4, 4, 0.4, 2, 2];
 
-        card.querySelectorAll('.layer-slider-row input[type=range]:not(.layer-bounce-sl):not(.layer-size-sl):not(.layer-liss-sl):not(.layer-strobe-thr-sl):not(.layer-pan-x-sl):not(.layer-pan-y-sl):not(.layer-pan-range-sl):not(.layer-beat-fade-sl):not(.layer-tile-sx-sl):not(.layer-tile-sy-sl)').forEach((sl, i) => {
+        card.querySelectorAll('.layer-slider-row input[type=range]:not(.layer-bounce-sl):not(.layer-size-sl):not(.layer-liss-sl):not(.layer-strobe-thr-sl):not(.layer-pan-x-sl):not(.layer-pan-y-sl):not(.layer-pan-range-sl):not(.layer-beat-fade-sl):not(.layer-tile-sx-sl):not(.layer-tile-sy-sl):not(.layer-shake-sl)').forEach((sl, i) => {
             const valEl = sl.nextElementSibling;
             sl.addEventListener('input', () => {
                 const v = parseFloat(sl.value);
@@ -2117,6 +2147,17 @@ export class EditorInspector {
             chromaticSpeedVal.textContent = entry.chromaticSpeed.toFixed(1);
             chromaticSpeedSl.style.setProperty('--pct', `${pct(entry.chromaticSpeed, 0, 4)}`);
             refresh();
+        });
+
+        // Posterize segmented buttons
+        const posterizeBtns = card.querySelectorAll('.layer-posterize-seg .lseg');
+        posterizeBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                posterizeBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                entry.posterize = parseInt(btn.dataset.posterize, 10);
+                refresh();
+            });
         });
 
         // Phase 6: Lissajous orbit mode
@@ -2670,6 +2711,10 @@ export class EditorInspector {
         const skewX = (img.skewX || 0).toFixed(4);
         const skewY = (img.skewY || 0).toFixed(4);
         const hasSkew = Math.abs(img.skewX || 0) > 0.001 || Math.abs(img.skewY || 0) > 0.001;
+        const shakeAmp = (img.shakeAmp || 0).toFixed(4);
+        const hasShake = parseFloat(shakeAmp) > 0.0001;
+        const posterize = parseInt(img.posterize || 0, 10);
+        const hasPosterize = posterize >= 2;
         const tex = `sampler_${img.texName}`;
         const imgAsp = (img.texW && img.texH) ? (img.texW / img.texH).toFixed(4) : '1.0000';
 
@@ -2787,6 +2832,20 @@ export class EditorInspector {
             centerLines = `    vec2 _u = _uvf - vec2(${cxExpr}, ${cyExpr});\n`;
         }
         centerLines = fieldLines + centerLines;
+
+        // Beat shake: random 2D UV impulse each beat, driven by audio reactivity.
+        // hash2(floor(time*24)) gives a new random direction ~24 times/sec (faster than most tempos)
+        // so it always fires on the beat. Amplitude scales with _r (the shaped audio signal).
+        if (hasShake) {
+            centerLines +=
+                `    { vec2 _shk; float _st = floor(time * 24.0);
+` +
+                `      _shk.x = fract(sin(_st * 127.1 + 311.7) * 43758.5453) - 0.5;
+` +
+                `      _shk.y = fract(sin(_st * 269.5 + 183.3) * 43758.5453) - 0.5;
+` +
+                `      _u += _shk * _r * ${shakeAmp} * 2.0; }\n`;
+        }
 
         // Group spin: rotate the whole UV field around canvas center before tiling
         const groupSpinLines = groupSpin
@@ -3019,6 +3078,7 @@ export class EditorInspector {
                     return `    _src *= vec3(${tintR}, ${tintG}, ${tintB});\n`;
                 }
             })() : '') +
+            (hasPosterize ? `    { float _pn = ${posterize}.0; _src = floor(_src * _pn + 0.5) / _pn; }\n` : '') +
             `    float _op = _t.w * _gapMask * clamp(${op} + _r * ${opa}, 0.0, 1.0);\n` +
             `    ${blendLine}\n` +
             `  }\n`
@@ -3114,7 +3174,7 @@ export class EditorInspector {
             strobeAmp: 0.00, strobeThr: 0.40,
             chromaticAberration: 0.00, chromaticSpeed: 1.0,
             tileScaleX: 1.00, tileScaleY: 1.00,
-            angle: 0.00, skewX: 0.00, skewY: 0.00,
+            angle: 0.00, skewX: 0.00, skewY: 0.00, shakeAmp: 0.00, posterize: 0,
             audioPulse: 0.00, pulseInvert: false,
             blendMode: 'overlay', tile: true, groupSpin: false,
             hueSpinSpeed: 0.00, tintR: 1.0, tintG: 1.0, tintB: 1.0,
