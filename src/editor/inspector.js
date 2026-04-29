@@ -1091,11 +1091,23 @@ export class EditorInspector {
             e.preventDefault();
             zone.classList.remove('drag-over');
             const file = e.dataTransfer?.files?.[0];
-            if (file?.type.startsWith('image/')) this._addImageLayer(file);
+            if (!file) return;
+            if (!file.type.startsWith('image/')) {
+                showToast('Drop an image file here (JPG, PNG, GIF, WebP…)', true);
+                return;
+            }
+            this._addImageLayer(file);
         });
         fileInput.addEventListener('change', () => {
             const file = fileInput.files?.[0];
-            if (file) { this._addImageLayer(file); fileInput.value = ''; }
+            if (!file) return;
+            if (!file.type.startsWith('image/')) {
+                showToast('Please choose an image file (JPG, PNG, GIF, WebP…)', true);
+                fileInput.value = '';
+                return;
+            }
+            this._addImageLayer(file);
+            fileInput.value = '';
         });
     }
 
