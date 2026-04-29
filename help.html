@@ -93,7 +93,8 @@
       margin-left: auto; flex-shrink: 0;
       padding: 7px 14px; border-radius: 8px;
       background: var(--bg-3); border: 1px solid var(--border);
-      color: var(--text-2); font-size: 13px; text-decoration: none;
+      color: var(--text-2); font-size: 13px;
+      cursor: pointer; font-family: inherit;
       transition: border-color .15s, color .15s;
     }
     .topbar-back:hover { border-color: var(--accent); color: var(--accent); }
@@ -265,7 +266,7 @@
     <input type="search" id="search-input" placeholder="Search help… (⌘K)" autocomplete="off" spellcheck="false">
     <div class="search-results" id="search-results"></div>
   </div>
-  <a href="/" class="topbar-back">← <span>Back to app</span></a>
+  <button type="button" class="topbar-back" onclick="history.length > 1 ? history.back() : window.close()">← <span>Back to app</span></button>
 </header>
 
 <!-- ── Layout ── -->

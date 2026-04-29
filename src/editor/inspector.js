@@ -1748,7 +1748,7 @@ export class EditorInspector {
               <span class="lsv">${entry.wanderSpeed.toFixed(2)}</span>
             </div>
             <div class="layer-section-divider"></div>
-            <p class="layer-section-label" data-tooltip="Whole-group L/R + U/D translation. Drift = continuous travel (pairs with Tile ON for endless scroll). Bounce = ping-pong around anchor.">Pan</p>
+            <p class="layer-section-label">Pan</p>
             <div class="layer-row-inline layer-pan-mode-row">
               <span class="layer-ctrl-label">Mode</span>
               <div class="layer-pan-mode" role="group" aria-label="Pan mode">

@@ -303,6 +303,78 @@ async function boot(connectAudioFn) {
         'color:#666'
     );
 
+    // Wire help modal
+    const helpModal   = document.getElementById('help-modal');
+    const helpClose   = document.getElementById('help-modal-close');
+    const helpToggle  = document.getElementById('help-toggle');
+    const helpContent = document.getElementById('help-modal-content');
+    const helpNavLinks = document.querySelectorAll('.help-nav-link');
+
+    function openHelp() { helpModal.hidden = false; }
+    function closeHelp() { helpModal.hidden = true; }
+
+    helpToggle?.addEventListener('click', openHelp);
+    helpClose?.addEventListener('click', closeHelp);
+    helpModal?.addEventListener('click', e => { if (e.target === helpModal) closeHelp(); });
+
+    // Sidebar nav — scroll to section and mark active
+    function scrollToSection(id) {
+        document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        helpNavLinks.forEach(l => l.classList.remove('active'));
+        document.querySelector(`.help-nav-link[href="#${id}"]`)?.classList.add('active');
+    }
+
+    helpNavLinks.forEach(link => {
+        link.addEventListener('click', e => {
+            e.preventDefault();
+            scrollToSection(link.getAttribute('href').slice(1));
+        });
+    });
+
+    // Inline search — build index from section headings + text
+    const hmSearch      = document.getElementById('hm-search');
+    const hmResults     = document.getElementById('hm-search-results');
+    const hmNavTree     = document.getElementById('hm-nav-tree');
+
+    const searchIndex = [];
+    document.querySelectorAll('.hm-section').forEach(sec => {
+        const heading = sec.querySelector('h2');
+        if (!heading) return;
+        searchIndex.push({
+            id: sec.id,
+            title: heading.textContent.trim(),
+            text: sec.innerText.toLowerCase(),
+        });
+    });
+
+    hmSearch?.addEventListener('input', () => {
+        const q = hmSearch.value.trim().toLowerCase();
+        if (!q) {
+            hmResults.style.display = 'none';
+            hmNavTree.style.display = '';
+            return;
+        }
+        const hits = searchIndex.filter(s => s.text.includes(q) || s.title.toLowerCase().includes(q));
+        hmNavTree.style.display = 'none';
+        hmResults.style.display = '';
+        if (!hits.length) {
+            hmResults.innerHTML = `<div class="hm-no-results">No results for "${q}"</div>`;
+            return;
+        }
+        hmResults.innerHTML = hits.map(h => {
+            const hl = h.title.replace(new RegExp(`(${q})`, 'gi'), '<mark>$1</mark>');
+            return `<a class="hm-search-result" data-id="${h.id}">${hl}</a>`;
+        }).join('');
+        hmResults.querySelectorAll('.hm-search-result').forEach(r => {
+            r.addEventListener('click', () => {
+                scrollToSection(r.dataset.id);
+                hmSearch.value = '';
+                hmResults.style.display = 'none';
+                hmNavTree.style.display = '';
+            });
+        });
+    });
+
     // Wire focus / preview toggle button
     document.getElementById('focus-toggle')?.addEventListener('click', toggleFocusMode);
 
@@ -443,5 +515,9 @@ document.addEventListener('keydown', e => {
     if (e.key === '\\' && !isInputFocused() && !shellEl.hidden) {
         e.preventDefault();
         toggleFocusMode();
+    }
+    if (e.key === 'Escape') {
+        const helpModal = document.getElementById('help-modal');
+        if (helpModal && !helpModal.hidden) { helpModal.hidden = true; }
     }
 });
