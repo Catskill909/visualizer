@@ -209,6 +209,46 @@ html, body {
   background: var(--bg-2);
   border-left: 1px solid var(--border);
   overflow: hidden;
+  transition: width 0.3s cubic-bezier(0.4,0,0.2,1),
+              opacity 0.25s ease,
+              border-color 0.3s ease;
+}
+
+/* Focus / preview mode — panel hidden, canvas fills screen */
+.editor-shell.focus-mode .editor-panel {
+  width: 0;
+  opacity: 0;
+  border-color: transparent;
+  pointer-events: none;
+  overflow: hidden;
+}
+.editor-shell.focus-mode .mini-player {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+/* Focus toggle — small icon button in the topbar */
+.focus-toggle {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--r-s);
+  color: var(--text-3);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+.focus-toggle:hover {
+  background: rgba(255,255,255,0.07);
+  border-color: var(--border);
+  color: var(--text);
+}
+.editor-shell.focus-mode .focus-toggle {
+  color: var(--text);
+  background: rgba(255,255,255,0.07);
+  border-color: var(--border);
 }
 
 /* ─── Panel header ────────────────────────────────────────────────── */

@@ -303,6 +303,12 @@ async function boot(connectAudioFn) {
         'color:#666'
     );
 
+    // Wire focus / preview toggle button
+    document.getElementById('focus-toggle')?.addEventListener('click', toggleFocusMode);
+
+    // Clicking the canvas restores the panel when in focus mode
+    canvasEl.addEventListener('click', () => { if (focusMode) toggleFocusMode(); });
+
     // Show onboarding tips modal (skipped if user clicked "Never show again")
     showOnboarding();
 }
@@ -422,3 +428,20 @@ function isInputFocused() {
     const tag = document.activeElement?.tagName;
     return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 }
+
+// ─── Focus / preview mode ─────────────────────────────────────────────────────
+
+let focusMode = false;
+
+function toggleFocusMode() {
+    focusMode = !focusMode;
+    shellEl.classList.toggle('focus-mode', focusMode);
+    setTimeout(sizeCanvas, 320);
+}
+
+document.addEventListener('keydown', e => {
+    if (e.key === '\\' && !isInputFocused() && !shellEl.hidden) {
+        e.preventDefault();
+        toggleFocusMode();
+    }
+});
