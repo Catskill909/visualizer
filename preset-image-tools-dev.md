@@ -268,13 +268,13 @@ Remaining candidates (pick order based on demand after first two land):
 - **Independent tile X / Y scale** ✅ — **Shipped.** Two new tile-only slider rows **Width** and **Height** in each layer card, below Spacing. Range 0.25–4.0 with a squared UI curve (same feel as the Size slider). Entry fields: `tileScaleX` and `tileScaleY` (both default 1.0 → fully backward-compatible). GLSL: `aspectPreScale()` now divides `_u.x` by `imgAsp * aspect.y * tileScaleX` and optionally `_u.y` by `tileScaleY`; the Y line is omitted when `tileScaleY === 1.0` so generated shaders stay minimal. Rows auto-hide when Tile is OFF. Both sliders are excluded from the generic `sliderKeys[]` loop and wired individually (same pattern as Size, Pulse, Bounce).
 - **Static Angle / Tilt** ✅ 🟢 — **Shipped.** `angle` field (degrees, −180 to +180). Inline slider row directly below Spin. GLSL: `_spinAng` expression becomes `time * sp + angleRad` when both are set, or just `angleRad` when Spin = 0 (pure tilt). `hasSpin` flag now true whenever `sp ≠ 0 || hasAngle`, so the rotation matrix always emits when either is non-zero. `perTileSpin` retains the original guard so a pure tilt on a tiled layer rotates per-tile as expected. Backward-compatible: `angle` absent → defaults to `0.00` (no-op).
 - **Skew X / Y** ✅ 🟢 — **Shipped.** Two inline sliders (Skew X and Skew Y, −1 to +1) directly below Angle. Applied as a 2×2 shear matrix to `_u` in all three pipeline paths (tiled, non-tiled, tunnel) — after group spin / rotation, before `aspectPreScale` and sizing. `applySkew(varName)` helper emits only when non-zero (zero cost at default). `skewX`/`skewY` fields, both default 0.00. Makes tiles parallelogram-shaped — slanted logos, diagonal grids, italic-style strips. Composes with Angle, Width/Height to give a full 2D affine toolkit.
-- **Perspective tilt** 🟡 — Simulate a card receding into distance on one axis (floor-tile or billboard lean). Implemented as a projective UV warp: divide by a depth term that varies linearly across the image. Two sliders: Perspective X and Perspective Y (how much the near/far edge scales). Visually distinct from skew — skew keeps parallel lines parallel; perspective makes them converge. Requires careful handling of the depth=0 singularity at extreme values.
+- **Perspective tilt** ✅ 🟡 — **Shipped.** `perspX` and `perspY` fields (−1 to +1). Two inline slider rows (Persp X / Persp Y) in Visual Effects above Posterize. GLSL: `applyPersp()` divides `_u.x` by `clamp(1.0 + perspY * _u.y, 0.1, 10.0)` and `_u.y` by `clamp(1.0 + perspX * _u.x, 0.1, 10.0)` — applied after skew in all three pipeline paths (tunnel, tiled, non-tiled). Singularity clamped to 0.1. Floor-tile vanishing point, billboard lean, forced-perspective grids. Composes with Angle + Skew for full 2D projective toolkit. Zero cost at 0.
 - **Beat Shake / Jitter** ✅ 🟢 — **Shipped.** `shakeAmp` field (0–0.15 UV units, cubic UI curve). Slider in the audio reactivity section below Bounce. GLSL: `hash2(floor(time*24))` generates a new random unit direction 24×/sec — fast enough to always catch the beat. Direction is multiplied by `_r * shakeAmp * 2.0` so it scales with the shaped audio signal. Applied to `_u` immediately after `centerLines`, before group spin and tiling. Zero cost at default.
-- **Depth Stack (Z-phase offset)** 🟡 — In tunnel mode, offset each layer's zoom phase so they feel at different depths — genuine parallax during zoom. One `depthOffset` field (0–1), added to the tunnel `fract()` phase. Tunnel-only; no-op otherwise.
+- **Depth Stack (Z-phase offset)** ✅ 🟡 — **Shipped.** `depthOffset` field (0–1) added to tunnel `fract()` phase: `fract(time * ts + depthOffset)`. Inline slider row "Depth" below Tunnel (hidden when Tile is OFF). Zero cost when 0. Set Layer 1 Depth=0, Layer 2 Depth=0.5 for true 180° phase offset — tiles appear to zoom past each other at different Z depths.
 - **Scatter / Radial Clone** 🔴 — Draw N copies in a ring around the anchor. Count (2–12) × Ring Radius. Each clone can spin in place. Requires looping UV sampling in the shader (unrollable but verbose) — structural change to the sample pipeline.
 - **Path recording** 🔴 — Drag the anchor dot for 4 seconds, record it as a looping path the layer follows. Requires a path data structure in the preset JSON and a playback interpolator in GLSL (texture-based LUT or polynomial fit).
 - ~~**Chromatic aberration**~~ ✅ **Shipped** — See Phase 6 shipped list above.
-- **Edge / Sobel mode** 🟡 — Replace sampled pixel with its edge detection result. Any image → neon line art. Requires a 3×3 Sobel kernel sample (9 texture reads per pixel) — cost is real but acceptable for one layer.
+- **Edge / Sobel mode** ✅ 🟡 — **Shipped.** `edgeSobel` bool field. On/Off segmented button in Visual Effects below Posterize. GLSL: 3×3 Sobel kernel (8 neighbour texture samples + luminance dot), gradient magnitude replaces `_src` before tint. Pixel step baked from `img.texW/texH` at shader build time. Pairs perfectly with Tint + Hue Spin for animated neon line-art. Zero cost when Off.
 - **Posterize** ✅ 🟢 — **Shipped.** `posterize` int field (0 = off, 2/4/8/16 steps). Segmented button row in Visual Effects below Chromatic — 5 buttons: Off / 2 / 4 / 8 / 16. GLSL: `floor(_src * _pn + 0.5) / _pn` applied per RGB channel after tint. Zero cost at Off. Pairs beautifully with Tint + Hue Spin for retro / pop-art looks.
 - **Displacement mapping** 🔴 — Use Layer 2 as a UV displacement source for Layer 1. Rippling, heat-haze, glitch. Requires cross-layer sampling and a defined layer evaluation order — significant shader builder change.
 
@@ -283,31 +283,42 @@ Remaining candidates (pick order based on demand after first two land):
 
 ---
 
-## Onboarding — First-use tips modal
+## Onboarding — First-use tips modal ✅ Shipped
 
 **Goal:** Replace the transient hint toast with a proper modal that gives new users a real orientation to the editor.
 
-**Design decisions (settled):**
-- Shows automatically on first editor open (localStorage flag `discocast_onboarding_seen`)
-- Shows every session **until** the user clicks **"Never show again"** — so curious users who dismiss it early can still see it on the next visit
-- "Never show again" sets the flag permanently; a reset link buried in settings can clear it
-- Modal is dismissible via backdrop click / Escape (but does NOT set the permanent flag — only the explicit button does)
+**Shipped implementation:**
+- 2-column tip grid (6 tips): Double-click reset, Anchor dot, Undo/Redo, Collapse cards, Save flow, A/B compare
+- Shows every session until **"Never show again"** is clicked (localStorage key `discocast_onboarding_never`)
+- Backdrop click / Escape dismisses without setting the permanent flag
+- "Open full Help guide →" button dismisses modal and triggers the in-app help
+- `showOnboarding()` exported from `inspector.js`, called from `boot()` in `main.js`
+- Uses `.onboarding-modal` / `.onboarding-card` CSS (distinct from `.save-modal`) — purple accent "Got it" button
+- **Reset during dev:** `localStorage.removeItem('discocast_onboarding_never')` in console
 
-**Content (first pass):**
-- **Double-click any slider label** to reset it to default
-- **Drag the anchor dot** on the canvas to reposition a layer
-- **Undo / Redo** — ⌘Z / ⌘⇧Z, 50-step history
-- **Collapse layer cards** by clicking the header strip — keeps the panel tidy with multiple layers
-- **Save** writes to your browser; open the main app → My Presets to play it back
-- Link to open the full in-app Help guide
+---
 
-**Implementation notes:**
-- Reuse the existing modal backdrop + `.save-modal` style — no new CSS infrastructure needed
-- One `<div id="onboarding-modal">` in `editor.html`, hidden by default
-- `showOnboarding()` exported from `inspector.js` alongside `showToast` / `showHint`
-- Remove the current `showHint()` toast once this lands (it's a stopgap)
+## Preview / Focus Mode ✅ Shipped
 
-**Priority:** Medium — ship after the next 1–2 feature additions so the tips list is more complete.
+**Goal:** Let the user hide the editor panel to see the full-width visualizer canvas.
+
+**Shipped implementation:**
+- Small icon button (expand SVG, 28×28px) in the topbar right-hand side
+- Tooltip: "Hide panel — click anywhere to restore"
+- Adds `.focus-mode` class to `.editor-shell` → panel width transitions to 0 (CSS), mini-player fades out
+- **Click anywhere on canvas** restores the panel
+- **`\` key** toggles (blocked when an input is focused)
+- `sizeCanvas()` called after 320ms transition so WebGL redraws at full width
+- No state saved — always opens in edit mode
+
+---
+
+## File-type Guard ✅ Shipped
+
+- Image file input: explicit `accept` with MIME types + extensions (jpg, png, gif, webp, svg, avif)
+- Audio file inputs (start screen + mini-player load): explicit `accept` with MIME types + extensions (mp3, wav, ogg, flac, aac, m4a)
+- JS guard in `_bindImageDropzone` rejects non-image files from both the file picker and drag-and-drop, showing a red error toast
+- Prevents the freeze-on-app-load bug (user accidentally chose a .app bundle)
 
 ---
 

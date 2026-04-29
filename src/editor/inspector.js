@@ -1495,6 +1495,10 @@ export class EditorInspector {
             skewY: 0.00,           // vertical shear (−1 to +1); applied after rotation
             shakeAmp: 0.00,        // beat shake: random 2D UV impulse on each beat (0–1)
             posterize: 0,          // color bucket count (0 = off, 2–16 steps)
+            depthOffset: 0.00,     // tunnel Z-phase offset (0–1) for parallax depth
+            edgeSobel: false,      // Edge / Sobel mode: replaces image with neon line art
+            perspX: 0.00,          // perspective tilt X (−1 to +1): horizontal vanishing point
+            perspY: 0.00,          // perspective tilt Y (−1 to +1): vertical vanishing point
             isHd: hdMode,          // badge shown in card header
         };
         this.currentState.images.push(entry);
@@ -1653,6 +1657,18 @@ export class EditorInspector {
                 value="${(entry.skewY || 0).toFixed(2)}" style="--pct:${pct(entry.skewY || 0, -1, 1)}">
               <span class="lsv layer-skewy-val">${(entry.skewY || 0).toFixed(2)}</span>
             </div>
+            <div class="layer-row-inline">
+              <span class="layer-ctrl-label" data-tooltip="Horizontal perspective — left/right edges converge to a vanishing point. Combine with Skew for full projective control.">Persp X</span>
+              <input type="range" class="slider layer-slider-inline layer-persp-x-sl" min="-1" max="1" step="0.01"
+                value="${(entry.perspX || 0).toFixed(2)}" style="--pct:${pct(entry.perspX || 0, -1, 1)}">
+              <span class="lsv layer-persp-x-val">${(entry.perspX || 0).toFixed(2)}</span>
+            </div>
+            <div class="layer-row-inline">
+              <span class="layer-ctrl-label" data-tooltip="Vertical perspective — top/bottom edges converge. Great for floor-tile or billboard-lean effects.">Persp Y</span>
+              <input type="range" class="slider layer-slider-inline layer-persp-y-sl" min="-1" max="1" step="0.01"
+                value="${(entry.perspY || 0).toFixed(2)}" style="--pct:${pct(entry.perspY || 0, -1, 1)}">
+              <span class="lsv layer-persp-y-val">${(entry.perspY || 0).toFixed(2)}</span>
+            </div>
             <div class="layer-slider-row">
               <span class="layer-ctrl-label">Orbit</span>
               <input type="range" class="slider" min="0" max="0.45" step="0.01"
@@ -1689,6 +1705,12 @@ export class EditorInspector {
               <input type="range" class="slider layer-tunnel-sl" min="-2" max="2" step="0.05"
                 value="${entry.tunnelSpeed}" style="--pct:${pct(entry.tunnelSpeed, -2, 2)}">
               <span class="lsv layer-tunnel-val">${entry.tunnelSpeed.toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row layer-tunnel-row"${entry.tile ? '' : ' style="display:none"'}>
+              <span class="layer-ctrl-label" data-tooltip="Shift this layer's zoom phase — offset two layers to get genuine parallax depth">Depth</span>
+              <input type="range" class="slider layer-depth-sl" min="0" max="1" step="0.01"
+                value="${(entry.depthOffset || 0).toFixed(2)}" style="--pct:${pct(entry.depthOffset || 0, 0, 1)}">
+              <span class="lsv layer-depth-val">${(entry.depthOffset || 0).toFixed(2)}</span>
             </div>
             <div class="layer-center-row">
               <span class="layer-ctrl-label" style="margin-bottom:5px">Center</span>
@@ -1797,6 +1819,13 @@ export class EditorInspector {
                 <button class="lseg${(entry.posterize || 0) === 4  ? ' active' : ''}" data-posterize="4">4</button>
                 <button class="lseg${(entry.posterize || 0) === 8  ? ' active' : ''}" data-posterize="8">8</button>
                 <button class="lseg${(entry.posterize || 0) === 16 ? ' active' : ''}" data-posterize="16">16</button>
+              </div>
+            </div>
+            <div class="layer-row-inline" style="margin-top:4px">
+              <span class="layer-ctrl-label" data-tooltip="Replaces the image with a Sobel edge-detected outline — neon line art mode. Pairs well with Tint + Hue Spin.">Edge</span>
+              <div class="layer-edge-seg" role="group" aria-label="Edge detect">
+                <button class="lseg${entry.edgeSobel ? '' : ' active'}" data-edge="off">Off</button>
+                <button class="lseg${entry.edgeSobel ? ' active' : ''}" data-edge="on">On</button>
               </div>
             </div>
             <div class="layer-section-divider"></div>
@@ -2011,12 +2040,12 @@ export class EditorInspector {
         // Remaining slider rows — DOM order must match sliderKeys exactly:
         // opacity, spacing, orbitRadius, tunnelSpeed,
         // swayAmt, swaySpeed, wanderAmt, wanderSpeed, hueSpinSpeed
-        const sliderKeys = ['opacity', 'spacing', 'orbitRadius', 'tunnelSpeed',
+        const sliderKeys = ['opacity', 'spacing', 'orbitRadius', 'tunnelSpeed', 'depthOffset',
             'swayAmt', 'swaySpeed', 'wanderAmt', 'wanderSpeed', 'hueSpinSpeed'];
-        const sliderMins = [0, 0, 0, -2, 0, 0, 0, 0, 0];
-        const sliderMaxes = [1, 0.8, 0.45, 2, 0.4, 4, 0.4, 2, 2];
+        const sliderMins = [0, 0, 0, -2, 0, 0, 0, 0, 0, 0];
+        const sliderMaxes = [1, 0.8, 0.45, 2, 1, 0.4, 4, 0.4, 2, 2];
 
-        card.querySelectorAll('.layer-slider-row input[type=range]:not(.layer-bounce-sl):not(.layer-size-sl):not(.layer-liss-sl):not(.layer-strobe-thr-sl):not(.layer-pan-x-sl):not(.layer-pan-y-sl):not(.layer-pan-range-sl):not(.layer-beat-fade-sl):not(.layer-tile-sx-sl):not(.layer-tile-sy-sl):not(.layer-shake-sl)').forEach((sl, i) => {
+        card.querySelectorAll('.layer-slider-row input[type=range]:not(.layer-bounce-sl):not(.layer-size-sl):not(.layer-liss-sl):not(.layer-strobe-thr-sl):not(.layer-pan-x-sl):not(.layer-pan-y-sl):not(.layer-pan-range-sl):not(.layer-beat-fade-sl):not(.layer-tile-sx-sl):not(.layer-tile-sy-sl):not(.layer-shake-sl):not(.layer-persp-x-sl):not(.layer-persp-y-sl)').forEach((sl, i) => {
             const valEl = sl.nextElementSibling;
             sl.addEventListener('input', () => {
                 const v = parseFloat(sl.value);
@@ -2161,6 +2190,24 @@ export class EditorInspector {
             refresh();
         });
 
+        // Perspective X / Y sliders
+        const perspXSl = card.querySelector('.layer-persp-x-sl');
+        const perspXVal = card.querySelector('.layer-persp-x-val');
+        const perspYSl = card.querySelector('.layer-persp-y-sl');
+        const perspYVal = card.querySelector('.layer-persp-y-val');
+        perspXSl.addEventListener('input', () => {
+            entry.perspX = parseFloat(perspXSl.value);
+            perspXVal.textContent = entry.perspX.toFixed(2);
+            perspXSl.style.setProperty('--pct', `${pct(entry.perspX, -1, 1)}`);
+            refresh();
+        });
+        perspYSl.addEventListener('input', () => {
+            entry.perspY = parseFloat(perspYSl.value);
+            perspYVal.textContent = entry.perspY.toFixed(2);
+            perspYSl.style.setProperty('--pct', `${pct(entry.perspY, -1, 1)}`);
+            refresh();
+        });
+
         // Posterize segmented buttons
         const posterizeBtns = card.querySelectorAll('.layer-posterize-seg .lseg');
         posterizeBtns.forEach(btn => {
@@ -2168,6 +2215,17 @@ export class EditorInspector {
                 posterizeBtns.forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 entry.posterize = parseInt(btn.dataset.posterize, 10);
+                refresh();
+            });
+        });
+
+        // Edge / Sobel toggle
+        const edgeBtns = card.querySelectorAll('.layer-edge-seg .lseg');
+        edgeBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                edgeBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                entry.edgeSobel = btn.dataset.edge === 'on';
                 refresh();
             });
         });
@@ -2727,6 +2785,14 @@ export class EditorInspector {
         const hasShake = parseFloat(shakeAmp) > 0.0001;
         const posterize = parseInt(img.posterize || 0, 10);
         const hasPosterize = posterize >= 2;
+        const depthOffset = (img.depthOffset || 0).toFixed(4);
+        const perspX = (img.perspX || 0).toFixed(4);
+        const perspY = (img.perspY || 0).toFixed(4);
+        const hasPersp = Math.abs(img.perspX || 0) > 0.001 || Math.abs(img.perspY || 0) > 0.001;
+        const hasEdge = !!img.edgeSobel;
+        // Pixel step for Sobel: 1/texW × 1/texH, falling back to 1/512
+        const edgeStepX = img.texW ? (1.0 / img.texW).toFixed(6) : '0.001953';
+        const edgeStepY = img.texH ? (1.0 / img.texH).toFixed(6) : '0.001953';
         const tex = `sampler_${img.texName}`;
         const imgAsp = (img.texW && img.texH) ? (img.texW / img.texH).toFixed(4) : '1.0000';
 
@@ -2917,6 +2983,23 @@ export class EditorInspector {
             return s;
         };
 
+        // Perspective projective warp — applied after skew, before aspectPreScale.
+        // Divides each axis by a depth term that varies linearly across the other axis,
+        // making parallel lines converge to a vanishing point.
+        // Clamp denominator to avoid singularity at extreme slider values.
+        const applyPersp = (varName) => {
+            if (!hasPersp) return '';
+            let s = `    {\n`;
+            if (Math.abs(img.perspY || 0) > 0.001)
+                s += `      float _dpx = clamp(1.0 + ${perspY} * ${varName}.y, 0.1, 10.0);\n` +
+                     `      ${varName}.x /= _dpx;\n`;
+            if (Math.abs(img.perspX || 0) > 0.001)
+                s += `      float _dpy = clamp(1.0 + ${perspX} * ${varName}.x, 0.1, 10.0);\n` +
+                     `      ${varName}.y /= _dpy;\n`;
+            s += `    }\n`;
+            return s;
+        };
+
         // Aspect-correct tiling: pre-scale _u.x by (imgAsp * aspect.y * tileScaleX) and
         // _u.y by tileScaleY BEFORE applyTileUV so tile cells have the correct shape.
         // tileScaleX/Y default to 1.0 → same output as before (fully backward-compatible).
@@ -2969,7 +3052,8 @@ export class EditorInspector {
             pipeline =
                 groupSpinLines +
                 applySkew('_u') +
-                `    float _tp = fract(time * ${ts});\n` +
+                applyPersp('_u') +
+                `    float _tp = fract(time * ${ts} + ${depthOffset});\n` +
                 `    float _tz1 = ${tz1Expr};\n` +
                 `    float _tz2 = ${tz2Expr};\n` +
                 `    float _tf = smoothstep(0.5, 1.0, _tp);\n` +
@@ -2991,6 +3075,7 @@ export class EditorInspector {
             // Plain tiled — group spin rotates field first, then tile (with optional per-tile spin)
             pipeline = groupSpinLines +
                 applySkew('_u') +
+                applyPersp('_u') +
                 `    float _gapMask = 1.0;\n` +
                 aspectPreScale('_u') +
                 applyTileUV('_u', sizeBase, '_gapMask', '_dx', '_dy') +
@@ -3009,6 +3094,7 @@ export class EditorInspector {
                 `    _u /= ${sizeBase};\n` +
                 rotLines +
                 applySkew('_u') +
+                applyPersp('_u') +
                 `    vec2 _uInstanced = _u + 0.5;\n` +  // Center the UV (now range depends on aspect)
                 `    float _inBounds = step(0.0, _uInstanced.x) * step(_uInstanced.x, 1.0) * step(0.0, _uInstanced.y) * step(_uInstanced.y, 1.0);\n` +
                 `    _gapMask = _inBounds;\n` +  // Mask out-of-bounds pixels
@@ -3065,6 +3151,28 @@ export class EditorInspector {
             sampleLine +
             chromaticLines +
             `    vec3 _src = _t.xyz;\n` +
+            (hasEdge ? (() => {
+                // Sobel edge detect — sample 3x3 neighbourhood in texture space,
+                // compute luminance gradient, replace _src with edge magnitude.
+                // _suv is the UV used for the primary sample (already in scope from pipeline).
+                const suv = hasTunnel ? `mix(_uA, _uB, _tf)` : `_u`;
+                return (
+                  `    { float _ex = ${edgeStepX}; float _ey = ${edgeStepY};\n` +
+                  `      vec2 _suv = ${suv};\n` +
+                  `      float _e00 = dot(texture(${tex}, clamp(_suv + vec2(-_ex,-_ey), 0.0, 1.0)).xyz, vec3(0.299,0.587,0.114));\n` +
+                  `      float _e10 = dot(texture(${tex}, clamp(_suv + vec2( 0.0,-_ey), 0.0, 1.0)).xyz, vec3(0.299,0.587,0.114));\n` +
+                  `      float _e20 = dot(texture(${tex}, clamp(_suv + vec2( _ex,-_ey), 0.0, 1.0)).xyz, vec3(0.299,0.587,0.114));\n` +
+                  `      float _e01 = dot(texture(${tex}, clamp(_suv + vec2(-_ex, 0.0), 0.0, 1.0)).xyz, vec3(0.299,0.587,0.114));\n` +
+                  `      float _e21 = dot(texture(${tex}, clamp(_suv + vec2( _ex, 0.0), 0.0, 1.0)).xyz, vec3(0.299,0.587,0.114));\n` +
+                  `      float _e02 = dot(texture(${tex}, clamp(_suv + vec2(-_ex, _ey), 0.0, 1.0)).xyz, vec3(0.299,0.587,0.114));\n` +
+                  `      float _e12 = dot(texture(${tex}, clamp(_suv + vec2( 0.0, _ey), 0.0, 1.0)).xyz, vec3(0.299,0.587,0.114));\n` +
+                  `      float _e22 = dot(texture(${tex}, clamp(_suv + vec2( _ex, _ey), 0.0, 1.0)).xyz, vec3(0.299,0.587,0.114));\n` +
+                  `      float _gx = -_e00 + _e20 - 2.0*_e01 + 2.0*_e21 - _e02 + _e22;\n` +
+                  `      float _gy = -_e00 - 2.0*_e10 - _e20 + _e02 + 2.0*_e12 + _e22;\n` +
+                  `      float _edge = clamp(sqrt(_gx*_gx + _gy*_gy) * 4.0, 0.0, 1.0);\n` +
+                  `      _src = vec3(_edge); }\n`
+                );
+            })() : '') +
             (hasTint ? (() => {
                 if (parseFloat(hueSpin) !== 0) {
                     // Rotate hue over time using RGB rotation matrix approximation
@@ -3186,7 +3294,7 @@ export class EditorInspector {
             strobeAmp: 0.00, strobeThr: 0.40,
             chromaticAberration: 0.00, chromaticSpeed: 1.0,
             tileScaleX: 1.00, tileScaleY: 1.00,
-            angle: 0.00, skewX: 0.00, skewY: 0.00, shakeAmp: 0.00, posterize: 0,
+            angle: 0.00, skewX: 0.00, skewY: 0.00, shakeAmp: 0.00, posterize: 0, depthOffset: 0.00, edgeSobel: false, perspX: 0.00, perspY: 0.00,
             audioPulse: 0.00, pulseInvert: false,
             blendMode: 'overlay', tile: true, groupSpin: false,
             hueSpinSpeed: 0.00, tintR: 1.0, tintG: 1.0, tintB: 1.0,

@@ -151,6 +151,29 @@ Rendered as a toggle switch (not a slider). Most visible with: Size > 1.0 + Addi
 
 ---
 
+### Onboarding modal
+
+Shown automatically on every editor session until dismissed permanently. Implemented as a 2-column tip grid with 6 tips (double-click reset, anchor dot, undo/redo, collapse cards, save flow, A/B compare).
+
+- localStorage key: `discocast_onboarding_never` — set to `'1'` by "Never show again"
+- `showOnboarding()` exported from `inspector.js`, called at end of `boot()` in `main.js`
+- Backdrop click / Escape = temporary dismiss; "Never show again" = permanent
+- **Dev reset:** `localStorage.removeItem('discocast_onboarding_never')` in console
+
+### Preview / Focus mode
+
+A small icon button in the topbar (right side) hides the editor panel for a full-width canvas view.
+
+- CSS: `.editor-shell.focus-mode` sets `editor-panel` width to 0 with a 0.3s ease transition; mini-player fades out
+- Click anywhere on the canvas, click the button again, or press `\` to restore
+- `sizeCanvas()` fires after 320ms so the WebGL canvas fills the full width correctly
+
+### File-type guard
+
+Image and audio file pickers now have explicit `accept` attributes (MIME types + extensions) so macOS Finder filters the dialog. A JS guard in `_bindImageDropzone` also rejects non-image files at both the file picker and drag-and-drop level, showing a red error toast instead of freezing.
+
+---
+
 ## Architecture
 
 ```

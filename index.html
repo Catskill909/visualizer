@@ -923,6 +923,60 @@
             </div>
 
             <div class="welcome-feature">
+              <div class="welcome-feature-title">Perspective Tilt</div>
+              <p>Two sliders — <strong>Persp X</strong> and <strong>Persp Y</strong> — directly below Skew in each
+                layer card. Unlike Skew (which keeps parallel lines parallel), Perspective makes lines <em>converge</em>
+                to a vanishing point, simulating depth.</p>
+              <ul class="welcome-list">
+                <li><strong>Persp X</strong> (−1 to +1) — left and right edges converge. Positive tilts the image
+                  away from you on the right side; negative on the left. Great for billboard lean or forced-perspective
+                  text.</li>
+                <li><strong>Persp Y</strong> (−1 to +1) — top and bottom edges converge. Positive creates a classic
+                  floor-tile vanishing point receding upward; negative fans it toward you.</li>
+                <li><strong>Combine with Skew + Angle</strong> — together these give you a full 2D projective
+                  toolkit. Persp Y + Tile is the go-to for infinite floor or ceiling grids.</li>
+                <li><strong>Works in all modes</strong> — tiled, non-tiled, and tunnel. Applied after Skew in every
+                  pipeline path. Singularity is clamped so extreme values stay safe.</li>
+                <li><strong>Zero cost at 0</strong> — no shader code emitted unless a non-zero value is set.</li>
+              </ul>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Depth Stack</div>
+              <p>A <strong>Depth</strong> slider below the Tunnel slider (visible when Tile is ON) that offsets
+                a layer's zoom phase in the tunnel, making it appear to fly through space at a different Z depth
+                than other layers.</p>
+              <ul class="welcome-list">
+                <li><strong>The classic move</strong> — two layers, same image, Tunnel speed identical, Depth = 0
+                  on Layer 1 and Depth = 0.5 on Layer 2. The tiles zoom past each other in true parallax —
+                  no other setting achieves this.</li>
+                <li><strong>Range 0–1</strong> — 0.5 = exactly 180° phase offset (maximum parallax). Other values
+                  give subtler staggered rhythms.</li>
+                <li><strong>Tunnel-only</strong> — the slider is hidden when Tile is OFF. Zero cost at 0.</li>
+                <li><strong>Combine freely</strong> — each layer can have its own Depth, Spin, Tint, and Size
+                  for a full multi-plane 3D look.</li>
+              </ul>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Edge / Sobel</div>
+              <p>An <strong>Edge On/Off</strong> toggle in the Visual Effects section that replaces the image with
+                its edge-detected outline — turning any photo into animated neon line art.</p>
+              <ul class="welcome-list">
+                <li><strong>How it works</strong> — a 3×3 Sobel kernel samples 8 neighbouring pixels, computes
+                  the luminance gradient, and uses the magnitude as brightness. High-contrast edges glow white;
+                  flat areas go black.</li>
+                <li><strong>Best combo</strong> — Edge ON + Tint color + Hue Spin. The monochrome edges take
+                  the Tint color perfectly, and Hue Spin cycles the outline through the full spectrum.</li>
+                <li><strong>Layer it</strong> — one layer with Edge ON (neon outlines) blended over a second layer
+                  with the original image creates a mixed illustration style.</li>
+                <li><strong>Works in all modes</strong> — tiled, non-tiled, and tunnel. Posterize stacks on top
+                  for an extra-crunchy look.</li>
+                <li><strong>Zero cost when Off</strong> — no extra samples taken unless enabled.</li>
+              </ul>
+            </div>
+
+            <div class="welcome-feature">
               <div class="welcome-feature-title">Beat Shake</div>
               <p>A <strong>Shake</strong> slider in the Audio Reactivity section (below Bounce) that jolts the image
                 in a random direction on every beat.</p>
@@ -980,6 +1034,12 @@
                   appear in the <em>My Presets</em> tab of the main app.</li>
                 <li><strong>Reset a slider</strong> — double-click its label to snap it back to the default
                   value instantly. Works on every slider in every layer card.</li>
+                <li><strong>Preview mode</strong> — click the expand icon in the top-right corner of the topbar
+                  (or press <kbd>\</kbd>) to hide the panel and see the full canvas. Click anywhere on the canvas
+                  to restore the panel.</li>
+                <li><strong>First-use tips</strong> — a tips modal appears when you open the editor. Dismiss it
+                  freely or click "Never show again" to stop it appearing. Reset with
+                  <code>localStorage.removeItem('discocast_onboarding_never')</code> in the browser console.</li>
                 <li><strong>Dev HUD</strong> — press <kbd>`</kbd> (backtick) to overlay frame time, estimated VRAM,
                   active layer count, and last shader rebuild time.</li>
               </ul>
