@@ -932,10 +932,7 @@ export class ControlPanel {
   // ===================== WELCOME GUIDE (start screen) =====================
 
   openWelcomeGuide() {
-    this.welcomeOpen = true;
-    this.els.welcomeGuide.classList.remove('hidden');
-    const firstBtn = this.els.welcomeGuide.querySelector('.welcome-rail-btn.active');
-    if (firstBtn) firstBtn.focus({ preventScroll: true });
+    window.open('/help.html', '_blank');
   }
 
   closeWelcomeGuide() {

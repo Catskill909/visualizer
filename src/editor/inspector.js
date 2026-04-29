@@ -3407,9 +3407,7 @@ export function showOnboarding() {
     document.getElementById('onboarding-help-btn')
         ?.addEventListener('click', () => {
             close(false);
-            // open the main app help modal if accessible, else open index in new tab
-            const helpBtn = document.getElementById('help-btn') || document.querySelector('[data-help]');
-            if (helpBtn) helpBtn.click();
+            window.open('/help.html', '_blank');
         }, { once: true });
 }
 
