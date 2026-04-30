@@ -105,6 +105,38 @@ blend             composite into col
 
 ---
 
+## ✅ Session — Apr 30 2026: Import / Export Overhaul
+
+### What shipped
+
+| Item | Detail |
+|---|---|
+| **Timeline export → `.dcshow.json` bundle** | `exportTimelineBundle()` in `timelineStorage.js` — walks all entries, finds `custom:` preset keys, calls `exportPreset(id)` for each (images inlined as base64), wraps as `{ formatVersion:1, exportedAt, timeline, customPresets[] }` |
+| **Timeline import → bundle restore** | `importTimelineBundle()` — restores custom presets to IndexedDB + localStorage, builds old→new key remap, rewrites entry `presetName` fields, falls back to plain `importTimeline()` for legacy `.json` files |
+| **`_presetImport` side-channel** | Bundle importer attaches `{ imported, names, failed }` to the returned timeline record; `saveTimeline()` strips it before writing to localStorage (prevents data leak), re-attaches after so callers can read it |
+| **Shared import result modal** | `src/importResultModal.js` — lazy DOM injection, works on all 3 pages; shows ✓ green list of imported names + ✗ red list of failures with error reasons; Escape / OK / backdrop close; one-shot listeners (no leak) |
+| **Modal CSS** | `.dc-import-modal-*` block added to all 3 stylesheets using each page's own CSS variables |
+| **Engine refresh after import** | All 3 import handlers now call `engine.refreshCustomPresets()` — presets playable immediately without page reload |
+| **`PresetLibrary` engine wiring** | `PresetLibrary` constructor now accepts `engine` option; `editor/main.js` passes it; `_importFrom()` calls `engine.refreshCustomPresets()` |
+| **`importFromFile` returns names** | `customPresets.js` now returns `{ imported, names, failed }` — `names` = display names of successfully imported presets |
+| **Dead import cleanup** | `exportTimeline` + `importTimeline` removed from `timelineEditor.js` imports (both handled inside `timelineStorage.js` now) |
+| **File input accept** | `timeline.html` import input now accepts `.json,.dcshow.json` |
+
+### Key file map
+
+| File | Change |
+|---|---|
+| `src/timelineStorage.js` | `exportTimelineBundle`, `importTimelineBundle`, `saveTimeline` strips `_presetImport` |
+| `src/importResultModal.js` | **new** — shared modal utility |
+| `src/customPresets.js` | `importFromFile` returns `names[]` |
+| `src/controls.js` | `importCustomPresetsFromFile` → `showImportResult` |
+| `src/editor/presetLibrary.js` | `_importFrom` → `showImportResult`; accepts `engine` option |
+| `src/timeline/timelineEditor.js` | `_exportTimeline` async + bundle; `_importFromFile` → `showImportResult` |
+| `src/style.css` / `src/editor/style.css` / `src/timeline/style.css` | `.dc-import-modal-*` CSS block |
+| `timeline.html` | Import input accepts `.dcshow.json` |
+
+---
+
 ## 🟡 Up Next — Candidates
 
 Difficulty: 🟢 < 1 hr · 🟡 2–4 hrs · 🔴 4+ hrs (structural)

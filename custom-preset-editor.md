@@ -206,6 +206,31 @@ Images are stored as raw pixel data in `this._imageTextures` (texName → `{data
 
 ---
 
+## Import / Export — Fully Implemented ✅
+
+### Preset Editor (Library panel)
+- **Export All** — `exportAllPresets()` → `{ version:1, exportedAt, presets:[] }` JSON download. Images inlined as base64 data-URLs per preset.
+- **Export single** — card download icon → `exportPreset(id)` → `<name>.json`. Images inlined.
+- **Import** — file input → `importFromFile()` → `importPreset()` for each entry. Restores image blobs to IndexedDB, assigns new IDs. Calls `engine.refreshCustomPresets()` immediately. Shows **import result modal** listing every imported preset name and any failures.
+- `PresetLibrary` constructor accepts `engine` option (passed from `editor/main.js`).
+
+### Main Visualizer Drawer (`controls.js`)
+- Same `exportAllPresets` / `exportPreset` / `importFromFile` calls.
+- Import calls `refreshCustomPresets()` + `filterPresets()` + shows result modal.
+
+### Timeline Export (`.dcshow.json` bundle)
+- `exportTimelineBundle()` embeds all `custom:` presets referenced by the timeline (with images).
+- `importTimelineBundle()` restores presets, remaps entry `presetName` keys to new IDs, shows result modal.
+- Backward compatible — plain `.json` timeline files still work.
+- Renaming the file on disk is safe — file contents only are read on import.
+
+### Shared result modal — `src/importResultModal.js`
+- Lazy DOM injection — no HTML changes needed per page.
+- Shows ✓ green list (imported names) + ✗ red list (failures + error reason).
+- Escape / OK / backdrop close. One-shot listeners — no event leak.
+
+---
+
 ## Timeline Editor (Separate Tool)
 
 The Timeline Editor lives at `/timeline.html` — fully self-contained, no changes needed here. A "Send to Timeline →" option on library cards opens `timeline.html?preset=<name>` (one line in `presetLibrary.js`). See `timeline-editor.md` for the full design.
@@ -216,7 +241,7 @@ The Timeline Editor lives at `/timeline.html` — fully self-contained, no chang
 
 - Audio-reactive orbit radius (orbit grows on bass)
 - More blend modes
-- Export / import preset as `.json`
+- ~~Export / import preset as `.json`~~ ✅ **Done — includes images + result modal**
 - "Mine" tab in main app preset drawer (custom presets already write to the right localStorage key)
 - Remix button in main app: open editor from existing preset
 - Beat Shake / Jitter
