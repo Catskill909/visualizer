@@ -69,6 +69,10 @@ export class VisualizerEngine {
     this.agcEnabled = true;
     this.kickLockEnabled = false;
     this.boostActive = false;
+    this.noiseGateEnabled = false;
+    this.noiseGateThreshold = 0.05;
+    this._gateClosed = false;
+    this._lastRawPeak = 0;
 
     // Audio nodes
     this.analyser = null;
@@ -655,12 +659,22 @@ export class VisualizerEngine {
       if (val > max) max = val;
     }
     const peak = max / 128; // 0 to 1.0
+    this._lastRawPeak = peak;
 
     // Log once to confirm data flow
     if (peak > 0 && !this._audioConfirmed) {
       console.log('[DiscoCast Visualizer] Audio signal confirmed at analyser.');
       this._audioConfirmed = true;
     }
+
+    // --- Noise Gate ---
+    if (this.noiseGateEnabled && peak < this.noiseGateThreshold) {
+      this._gateClosed = true;
+      this.hypeLevel = 0;
+      return; // hold current gain — don't let AGC normalize the noise floor
+    }
+    this._gateClosed = false;
+    // --- End Noise Gate ---
 
     this.lastPeak = this.lastPeak * 0.95 + peak * 0.05;
 
@@ -675,6 +689,16 @@ export class VisualizerEngine {
     this.visualizerGainNode.gain.setTargetAtTime(targetGain, this.audioContext.currentTime, 0.1);
 
     this.hypeLevel = Math.min(peak * this.energyMultiplier, 1.2);
+  }
+
+  toggleNoiseGate() {
+    this.noiseGateEnabled = !this.noiseGateEnabled;
+    if (!this.noiseGateEnabled) this._gateClosed = false;
+    return this.noiseGateEnabled;
+  }
+
+  setNoiseGateThreshold(value) {
+    this.noiseGateThreshold = Math.min(Math.max(value, 0), 1);
   }
 
   toggleKickLock() {

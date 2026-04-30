@@ -85,12 +85,16 @@ export class ControlPanel {
       importFileInput: document.getElementById('import-file-input'),
       backupCount: document.getElementById('backup-count'),
       btnFavorite: document.getElementById('btn-favorite'),
+      btnHidePreset: document.getElementById('btn-hide-preset'),
       btnHelp: document.getElementById('btn-help'),
       btnAudioTuning: document.getElementById('btn-audio-tuning'),
       audioTuningPanel: document.getElementById('audio-tuning-panel'),
       tuningEnergy: document.getElementById('tuning-energy'),
       toggleAgc: document.getElementById('toggle-agc'),
       toggleKicklock: document.getElementById('toggle-kicklock'),
+      toggleNoisegate: document.getElementById('toggle-noisegate'),
+      noiseGateThresholdRow: document.getElementById('noisegate-threshold-row'),
+      noiseGateThreshold: document.getElementById('noisegate-threshold'),
       vuMeterBar: document.getElementById('vu-meter-bar'),
       signalStatus: document.getElementById('signal-status'),
       keyboardGuide: document.getElementById('keyboard-guide'),
@@ -311,6 +315,12 @@ export class ControlPanel {
       if (currentPreset) this.toggleFavorite(currentPreset);
     });
 
+    // --- Hide preset (control bar) ---
+    els.btnHidePreset.addEventListener('click', () => {
+      const currentPreset = engine.getCurrentPresetName();
+      if (currentPreset) this.toggleHidden(currentPreset, { advanceIfCurrent: true });
+    });
+
     // --- Fullscreen ---
     els.btnFullscreen.addEventListener('click', () => this.toggleFullscreen());
 
@@ -343,6 +353,16 @@ export class ControlPanel {
     els.toggleKicklock.addEventListener('change', (e) => {
       const active = engine.toggleKickLock();
       this.showToast(active ? '🥁 Kick Lock ON' : '🥁 Kick Lock OFF');
+    });
+
+    els.toggleNoisegate.addEventListener('change', () => {
+      const active = engine.toggleNoiseGate();
+      els.noiseGateThresholdRow.style.display = active ? '' : 'none';
+      this.showToast(active ? '🔇 Noise Gate ON' : '🔇 Noise Gate OFF');
+    });
+
+    els.noiseGateThreshold.addEventListener('input', (e) => {
+      engine.setNoiseGateThreshold(parseFloat(e.target.value));
     });
 
     // --- Audio player controls ---
@@ -502,6 +522,13 @@ export class ControlPanel {
     // Update active UI state if the toggled preset is the currently playing one
     if (name === this.engine.getCurrentPresetName()) {
       this.els.btnFavorite.classList.toggle('is-favorite', this.favorites.has(name));
+    }
+
+    // Sync hide button state
+    if (name === this.engine.getCurrentPresetName()) {
+      const isHidden = this.hidden.has(name);
+      this.els.btnHidePreset.classList.toggle('is-hidden-preset', isHidden);
+      this.els.btnHidePreset.setAttribute('data-tooltip', isHidden ? 'Unhide Preset (X)' : 'Hide Preset (X)');
     }
 
     // Refresh drawer if it's open so hearts update
@@ -997,11 +1024,20 @@ export class ControlPanel {
 
   updateVUMeter() {
     const level = this.engine.hypeLevel || 0;
+    const peak = this.engine._lastRawPeak || 0;
+    const gated = this.engine.noiseGateEnabled && this.engine._gateClosed;
+    const clipping = peak >= 0.98;
     const width = Math.min(level * 100, 100);
     this.els.vuMeterBar.style.width = width + '%';
+    this.els.vuMeterBar.classList.toggle('clipping', clipping);
 
-    // Update status text
-    if (level > 0.01) {
+    if (clipping) {
+      this.els.signalStatus.textContent = 'CLIPPING — move mic';
+      this.els.signalStatus.classList.add('active');
+    } else if (gated) {
+      this.els.signalStatus.textContent = 'GATED';
+      this.els.signalStatus.classList.remove('active');
+    } else if (level > 0.01) {
       this.els.signalStatus.textContent = 'SIGNAL DETECTED';
       this.els.signalStatus.classList.add('active');
     } else {
@@ -1157,6 +1193,10 @@ export class ControlPanel {
     const isFav = this.favorites.has(name);
     this.els.btnFavorite.classList.toggle('is-favorite', isFav);
     this.els.btnFavorite.setAttribute('data-tooltip', isFav ? 'Remove from Favorites (S)' : 'Add to Favorites (S)');
+
+    const isHidden = this.hidden.has(name);
+    this.els.btnHidePreset.classList.toggle('is-hidden-preset', isHidden);
+    this.els.btnHidePreset.setAttribute('data-tooltip', isHidden ? 'Unhide Preset (X)' : 'Hide Preset (X)');
   }
 
   showControls() {

@@ -539,6 +539,10 @@ body.force-hide-ui, body.controls-hidden {
 .heart-btn.is-favorite .icon-heart-outline { display: none; }
 .heart-btn.is-favorite .icon-heart-filled { display: block !important; color: #ff3b3b; filter: drop-shadow(0 0 6px rgba(255, 59, 59, 0.4)); }
 
+/* Hide Button in Control Bar */
+.hide-btn { padding: 6px; }
+.hide-btn.is-hidden-preset { color: #ffb84d; filter: drop-shadow(0 0 6px rgba(255, 184, 77, 0.4)); }
+
 /* KEYBOARD GUIDE MODAL */
 #keyboard-guide {
   position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 150;
@@ -1090,6 +1094,18 @@ kbd {
   background: linear-gradient(to right, #00ff88 0%, #00ff88 60%, #ffcc00 80%, #ff3b3b 100%);
   transition: width 0.05s ease-out;
   box-shadow: 0 0 10px rgba(0, 255, 136, 0.2);
+}
+
+.vu-meter-bar.clipping {
+  background: #ff3b3b;
+  animation: vu-clip-flash 0.2s steps(1) infinite;
+  box-shadow: 0 0 14px rgba(255, 59, 59, 0.7);
+}
+
+@keyframes vu-clip-flash {
+  0%   { opacity: 1; }
+  50%  { opacity: 0.4; }
+  100% { opacity: 1; }
 }
 
 .vu-meter-labels {

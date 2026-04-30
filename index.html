@@ -105,6 +105,11 @@
               d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
           </svg>
         </button>
+        <button id="btn-hide-preset" class="ctrl-btn hide-btn" data-tooltip="Hide Preset (X)" type="button">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46A11.804 11.804 0 0 0 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/>
+          </svg>
+        </button>
         <span class="preset-label" id="preset-name">Loading preset...</span>
       </div>
 
@@ -237,6 +242,20 @@
                 <input type="checkbox" id="toggle-kicklock" />
                 <span class="switch-track"></span>
               </label>
+            </div>
+            <div class="switch-row">
+              <label class="switch-label" for="toggle-noisegate">Noise Gate</label>
+              <label class="switch">
+                <input type="checkbox" id="toggle-noisegate" />
+                <span class="switch-track"></span>
+              </label>
+            </div>
+            <div class="tuning-group" id="noisegate-threshold-row" style="display:none">
+              <label>Gate Threshold</label>
+              <div class="slider-with-icon">
+                <span>🔇</span>
+                <input type="range" id="noisegate-threshold" min="0.01" max="0.30" step="0.01" value="0.05" />
+              </div>
             </div>
           </div>
         </div>
@@ -609,6 +628,27 @@
               <p>Skip the visualizer entirely and go straight into the creative editor to design your own presets from
                 scratch. See the <em>Preset Studio</em> section for details.</p>
             </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Playing in a Club or Loud Venue</div>
+              <p>Laptop mics in loud rooms are tough — here's what actually works, in order of how well it works:</p>
+              <ol class="welcome-list">
+                <li><strong>Booth Out / Record Out → USB audio interface</strong> — plug directly into the DJ mixer's
+                  record output. Zero room noise, perfect signal. Even a $35 iRig works.</li>
+                <li><strong>Loopback / BlackHole</strong> — if the DJ is playing from the same Mac, route internal audio
+                  directly to DiscoCast. 100% clean, ignores the room entirely.</li>
+                <li><strong>USB audio interface with XLR mic</strong> — better preamp, physically further from the
+                  speaker stack than a laptop mic.</li>
+                <li><strong>Built-in laptop mic</strong> — last resort. Enable <em>Noise Gate</em> + <em>Kick
+                    Lock</em> in the Tuning panel. Position the laptop away from the speaker stack — even 6 feet makes a
+                  big difference. Angle the screen away from the speakers. Setting it on something soft (a bag, a
+                  hoodie) reduces sub vibration coupling through the table. If the VU meter shows <strong>CLIPPING</strong>,
+                  no software setting can fix it — the mic is physically overwhelmed and needs to move further away.</li>
+              </ol>
+              <p class="welcome-hint">💡 Covering the mic to muffle sound reduces everything equally — noise and signal
+                drop together, so AGC just cranks back up. It only helps if the meter is showing CLIPPING, where it
+                brings the signal back under the clip ceiling.</p>
+            </div>
           </section>
 
           <!-- Browsing Presets -->
@@ -674,6 +714,11 @@
                   volume. <kbd>A</kbd> toggles it. On by default.</li>
                 <li><strong>Kick-Lock</strong> — low-pass filter at 150 Hz locks visuals to the kick drum only.
                   <kbd>K</kbd> toggles it.</li>
+                <li><strong>Noise Gate</strong> — cuts signal processing when the room is quieter than a set threshold.
+                  Prevents visuals jittering on constant ambient noise (air conditioning, crowd hum, a loud room).
+                  Off by default. When enabled, a threshold slider appears — start low and raise it until the jitter
+                  stops. The VU meter shows <strong>GATED</strong> when it's actively blocking noise, and
+                  <strong>CLIPPING</strong> (red flash) when the mic signal is too loud for software to fix.</li>
                 <li><strong>Hold Shift</strong> — momentary 2× boost for drops. Silent — doesn't reveal the UI.</li>
               </ul>
             </div>
