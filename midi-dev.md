@@ -869,45 +869,96 @@ Defer the actual wiring until the basic record/playback is working reliably (Mod
 
 ---
 
-### Phase 1 — MVP: The Two Most Useful Things (start here)
+### Phase 1 — Foundation: Next/Prev + Layer Solo/Mute
 
-Smallest useful slice. No MIDI Learn UI, no Tauri bridge, no CC knobs yet. Just Web MIDI in Chrome with hard-coded default bindings for the two highest-value contexts.
+Two things only. No MIDI Learn UI, no Tauri bridge, no CC knobs yet — Web MIDI in Chrome with hard-coded default bindings, building directly on keyboard patterns that already exist.
 
-**1a — Plumbing (shared by everything)**
-- [ ] Create `src/midi/actions.js` — unified action registry: each action has `{ id, label, keyboard, midi: { type, number|cc } }`
-- [ ] Create `src/midi/midiDispatcher.js` — routes incoming `{type, ch, data1, data2}` to registered action callbacks; keyboard shortcuts feed the same dispatcher
-- [ ] Create `src/midi/midiWebTransport.js` — `navigator.requestMIDIAccess()`, forwards messages to dispatcher
-- [ ] Create `src/midi/index.js` — runtime detection (`'__TAURI__' in window`), exports active transport
+**Why these two?**
+- Next/Prev already has keyboard handlers in `controls.js` — MIDI is just a second route into the same function. Lowest possible implementation risk.
+- Layer Solo/Mute establishes the complete pattern (per-layer addressing, toggle buttons, keyboard+MIDI pairing) that every subsequent control follows. 10 dedicated pads also beats hunting for modifier keys mid-performance.
 
-**1b — Main app: Preset navigation**
+---
 
-Wire into `src/main.js`. Three notes, immediately useful for any live set:
+**Layer assignment: fixed per layer**
 
-| Action | Keyboard | MIDI Note |
-|--------|----------|-----------|
-| Next preset | `→` *(existing)* | Note 36 |
-| Previous preset | `←` *(existing)* | Note 37 |
-| Random preset | `R` *(existing)* | Note 38 |
+Each of the 5 layers has its own dedicated keyboard shortcut and MIDI note — no "active layer" mode state to track. Like a hardware mixer: every channel always has its own Solo and Mute button.
 
-Both the existing `keydown` handler and the new MIDI dispatcher call the same action function — keyboard shortcuts don't move, they just get a second input path.
+```
+           SOLO              MUTE
+Layer 1:   Shift+1 / Note 110   Ctrl+1 / Note 120
+Layer 2:   Shift+2 / Note 111   Ctrl+2 / Note 121
+Layer 3:   Shift+3 / Note 112   Ctrl+3 / Note 122
+Layer 4:   Shift+4 / Note 113   Ctrl+4 / Note 123
+Layer 5:   Shift+5 / Note 114   Ctrl+5 / Note 124
+```
 
-Also add keyboard companions for the energy slider (new shortcuts, not currently in the app):
+On a pad controller: a clean 2×5 grid (Solo column / Mute column, one row per layer). Spare notes for layers that don't exist in the current preset are silently ignored. MIDI Out will light the pad LED when the layer is soloed or muted — but that's Phase 8, not now.
 
-| Action | Keyboard (new) | MIDI |
-|--------|---------------|------|
-| Energy + | `]` | CC 11 (full range) |
-| Energy − | `[` | CC 11 (full range) |
+> **Option B (future, Phase 4):** For controllers with fewer pads, an active-layer-focus model (5 select pads + 1 Solo + 1 Mute = 7 pads total) can be layered on later. No changes to the underlying `toggleLayerSolo` / `toggleLayerMute` functions needed.
 
-Shift+`]` / Shift+`[` = large step (10×). The CC knob covers the full range continuously; `[` `]` give keyboard users the same control in discrete steps.
+---
 
-**1c — Preset Studio: Layer Solo / Mute**
+**Step 1 — Plumbing** *(new files, nothing in existing code changes yet)*
 
-Wire into `src/editor/main.js` (uses `window.__editorInspector`). Add two new methods to `EditorInspector`:
-- `toggleLayerSolo(layerIndex)` — extracts the existing inline solo click logic
-- `toggleLayerMute(layerIndex)` — extracts the existing inline mute click logic
+- [ ] `src/midi/actions.js` — action registry; each entry: `{ id, label, keyboard, midi }`
+- [ ] `src/midi/midiDispatcher.js` — receives `{ type, ch, data1, data2 }`, fires registered callbacks; keyboard events feed the same dispatcher
+- [ ] `src/midi/midiWebTransport.js` — `navigator.requestMIDIAccess()`, forwards all messages to dispatcher
+- [ ] `src/midi/index.js` — detects `'__TAURI__' in window`, exports active transport (Tauri transport is a stub for now)
+- [ ] Validate with console test before wiring to the app (see Quick Validation section)
 
-| Action | Keyboard | MIDI Note |
-|--------|----------|-----------|
+---
+
+**Step 2 — Main app: Next / Previous**
+
+*Touch points: `src/controls.js`, `src/main.js`, `src/midi/actions.js`*
+
+The existing `ArrowRight` / `ArrowLeft` handlers in `controls.js` call `engine.nextPreset()` / `engine.prevPreset()` directly. Refactor so they route through the dispatcher instead — MIDI notes 36 and 37 register the same callbacks.
+
+| Action | Keyboard | MIDI | Type |
+|--------|----------|------|------|
+| Next preset | `→` *(existing)* | Note 36 | Trigger |
+| Previous preset | `←` *(existing)* | Note 37 | Trigger |
+
+No new keyboard shortcuts. No new UI. The only visible change: a pad on a connected controller changes the preset.
+
+- [ ] Refactor `ArrowRight` / `ArrowLeft` in `controls.js` to route through dispatcher
+- [ ] Register Note 36 / Note 37 in `actions.js`
+- [ ] Wire dispatcher into `src/main.js` after engine init
+- [ ] Smoke test: keyboard still works; controller pad works
+
+---
+
+**Step 3 — Preset Studio: Layer Solo / Mute**
+
+*Touch points: `src/editor/inspector.js`, `src/editor/main.js`, `src/midi/actions.js`*
+
+The existing solo/mute logic lives as inline click handlers inside `_buildLayerCard()` in `inspector.js` (~line 2481). Extract into two public methods:
+
+```js
+// New on EditorInspector — extracts existing inline logic, no behaviour change
+toggleLayerSolo(index) {
+  const entry = this.currentState.images[index];
+  if (!entry) return;
+  entry.solo = !entry.solo;
+  this._syncSoloMuteUI();
+  this._buildCompShader();
+  this._applyToEngine();
+}
+
+toggleLayerMute(index) {
+  const entry = this.currentState.images[index];
+  if (!entry) return;
+  entry.muted = !entry.muted;
+  this._syncSoloMuteUI();
+  this._buildCompShader();
+  this._applyToEngine();
+}
+```
+
+Existing click handlers call these methods. Register all 10 actions. Add keyboard handler in `editor/main.js`. Wire dispatcher.
+
+| Action | Keyboard *(new)* | MIDI Note |
+|--------|-----------------|-----------|
 | Solo Layer 1 | `Shift+1` | Note 110 |
 | Solo Layer 2 | `Shift+2` | Note 111 |
 | Solo Layer 3 | `Shift+3` | Note 112 |
@@ -919,9 +970,18 @@ Wire into `src/editor/main.js` (uses `window.__editorInspector`). Add two new me
 | Mute Layer 4 | `Ctrl+4` | Note 123 |
 | Mute Layer 5 | `Ctrl+5` | Note 124 |
 
-The keyboard shortcuts are new — they don't exist yet in `editor/main.js`. MIDI and keyboard land together.
+- [ ] Extract `toggleLayerSolo` / `toggleLayerMute` from inline click handlers
+- [ ] Confirm existing solo/mute click behaviour unchanged
+- [ ] Register 10 actions in `actions.js`
+- [ ] Add `Shift+1–5` / `Ctrl+1–5` keyboard handler in `editor/main.js`
+- [ ] Wire dispatcher into `editor/main.js`
+- [ ] Smoke test: keyboard shortcuts solo/mute correct layers; controller pads do the same
 
-**Phase 1 deliverable:** plug in any class-compliant USB MIDI controller in Chrome, hit a pad → next preset. Hit 5 pads → solo/mute image layers in the editor. Nothing else needed.
+---
+
+**Phase 1 deliverable**
+
+A connected USB MIDI controller in Chrome can hit a pad to go next/prev preset in the main app, and hit any of 10 pads to solo or mute a specific image layer in the Preset Studio. Keyboard users gain 10 new shortcuts in the editor (`Shift+1–5`, `Ctrl+1–5`). The dispatcher and action registry are in place as the foundation every subsequent phase builds on.
 
 ---
 
