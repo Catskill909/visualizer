@@ -138,7 +138,17 @@ export class ControlPanel {
     // --- Start screen & Audio loading ---
     els.btnMic.addEventListener('click', () => this.startWithMic());
 
-    const triggerFilePicker = () => els.fileInput.click();
+    const triggerFilePicker = async () => {
+      if (window.__TAURI__) {
+        const result = await window.__TAURI__.invoke('pick_audio_file');
+        if (!result) return;
+        const bytes = Uint8Array.from(atob(result.data), c => c.charCodeAt(0));
+        const file = new File([bytes], result.name, { type: 'audio/mpeg' });
+        this.handleFileSelection(file);
+      } else {
+        els.fileInput.click();
+      }
+    };
     els.btnFile.addEventListener('click', triggerFilePicker);
 
     els.fileInput.addEventListener('change', (e) => {

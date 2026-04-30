@@ -423,7 +423,30 @@ btnMic.addEventListener('click', () => {
     });
 });
 
-btnFile.addEventListener('click', () => fileInput.click());
+const pickAudioFile = async () => {
+    if (window.__TAURI__) {
+        const result = await window.__TAURI__.invoke('pick_audio_file');
+        if (!result) return null;
+        const bytes = Uint8Array.from(atob(result.data), c => c.charCodeAt(0));
+        return new File([bytes], result.name, { type: 'audio/mpeg' });
+    }
+    return null;
+};
+
+btnFile.addEventListener('click', async () => {
+    if (window.__TAURI__) {
+        const file = await pickAudioFile();
+        if (!file) return;
+        boot(async eng => {
+            const audio = await eng.connectAudioFile(file);
+            audio.play();
+            mountMiniPlayer(audio, file.name);
+            showToast('Playing: ' + file.name);
+        });
+    } else {
+        fileInput.click();
+    }
+});
 
 fileInput.addEventListener('change', () => {
     const file = fileInput.files?.[0];
@@ -437,9 +460,22 @@ fileInput.addEventListener('change', () => {
 });
 
 // Mini-player load button — swap audio file without restarting the editor
-mpLoad.addEventListener('click', () => {
-    mpFileInput.value = '';
-    mpFileInput.click();
+mpLoad.addEventListener('click', async () => {
+    if (window.__TAURI__) {
+        const file = await pickAudioFile();
+        if (!file || !engine) return;
+        try {
+            const audio = await engine.connectAudioFile(file);
+            audio.play();
+            mountMiniPlayer(audio, file.name);
+            showToast('Playing: ' + file.name);
+        } catch (err) {
+            showToast('Failed to load: ' + err.message, true);
+        }
+    } else {
+        mpFileInput.value = '';
+        mpFileInput.click();
+    }
 });
 
 mpFileInput.addEventListener('change', async () => {
