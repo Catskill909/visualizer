@@ -11,6 +11,7 @@ import {
     importFromFile,
 } from '../customPresets.js';
 import { showToast } from './inspector.js';
+import { showImportResult } from '../importResultModal.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -75,10 +76,12 @@ export class PresetLibrary {
      * @param {object} opts
      * @param {(id: string) => void} opts.onLoad  - called when user clicks a card
      * @param {() => void}           opts.onNew   - called when user clicks "+ New"
+     * @param {object}               opts.engine  - VisualizerEngine, used to refresh preset registry after import
      */
-    constructor({ onLoad, onNew }) {
-        this.onLoad = onLoad;
-        this.onNew  = onNew;
+    constructor({ onLoad, onNew, engine }) {
+        this.onLoad  = onLoad;
+        this.onNew   = onNew;
+        this._engine = engine || null;
 
         this._search    = '';
         this._sort      = 'recent';
@@ -395,10 +398,10 @@ export class PresetLibrary {
         try {
             const text   = await file.text();
             const json   = JSON.parse(text);
-            const result = await importFromFile(json);
+            const { imported, names, failed } = await importFromFile(json);
+            this._engine?.refreshCustomPresets();
             this._renderGrid();
-            const n = result.imported ?? 0;
-            showToast(`Imported ${n} preset${n !== 1 ? 's' : ''}`);
+            showImportResult({ imported, names, failed });
         } catch (err) {
             showToast('Import failed: ' + err.message, true);
         }

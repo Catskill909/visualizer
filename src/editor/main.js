@@ -274,8 +274,9 @@ async function boot(connectAudioFn) {
 
     // Wire library
     library = new PresetLibrary({
-        onLoad: handleLibraryLoad,
-        onNew:  handleLibraryNew,
+        onLoad:  handleLibraryLoad,
+        onNew:   handleLibraryNew,
+        engine,
     });
 
     // Wire New Preset button in the Edit panel footer

@@ -13,11 +13,12 @@ import {
     deleteTimeline,
     pruneEmptyUntitled,
     createEntry,
-    exportTimeline,
-    importTimeline,
+    exportTimelineBundle,
+    importTimelineBundle,
     generateId,
 } from '../timelineStorage.js';
 import { VisualizerEngine } from '../visualizer.js';
+import { showImportResult } from '../importResultModal.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1504,16 +1505,16 @@ export class TimelineEditor {
 
     // ─── JSON Export / Import ─────────────────────────────────────────────────
 
-    _exportTimeline() {
+    async _exportTimeline() {
         if (!this._tl) return;
         try {
-            const json     = exportTimeline(this._tl);
+            this._toast('Preparing export…');
+            const json     = await exportTimelineBundle(this._tl);
             const blob     = new Blob([json], { type: 'application/json' });
-            const url      = URL.createObjectURL(blob);
-            const filename = `${(this._tl.name || 'timeline').replace(/[^a-z0-9_\-]/gi, '_')}.json`;
-            Object.assign(document.createElement('a'), { href: url, download: filename }).click();
-            URL.revokeObjectURL(url);
-            this._toast(`Exported: ${this._tl.name}`);
+            const filename = `${(this._tl.name || 'timeline').replace(/[^a-z0-9_\-]/gi, '_')}.dcshow.json`;
+            Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: filename }).click();
+            const mb = (blob.size / 1024 / 1024).toFixed(1);
+            this._toast(`Exported: ${this._tl.name} (${mb} MB)`);
         } catch (err) {
             this._toast('Export failed: ' + err.message, true);
         }
@@ -1521,8 +1522,9 @@ export class TimelineEditor {
 
     async _importFromFile(file) {
         try {
+            this._toast('Importing…');
             const text     = await file.text();
-            const imported = importTimeline(text);
+            const imported = await importTimelineBundle(text);
             this._timelines[imported.id] = imported;
             this._tl    = JSON.parse(JSON.stringify(imported));
             this._migrateEntryStartTimes(this._tl);
@@ -1530,9 +1532,15 @@ export class TimelineEditor {
             this._refreshSelector();
             this._selectEl.value = this._tl.id;
             this._syncZoneCanvases();
+            this._primaryEngine.refreshCustomPresets();
             this._renderStrip();
             this._setClean();
-            this._toast(`Imported: ${imported.name}`);
+            // Show result modal if the bundle included custom presets
+            if (imported._presetImport) {
+                showImportResult({ ...imported._presetImport, context: 'preset' });
+            } else {
+                this._toast(`Imported: ${imported.name}`);
+            }
         } catch (err) {
             this._toast('Import failed: ' + err.message, true);
         }

@@ -11,6 +11,7 @@ import {
   loadAllCustomPresets,
   CUSTOM_PREFIX,
 } from './customPresets.js';
+import { showImportResult } from './importResultModal.js';
 
 export class ControlPanel {
   constructor(engine) {
@@ -665,20 +666,11 @@ export class ControlPanel {
     this.showToast('⏳ Importing…');
     try {
       const text = await file.text();
-      const { imported, failed } = await importFromFile(text);
+      const { imported, names, failed } = await importFromFile(text);
       this.engine.refreshCustomPresets();
       this.syncBackupBar();
       if (this.drawerOpen) this.filterPresets();
-
-      if (imported && !failed.length) {
-        this.showToast(`📥 Imported ${imported} preset${imported === 1 ? '' : 's'}`);
-      } else if (imported && failed.length) {
-        this.showToast(`📥 Imported ${imported}, ${failed.length} failed`);
-        console.warn('Some presets failed to import:', failed);
-      } else {
-        this.showToast('❌ Nothing imported — check file format');
-        console.warn('Import failed:', failed);
-      }
+      showImportResult({ imported, names, failed });
     } catch (err) {
       console.error('Import failed:', err);
       this.showToast(`❌ Import failed: ${err.message}`);

@@ -275,14 +275,16 @@ export async function importFromFile(json) {
     }
 
     const failed = [];
+    const names   = [];
     let imported = 0;
     for (const preset of list) {
         try {
-            await importPreset(preset);
+            const saved = await importPreset(preset);
             imported++;
+            names.push(saved.name);
         } catch (err) {
             failed.push({ name: preset?.name || '(unnamed)', error: err.message });
         }
     }
-    return { imported, failed };
+    return { imported, names, failed };
 }

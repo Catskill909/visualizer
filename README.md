@@ -21,7 +21,7 @@ A modern browser-based MilkDrop music visualizer powered by [Butterchurn](https:
 - **Output Settings** (`O` key or monitor icon) — lock canvas render resolution (HD / Full HD / QHD / 4K / Custom), constrain aspect ratio (16:9, 4:3, 21:9, 1:1, 9:16 portrait), choose fill mode (Letterbox / Stretch / Crop); settings persist across reloads. **Virtual Camera** toggle streams the canvas as a system webcam source — pick it in OBS, Zoom, or any capture app with no additional driver install
 - **Responsive design** — works on desktop and mobile viewports
 - **Preset Studio** (`/editor.html` or press **E**) — standalone visual preset builder: 12 one-click palettes, 3 independent color swatches (Wave / Glow / Accent), 5 tabbed control sections (Palette / Motion / Wave / Feel / Images), undo/redo (50-deep), A/B comparison; **up to 5 image layers** in a collapsible smart-accordion stack with drag-to-reorder, per-layer solo / mute / rename / static thumbnail, image resize on upload (1024px standard / 2048px HD toggle), per-layer UV mirror with Per Tile · Whole Image scope, scene-level Canvas Mirror, per-layer audio reactivity (source: Bass / Mid / Treble / Volume; curve: Linear / Squared / Cubed / Gate), aspect-correct tiling (portrait · square · landscape images tile without distortion), **Pan** (whole-group L/R + U/D translation — Drift for continuous travel/endless tile scroll, Bounce for independent-axis ping-pong), **Chromatic Aberration** (per-layer RGB split with animated offset), dev performance HUD (`` ` `` key); saves to localStorage
-- **Timeline Editor** (`/timeline.html` or press **L**) — self-contained full-screen show sequencer: canvas fills the screen, glassmorphic controls are always visible; a **fullscreen button** (top-right, or press `F`) hides all controls and enters true fullscreen — outside the browser on web, window-fullscreen in the macOS app; pressing `F`, clicking the button again, or pressing `Escape` restores controls; arrange presets on a proportional-width multi-track strip, set per-entry durations and blend times, play/stop/loop live; **Zone Compositor** assigns each entry to a named screen region (quadrant, banner, center square, custom rectangle) so multiple presets render simultaneously in different areas — each zone has independent opacity, blend mode (screen/overlay/multiply/add), and gap behavior; supports drag-to-reorder, snap-to-grid, waveform overlay, BPM grid, JSON export/import
+- **Timeline Editor** (`/timeline.html` or press **L**) — self-contained full-screen show sequencer: canvas fills the screen, glassmorphic controls are always visible; a **fullscreen button** (top-right, or press `F`) hides all controls and enters true fullscreen — outside the browser on web, window-fullscreen in the macOS app; pressing `F`, clicking the button again, or pressing `Escape` restores controls; arrange presets on a proportional-width multi-track strip, set per-entry durations and blend times, play/stop/loop live; **Zone Compositor** assigns each entry to a named screen region (quadrant, banner, center square, custom rectangle) so multiple presets render simultaneously in different areas — each zone has independent opacity, blend mode (screen/overlay/multiply/add), and gap behavior; supports drag-to-reorder, snap-to-grid, waveform overlay, BPM grid; **Export** saves a `.dcshow.json` bundle that embeds all referenced custom presets including image layers as base64 — fully portable across devices; **Import** restores the timeline and all custom presets, remapping IDs automatically, and shows a detailed result modal listing every imported preset and any failures
 
 ## Tech Stack
 
@@ -156,8 +156,10 @@ Single source of truth for custom preset CRUD.
 | `loadAllCustomPresets()` | Return all saved custom presets |
 | `storeImage(blob)` | Persist image blob to IndexedDB, return imageId |
 | `getImage(imageId)` | Retrieve image blob by id |
-| `exportPreset(id)` | Serialize preset + inlined images to JSON |
-| `importPreset(json)` | Validate, re-hydrate images, write to storage |
+| `exportPreset(id)` | Serialize preset + inlined images as base64 data-URLs to JSON |
+| `exportAllPresets()` | Bulk export all custom presets as a single JSON bundle |
+| `importPreset(json)` | Validate, re-hydrate images to IndexedDB, write metadata to localStorage |
+| `importFromFile(json)` | Batch import (single preset, array, or bulk bundle); returns `{ imported, names, failed }` |
 
 Storage schema: `{ id, name, schemaVersion: 1, baseVals, shapes, waves, warp, comp, init_eqs, frame_eqs, pixel_eqs, images, parentPresetName?, createdAt, updatedAt }`. Registry key format: `custom:<id>:<name>` prevents collision with bundled names.
 
@@ -314,7 +316,7 @@ After changing `nginx.conf`, redeploy and check the browser Console for CSP viol
 **Out of scope / known soft spots:**
 - **Password-in-bundle** — covered above. Not real auth by design.
 - **HTTPS / HSTS** — terminated at the Coolify reverse proxy, not in this Dockerfile. Verify HTTPS redirect is enabled on the Coolify app.
-- **Image layer injection (editor)** — `file.name` from user uploads is set via `textContent`/`title` (not `innerHTML`) so it can't XSS. If preset import/export is ever wired to UI, re-audit image layer card rendering.
+- **Image layer injection (editor)** — `file.name` from user uploads is set via `textContent`/`title` (not `innerHTML`) so it can't XSS. Preset names in the import result modal are HTML-escaped by `importResultModal.js`.
 
 ## Dependencies
 
