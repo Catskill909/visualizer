@@ -107,6 +107,7 @@ html, body {
 /* Zone canvases injected here — fill the full screen */
 #tl-canvas-container { position: fixed; inset: 0; z-index: 0; }
 #tl-canvas-container canvas { position: absolute; display: block; }
+body.tl-fullscreen #tl-canvas-container { cursor: pointer; }
 
 /* ── Overlay fade behaviour ── */
 .tl-overlay {
@@ -1000,10 +1001,10 @@ html, body {
 .tl-layout-tile:hover span  { color: var(--text-2); }
 
 /* ══════════════════════════════════════════════════════════════════════
-   TOGGLE UI — always-visible pin button (top-right corner)
+   FULLSCREEN BUTTON — always-visible, top-right corner
    ══════════════════════════════════════════════════════════════════════ */
 
-.tl-toggle-ui {
+.tl-fullscreen-btn {
   position: fixed;
   top: 12px;
   right: 14px;
@@ -1019,21 +1020,8 @@ html, body {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
-.tl-toggle-ui:hover {
+.tl-fullscreen-btn:hover {
   background: rgba(30,30,30,0.9);
   color: rgba(255,255,255,0.85);
   border-color: rgba(255,255,255,0.25);
-}
-.tl-toggle-ui.active {
-  background: rgba(124,111,205,0.25);
-  border-color: rgba(124,111,205,0.5);
-  color: #b8b0e8;
-}
-/* When controls are hidden, the button fades to a subtle dot in the corner */
-.tl-toggle-ui.ui-hidden {
-  opacity: 0.22;
-  color: rgba(255,255,255,0.35);
-}
-.tl-toggle-ui.ui-hidden:hover {
-  opacity: 1;
 }

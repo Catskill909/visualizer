@@ -1,7 +1,7 @@
 # Timeline Editor — Design & Planning Doc
 
 **Status:** Phases 1–3 complete. Phase 4 (Waveform + BPM) is next.  
-**Last updated:** 2026-04-26  
+**Last updated:** 2026-04-30  
 **Architecture:** Standalone page (`/timeline.html`) — self-contained MPA entry in Vite.
 
 ---
@@ -55,12 +55,16 @@ All three phases are fully working. Here's an accurate picture of the running co
 ### Block inline actions (Phase 3 UX, complete)
 Each block shows **Edit / Duplicate / Delete** icon buttons on hover — no hidden double-click or right-click required. Right-click context menu still works as secondary path.
 
-### Auto-hide + toggle button (Phase 3 UX, complete)
-- All overlays (topbar, transport, mini-player, strip) fade after 3.5s of mouse inactivity at all times
-- `#tl-toggle-ui` button in top-right corner is **always visible** regardless of overlay state
-  - Click → pins controls permanently (`_uiLocked = true`, button glows purple)
-  - Click again → unpins, idle timer resumes
-  - When controls are hidden, button fades to 22% opacity but reappears on hover
+### Fullscreen button (Phase 3 UX, updated)
+- Controls are **always visible** — auto-hide timer removed entirely
+- `#tl-fullscreen-btn` button in top-right corner (replaced the old `#tl-toggle-ui` pin button)
+  - Click → hides all overlay controls and enters fullscreen (`_isFullscreen = true`)
+  - Web: uses `document.documentElement.requestFullscreen()` — native browser fullscreen
+  - macOS app (Tauri): uses `appWindow.setFullscreen(true)` via `@tauri-apps/api/window` (import is `/* @vite-ignore */` so Vite doesn't resolve it outside Tauri builds)
+  - Icon swaps from expand arrows (enter) to compress arrows (exit)
+  - `fullscreenchange` / `webkitfullscreenchange` events sync `_isFullscreen` and restore overlays when browser Esc exits fullscreen
+  - `Escape` key in `handleEscape()` also calls `_exitFullscreen()` (covers Tauri where browser Esc interception differs)
+  - `F` key also toggles fullscreen
 - `T` key still toggles the strip panel visibility (`toggleStrip()`)
 
 ---
@@ -84,8 +88,8 @@ Current behavior (Phase 3+): `startTime` is stored and is the actual seconds-fro
 ### `_zoneTimers` stores arrays, not single handles
 `stop()` iterates: `for (const timers of this._zoneTimers.values()) for (const t of timers) clearTimeout(t)`. Don't accidentally store a single handle — it will not be cleared.
 
-### `_uiLocked` guards `_hideOverlays()`
-Both `_hideOverlays()` and `_resetHideTimer()` return early if `this._uiLocked === true`. This is set by `toggleUI()`. The constructor initializes `this._uiLocked = false`.
+### `_isFullscreen` tracks fullscreen state
+`_isFullscreen` is set to `true` on enter, `false` on exit. `_hideOverlays()` is called on enter; `_showOverlays()` is called on exit. For web, `_onFullscreenChange()` is the authoritative setter (fired by the browser). For Tauri, `_isFullscreen` is set directly in `_enterFullscreen`/`_exitFullscreen` since WKWebView does not fire standard fullscreen events.
 
 ---
 
@@ -221,12 +225,16 @@ new TimelineEditor({ engine, canvasContainer })
 | `_zoneEntriesFor(zoneId)` | Filters entries by zone and **sorts by `startTime`** |
 | `_totalDuration()` | `max(entry.startTime + entry.duration)` across all entries |
 
-### Auto-hide
+### Fullscreen
 | Method | What it does |
 |--------|-------------|
-| `_resetHideTimer()` | Shows overlays, schedules `_hideOverlays` after 3.5s. Respects `_uiLocked`. |
-| `_hideOverlays()` | Adds `.tl-hidden` to all overlay elements + fades strip. Respects `_uiLocked`. |
-| `toggleUI()` | Flips `_uiLocked`. When locked: shows all overlays permanently. When unlocked: restarts idle timer. |
+| `toggleFullscreen()` | Enters or exits fullscreen based on `_isFullscreen`. |
+| `_enterFullscreen()` | Calls browser or Tauri fullscreen API, calls `_hideOverlays()`. |
+| `_exitFullscreen()` | Exits fullscreen, calls `_showOverlays()`. |
+| `_onFullscreenChange()` | Fired by `fullscreenchange` / `webkitfullscreenchange` — syncs `_isFullscreen`, restores overlays on exit. |
+| `_updateFsIcon(bool)` | Swaps enter/exit SVG icons and toggles `.fs-active` class on the button. |
+| `_showOverlays()` | Removes `.tl-hidden` from all overlay elements + restores strip opacity. |
+| `_hideOverlays()` | Adds `.tl-hidden` to all overlay elements + fades strip. |
 
 ---
 
@@ -234,12 +242,11 @@ new TimelineEditor({ engine, canvasContainer })
 
 | State | Topbar | Transport | Strip | Mini-player |
 |-------|--------|-----------|-------|-------------|
-| Any — mouse active | Visible | Visible | Visible | Visible |
-| Idle 3.5s (any state) | Fades | Fades | Fades | Fades |
-| `toggleUI()` locked | Always visible | Always visible | Always visible | Always visible |
+| Normal (any) | Visible | Visible | Visible | Visible |
+| Fullscreen active | Hidden | Hidden | Hidden | Hidden |
 | `T` key | — | — | Toggles panel | — |
 
-The `#tl-toggle-ui` button is **not** in `_overlays`. It lives outside the overlay system at `z-index: 110` and is always reachable. It fades to 22% opacity when controls are hidden but is still clickable/hoverable.
+The `#tl-fullscreen-btn` is **not** in `_overlays`. It lives outside the overlay system at `z-index: 110` and is always reachable — it is the only element visible in fullscreen mode.
 
 ---
 
@@ -265,7 +272,7 @@ timeline.html
     #tl-delete-modal      — confirm delete timeline
     #tl-toast             — ephemeral status messages
     #mini-player          — overlay: audio file player
-    #tl-toggle-ui         — always-visible pin button (top-right, z-index 110)
+    #tl-fullscreen-btn    — always-visible fullscreen toggle (top-right, z-index 110)
 ```
 
 ---
@@ -327,8 +334,8 @@ Defined in `src/timeline/style.css` `:root`:
 
 - **Position-based dragging** — blocks drag freely to any time position. `entry.startTime` is now stored (not computed). Dragging the block body updates `entry.startTime` directly on drop. `_migrateEntryStartTimes()` auto-converts old sequential timelines on load.
 - **Inline block actions** — hover a block to reveal Edit / Duplicate / Delete icon buttons. Clicking them does not trigger drag. Right-click context menu preserved as secondary path.
-- **Always-active auto-hide** — controls fade after 3.5s of mouse inactivity at all times (previously only during playback). Any mouse movement shows them again.
-- **`#tl-toggle-ui` pin button** — always-visible `≡` button in top-right corner. Pins controls permanently when activated (purple highlight). Fades to 22% when controls are hidden but always reachable.
+- **Controls always visible** — auto-hide timer removed. Controls are permanently visible unless fullscreen is active.
+- **`#tl-fullscreen-btn`** — always-visible fullscreen icon in top-right corner (replaced the old `≡` pin toggle). Click or press `F` to enter fullscreen and hide all controls. Click again, press `F`, or press `Escape` to exit fullscreen and restore controls. Web uses native browser fullscreen API; macOS app uses Tauri `appWindow.setFullscreen()`.
 
 ### Phase 4 — Advanced show features
 

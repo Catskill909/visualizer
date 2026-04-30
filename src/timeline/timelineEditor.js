@@ -133,10 +133,9 @@ export class TimelineEditor {
         this._masterTimer  = null;
         this._rafId        = null;
 
-        // Auto-hide
-        this._hideTimer    = null;
-        this._stripVisible = true;
-        this._uiLocked     = false;
+        // UI state
+        this._stripVisible  = true;
+        this._isFullscreen  = false;
 
         // Quick-edit
         this._qeEntryId    = null;
@@ -157,8 +156,6 @@ export class TimelineEditor {
         this._bindDOM();
         this._loadAll();
         this._newTimeline();
-        // Start idle-hide timer immediately so controls fade after inactivity
-        this._startHideTimer();
     }
 
     // ─── DOM binding ──────────────────────────────────────────────────────────
@@ -169,8 +166,9 @@ export class TimelineEditor {
         this._nameInput     = document.getElementById('tl-name-input');
         this._btnNew        = document.getElementById('tl-btn-new');
         this._btnSave       = document.getElementById('tl-btn-save');
-        this._btnCopy       = document.getElementById('tl-btn-copy');
-        this._btnPaste      = document.getElementById('tl-btn-paste');
+        this._btnExport     = document.getElementById('tl-btn-export');
+        this._btnImport     = document.getElementById('tl-btn-import');
+        this._importInput   = document.getElementById('tl-import-input');
         this._btnDelete     = document.getElementById('tl-btn-delete');
 
         // Transport
@@ -241,8 +239,13 @@ export class TimelineEditor {
 
         this._btnNew.addEventListener('click',    () => this._confirmNewTimeline());
         this._btnSave.addEventListener('click',   () => this.saveTimeline());
-        this._btnCopy.addEventListener('click',   () => this._copyJSON());
-        this._btnPaste.addEventListener('click',  () => this._pasteJSON());
+        this._btnExport.addEventListener('click', () => this._exportTimeline());
+        this._btnImport.addEventListener('click', () => this._importInput.click());
+        this._importInput.addEventListener('change', e => {
+            const file = e.target.files?.[0];
+            if (file) this._importFromFile(file);
+            e.target.value = '';
+        });
         this._btnDelete.addEventListener('click', () => this._confirmDeleteTimeline());
 
         this._selectEl.addEventListener('change', e => {
@@ -357,12 +360,18 @@ export class TimelineEditor {
                 this._closeQuickEdit();
         }, { capture: true });
 
-        // Mouse activity always resets the auto-hide timer
-        document.addEventListener('pointermove', () => this._resetHideTimer());
+        // Fullscreen button — enter only; exit is via click-on-canvas or Esc
+        const fsBtn = document.getElementById('tl-fullscreen-btn');
+        fsBtn?.addEventListener('click', () => this._enterFullscreen());
 
-        // Toggle UI button (always visible, outside overlays)
-        const toggleBtn = document.getElementById('tl-toggle-ui');
-        toggleBtn?.addEventListener('click', () => this.toggleUI());
+        // Click anywhere on the canvas container to exit fullscreen
+        this._canvasContainer.addEventListener('click', () => {
+            if (this._isFullscreen) this._exitFullscreen();
+        });
+
+        // Update button visibility when browser fullscreen state changes externally (e.g. Esc key)
+        document.addEventListener('fullscreenchange', () => this._onFullscreenChange());
+        document.addEventListener('webkitfullscreenchange', () => this._onFullscreenChange());
     }
 
     // ─── Save state helpers ───────────────────────────────────────────────────
@@ -1230,8 +1239,6 @@ export class TimelineEditor {
         this._psStopIcon.style.display = '';
         this._psLabel.textContent = 'Stop';
 
-        this._startHideTimer();
-
         // Launch per-zone playback chains
         for (const zone of (this._tl.zones || [])) {
             this._playZone(zone.id);
@@ -1323,8 +1330,7 @@ export class TimelineEditor {
 
         this._playheadEl.style.display = 'none';
         this._updateTimeDisplay(0);
-        this._cancelHideTimer();
-        this._showOverlays();
+        if (!this._isFullscreen) this._showOverlays();
     }
 
     togglePlayback() {
@@ -1392,50 +1398,84 @@ export class TimelineEditor {
         this._timeDisp.textContent = `${fmtTime(tNow)} / ${fmtTime(total)}`;
     }
 
-    // ─── Auto-hide overlays ───────────────────────────────────────────────────
-
-    _startHideTimer()  { this._resetHideTimer(); }
-
-    _resetHideTimer() {
-        if (this._uiLocked) return;   // user pinned controls visible
-        clearTimeout(this._hideTimer);
-        this._showOverlays();
-        this._hideTimer = setTimeout(() => this._hideOverlays(), 3500);
-    }
-
-    _cancelHideTimer() {
-        clearTimeout(this._hideTimer);
-        this._hideTimer = null;
-    }
+    // ─── Overlay visibility ───────────────────────────────────────────────
 
     _showOverlays() {
         this._overlays.forEach(el => el.classList.remove('tl-hidden'));
         if (this._stripVisible) this._stripEl.style.opacity = '';
-        const toggleBtn = document.getElementById('tl-toggle-ui');
-        if (toggleBtn) toggleBtn.classList.remove('ui-hidden');
     }
 
     _hideOverlays() {
-        if (this._uiLocked) return;
         this._overlays.forEach(el => el.classList.add('tl-hidden'));
         if (this._stripVisible) this._stripEl.style.opacity = '0';
-        const toggleBtn = document.getElementById('tl-toggle-ui');
-        if (toggleBtn) toggleBtn.classList.add('ui-hidden');
     }
 
-    // Toggle button — pin controls visible / let them auto-hide
-    toggleUI() {
-        this._uiLocked = !this._uiLocked;
-        const toggleBtn = document.getElementById('tl-toggle-ui');
-        if (this._uiLocked) {
-            clearTimeout(this._hideTimer);
-            this._showOverlays();
-            toggleBtn?.classList.add('active');
+    // ─── Fullscreen ───────────────────────────────────────────────────────
+
+    async toggleFullscreen() {
+        if (this._isFullscreen) {
+            await this._exitFullscreen();
         } else {
-            toggleBtn?.classList.remove('active');
-            this._resetHideTimer();
+            await this._enterFullscreen();
         }
     }
+
+    async _enterFullscreen() {
+        try {
+            if (window.__TAURI__) {
+                // Tauri / macOS app — use Tauri window API.
+                // Dynamic import path kept in a variable so Vite's static resolver
+                // doesn't attempt to bundle a package that only exists in Tauri builds.
+                const mod = '@tauri-apps/api/window';
+                const { appWindow } = await import(/* @vite-ignore */ mod);
+                await appWindow.setFullscreen(true);
+                this._isFullscreen = true;
+            } else {
+                // Web browser — request native fullscreen
+                const el = document.documentElement;
+                if (el.requestFullscreen) await el.requestFullscreen();
+                else if (el.webkitRequestFullscreen) await el.webkitRequestFullscreen();
+                // _isFullscreen is set in _onFullscreenChange
+            }
+            this._hideOverlays();
+            this._updateFsBtn(true);
+        } catch (err) {
+            console.warn('Fullscreen enter failed:', err);
+        }
+    }
+
+    async _exitFullscreen() {
+        try {
+            if (window.__TAURI__) {
+                const mod = '@tauri-apps/api/window';
+                const { appWindow } = await import(/* @vite-ignore */ mod);
+                await appWindow.setFullscreen(false);
+                this._isFullscreen = false;
+            } else {
+                if (document.exitFullscreen) await document.exitFullscreen();
+                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+                // _isFullscreen is set in _onFullscreenChange
+            }
+            this._showOverlays();
+            this._updateFsBtn(false);
+        } catch (err) {
+            console.warn('Fullscreen exit failed:', err);
+        }
+    }
+
+    _onFullscreenChange() {
+        const inFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+        this._isFullscreen = inFs;
+        this._updateFsBtn(inFs);
+        if (!inFs) this._showOverlays();
+    }
+
+    _updateFsBtn(isFullscreen) {
+        const btn = document.getElementById('tl-fullscreen-btn');
+        if (btn) btn.style.display = isFullscreen ? 'none' : '';
+        document.body.classList.toggle('tl-fullscreen', isFullscreen);
+    }
+
 
     // ─── Strip toggle ─────────────────────────────────────────────────────────
 
@@ -1458,21 +1498,30 @@ export class TimelineEditor {
         if (!this._ctxMenu.hidden)     { this._closeContextMenu();  return; }
         if (!this._entryDeleteModal.hidden) { this._pendingDeleteId = null; this._entryDeleteModal.hidden = true; return; }
         if (!this._deleteModal.hidden) { this._deleteModal.hidden = true; return; }
+        if (this._isFullscreen)        { this._exitFullscreen();    return; }
         if (this._playing)             { this.stop();               return; }
     }
 
     // ─── JSON Export / Import ─────────────────────────────────────────────────
 
-    _copyJSON() {
+    _exportTimeline() {
         if (!this._tl) return;
-        navigator.clipboard.writeText(exportTimeline(this._tl))
-            .then(() => this._toast('Copied to clipboard'))
-            .catch(() => this._toast('Copy failed', true));
+        try {
+            const json     = exportTimeline(this._tl);
+            const blob     = new Blob([json], { type: 'application/json' });
+            const url      = URL.createObjectURL(blob);
+            const filename = `${(this._tl.name || 'timeline').replace(/[^a-z0-9_\-]/gi, '_')}.json`;
+            Object.assign(document.createElement('a'), { href: url, download: filename }).click();
+            URL.revokeObjectURL(url);
+            this._toast(`Exported: ${this._tl.name}`);
+        } catch (err) {
+            this._toast('Export failed: ' + err.message, true);
+        }
     }
 
-    async _pasteJSON() {
+    async _importFromFile(file) {
         try {
-            const text     = await navigator.clipboard.readText();
+            const text     = await file.text();
             const imported = importTimeline(text);
             this._timelines[imported.id] = imported;
             this._tl    = JSON.parse(JSON.stringify(imported));
@@ -1485,7 +1534,7 @@ export class TimelineEditor {
             this._setClean();
             this._toast(`Imported: ${imported.name}`);
         } catch (err) {
-            this._toast('Paste failed: ' + err.message, true);
+            this._toast('Import failed: ' + err.message, true);
         }
     }
 

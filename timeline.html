@@ -86,19 +86,23 @@
         <div class="tl-topbar-actions">
             <button id="tl-btn-new"    class="tl-btn"           type="button">+ New</button>
             <button id="tl-btn-save"   class="tl-btn tl-btn--primary" type="button">Save</button>
-            <button id="tl-btn-copy"   class="tl-btn tl-btn--icon" type="button" title="Copy timeline as JSON">
+            <button id="tl-btn-export" class="tl-btn tl-btn--icon" type="button" title="Export timeline as JSON file">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-                    <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
                 </svg>
-                Copy JSON
+                Export
             </button>
-            <button id="tl-btn-paste"  class="tl-btn tl-btn--icon" type="button" title="Paste timeline from JSON">
+            <button id="tl-btn-import" class="tl-btn tl-btn--icon" type="button" title="Import timeline from JSON file">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
-                    <rect x="8" y="2" width="8" height="4" rx="1"/>
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 5 17 10"/>
+                    <line x1="12" y1="5" x2="12" y2="17"/>
                 </svg>
-                Paste JSON
+                Import
             </button>
+            <input type="file" id="tl-import-input" accept=".json,application/json" hidden />
             <button id="tl-btn-delete" class="tl-btn tl-btn--danger tl-btn--icon" type="button" title="Delete this timeline">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
                     <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
@@ -257,12 +261,11 @@
         </div>
     </div>
 
-    <!-- ─── TOGGLE UI BUTTON (always visible) ─── -->
-    <button id="tl-toggle-ui" class="tl-toggle-ui" type="button" title="Pin controls visible (T)">
+    <!-- ─── FULLSCREEN BUTTON (always visible, top-right) ─── -->
+    <button id="tl-fullscreen-btn" class="tl-fullscreen-btn" type="button" title="Fullscreen — click canvas or press Esc to exit">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <line x1="3" y1="12" x2="21" y2="12"/>
-            <line x1="3" y1="6"  x2="21" y2="6"/>
-            <line x1="3" y1="18" x2="21" y2="18"/>
+            <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>
+            <line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
         </svg>
     </button>
 

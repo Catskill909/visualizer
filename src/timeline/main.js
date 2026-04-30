@@ -169,6 +169,11 @@ async function boot(connectAudioFn) {
             e.preventDefault();
             editor.toggleStrip();
         }
+        // F — toggle fullscreen
+        if (!ctrl && !e.shiftKey && e.key === 'f' && !inInput) {
+            e.preventDefault();
+            editor.toggleFullscreen();
+        }
         // Escape — close any open overlay or stop playback
         if (e.key === 'Escape') {
             editor.handleEscape();
