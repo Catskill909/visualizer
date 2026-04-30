@@ -88,41 +88,43 @@
         <div class="section-label">Overview</div>
         <h2 class="section-title">What's in the app</h2>
         <p class="section-desc">
-          Over 1,100 reactive visuals, a full preset studio, a timeline editor
-          for planning shows, and live performance controls — all in one app.
+          Over 1,100 reactive visuals, a full preset studio with deep per-layer animation controls,
+          a timeline editor for planning shows, and live performance tools — all in one app.
         </p>
       </div>
 
       <div class="features-grid">
         <div class="feature-card fade-in">
           <h3>1,144 MilkDrop Presets</h3>
-          <p>The full Butterchurn library plus the community-curated Baron pack — all bundled locally, no network calls
-            needed.</p>
+          <p>The full Butterchurn library plus the community-curated Baron pack — all bundled locally, no network calls needed.</p>
         </div>
         <div class="feature-card fade-in">
           <h3>Live Audio Input</h3>
-          <p>Mic, USB DJ controller, external sound card — pick your device from a native dropdown and the visuals
-            follow whatever you're playing.</p>
+          <p>Mic, USB DJ controller, external sound card — pick your device from a native dropdown and the visuals follow whatever you're playing.</p>
         </div>
         <div class="feature-card fade-in">
           <h3>Auto-Gain &amp; Kick-Lock</h3>
-          <p>AGC keeps the visuals consistently punchy regardless of volume. Kick-Lock isolates the low end so
-            everything syncs to the kick drum.</p>
+          <p>AGC keeps visuals consistently punchy regardless of volume. Kick-Lock isolates the low end so everything locks to the kick drum.</p>
         </div>
         <div class="feature-card fade-in">
           <h3>Projector Ready</h3>
-          <p>Screen Wake Lock, auto-hiding cursor, and Zen Mode (press H) for zero-UI projection. Built for live events
-            and installations.</p>
+          <p>Screen Wake Lock, auto-hiding cursor, and Zen Mode (H key) for zero-UI projection. Built for live events and installations.</p>
         </div>
         <div class="feature-card fade-in">
-          <h3>Live Performance Keys</h3>
-          <p>One-key strobe, blackout, and color inversion. Hold Shift for a 2× intensity boost. Fast enough for live DJ
-            sets.</p>
+          <h3>Virtual Camera Output</h3>
+          <p>Stream the visualizer canvas directly into OBS, Zoom, or any app that accepts a webcam. No extra drivers — one toggle in the app.</p>
         </div>
         <div class="feature-card fade-in">
           <h3>Preset Browser</h3>
-          <p>Searchable drawer across all 1,144 presets. Heart your favorites, hide the ones you don't want, and cycle
-            through only the good stuff.</p>
+          <p>Searchable drawer across all 1,144 presets. Heart your favorites, hide the ones you don't want, and cycle only through the good stuff.</p>
+        </div>
+        <div class="feature-card fade-in">
+          <h3>Output Resolution Control</h3>
+          <p>Lock the render canvas to HD / Full HD / QHD / 4K or a custom size. Set aspect ratio and fill mode (Letterbox / Stretch / Crop) independently.</p>
+        </div>
+        <div class="feature-card fade-in">
+          <h3>Live Performance Keys</h3>
+          <p>One-key strobe, blackout, and color inversion. Hold Shift for a 2× intensity boost. Fast enough for live DJ sets.</p>
         </div>
       </div>
     </div>
@@ -142,34 +144,26 @@
           <div class="section-label">Preset Studio</div>
           <h2 class="section-title">Make your own visuals</h2>
           <p class="section-desc">
-            The Preset Studio is where you build custom presets from scratch.
-            Pick a color palette, tweak the motion and wave controls, then
-            layer in your own images and make them react to the music.
+            Build custom presets from scratch with a live canvas and a tabbed inspector.
+            Pick a palette, shape the motion, then add your own images and wire every
+            layer to the music independently.
           </p>
           <ul class="feature-list">
             <li>
-              <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              12 one-click palettes with 3 independent color swatches
+              <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12" /></svg>
+              12 one-click palettes · 3 independent color swatches (Wave / Glow / Accent)
             </li>
             <li>
-              <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
+              <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12" /></svg>
               5 tabbed sections: Palette, Motion, Wave, Feel, Images
             </li>
             <li>
-              <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              50-deep undo/redo and A/B comparison
+              <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12" /></svg>
+              50-deep undo/redo · A/B comparison · Focus mode (\ key)
             </li>
             <li>
-              <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              Saves to localStorage — your presets are always there
+              <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12" /></svg>
+              Export presets as portable files — images included, no data lost
             </li>
           </ul>
         </div>
@@ -177,44 +171,62 @@
 
       <!-- Image Layers Deep Dive -->
       <div class="image-layers fade-in">
-        <h4>Image Layers — the fun part</h4>
-        <p class="section-desc" style="margin-bottom: 20px; max-width: 100%;">
-          You can add up to 5 image layers to any custom preset. Upload your own photos, textures, or artwork
-          and the visualizer composites them into the scene in real-time. Each layer has independent controls,
-          so you can build complex layered visuals that react differently to bass, mids, or treble.
+        <h4>Image Layers — up to 5 per preset</h4>
+        <p class="section-desc" style="margin-bottom: 28px; max-width: 100%;">
+          Upload your own photos, textures, or artwork and composite them into the scene in real-time.
+          Each layer has a full independent animation and effects pipeline — motion, transforms, audio reactivity,
+          color, and blending — so you can build complex visuals that move and react exactly how you want.
         </p>
-        <div class="image-layers-grid">
-          <div class="il-item">
-            <span class="il-dot"></span>
-            Drag-to-reorder layer stack with per-layer solo &amp; mute
+
+        <div class="il-categories">
+          <div class="il-category">
+            <div class="il-category-title">Motion</div>
+            <div class="image-layers-grid">
+              <div class="il-item"><span class="il-dot"></span>Spin — per-tile or whole-image rotation speed</div>
+              <div class="il-item"><span class="il-dot"></span>Orbit — circular or Lissajous path (figure-8, clover)</div>
+              <div class="il-item"><span class="il-dot"></span>Bounce — bass-driven upward displacement on every beat</div>
+              <div class="il-item"><span class="il-dot"></span>Beat Shake — random UV impulse on kick, scales with audio</div>
+              <div class="il-item"><span class="il-dot"></span>Sway — sinusoidal horizontal pendulum</div>
+              <div class="il-item"><span class="il-dot"></span>Wander — organic dual-sine drift that never repeats</div>
+              <div class="il-item"><span class="il-dot"></span>Pan — Drift (endless scroll) or Bounce (ping-pong)</div>
+              <div class="il-item"><span class="il-dot"></span>Tunnel — seamless zoom-through with per-layer depth offset</div>
+            </div>
           </div>
-          <div class="il-item">
-            <span class="il-dot"></span>
-            Per-layer audio reactivity — choose Bass, Mid, Treble, or Volume
+
+          <div class="il-category">
+            <div class="il-category-title">Transform</div>
+            <div class="image-layers-grid">
+              <div class="il-item"><span class="il-dot"></span>Size with audio-reactive pulse</div>
+              <div class="il-item"><span class="il-dot"></span>Angle — static rotation offset</div>
+              <div class="il-item"><span class="il-dot"></span>Skew X / Y — 2D shear transform</div>
+              <div class="il-item"><span class="il-dot"></span>Perspective X / Y — projective warp to vanishing point</div>
+              <div class="il-item"><span class="il-dot"></span>Tile Width / Height — independent cell shape</div>
+              <div class="il-item"><span class="il-dot"></span>Aspect-correct tiling — portrait/square/landscape without distortion</div>
+            </div>
           </div>
-          <div class="il-item">
-            <span class="il-dot"></span>
-            Response curves: Linear, Squared, Cubed, or Gate
+
+          <div class="il-category">
+            <div class="il-category-title">Visual Effects</div>
+            <div class="image-layers-grid">
+              <div class="il-item"><span class="il-dot"></span>Chromatic aberration — animated RGB channel split</div>
+              <div class="il-item"><span class="il-dot"></span>Tint + Hue Spin — color wheel animation</div>
+              <div class="il-item"><span class="il-dot"></span>Mirror — H / V / Quad / Kaleidoscope (per-tile or whole)</div>
+              <div class="il-item"><span class="il-dot"></span>Canvas Mirror — folds the entire scene</div>
+              <div class="il-item"><span class="il-dot"></span>Posterize — 2 / 4 / 8 / 16 color quantize steps</div>
+              <div class="il-item"><span class="il-dot"></span>Edge / Sobel — luminance gradient outline effect</div>
+              <div class="il-item"><span class="il-dot"></span>Strobe — hard binary opacity cut on beat threshold</div>
+              <div class="il-item"><span class="il-dot"></span>Blend mode — Overlay / Additive / Multiply</div>
+            </div>
           </div>
-          <div class="il-item">
-            <span class="il-dot"></span>
-            UV mirror with Per Tile or Whole Image scope
-          </div>
-          <div class="il-item">
-            <span class="il-dot"></span>
-            Auto-resize on upload (1024px standard / 2048px HD toggle)
-          </div>
-          <div class="il-item">
-            <span class="il-dot"></span>
-            Aspect-correct tiling — portrait, square, or landscape images tile without distortion
-          </div>
-          <div class="il-item">
-            <span class="il-dot"></span>
-            Per-layer rename with static thumbnail preview
-          </div>
-          <div class="il-item">
-            <span class="il-dot"></span>
-            Scene-level Canvas Mirror for global symmetry effects
+
+          <div class="il-category">
+            <div class="il-category-title">Audio Reactivity</div>
+            <div class="image-layers-grid">
+              <div class="il-item"><span class="il-dot"></span>Source — Bass, Mid, Treble, or Volume per layer</div>
+              <div class="il-item"><span class="il-dot"></span>Curve — Linear, Squared, Cubed, or Gate shaping</div>
+              <div class="il-item"><span class="il-dot"></span>Opacity Pulse — audio-reactive fade independent of base opacity</div>
+              <div class="il-item"><span class="il-dot"></span>All motion + effects driven by same audio signal</div>
+            </div>
           </div>
         </div>
       </div>
@@ -235,36 +247,62 @@
           <div class="section-label">Timeline Editor</div>
           <h2 class="section-title">Plan a whole show</h2>
           <p class="section-desc">
-            Arrange presets on a timeline, set durations and blend times,
-            then hit play. The Zone Compositor lets you run multiple presets
-            in different screen regions at the same time.
+            Arrange presets on a multi-track strip, set durations and blend times, then hit play.
+            The Zone Compositor lets you run multiple presets in different screen regions simultaneously —
+            each with its own opacity and blend mode.
           </p>
           <ul class="feature-list">
             <li>
-              <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              Multi-track strip with drag-to-reorder and snap-to-grid
+              <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12" /></svg>
+              Multi-track strip — drag-to-reorder, snap-to-grid, BPM grid overlay
             </li>
             <li>
-              <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              Zone Compositor — quadrant, banner, center, custom rect
+              <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12" /></svg>
+              Zone Compositor — quadrant, banner, center square, custom rectangle
             </li>
             <li>
-              <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              Per-zone opacity, blend mode, and gap behavior
+              <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12" /></svg>
+              Per-zone opacity, blend mode (Screen / Overlay / Multiply / Add), and gap behavior
             </li>
             <li>
-              <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              JSON export/import — share shows with other DJs
+              <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12" /></svg>
+              Fullscreen mode — F key hides all controls for clean projection
+            </li>
+            <li>
+              <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12" /></svg>
+              Export as <code style="font-size:0.85em;opacity:0.8">.dcshow.json</code> bundle — custom presets and images travel with the file
             </li>
           </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ── Import / Export ── -->
+  <section class="section">
+    <div class="container">
+      <div class="section-header fade-in">
+        <div class="section-label">Portability</div>
+        <h2 class="section-title">Your work travels with you</h2>
+        <p class="section-desc">
+          Every preset you build — including image layers — can be exported to a single file
+          and imported on any machine running DiscoCast. No cloud, no sync, no lost work.
+        </p>
+      </div>
+      <div class="features-grid fade-in">
+        <div class="feature-card">
+          <h3>Preset Export / Import</h3>
+          <p>Export a single preset or your entire library as a <code>.json</code> file. Images are embedded as base64 — open the file on another Mac and everything is exactly as you built it.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Show Bundle Export</h3>
+          <p>Export a timeline as a <code>.dcshow.json</code> bundle. All custom presets and their images are embedded — hand the file to another DJ and they can run your exact show.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Import Result Feedback</h3>
+          <p>After any import, a modal lists exactly what was restored by name — and flags anything that didn't make it, with the reason why.</p>
         </div>
       </div>
     </div>
