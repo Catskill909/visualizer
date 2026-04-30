@@ -194,3 +194,97 @@ Optional, in priority order:
 1. **Which GIFs feel slow?** — a specific URL or attached file would let us check `delays[]` directly.
 2. **Have you tried the existing speed slider?** If yes, did you see the colour cycling? That tells us whether the bug is the actual blocker, or whether the user simply hasn't found the slider.
 3. **iPad in scope?** — if yes, any new approach must avoid WebCodecs-only paths.
+
+---
+
+## 7. GPU/Performance Strategy — Design Decision
+
+> Captured from conversation, Apr 2026. Research only — not yet implemented.
+
+### Observed behaviour
+
+Loading a large animated GIF in the editor caused slowdown but **no crash**. This is expected — WebGL and the browser compositor shed frames gracefully under pressure. Audio continues on a separate thread. The worst case is choppy visuals, not data loss or tab death.
+
+### Why "disable on slow GPU" isn't viable
+
+Detecting GPU capability reliably in the browser is nearly impossible:
+- `WEBGL_debug_renderer_info` — deprecated/blocked in most browsers (fingerprinting concerns)
+- `navigator.gpu` (WebGPU) — not universally available
+- Frame time measurement — the only real signal, but you only know you're over budget *after* you've already loaded the heavy asset
+
+### Decision: warnings only, no hard limits
+
+This is creative software. The degradation is graceful. The right model is:
+- **Inform** the user when things are getting heavy
+- **Never block** a creative decision based on a heuristic that may be wrong
+- **Trust** the user — sluggishness is its own feedback
+
+See `custom-preset-editor.md` § "Performance — Realistic CPU/GPU Budget" for the full warning indicator design (green/amber/red frame time indicator, layer count + pixel_eqs warnings).
+
+### Contextual GIF warning (to implement with GIF optimizer tool)
+
+On first GIF upload (one-time, dismissible):
+> *"Large animated GIFs increase GPU load. If playback slows, use the Optimize tool to reduce file size or frame count before adding."*
+
+Not a block. Not a disable. Just information at the moment it's relevant.
+
+---
+
+## 8. GIF Optimization Tool — Design Spec
+
+> Captured from conversation, Apr 2026. Not yet built.
+
+### Motivation
+
+The user wants a built-in tool to size and remove frames from GIFs before they hit the layer pipeline — reducing GPU cost at the source rather than trying to compensate at runtime.
+
+### What already exists
+
+- `resizeImageFile()` in `inspector.js` — resizes static images. Skips GIFs (just grabs first frame).
+- `gifuct-js` — already imported in `visualizer.js` for playback. Can also parse frames for editing.
+- `gifSpeed` slider — per-layer speed control (0.25×–4×). Useful for playback feel but doesn't reduce actual file weight.
+
+### Tool feature set
+
+| Feature | What it does | Effort |
+|---------|-------------|--------|
+| **Parse + frame strip** | Show thumbnail row of every frame with index and delay time | Medium — `gifuct-js` does parsing, UI is the work |
+| **Keep every Nth frame** | "Keep every 2nd frame" halves frame count, halves texture upload cost | Low — filter the frames array |
+| **Remove specific frames** | Click to toggle individual frames in/out | Low — UI toggle per frame thumbnail |
+| **Set uniform frame delay** | Override each frame's native delay with a single value | Low — set `delays[]` uniformly |
+| **Resize** | Scale all frames to a target max dimension | Low — existing canvas resize loop, once per frame |
+| **Re-encode to GIF** | Output a new `.gif` blob | Medium — needs a GIF encoder dependency |
+| **Hand off to layer pipeline** | Feed the new blob into existing `_addImageLayer()` as a fresh upload | Low — replace blob, call existing code |
+
+### GIF encoder dependency
+
+The browser has no native GIF encoder. Best option: **`gifenc`**
+- ~15KB gzipped
+- No Web Workers required (synchronous)
+- Well maintained
+- Significantly smaller and faster than `gif.js`
+
+### UI entry points
+
+Two natural places:
+
+**A — On upload (if GIF is over a threshold)**
+If `frames.length > 30` or file size > 2MB, show a prompt:
+> *"This GIF has 47 frames (3.2 MB). Optimize before adding?"*
+> `[Optimize…]` `[Add as-is]`
+
+**B — On existing layer card**
+An `Optimize…` button in the GIF layer card header. Opens the tool for that layer's source file. User can add first, see how it looks, then optimize if needed. **Cleaner UX — preferred.**
+
+### Recommended implementation order
+
+1. Build the frame strip UI + frame selection
+2. Add Keep-every-N + uniform delay controls
+3. Add resize (reuse existing pipeline)
+4. Add `gifenc` and wire re-encode → hand off to `_addImageLayer`
+5. Add the card-header "Optimize…" entry point
+6. Optionally add the on-upload threshold prompt
+
+### Relationship to colour cycling bug
+
+The optimizer tool is independent of the colour cycling bug (§3). Both should be fixed — the bug fix is Phase 2 of the existing roadmap; the optimizer is a new separate tool. Don't block one on the other.

@@ -130,7 +130,7 @@
               <li><strong>Drag to reorder</strong> — grab the ⠿ handle. Top of list = drawn on top.</li>
               <li><strong>Solo / Mute</strong> — audition one layer or hide it without deleting.</li>
               <li><strong>Reset ↻</strong> — restores all animation fields to default, keeps the image. Undoable.</li>
-              <li><strong>HD toggle</strong> — enable before uploading for 2048 px (default 1024 px).</li>
+              <li><strong>HD toggle</strong> — sets the upload size ceiling: OFF = 1024 px, ON = 2048 px (longest side). Images larger than the ceiling are scaled down proportionally — aspect ratio is always preserved, nothing is cropped or stretched. Images already smaller than the ceiling are passed through untouched (a 300×300 image stays 300×300 regardless of the toggle). Set the toggle <em>before</em> uploading — the resize happens once at upload time and is not reversible without re-uploading. HD layers use ~4× more GPU memory than standard; use HD only when fine detail matters at large projection sizes. <strong>GIFs are not resized</strong> — they always upload at their native resolution.</li>
             </ul>
           </section>
 

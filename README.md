@@ -365,6 +365,62 @@ const audioEl = await engine.connectAudioFile(fileObject);
 - **getUserMedia** — required for microphone input
 - Best experience in **Chrome** or **Firefox**
 
+## Developer Documentation Index
+
+All planning, research, and implementation notes live as `.md` files in the repo. This index is the starting point.
+
+### Active Implementation References
+
+These docs reflect what is actually built and are kept up to date:
+
+| Doc | What it covers |
+|-----|---------------|
+| [`custom-preset-editor.md`](custom-preset-editor.md) | Preset Studio full implementation reference — tabs, controls, image layers, undo/redo, save/load, GLSL shader builder, tunnel, canvas mirror, solid color base, import/export. Also contains the **MilkDrop settings audit** (what's exposed vs not), **creative vision / tool-agnostic philosophy**, and the **performance / CPU-GPU budget research**. |
+| [`preset-image-tools-dev.md`](preset-image-tools-dev.md) | Image layer tools dev reference — phase status, per-layer effect implementation notes, polish backlog. Companion to `custom-preset-editor.md`. |
+| [`macos-app-generate.md`](macos-app-generate.md) | Full macOS app packaging guide — Tauri build, code signing, notarization, DMG creation, distribution workflow. |
+| [`timeline-editor.md`](timeline-editor.md) | Timeline Editor design and planning — phases 1–3 complete, phase 4 (waveform + BPM) next. Zone compositor, export/import bundle format. |
+
+### Feature Dev / Planning Docs
+
+Research and design docs for specific features — some shipped, some pending:
+
+| Doc | Status | What it covers |
+|-----|--------|---------------|
+| [`noise-gate-dev.md`](noise-gate-dev.md) | ✅ Built | Noise gate feature for live/mic use — silence threshold, AGC interaction, VU meter GATED/CLIPPING states, club venue audio tips. |
+| [`midi-dev.md`](midi-dev.md) | 📋 Planning | MIDI controller integration — design rules, action registry, MIDI learn UX, device UI, recording/playback modes, phased plan. |
+| [`preset-dev.md`](preset-dev.md) | ✅ Shipped | Preset drawer hide feature — data model, filtering rules, Show Hidden toggle, Unhide All modal. |
+| [`preset-image-pan-dev.md`](preset-image-pan-dev.md) | 📋 Design only | Image layer Pan mode design — Drift, Bounce, pan pad UX spec. |
+| [`animated-gif-dev.md`](animated-gif-dev.md) | 🔍 Audit + Design | GIF playback audit — speed slider exists but has a colour-cycling bug at 2×–4×. Three root causes identified. Diagnose before fixing. Also covers: GPU/performance strategy (warnings-only decision), and full **GIF Optimization Tool** design spec (frame strip UI, keep-every-N, resize, re-encode via `gifenc`, layer card entry point). |
+| [`new-image-effects-future-dev.md`](new-image-effects-future-dev.md) | 📋 Future | Future image layer effects spec — Chromatic Aberration sets the quality bar. |
+| [`saved-presets-dev.md`](saved-presets-dev.md) | 📋 Planning | Saved presets panel design for Preset Studio library. |
+| [`user-guide-dev.md`](user-guide-dev.md) | 📋 Planning | In-app user guide redesign — searchable help centre, contextual `?` deep links. |
+| [`app-output-dev.md`](app-output-dev.md) | 📋 Reference | Output/projection settings — resolution lock, aspect ratio, virtual camera, macOS distribution workflow. |
+| [`layer-header.md`](layer-header.md) | 📋 Planning | Layer card header redesign options for Preset Studio image layers. |
+
+### Bug / Handoff Docs
+
+| Doc | Status | What it covers |
+|-----|--------|---------------|
+| [`strobe-bug.md`](strobe-bug.md) | ⚠️ Unresolved | Strobe slider bug — handoff document with reproduction steps and suspected cause. |
+| [`fullscreen-macos-bug.md`](fullscreen-macos-bug.md) | 📋 Reference | Fullscreen macOS-specific bug — behaviour difference between browser and Tauri app. |
+
+### Legacy / Archive Docs (`docs/`)
+
+Older research docs kept for context. Not actively maintained:
+
+| Doc | What it covers |
+|-----|---------------|
+| [`docs/future-dev.md`](docs/future-dev.md) | Early brainstorm — Silent Disco + live DJ enhancement ideas. Some shipped, some superseded. |
+| [`docs/audio-triggering.md`](docs/audio-triggering.md) | Winamp vs modern DJ audio triggering research. Informed the AGC + hype key implementation. |
+| [`docs/user-live.md`](docs/user-live.md) | Live audio device selection research — USB controllers, audio interfaces, mic selection. |
+| [`docs/favorites.md`](docs/favorites.md) | Favorites feature brainstorm — core shipped, favorites-only cycling shipped. |
+| [`docs/more-presets.md`](docs/more-presets.md) | Baron pack + multi-pack preset loading research. Phase 1 shipped (1,144 presets). |
+| [`docs/controls-styling.md`](docs/controls-styling.md) | Museum dark aesthetic specification for control bar. |
+| [`docs/HANDOFF_AUDIO_DEBUG.md`](docs/HANDOFF_AUDIO_DEBUG.md) | Audio triggering debug handoff — resolved. |
+| [`docs/HANDOFF_CUSTOM_PRESET_LOADING.md`](docs/HANDOFF_CUSTOM_PRESET_LOADING.md) | Custom preset loading bug handoff — resolved. |
+
+---
+
 ## License
 
 MilkDrop is open source under the BSD license. Butterchurn is MIT licensed.
