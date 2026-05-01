@@ -285,11 +285,11 @@ See `macos-app-generate.md` for full packaging details and `app-output-dev.md` �
 
 ## Windows App
 
-A standalone Windows app built via GitHub Actions on demand — produces both an `.msi` (Windows Installer) and an `.exe` (NSIS installer).
+A standalone Windows app built via GitHub Actions on demand — produces a single NSIS `.exe` installer.
 
 ### Install
-1. Download `DiscoCast-Visualizer-Windows.zip` from the [GitHub Actions artifacts](#build-from-github-actions)
-2. Run either the `.msi` or `.exe` installer
+1. Download `DiscoCast-Visualizer-Windows-Setup` from the [GitHub Actions artifacts](#build-from-github-actions)
+2. Unzip → double-click the `.exe` to install
 3. Launch **DiscoCast Visualizer** from the Start menu
 4. First time using mic/USB: Windows will prompt for microphone permission — click **Allow**
 
@@ -302,12 +302,12 @@ The Windows build runs on a GitHub-hosted Windows machine triggered manually —
 1. Go to your repo on **GitHub.com → Actions → Build Windows Installer**
 2. Click **Run workflow** → select branch `main` → **Run workflow**
 3. Wait ~10–15 min (first run); ~5 min after Rust cache warms up
-4. When complete, click the run → scroll to **Artifacts** → download `DiscoCast-Visualizer-Windows`
-5. Unzip — you'll find both `.msi` and `.exe` installers inside
+4. When complete, click the run → scroll to **Artifacts** → download `DiscoCast-Visualizer-Windows-Setup`
+5. Unzip → run the `.exe`
 
 Nothing runs automatically — the build only starts when you click the button.
 
-> The workflow file lives at `.github/workflows/build-windows.yml`. It is manual-trigger only (`workflow_dispatch`) and touches no existing macOS or web build infrastructure.
+> The workflow file lives at `.github/workflows/build-windows.yml`. It is manual-trigger only (`workflow_dispatch`) and touches no existing macOS or web build infrastructure. See [`windows-dev.md`](windows-dev.md) for full build details and bugs fixed during Windows bringup.
 
 ## Deployment (Coolify)
 
@@ -451,6 +451,7 @@ These docs reflect what is actually built and are kept up to date:
 | [`custom-preset-editor.md`](custom-preset-editor.md) | Preset Studio full implementation reference — tabs, controls, image layers, undo/redo, save/load, GLSL shader builder, tunnel, canvas mirror, solid color base, import/export. Also contains the **MilkDrop settings audit** (what's exposed vs not), **creative vision / tool-agnostic philosophy**, and the **performance / CPU-GPU budget research**. |
 | [`preset-image-tools-dev.md`](preset-image-tools-dev.md) | Image layer tools dev reference — phase status, per-layer effect implementation notes, polish backlog. Companion to `custom-preset-editor.md`. |
 | [`macos-app-generate.md`](macos-app-generate.md) | Full macOS app packaging guide — Tauri build, code signing, notarization, DMG creation, distribution workflow. |
+| [`windows-dev.md`](windows-dev.md) | Windows build & compatibility reference — GitHub Actions workflow, all bugs fixed during Windows bringup (icon.ico, unsafe-eval CSP, crossOrigin blob audio, Tauri Windows CSP). |
 | [`timeline-editor.md`](timeline-editor.md) | Timeline Editor design and planning — phases 1–3 complete, phase 4 (waveform + BPM) next. Zone compositor, export/import bundle format. |
 
 ### Feature Dev / Planning Docs
