@@ -392,7 +392,7 @@ Research and design docs for specific features — some shipped, some pending:
 | [`preset-image-pan-dev.md`](preset-image-pan-dev.md) | 📋 Design only | Image layer Pan mode design — Drift, Bounce, pan pad UX spec. |
 | [`animated-gif-dev.md`](animated-gif-dev.md) | 🔍 Audit + Design | GIF playback audit — speed slider exists but has a colour-cycling bug at 2×–4×. Three root causes identified. Diagnose before fixing. Also covers: GPU/performance strategy (warnings-only decision), and full **GIF Optimization Tool** design spec (frame strip UI, keep-every-N, resize, re-encode via `gifenc`, layer card entry point). |
 | [`new-image-effects-future-dev.md`](new-image-effects-future-dev.md) | 📋 Future | Future image layer effects spec — Chromatic Aberration sets the quality bar. |
-| [`saved-presets-dev.md`](saved-presets-dev.md) | 📋 Planning | Saved presets panel design for Preset Studio library. |
+| [`saved-presets-dev.md`](saved-presets-dev.md) | ✅ Phases 1–5 built · ⚠️ Known bug | Saved presets panel design for Preset Studio library — all 5 phases shipped. Known bug (§10): export only captures image layers, not palette/motion/wave/feel baseVals. Fix deferred to the Remix/schema-unification work in `custom-preset-editor.md`. |
 | [`user-guide-dev.md`](user-guide-dev.md) | 📋 Planning | In-app user guide redesign — searchable help centre, contextual `?` deep links. |
 | [`app-output-dev.md`](app-output-dev.md) | 📋 Reference | Output/projection settings — resolution lock, aspect ratio, virtual camera, macOS distribution workflow. |
 | [`layer-header.md`](layer-header.md) | 📋 Planning | Layer card header redesign options for Preset Studio image layers. |
@@ -401,6 +401,7 @@ Research and design docs for specific features — some shipped, some pending:
 
 | Doc | Status | What it covers |
 |-----|--------|---------------|
+| [`export-fix.md`](export-fix.md) | ✅ Fixed — needs rebuild | Tauri macOS export bug — `<a download>` silently swallowed by WKWebView. Full audit of all 5 affected call sites, complete fix plan (Rust `save_file` command + `downloadFile` JS helper), scope: ~6 files ~30 lines. Requires full rebuild. |
 | [`strobe-bug.md`](strobe-bug.md) | ⚠️ Unresolved | Strobe slider bug — handoff document with reproduction steps and suspected cause. |
 | [`fullscreen-macos-bug.md`](fullscreen-macos-bug.md) | 📋 Reference | Fullscreen macOS-specific bug — behaviour difference between browser and Tauri app. |
 

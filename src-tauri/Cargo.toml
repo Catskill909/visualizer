@@ -7,7 +7,7 @@ edition = "2021"
 tauri-build = { version = "1.5", features = [] }
 
 [dependencies]
-tauri = { version = "1.5", features = [ "dialog-open", "window-set-fullscreen", "shell-execute"] }
+tauri = { version = "1.5", features = [ "dialog-save", "dialog-open", "window-set-fullscreen", "shell-execute"] }
 base64 = "0.21"
 serde = { version = "1", features = ["derive"] }
 

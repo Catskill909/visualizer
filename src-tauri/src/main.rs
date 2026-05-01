@@ -49,6 +49,23 @@ struct AudioFileResult {
 }
 
 #[tauri::command]
+async fn save_file(filename: String, content: String) -> Result<Option<String>, String> {
+    let (tx, mut rx) = channel::<Option<std::path::PathBuf>>(1);
+    FileDialogBuilder::new()
+        .set_title("Save File")
+        .set_file_name(&filename)
+        .save_file(move |path| {
+            let _ = tx.blocking_send(path);
+        });
+    let path = match rx.recv().await.unwrap_or(None) {
+        Some(p) => p,
+        None => return Ok(None), // user cancelled
+    };
+    std::fs::write(&path, content.as_bytes()).map_err(|e| e.to_string())?;
+    Ok(Some(path.to_string_lossy().into_owned()))
+}
+
+#[tauri::command]
 async fn pick_audio_file() -> Option<AudioFileResult> {
     let (tx, mut rx) = channel::<Option<std::path::PathBuf>>(1);
     FileDialogBuilder::new()
@@ -67,7 +84,7 @@ async fn pick_audio_file() -> Option<AudioFileResult> {
 fn main() {
     tauri::Builder::default()
         .manage(CaffeinateState(Mutex::new(None)))
-        .invoke_handler(tauri::generate_handler![caffeinate_start, caffeinate_stop, toggle_fullscreen, get_fullscreen, pick_audio_file])
+        .invoke_handler(tauri::generate_handler![caffeinate_start, caffeinate_stop, toggle_fullscreen, get_fullscreen, pick_audio_file, save_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

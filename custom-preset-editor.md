@@ -458,6 +458,92 @@ Items 1–4 are a single clean session and cover all the easy missing `baseVals`
 
 ---
 
+## The One Truth Goal — Primary Architecture Objective
+
+> Captured Apr 2026. This is the north star for the next major dev phase.
+
+### The problem today
+
+The editor operates with two separate, incompatible worlds:
+
+- **MilkDrop library presets** — complete objects: full `baseVals`, `shapes[]`, `waves[]`, `warp` shader, `comp` shader, equation strings. Everything is there.
+- **Custom presets** — partial objects: only what the editor's tabs currently expose (`images[]`, `comp` shader, a subset of `baseVals`). The rest is silently absent.
+
+Because these two worlds never fully merge, three problems exist simultaneously:
+1. **You can't edit a library preset** — no entry point to load one into the editor
+2. **Export is incomplete** — the exported `.json` only contains what the editor's `currentState` knows about (image layers + partial `baseVals`), not the full preset
+3. **Import round-trip is lossy** — importing a file back in doesn't restore everything that was set
+
+### The one truth principle
+
+> **`currentState` must always be the complete, authoritative representation of the entire preset — every `baseVal`, every shape, every wave, both shaders, all equation strings, all image layers. Nothing lives anywhere else.**
+
+When this is true:
+- Save = serialise `currentState`. Done.
+- Export = serialise `currentState`. Done.
+- Import = deserialise into `currentState`, sync all controls. Done.
+- Load library preset = deserialise into `currentState`, sync all controls. Done.
+- All three bugs above disappear as side effects — no separate fix required for any of them.
+
+### How the Remix / import-for-editing work achieves this
+
+Building the "load any preset into the editor" flow forces the implementation to be correct:
+
+1. Read the full preset object (library or custom) into `currentState` — every field, nothing omitted
+2. Sync every editor control (all tabs) to reflect that full object
+3. On every user interaction, write back to `currentState` immediately
+4. Save / export reads only from `currentState`
+
+Step 1 is the unlock. Once `currentState` is always populated completely, steps 2–4 are already mostly working — the controls already write to `currentState.baseVals` live. The gap is only on the *read* side (loading) and the *schema* side (ensuring all fields are present).
+
+### Dependency chain
+
+```
+Remix / import-for-editing flow
+        ↓
+currentState holds the complete preset object (one truth)
+        ↓
+Save writes complete object        → export bug fixed
+Export serialises complete object  → export bug fixed
+Import → currentState → sync       → import round-trip fixed
+Load library preset → same path    → remix feature ships
+```
+
+**This one piece of work closes four problems.** It is the right place to invest before adding any more editor controls or export features.
+
+### MilkDrop compliance — the standard we target
+
+The custom preset schema must be a **strict superset** of a valid MilkDrop preset — never a subset. The core fields are the MilkDrop standard:
+
+| Field | Standard |
+|-------|---------|
+| `baseVals` | MilkDrop spec |
+| `shapes[]` | MilkDrop spec |
+| `waves[]` | MilkDrop spec |
+| `warp` | MilkDrop GLSL |
+| `comp` | MilkDrop GLSL |
+| `*_eqs_str` | MilkDrop spec |
+
+The editor-specific fields (`id`, `name`, `images[]`, `thumbnailDataUrl`, `parentPresetName`) are our envelope around the standard. Strip those off and what remains is a valid MilkDrop preset playable in any compliant renderer — Butterchurn, Winamp, WACUP, any future port.
+
+**This unlocks:**
+- Sharing presets with the wider MilkDrop community
+- Loading community `.milk` files into the editor (future)
+- Exporting back to `.milk` format (future)
+- Interoperability with any MilkDrop-compatible software, forever
+
+The moment the editor invents its own field names or silently omits standard ones, we've created a proprietary format that only works inside this app. Compliance with the standard is what keeps the door open.
+
+### What "done" looks like
+
+- Open any of the 1,144 library presets in the editor — all tabs reflect its values
+- Make changes, save — the saved preset contains everything, not just the image layer
+- Export the saved preset — the `.json` is the complete preset, importable anywhere
+- Import that `.json` back — all settings restored perfectly, including palette, motion, wave, feel, and images
+- Strip the editor envelope fields → valid `.milk`-compatible object that any MilkDrop renderer can play
+
+---
+
 ## Creative Vision — Tool-Agnostic Philosophy
 
 > Captured from design conversation, Apr 2026.

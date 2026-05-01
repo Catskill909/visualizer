@@ -3,6 +3,7 @@
  * Reads/writes through customPresets.js; never touches the main app's state.
  */
 
+import { downloadFile } from '../fileUtils.js';
 import {
     loadAllCustomPresets,
     deleteCustomPreset,
@@ -366,11 +367,8 @@ export class PresetLibrary {
             const filename = data.name
                 ? `${data.name.replace(/[^a-z0-9_\-]/gi, '_')}.json`
                 : `preset-${id}.json`;
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-            const url  = URL.createObjectURL(blob);
-            Object.assign(document.createElement('a'), { href: url, download: filename }).click();
-            URL.revokeObjectURL(url);
-            showToast(`Exported · ${data.name || id}`);
+            const saved = await downloadFile(filename, JSON.stringify(data, null, 2));
+            if (saved) showToast(`Exported · ${data.name || id}`);
         } catch (err) {
             showToast('Export failed: ' + err.message, true);
         }
@@ -378,17 +376,13 @@ export class PresetLibrary {
 
     async _exportAll() {
         try {
-            const data = await exportAllPresets();
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-            const url  = URL.createObjectURL(blob);
-            const a    = Object.assign(document.createElement('a'), {
-                href: url,
-                download: `discocast-presets-${new Date().toISOString().slice(0, 10)}.json`,
-            });
-            a.click();
-            URL.revokeObjectURL(url);
-            const n = data.presets?.length ?? 0;
-            showToast(`Exported ${n} preset${n !== 1 ? 's' : ''}`);
+            const data     = await exportAllPresets();
+            const filename = `discocast-presets-${new Date().toISOString().slice(0, 10)}.json`;
+            const saved    = await downloadFile(filename, JSON.stringify(data, null, 2));
+            if (saved) {
+                const n = data.presets?.length ?? 0;
+                showToast(`Exported ${n} preset${n !== 1 ? 's' : ''}`);
+            }
         } catch (err) {
             showToast('Export failed: ' + err.message, true);
         }

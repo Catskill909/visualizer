@@ -19,6 +19,7 @@ import {
 } from '../timelineStorage.js';
 import { VisualizerEngine } from '../visualizer.js';
 import { showImportResult } from '../importResultModal.js';
+import { downloadFile } from '../fileUtils.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1510,11 +1511,12 @@ export class TimelineEditor {
         try {
             this._toast('Preparing export…');
             const json     = await exportTimelineBundle(this._tl);
-            const blob     = new Blob([json], { type: 'application/json' });
             const filename = `${(this._tl.name || 'timeline').replace(/[^a-z0-9_\-]/gi, '_')}.dcshow.json`;
-            Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: filename }).click();
-            const mb = (blob.size / 1024 / 1024).toFixed(1);
-            this._toast(`Exported: ${this._tl.name} (${mb} MB)`);
+            const saved    = await downloadFile(filename, json);
+            if (saved) {
+                const mb = (json.length / 1024 / 1024).toFixed(1);
+                this._toast(`Exported: ${this._tl.name} (${mb} MB)`);
+            }
         } catch (err) {
             this._toast('Export failed: ' + err.message, true);
         }

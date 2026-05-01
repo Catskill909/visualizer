@@ -312,3 +312,33 @@ All four previously open questions are settled:
 ---
 
 _This document is the planning ground-truth. Implementation work should be tracked against Phases 1–5 above._
+
+---
+
+## 10. Known Bug — Export Only Saves Image Layer (not full preset state)
+
+> Discovered Apr 2026 during macOS app export testing.
+
+### Symptom
+
+When a custom preset is exported from the Library tab (single preset export), the resulting `.json` file contains the image layer data but **does not include the editor tab settings** — palette (colours, gamma), motion (zoom, rot, warp, warp speed), wave (mode, opacity, size), or feel (decay, darken, invert). Importing the file back produces a preset that looks correct visually only if it has no custom baseVals — any tab changes are silently lost.
+
+### Root cause (suspected)
+
+The current save flow captures `currentState` which includes `images[]` and the GLSL `comp` shader string, but does not guarantee all `baseVals` mutations made via the inspector tabs are flushed into `currentState.baseVals` before the save is serialised. The inspector controls write to `currentState.baseVals` live, but if there is any path where `currentState` is written from a stale copy or the export reads directly from a different object, those values are dropped.
+
+The true fix is not a patch to the export — it is making **one canonical preset object** the single source of truth for all editor state (baseVals, images, waves, shapes, comp, warp, all tab values). Once that is in place, export trivially serialises the whole thing correctly.
+
+### Why this is a "future dev" fix
+
+This bug is a symptom of the broader unfinished work described in `custom-preset-editor.md` § "MilkDrop Settings Audit" — specifically the "Remix from Library" architecture (Priority 5 in the roadmap). That work will:
+
+- Unify custom presets and imported MilkDrop library presets under a single preset object schema
+- Ensure `currentState` is always the complete, authoritative representation of everything the user has set
+- Make save/export a trivial full-object serialisation with no risk of partial capture
+
+Until that architecture lands, the export bug exists. **Do not patch around it** — a downstream workaround here would conflict with the upstream schema unification.
+
+### Workaround for users (until fixed)
+
+None currently. Users can continue editing and saving within the app — the live state is correct. Only the exported `.json` file is incomplete. Importing back into the same browser/app session is unaffected since the app reads from `localStorage` directly, not from the exported file.

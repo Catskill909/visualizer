@@ -21,7 +21,8 @@
         "setFullscreen": true
       },
       "dialog": {
-        "open": true
+        "open": true,
+        "save": true
       }
     },
     "bundle": {

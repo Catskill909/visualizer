@@ -1,6 +1,7 @@
 /**
  * ControlPanel — UI bindings, auto-hide, keyboard shortcuts, preset drawer
  */
+import { downloadFile } from './fileUtils.js';
 import {
   getCustomPreset,
   deleteCustomPreset,
@@ -644,16 +645,8 @@ export class ControlPanel {
     backupBar.classList.toggle('hidden', this.currentTab !== 'custom');
   }
 
-  downloadJson(filename, data) {
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  async downloadJson(filename, data) {
+    return downloadFile(filename, JSON.stringify(data, null, 2));
   }
 
   async exportAllCustomPresets() {
@@ -666,8 +659,8 @@ export class ControlPanel {
     try {
       const backup = await exportAllPresets();
       const date = new Date().toISOString().slice(0, 10);
-      this.downloadJson(`discocast-presets-${date}.json`, backup);
-      this.showToast(`💾 Backed up ${count} preset${count === 1 ? '' : 's'}`);
+      const saved = await this.downloadJson(`discocast-presets-${date}.json`, backup);
+      if (saved) this.showToast(`💾 Backed up ${count} preset${count === 1 ? '' : 's'}`);
     } catch (err) {
       console.error('Export failed:', err);
       this.showToast('❌ Export failed — see console');
@@ -681,8 +674,8 @@ export class ControlPanel {
     try {
       const data = await exportPreset(id);
       const safe = (record.name || 'preset').replace(/[^a-z0-9_\-]+/gi, '_').slice(0, 60);
-      this.downloadJson(`${safe}.preset.json`, data);
-      this.showToast(`💾 Exported "${this.truncate(record.name, 40)}"`);
+      const saved = await this.downloadJson(`${safe}.preset.json`, data);
+      if (saved) this.showToast(`💾 Exported "${this.truncate(record.name, 40)}"`);
     } catch (err) {
       console.error('Export failed:', err);
       this.showToast('❌ Export failed — see console');
