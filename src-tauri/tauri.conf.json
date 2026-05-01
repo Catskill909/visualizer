@@ -38,6 +38,11 @@
       "macOS": {
         "entitlements": "entitlements.plist"
       },
+      "windows": {
+        "webviewInstallMode": {
+          "type": "embedBootstrapper"
+        }
+      },
       "targets": ["app"]
     },
     "windows": [{
