@@ -1328,6 +1328,7 @@
         <div class="help-nav-group">
           <div class="help-nav-label">Preset Studio</div>
           <a class="help-nav-link" href="#hm-image-layers">Image Layers</a>
+          <a class="help-nav-link" href="#hm-animated-gifs">Animated GIFs</a>
           <a class="help-nav-link" href="#hm-transform">Transform</a>
           <a class="help-nav-link" href="#hm-motion">Motion</a>
           <a class="help-nav-link" href="#hm-tunnel">Tunnel &amp; Depth Stack</a>
@@ -1390,6 +1391,32 @@
             <li><strong>Reset ↻</strong> — restores all animation fields to default, keeps the image. Undoable.</li>
             <li><strong>HD toggle</strong> — enable before uploading for 2048 px (default 1024 px).</li>
           </ul>
+        </section>
+
+        <section class="hm-section" id="hm-animated-gifs">
+          <h2>Animated GIFs</h2>
+          <p>GIFs animate as real GPU textures — every effect (mirror, tunnel, hue spin, audio reactivity) applies to every frame in real time.</p>
+          <ul class="hm-list">
+            <li><strong>Speed slider</strong> — 0.25× to 8×. Default is 1.2× because most web GIFs are encoded slow (10 fps native). Drag right for fast-forward, left for slow-motion freeze-frame feel.</li>
+            <li><strong>All effects work</strong> — Tile, Mirror, Kaleido, Tunnel, Pulse, Strobe, Hue Spin, Chromatic, Edge — everything applies per frame.</li>
+            <li><strong>GIFs are not resized on upload</strong> — they load at native resolution. A 1200×1200 GIF uses significantly more GPU memory than a 512×512 one.</li>
+          </ul>
+          <div class="hm-tip"><strong>Performance guide:</strong>
+            <ul class="hm-list" style="margin-top:6px">
+              <li>1–2 GIF layers — smooth on any device.</li>
+              <li>3–4 GIF layers — fine on a dedicated GPU, may stutter on integrated graphics.</li>
+              <li>5+ GIFs or large GIFs (1024 px+) — expect slowdown regardless of GPU. Use smaller or fewer-frame GIFs.</li>
+              <li>Adding audio reactivity to a GIF layer costs extra GPU work per frame. If things slow down, reduce the number of audio-reactive GIF layers first.</li>
+            </ul>
+          </div>
+          <div class="hm-tip"><strong>GIF Optimizer (auto-prompt on upload):</strong> When you drop a GIF that is large (&gt;256 px) or has many frames (&gt;10), the Optimizer appears automatically before the layer is created. It lets you:<br>
+            <ul class="hm-list" style="margin-top:6px">
+              <li><strong>Keep every Nth frame</strong> — reduce frame count. Delays are scaled so animation stays at the same perceived speed.</li>
+              <li><strong>Resize to 128 / 192 / 256 px</strong> — shrink large GIFs. Saves significant GPU memory.</li>
+              <li><strong>Live GPU savings preview</strong> — shows before/after memory estimate so you know the trade-off before committing.</li>
+              <li>Click <strong>Use Original</strong> to skip optimization and load as-is.</li>
+            </ul>
+          </div>
         </section>
 
         <section class="hm-section" id="hm-transform">
@@ -1478,6 +1505,7 @@
           <div class="hm-combo"><h4>Liquid Mirror</h4><p>Tile ON · Mirror → Quad, Scope → Whole Image · Sway Amt → 0.08 · Wander Amt → 0.04. No Tunnel.</p></div>
           <div class="hm-combo"><h4>Diamond Tile Grid</h4><p>Tile ON · Angle → 45° · Skew X → 0.3 · Skew Y → −0.3 · Width → 0.7 · Height → 0.7 · Spin → 0.03.</p></div>
           <div class="hm-combo"><h4>Depth Hue Shift</h4><p>Three layers, same image, Tunnel = 0.6.<br>Layer 1: Depth = 0 · Tint = cyan. Layer 2: Depth = 0.33 · Tint = magenta. Layer 3: Depth = 0.66 · Tint = yellow.</p></div>
+          <div class="hm-combo"><h4>Animated GIF Loop</h4><p>Drop a GIF · Speed → 1.2 · Mirror → Kaleido · Hue Spin → 0.2 · Blend → Additive.<br>Or: Speed → 0.25 · Strobe ON · Source → Bass — frames strobe to the beat in slow-motion.</p></div>
           <div class="hm-combo"><h4>Bass Strobe + Treble Shimmer</h4><p>Layer 1: Opacity Pulse → 0.6 · Source → Bass · Curve → Cubed.<br>Layer 2: Hue Spin → 1.0 · Chromatic → 0.2 · Source → Treble · Blend → Screen.</p></div>
         </section>
 

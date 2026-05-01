@@ -747,7 +747,9 @@ export class VisualizerEngine {
   setUserTexture(name, texObj) {
     if (!this.visualizer) return;
     if (texObj.isGif && texObj.data) {
-      this._loadGifTexture(name, texObj.data, texObj.gifSpeed || 1.0);
+      // Pass pre-processed frame data if available from optimizer
+      const optimizedData = texObj.optimizedGifData || null;
+      this._loadGifTexture(name, texObj.data, texObj.gifSpeed || 1.0, optimizedData);
       return;
     }
     this._gifAnimations.delete(name);
@@ -781,15 +783,50 @@ export class VisualizerEngine {
    * precision on semi-transparent pixels and produces the colour shift we observed.
    * Uploading a raw Uint8ClampedArray to texImage2D bypasses all of that.
    */
-  async _loadGifTexture(name, dataURL, speed = 1.0) {
+  async _loadGifTexture(name, dataURL, speed = 1.0, optimizedData = null) {
     try {
       const imgTextures = this.visualizer?.renderer?.image;
       if (!imgTextures?.gl) {
-        console.warn('[DiscoCast Visualizer] WebGL context not ready for GIF', name);
+        console.warn('[DiscoCast Visualizer] No GL context for GIF texture');
         return;
       }
+      
       const gl = imgTextures.gl;
-
+      
+      // If pre-processed optimized data is provided, use it directly
+      if (optimizedData && optimizedData.frames && optimizedData.delays) {
+        const { frames, delays, width, height } = optimizedData;
+        
+        // Create texture
+        const texture = gl.createTexture();
+        imgTextures.samplers[name] = texture;
+        
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        
+        // Initial upload
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, frames[0]);
+        
+        // Register animation
+        this._gifAnimations.set(name, { 
+          frames, 
+          delays, 
+          gl, 
+          texture, 
+          frameIndex: 0, 
+          nextFrameAt: performance.now(), 
+          width, 
+          height, 
+          speed 
+        });
+        
+        console.log('[DiscoCast Visualizer] Optimized GIF loaded:', name, `${width}×${height}`, frames.length + ' frames');
+        return;
+      }
+      
       // Decode base64 data URL → ArrayBuffer without fetch()
       const base64 = dataURL.split(',')[1];
       const binary = atob(base64);
@@ -878,10 +915,20 @@ export class VisualizerEngine {
       anim.frameIndex = (anim.frameIndex + 1) % anim.frames.length;
       anim.nextFrameAt = now + anim.delays[anim.frameIndex] / (anim.speed || 1.0);
       const { gl, texture, width, height } = anim;
+      // Save pixel-store state — Butterchurn may have dirtied these between frames,
+      // causing colour cycling when speed > 1×. Restore after upload.
+      const prevFlip   = gl.getParameter(gl.UNPACK_FLIP_Y_WEBGL);
+      const prevPremul = gl.getParameter(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL);
+      const prevAlign  = gl.getParameter(gl.UNPACK_ALIGNMENT);
       gl.bindTexture(gl.TEXTURE_2D, texture);
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
       // texSubImage2D writes into the existing GPU allocation — no realloc, much faster than texImage2D
       gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, anim.frames[anim.frameIndex]);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, prevFlip);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, prevPremul);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, prevAlign);
     }
   }
 

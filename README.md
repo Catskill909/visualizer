@@ -39,8 +39,12 @@ A modern browser-based MilkDrop music visualizer powered by [Butterchurn](https:
 ```
 discocast-visualizer/
 ├── index.html              # Main app — canvas, start screen, control bar, preset drawer
+│                           #   ↳ help-modal (line ~1315) = User Guide from the start screen "User Guide" button
 ├── editor.html             # Preset Studio — standalone visual builder (/editor.html)
-├── vite.config.js          # Vite MPA config — dual Rollup entries (main + editor)
+│                           #   ↳ help-modal (line ~62) = Preset Studio in-app User Guide
+├── help.html               # Full standalone help page (/help.html) — searchable deep-dive
+├── timeline.html           # Timeline Editor — full-screen show sequencer (/timeline.html)
+├── vite.config.js          # Vite MPA config — 5 Rollup entries (main, editor, timeline, promo, help)
 ├── package.json
 ├── build-and-sign.sh       # One-command macOS build script
 ├── macos-app-generate.md   # macOS app packaging guide
@@ -57,7 +61,10 @@ discocast-visualizer/
     ├── visualizer.js       # VisualizerEngine class — butterchurn wrapper, audio routing
     ├── controls.js         # ControlPanel class — UI bindings, keyboard, auto-hide
     ├── style.css           # Main app design system — dark theme, glassmorphism
+    ├── auth-gate.js        # Password gate overlay — soft auth via VITE_APP_PASSWORD env var
     ├── customPresets.js    # Custom preset CRUD — localStorage + IndexedDB image storage
+    ├── fileUtils.js        # downloadFile helper — browser <a download> or Tauri native Save As
+    ├── importResultModal.js # Import result modal — shows per-preset success/failure after import
     ├── presetRegistry.js   # Merge layer — bundled + custom presets under one API
     ├── timelineStorage.js  # Timeline CRUD — localStorage (no blobs; stores preset name refs)
     ├── timeline/
@@ -67,6 +74,8 @@ discocast-visualizer/
     └── editor/
         ├── main.js         # Preset Studio entry point — audio source boot
         ├── inspector.js    # EditorInspector class — tabs, palettes, controls, undo/redo
+        ├── presetLibrary.js # PresetLibrary class — Library panel, CRUD, import/export UI
+        ├── gifOptimizer.js # GIF Optimizer — upload-time frame reduction + resize tool
         └── style.css       # Preset Studio design system — museum dark, tab layout
 ```
 
@@ -208,14 +217,24 @@ Merge layer exposing bundled + custom presets under one API.
 # Install dependencies
 npm install
 
-# Start dev server
-npm run dev
+# Start dev server (safe — kills zombie processes + clears stale cache first)
+npm run dev:safe
 # → http://localhost:5173/
+
+# Start dev server (fast — only use when you know Vite was cleanly stopped last time)
+npm run dev
 
 # Production build
 npm run build
 # → Output in dist/
 ```
+
+> **Always use `npm run dev:safe` to start a session.** It kills any lingering Vite processes
+> and wipes the dep-optimization cache before starting. If you only use `npm run dev` and a
+> previous session wasn't closed cleanly (terminal window closed instead of Ctrl+C), the next
+> start will appear to hang or fail with a port conflict. `npm run dev:safe` always recovers.
+>
+> **Stop Vite cleanly:** always use **Ctrl+C** in the terminal before closing the window.
 
 ## macOS App
 
@@ -365,6 +384,34 @@ const audioEl = await engine.connectAudioFile(fileObject);
 - **getUserMedia** — required for microphone input
 - Best experience in **Chrome** or **Firefox**
 
+## Developer Workflow
+
+### Editing Help / User Guide Content
+
+There are **three separate help systems** — edit the right one:
+
+| Button / entry point | File to edit | Location in file |
+|---|---|---|
+| "User Guide" on main app start screen | `index.html` | `id="help-modal"` ~line 1315 |
+| Help icon inside Preset Studio | `editor.html` | `id="help-modal"` ~line 62 |
+| Standalone `/help.html` page | `help.html` | Full page, nav-linked sections |
+
+All three are independent — changes to one do not affect the others.
+
+### Dev Server Troubleshooting
+
+If `npm run dev` fails, hangs, or gives a port conflict:
+
+```bash
+npm run dev:safe
+```
+
+This kills any zombie Vite processes, wipes the `.vite` dep cache, and starts fresh. Use it as
+your default start command. `node_modules/.vite-temp/` left over from a crashed prior session
+is the most common cause of startup failures — `dev:safe` removes it automatically.
+
+---
+
 ## Developer Documentation Index
 
 All planning, research, and implementation notes live as `.md` files in the repo. This index is the starting point.
@@ -390,9 +437,9 @@ Research and design docs for specific features — some shipped, some pending:
 | [`midi-dev.md`](midi-dev.md) | 📋 Planning | MIDI controller integration — design rules, action registry, MIDI learn UX, device UI, recording/playback modes, phased plan. |
 | [`preset-dev.md`](preset-dev.md) | ✅ Shipped | Preset drawer hide feature — data model, filtering rules, Show Hidden toggle, Unhide All modal. |
 | [`preset-image-pan-dev.md`](preset-image-pan-dev.md) | 📋 Design only | Image layer Pan mode design — Drift, Bounce, pan pad UX spec. |
-| [`animated-gif-dev.md`](animated-gif-dev.md) | 🔍 Audit + Design | GIF playback audit — speed slider exists but has a colour-cycling bug at 2×–4×. Three root causes identified. Diagnose before fixing. Also covers: GPU/performance strategy (warnings-only decision), and full **GIF Optimization Tool** design spec (frame strip UI, keep-every-N, resize, re-encode via `gifenc`, layer card entry point). |
+| [`animated-gif-dev.md`](animated-gif-dev.md) | ✅ Phase 2 shipped | GIF playback — speed slider (0.25×–8×), colour cycling bug fixed (May 2026), debounce optimization. **GIF Optimizer shipped** — upload-time modal with Preview.app-style stats, "Keep every Nth" frame reduction, resize to 128/192/256px, live GPU savings preview. Delays scaled by `keepEveryN/3` for smooth animation. |
 | [`new-image-effects-future-dev.md`](new-image-effects-future-dev.md) | 📋 Future | Future image layer effects spec — Chromatic Aberration sets the quality bar. |
-| [`saved-presets-dev.md`](saved-presets-dev.md) | ✅ Phases 1–5 built · ⚠️ Known bug | Saved presets panel design for Preset Studio library — all 5 phases shipped. Known bug (§10): export only captures image layers, not palette/motion/wave/feel baseVals. Fix deferred to the Remix/schema-unification work in `custom-preset-editor.md`. |
+| [`saved-presets-dev.md`](saved-presets-dev.md) | ✅ Phases 1–5 built · ⚠️ Known bug | Saved presets panel design for Preset Studio library — all 5 phases shipped. §11: Solid FX audio reactivity upgraded — Source (Bass/Mid/Treb/Vol) + Curve (Linear/Squared/Cubed/Gate) controls added to Palette tab, matching image layer pattern. Known bug (§10): export only captures image layers, not palette/motion/wave/feel baseVals. Fix deferred to Remix/schema-unification work. |
 | [`user-guide-dev.md`](user-guide-dev.md) | 📋 Planning | In-app user guide redesign — searchable help centre, contextual `?` deep links. |
 | [`app-output-dev.md`](app-output-dev.md) | 📋 Reference | Output/projection settings — resolution lock, aspect ratio, virtual camera, macOS distribution workflow. |
 | [`layer-header.md`](layer-header.md) | 📋 Planning | Layer card header redesign options for Preset Studio image layers. |

@@ -75,6 +75,7 @@
           <div class="help-nav-group">
             <div class="help-nav-label">Preset Studio</div>
             <a class="help-nav-link" href="#hm-image-layers">Image Layers</a>
+            <a class="help-nav-link" href="#hm-animated-gifs">Animated GIFs</a>
             <a class="help-nav-link" href="#hm-transform">Transform</a>
             <a class="help-nav-link" href="#hm-motion">Motion</a>
             <a class="help-nav-link" href="#hm-tunnel">Tunnel &amp; Depth Stack</a>
@@ -132,6 +133,50 @@
               <li><strong>Reset ↻</strong> — restores all animation fields to default, keeps the image. Undoable.</li>
               <li><strong>HD toggle</strong> — sets the upload size ceiling: OFF = 1024 px, ON = 2048 px (longest side). Images larger than the ceiling are scaled down proportionally — aspect ratio is always preserved, nothing is cropped or stretched. Images already smaller than the ceiling are passed through untouched (a 300×300 image stays 300×300 regardless of the toggle). Set the toggle <em>before</em> uploading — the resize happens once at upload time and is not reversible without re-uploading. HD layers use ~4× more GPU memory than standard; use HD only when fine detail matters at large projection sizes. <strong>GIFs are not resized</strong> — they always upload at their native resolution.</li>
             </ul>
+          </section>
+
+          <section class="hm-section" id="hm-animated-gifs">
+            <h2>Animated GIFs</h2>
+            <p>GIFs animate as real GPU textures — every effect (mirror, tunnel, hue spin, audio reactivity) applies to every frame in real time.</p>
+            <ul class="hm-list">
+              <li><strong>Speed slider</strong> — 0.25× to 8×. Default is 1.2× because most web GIFs are encoded slow (10 fps native). Drag right for fast-forward, left for slow-motion freeze-frame feel.</li>
+              <li><strong>All effects work</strong> — Tile, Mirror, Kaleido, Tunnel, Pulse, Strobe, Hue Spin, Chromatic, Edge — everything applies per frame.</li>
+              <li><strong>GIFs are not resized on upload</strong> — they load at native resolution. A 1200×1200 GIF uses significantly more GPU memory than a 512×512 one.</li>
+            </ul>
+            <div class="hm-tip"><strong>Performance guide:</strong>
+              <ul class="hm-list" style="margin-top:6px">
+                <li>1–2 GIF layers — smooth on any device.</li>
+                <li>3–4 GIF layers — fine on a dedicated GPU, may stutter on integrated graphics.</li>
+                <li>5+ GIFs or large GIFs (1024 px+) — expect slowdown regardless of GPU. Use smaller or fewer-frame GIFs.</li>
+                <li>Adding audio reactivity to a GIF layer costs extra GPU work per frame. If things slow down, reduce the number of audio-reactive GIF layers first.</li>
+              </ul>
+            </div>
+            <div class="hm-tip"><strong>Tips for smooth GIFs:</strong>
+              <ul class="hm-list" style="margin-top:6px">
+                <li>Use GIFs under 512 px for best performance. Larger GIFs look great but cost more.</li>
+                <li>Fewer frames = faster. A 10-frame loop at 8× looks identical to a 30-frame loop at natural speed and uses 3× less memory.</li>
+                <li>Mute GIF layers you're not currently using — muted layers cost nothing.</li>
+                <li>A dedicated GPU (MacBook Pro, gaming PC) handles more GIF layers automatically — no settings to change.</li>
+              </ul>
+            </div>
+            <div class="hm-tip" style="background:var(--accent);color:white;padding:16px 20px;border-radius:10px;margin-top:16px;">
+              <strong style="font-size:15px;display:block;margin-bottom:10px;">🚀 GIF Optimizer — Now Available!</strong>
+              <p style="font-size:13px;opacity:0.95;margin-bottom:12px;line-height:1.5;">
+                When you upload a large GIF (>10 frames, >256px, or >1MB), the optimizer modal appears automatically. 
+                Preview frame-by-frame thumbnails with original indices, adjust "Keep every Nth" to reduce frame count, 
+                resize to 128/192/256px, and see live GPU memory savings before committing.
+              </p>
+              <p style="font-size:13px;opacity:0.95;margin-bottom:8px;line-height:1.5;">
+                <strong>Three options:</strong> "Apply & Add Layer" uses your optimized settings, 
+                "Use As-Is" adds the original GIF unchanged, "Cancel" aborts the upload.
+              </p>
+              <p style="font-size:12px;opacity:0.85;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.2);line-height:1.4;">
+                <strong>Note:</strong> These are general guidelines — every machine is different. 
+                Experiment with frame count, size, and the speed slider to find the sweet spot 
+                for <em>your</em> GPU. MacBook Airs need more aggressive optimization than MacBook Pros. 
+                When in doubt: fewer frames + smaller dimensions = smoother performance.
+              </p>
+            </div>
           </section>
 
           <section class="hm-section" id="hm-transform">
@@ -351,6 +396,25 @@
                              Pulse/Breath apply to both; Shift row appears for Shift only. -->
                         <div id="solid-fx-panel" hidden>
                             <p class="section-label" id="solid-fx-label">Pulse &amp; Breath</p>
+                            <p class="section-note">Source &amp; Curve shape the audio signal driving Pulse and Shift.</p>
+                            <div class="layer-row-inline" style="gap:8px;margin-bottom:6px">
+                                <span class="layer-ctrl-label" data-tooltip="Which frequency band drives Pulse and Shift — Bass = kicks, Mid = melody, Treble = hi-hats, Volume = overall mix">Source</span>
+                                <select id="solid-react-source" class="layer-react-source">
+                                    <option value="bass">Bass</option>
+                                    <option value="mid">Mid</option>
+                                    <option value="treb">Treble</option>
+                                    <option value="vol">Volume</option>
+                                </select>
+                            </div>
+                            <div class="layer-row-inline" style="gap:8px;margin-bottom:8px">
+                                <span class="layer-ctrl-label" data-tooltip="How the signal is shaped — Squared suppresses quiet hits, Cubed reserves reaction for loudest peaks, Gate flips binary on/off">Curve</span>
+                                <div id="solid-react-curve" class="layer-react-curve" role="group" aria-label="Reactivity curve">
+                                    <button class="lseg active" data-curve="linear">Linear</button>
+                                    <button class="lseg" data-curve="squared">Squared</button>
+                                    <button class="lseg" data-curve="cubed">Cubed</button>
+                                    <button class="lseg" data-curve="threshold">Gate</button>
+                                </div>
+                            </div>
                             <div id="solid-fx-sliders"></div>
                             <div class="color-row" id="solid-colorb-row" hidden>
                                 <span class="color-row-label">Shift color</span>
@@ -646,6 +710,77 @@
                 <div class="save-modal-actions">
                     <button id="layer-delete-confirm" class="danger-btn" type="button">Delete</button>
                     <button id="layer-delete-cancel" class="reset-btn" type="button">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- GIF Optimizer modal -->
+        <div id="gif-optimizer-modal" class="save-modal gif-optimizer-modal" hidden role="dialog" aria-modal="true"
+            aria-labelledby="gif-optimizer-title">
+            <div class="save-modal-card" style="width:min(900px, 95vw);max-height:90vh;overflow-y:auto;">
+                <h2 id="gif-optimizer-title" class="save-modal-title">Optimize GIF</h2>
+                
+                <!-- Stats header -->
+                <div id="gif-opt-stats" class="gif-opt-stats" style="background:var(--bg-2);padding:16px 20px;border-radius:8px;margin-bottom:16px;font-size:14px;color:var(--text-2);">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap;">
+                        <div>
+                            <div id="gif-opt-filename" style="font-weight:600;color:var(--text-1);margin-bottom:6px;font-size:15px;"></div>
+                            <div id="gif-opt-dims" style="display:flex;gap:20px;flex-wrap:wrap;">
+                                <span id="gif-opt-size"></span>
+                                <span id="gif-opt-frames"></span>
+                                <span id="gif-opt-filesize"></span>
+                                <span id="gif-opt-gpu" style="color:var(--accent);font-weight:500;"></span>
+                            </div>
+                        </div>
+                        <div id="gif-opt-warning" style="color:var(--danger);font-weight:500;display:none;background:var(--bg-1);padding:8px 12px;border-radius:6px;max-width:300px;"></div>
+                    </div>
+                </div>
+
+                <!-- Frame strip preview -->
+                <div id="gif-opt-frame-strip" class="gif-opt-frame-strip" style="display:flex;gap:6px;overflow-x:auto;padding:10px;background:var(--bg-1);border-radius:8px;margin-bottom:16px;max-height:100px;scrollbar-width:thin;">
+                    <!-- Thumbnails injected here -->
+                </div>
+
+                <!-- Controls -->
+                <div class="gif-opt-controls" style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:16px;">
+                    <div>
+                        <label style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:14px;">
+                            <span>Keep every <strong id="gif-opt-nth-val" style="color:var(--accent);font-size:16px;">1</strong> frame</span>
+                            <span id="gif-opt-result-frames" style="color:var(--text-3);"></span>
+                        </label>
+                        <input type="range" id="gif-opt-nth" min="1" max="20" value="1" step="1"
+                            style="width:100%;accent-color:var(--accent);height:6px;">
+                        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-3);margin-top:6px;">
+                            <span>Keep all</span>
+                            <span>Reduce</span>
+                            <span>Keep 1/20</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:14px;">
+                            <span>Max dimension</span>
+                            <span id="gif-opt-resize-dims" style="color:var(--text-3);"></span>
+                        </label>
+                        <div style="display:flex;gap:10px;">
+                            <button type="button" class="gif-opt-size-btn" data-size="0" style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg-1);cursor:pointer;font-size:13px;">Original</button>
+                            <button type="button" class="gif-opt-size-btn" data-size="256" style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg-1);cursor:pointer;font-size:13px;">256px</button>
+                            <button type="button" class="gif-opt-size-btn" data-size="192" style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg-1);cursor:pointer;font-size:13px;">192px</button>
+                            <button type="button" class="gif-opt-size-btn" data-size="128" style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg-1);cursor:pointer;font-size:13px;">128px</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Result preview -->
+                <div id="gif-opt-result" style="background:linear-gradient(135deg, var(--bg-2) 0%, var(--bg-1) 100%);padding:16px 20px;border-radius:10px;margin-bottom:20px;font-size:14px;border:1px solid var(--border);">
+                    <div style="font-weight:600;margin-bottom:10px;color:var(--text-1);font-size:15px;">After optimization:</div>
+                    <div id="gif-opt-result-text" style="color:var(--text-2);font-size:14px;line-height:1.5;"></div>
+                </div>
+
+                <div class="save-modal-actions" style="display:flex;gap:12px;justify-content:flex-end;">
+                    <button id="gif-opt-cancel" class="reset-btn" type="button" style="padding:10px 20px;">Cancel</button>
+                    <button id="gif-opt-as-is" class="secondary-btn" type="button" style="padding:10px 20px;">Use As-Is</button>
+                    <button id="gif-opt-apply" class="primary-btn" type="button" style="padding:10px 24px;font-weight:500;">Apply & Add Layer</button>
                 </div>
             </div>
         </div>

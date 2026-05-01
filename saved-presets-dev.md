@@ -315,6 +315,49 @@ _This document is the planning ground-truth. Implementation work should be track
 
 ---
 
+## 11. Solid FX Audio Reactivity — Source + Curve Controls (May 2026)
+
+The Palette tab Solid/Shift variation panel (Pulse / Breath / Shift sliders) previously had audio reactivity hardcoded to `bass` and `bass_att` with no user control. Updated to match the image layer audio reactivity pattern exactly.
+
+### Important: neither control set belongs to MilkDrop
+
+A common point of confusion — both the image layer audio controls and the Solid FX audio controls are **DiscoCast inventions**, not MilkDrop features:
+
+| Control set | Belongs to | What it drives |
+|-------------|-----------|---------------|
+| Image layer Source + Curve + Pulse/Bounce/Shake/Beat Fade/Strobe | DiscoCast | Our image compositing layer on top of MilkDrop |
+| Solid FX Source + Curve + Pulse/Breath/Shift | DiscoCast | Our solid color base (Solid/Shift variations don't exist in MilkDrop) |
+| `frame_eqs_str` equations | MilkDrop standard | Zoom, rot, warp, colors, decay — the whole visual system at once |
+
+The controls look similar by design — same Source dropdown, same Curve segment buttons — because we deliberately matched the UI language for consistency across the editor.
+
+The **only** MilkDrop audio reactivity the user cannot yet touch directly is the `frame_eqs_str` in library presets. That is the future Code tab work described in `custom-preset-editor.md` roadmap items 9 and 12.
+
+### What was added
+
+**Source dropdown** — `#solid-react-source` — picks which frequency band drives Pulse and Shift:
+- Bass (default) / Mid / Treble / Volume
+
+**Curve segment control** — `#solid-react-curve` — shapes the signal before it reaches the sliders:
+- Linear / Squared / Cubed / Gate (threshold)
+
+These appear at the top of the `#solid-fx-panel`, above the three sliders. Same HTML, same CSS classes (`layer-react-source`, `layer-react-curve`, `lseg`), same UX pattern as image layer Audio Reactivity section.
+
+### New state fields
+- `solidReactSource: 'bass'` — added to `BLANK` defaults
+- `solidReactCurve: 'linear'` — added to `BLANK` defaults
+- Both reset in all 3 `_applyVariation` call sites
+- Both synced in `_syncSolidFx()`
+
+### GLSL change
+The comp shader solid-mode block now computes a shaped signal `_sr` from the selected source and curve, then uses it to drive `_pulse` and `_shiftT`. `Breath` remains time-driven (`sin(time * 0.6)`) — not audio, no source picker needed there.
+
+### Files changed
+- `editor.html` — Source dropdown + Curve segment rows in `#solid-fx-panel`
+- `src/editor/inspector.js` — `BLANK` schema, `_buildSolidFxPanel()`, `_buildCompShader()`, `_syncSolidFx()`, 3× `_applyVariation` reset locations
+
+---
+
 ## 10. Known Bug — Export Only Saves Image Layer (not full preset state)
 
 > Discovered Apr 2026 during macOS app export testing.

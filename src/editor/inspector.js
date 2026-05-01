@@ -14,6 +14,11 @@
  */
 
 import { createCustomPreset, saveCustomPreset, getImage, storeImage, generateId } from '../customPresets.js';
+import {
+    parseGifFile, processGifFrames, generateFrameStrip,
+    shouldOptimize, getRecommendedSettings, formatBytes,
+    estimateGpuMemory
+} from './gifOptimizer.js';
 
 // ─── Phase 1: layer limits + upload resize ───────────────────────────────────
 // Cap surface area for Phase 1. Internals (shader builder, state array) are
@@ -76,11 +81,6 @@ async function resizeImageFile(file, maxDim) {
     return { blob, dataURL: outDataURL, width: w, height: h, resized: true, originalW: img.naturalWidth, originalH: img.naturalHeight };
 }
 
-function formatBytes(bytes) {
-    if (bytes < 1024) return `${bytes}B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)}KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
-}
 
 // ─── Blank start state ────────────────────────────────────────────────────────
 
@@ -113,6 +113,8 @@ const BLANK = {
     solidBreath: 0,       // slow sine amplitude: col *= mix(1, 0.5+0.5*sin(t*0.6), breath)
     solidShift: 0,        // beat-driven mix amount toward solidColorB (uses bass_att)
     solidColorB: [0, 0, 0],
+    solidReactSource: 'bass',  // 'bass' | 'mid' | 'treb' | 'vol'
+    solidReactCurve:  'linear', // 'linear' | 'squared' | 'cubed' | 'threshold'
 };
 
 // ─── Base Variations ─────────────────────────────────────────────────────────
@@ -357,6 +359,7 @@ export class EditorInspector {
         this._bindSave();
         this._bindReset();
         this._bindImageDropzone();
+        this._bindGifOptimizer();
         this._bindImagesOnly();
         this._bindHdUploads();
         this._bindCollapseAll();
@@ -376,6 +379,8 @@ export class EditorInspector {
         this.currentState.solidBreath = v0.solidBreath ?? 0;
         this.currentState.solidShift = v0.solidShift ?? 0;
         this.currentState.solidColorB = (v0.solidColorB || [0, 0, 0]).slice();
+        this.currentState.solidReactSource = v0.solidReactSource ?? 'bass';
+        this.currentState.solidReactCurve  = v0.solidReactCurve  ?? 'linear';
         // _buildCompShader must run here so the solid-color GLSL is baked into
         // currentState.comp before the first _applyToEngine call.
         this._buildCompShader();
@@ -439,6 +444,8 @@ export class EditorInspector {
         this.currentState.solidBreath = v.solidBreath ?? 0;
         this.currentState.solidShift = v.solidShift ?? 0;
         this.currentState.solidColorB = (v.solidColorB || [0, 0, 0]).slice();
+        this.currentState.solidReactSource = v.solidReactSource ?? 'bass';
+        this.currentState.solidReactCurve  = v.solidReactCurve  ?? 'linear';
         // Reset equations but preserve comp (may have image layers)
         this.currentState.init_eqs_str = '';
         this.currentState.frame_eqs_str = '';
@@ -488,6 +495,29 @@ export class EditorInspector {
     _buildSolidFxPanel() {
         const container = document.getElementById('solid-fx-sliders');
         if (!container) return;
+
+        // ── Audio Reactivity source + curve (mirrors image layer pattern) ──
+        const reactSrcSel = document.getElementById('solid-react-source');
+        if (reactSrcSel) {
+            reactSrcSel.value = this.currentState.solidReactSource || 'bass';
+            reactSrcSel.addEventListener('change', () => {
+                this.currentState.solidReactSource = reactSrcSel.value;
+                this._buildCompShader();
+                this._applyToEngine();
+            });
+        }
+        const curveBtns = document.querySelectorAll('#solid-react-curve .lseg');
+        curveBtns.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.curve === (this.currentState.solidReactCurve || 'linear'));
+            btn.addEventListener('click', () => {
+                curveBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.currentState.solidReactCurve = btn.dataset.curve;
+                this._buildCompShader();
+                this._applyToEngine();
+            });
+        });
+
         const configs = [
             { id: 'sf-pulse', label: 'Pulse', min: 0, max: 2.0, step: 0.01, value: 0, key: 'solidPulse' },
             { id: 'sf-breath', label: 'Breath', min: 0, max: 1.0, step: 0.01, value: 0, key: 'solidBreath' },
@@ -589,7 +619,7 @@ export class EditorInspector {
                 if (valEl) valEl.textContent = v.toFixed(cfg.decimals ?? 2);
                 input.style.setProperty('--pct', `${((v - cfg.min) / (cfg.max - cfg.min)) * 100}%`);
                 this.currentState.baseVals[cfg.key] = v;
-                this._applyToEngine();
+                this._applyToEngine(true);
             });
             input.addEventListener('pointerup', () => this._postSnap());
         });
@@ -628,7 +658,7 @@ export class EditorInspector {
             if (hexLabel) hexLabel.textContent = native.value.toUpperCase();
             applyFn(native.value);
             this._buildCompShader();
-            this._applyToEngine();
+            this._applyToEngine(true);
             this._clearPaletteActive();
         });
         native.addEventListener('change', () => {
@@ -677,7 +707,7 @@ export class EditorInspector {
                 if (valEl) valEl.textContent = v.toFixed(2);
                 input.style.setProperty('--pct', `${((v - cfg.min) / (cfg.max - cfg.min)) * 100}%`);
                 this.currentState.baseVals[cfg.key] = v;
-                this._applyToEngine();
+                this._applyToEngine(true);
             });
             input.addEventListener('pointerup', () => this._postSnap());
         });
@@ -757,7 +787,7 @@ export class EditorInspector {
                 if (valEl) valEl.textContent = v.toFixed(2);
                 input.style.setProperty('--pct', `${((v - cfg.min) / (cfg.max - cfg.min)) * 100}%`);
                 this.currentState.baseVals[cfg.key] = v;
-                this._applyToEngine();
+                this._applyToEngine(true);
             });
             input.addEventListener('pointerup', () => this._postSnap());
         });
@@ -1055,6 +1085,8 @@ export class EditorInspector {
             this.currentState.solidBreath = v0.solidBreath ?? 0;
             this.currentState.solidShift = v0.solidShift ?? 0;
             this.currentState.solidColorB = (v0.solidColorB || [0, 0, 0]).slice();
+            this.currentState.solidReactSource = v0.solidReactSource ?? 'bass';
+            this.currentState.solidReactCurve  = v0.solidReactCurve  ?? 'linear';
             this._imagesOnly = false;
             const ioToggle = document.getElementById('toggle-images-only');
             if (ioToggle) ioToggle.checked = false;
@@ -1087,7 +1119,7 @@ export class EditorInspector {
         });
         zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('drag-over'); });
         zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
-        zone.addEventListener('drop', (e) => {
+        zone.addEventListener('drop', async (e) => {
             e.preventDefault();
             zone.classList.remove('drag-over');
             const file = e.dataTransfer?.files?.[0];
@@ -1096,9 +1128,14 @@ export class EditorInspector {
                 showToast('Drop an image file here (JPG, PNG, GIF, WebP…)', true);
                 return;
             }
+            // Intercept GIFs for optimization check
+            if (file.type === 'image/gif') {
+                await this._handleGifUpload(file);
+                return;
+            }
             this._addImageLayer(file);
         });
-        fileInput.addEventListener('change', () => {
+        fileInput.addEventListener('change', async () => {
             const file = fileInput.files?.[0];
             if (!file) return;
             if (!file.type.startsWith('image/')) {
@@ -1106,9 +1143,272 @@ export class EditorInspector {
                 fileInput.value = '';
                 return;
             }
+            // Intercept GIFs for optimization check
+            if (file.type === 'image/gif') {
+                await this._handleGifUpload(file);
+                fileInput.value = '';
+                return;
+            }
             this._addImageLayer(file);
             fileInput.value = '';
         });
+    }
+
+    // ─── GIF Optimizer ─────────────────────────────────────────────────────────
+
+    async _handleGifUpload(file) {
+        // Check layer limit first
+        if (!this.currentState.images) this.currentState.images = [];
+        if (this.currentState.images.length >= MAX_LAYERS) {
+            showToast(`Max ${MAX_LAYERS} image layers`, true);
+            return;
+        }
+
+        try {
+            // Parse the GIF to check if optimization is needed
+            const gifData = await parseGifFile(file);
+            
+            // If it doesn't need optimization, add directly
+            if (!shouldOptimize(gifData)) {
+                this._addImageLayer(file);
+                return;
+            }
+
+            // Show optimizer modal
+            await this._showGifOptimizerModal(file, gifData);
+        } catch (err) {
+            console.error('GIF parse error:', err);
+            // Fallback: add as-is if parsing fails
+            this._addImageLayer(file);
+        }
+    }
+
+    async _showGifOptimizerModal(file, gifData) {
+        const modal = document.getElementById('gif-optimizer-modal');
+        if (!modal) {
+            // Modal not found, add as-is
+            this._addImageLayer(file);
+            return;
+        }
+
+        // Store current optimization state
+        this._gifOptimizerState = {
+            file,
+            gifData,
+            keepEveryN: 1,
+            targetSize: 0,
+            processed: null
+        };
+
+        // Get recommendations
+        const rec = getRecommendedSettings(gifData);
+        this._gifOptimizerState.keepEveryN = rec.keepEveryN;
+        this._gifOptimizerState.targetSize = rec.targetSize;
+
+        // Update stats display
+        document.getElementById('gif-opt-filename').textContent = gifData.fileName;
+        document.getElementById('gif-opt-size').textContent = `${gifData.width} × ${gifData.height}`;
+        document.getElementById('gif-opt-frames').textContent = `${gifData.frameCount} frames`;
+        document.getElementById('gif-opt-filesize').textContent = formatBytes(gifData.fileSize);
+        
+        const gpuBytes = estimateGpuMemory(gifData.width, gifData.height, gifData.frameCount);
+        document.getElementById('gif-opt-gpu').textContent = `~${formatBytes(gpuBytes)} GPU`;
+
+        // Show warning if applicable
+        const warningEl = document.getElementById('gif-opt-warning');
+        if (rec.reason) {
+            warningEl.textContent = `⚠️ ${rec.reason}`;
+            warningEl.style.display = 'block';
+        } else {
+            warningEl.style.display = 'none';
+        }
+
+        // Set initial control values
+        const nthSlider = document.getElementById('gif-opt-nth');
+        nthSlider.value = this._gifOptimizerState.keepEveryN;
+        document.getElementById('gif-opt-nth-val').textContent = this._gifOptimizerState.keepEveryN;
+
+        // Set initial size button
+        document.querySelectorAll('.gif-opt-size-btn').forEach(btn => {
+            const size = parseInt(btn.dataset.size);
+            btn.classList.toggle('active', size === this._gifOptimizerState.targetSize);
+            if (size === this._gifOptimizerState.targetSize) {
+                btn.style.background = 'var(--accent)';
+                btn.style.color = 'white';
+            } else {
+                btn.style.background = 'var(--bg-1)';
+                btn.style.color = '';
+            }
+        });
+
+        // Initial preview update
+        await this._updateGifOptimizerPreview();
+
+        // Show modal
+        modal.hidden = false;
+    }
+
+    async _updateGifOptimizerPreview() {
+        const state = this._gifOptimizerState;
+        if (!state) return;
+
+        const { gifData, keepEveryN, targetSize } = state;
+
+        // Process frames with current settings
+        const processed = await processGifFrames(gifData, { keepEveryN, targetSize });
+        state.processed = processed;
+
+        // Update result text
+        const originalBytes = estimateGpuMemory(gifData.width, gifData.height, gifData.frameCount);
+        const newBytes = estimateGpuMemory(processed.width, processed.height, processed.frameCount);
+        const savings = ((originalBytes - newBytes) / originalBytes * 100).toFixed(0);
+        
+        document.getElementById('gif-opt-result-frames').textContent = `${processed.frameCount} frames`;
+        document.getElementById('gif-opt-result-text').innerHTML = 
+            `${processed.width} × ${processed.height} · ${processed.frameCount} frames · ~${formatBytes(newBytes)} GPU ` +
+            `<span style="color:var(--success);">(${savings}% smaller)</span>`;
+
+        // Update resize dims text
+        if (targetSize > 0 && (gifData.width > targetSize || gifData.height > targetSize)) {
+            const scale = targetSize / Math.max(gifData.width, gifData.height);
+            const newW = Math.round(gifData.width * scale);
+            const newH = Math.round(gifData.height * scale);
+            document.getElementById('gif-opt-resize-dims').textContent = `${newW} × ${newH}`;
+        } else {
+            document.getElementById('gif-opt-resize-dims').textContent = 'Original size';
+        }
+
+        // Generate frame strip preview
+        const strip = document.getElementById('gif-opt-frame-strip');
+        strip.innerHTML = '';
+        
+        const previews = await generateFrameStrip(processed, 20);
+        previews.forEach((preview, idx) => {
+            const thumb = document.createElement('div');
+            thumb.style.cssText = 'flex-shrink:0;width:80px;height:80px;border-radius:6px;overflow:hidden;position:relative;box-shadow:0 2px 4px rgba(0,0,0,0.3);';
+            thumb.innerHTML = `
+                <img src="${preview.dataUrl}" style="width:100%;height:100%;object-fit:cover;">
+                <span style="position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.8);color:white;font-size:11px;padding:2px 6px;border-radius:4px;font-weight:500;">${preview.index + 1}</span>
+            `;
+            strip.appendChild(thumb);
+        });
+    }
+
+    _bindGifOptimizer() {
+        const modal = document.getElementById('gif-optimizer-modal');
+        if (!modal) return;
+
+        // Close on backdrop click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) this._closeGifOptimizer(false);
+        });
+
+        // Cancel button
+        document.getElementById('gif-opt-cancel')?.addEventListener('click', () => {
+            this._closeGifOptimizer(false);
+        });
+
+        // Use As-Is button
+        document.getElementById('gif-opt-as-is')?.addEventListener('click', () => {
+            const state = this._gifOptimizerState;
+            if (state?.file) {
+                this._closeGifOptimizer(false);
+                this._addImageLayer(state.file);
+            }
+        });
+
+        // Apply button
+        document.getElementById('gif-opt-apply')?.addEventListener('click', async () => {
+            const state = this._gifOptimizerState;
+            if (!state?.processed) return;
+
+            this._closeGifOptimizer(false);
+            
+            // Create a modified file with processed frames
+            // We pass the processed data directly to _addImageLayer
+            await this._addOptimizedGifLayer(state.file, state.processed);
+        });
+
+        // Nth frame slider
+        const nthSlider = document.getElementById('gif-opt-nth');
+        nthSlider?.addEventListener('input', async (e) => {
+            const n = parseInt(e.target.value);
+            document.getElementById('gif-opt-nth-val').textContent = n;
+            if (this._gifOptimizerState) {
+                this._gifOptimizerState.keepEveryN = n;
+                await this._updateGifOptimizerPreview();
+            }
+        });
+
+        // Size buttons
+        document.querySelectorAll('.gif-opt-size-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const size = parseInt(btn.dataset.size);
+                if (this._gifOptimizerState) {
+                    this._gifOptimizerState.targetSize = size;
+                    
+                    // Update button styling
+                    document.querySelectorAll('.gif-opt-size-btn').forEach(b => {
+                        const bSize = parseInt(b.dataset.size);
+                        b.classList.toggle('active', bSize === size);
+                        if (bSize === size) {
+                            b.style.background = 'var(--accent)';
+                            b.style.color = 'white';
+                        } else {
+                            b.style.background = 'var(--bg-1)';
+                            b.style.color = '';
+                        }
+                    });
+                    
+                    await this._updateGifOptimizerPreview();
+                }
+            });
+        });
+    }
+
+    _closeGifOptimizer(cancelled) {
+        const modal = document.getElementById('gif-optimizer-modal');
+        if (modal) modal.hidden = true;
+        this._gifOptimizerState = null;
+    }
+
+    async _addOptimizedGifLayer(originalFile, processedData) {
+        // Create a wrapper that the visualizer will recognize as a pre-processed GIF
+        // We need to pass the processed frames directly to avoid re-parsing
+        
+        // Generate a data URL from the first frame as the "preview"
+        const canvas = document.createElement('canvas');
+        canvas.width = processedData.width;
+        canvas.height = processedData.height;
+        const ctx = canvas.getContext('2d');
+        
+        if (processedData.frames.length > 0) {
+            const imageData = new ImageData(processedData.frames[0], processedData.width, processedData.height);
+            ctx.putImageData(imageData, 0, 0);
+        }
+        
+        const previewDataUrl = canvas.toDataURL('image/png');
+        
+        // Store processed data for the visualizer to pick up
+        const processedGifKey = `processed_gif_${Date.now()}`;
+        this._processedGifCache = this._processedGifCache || new Map();
+        this._processedGifCache.set(processedGifKey, {
+            frames: processedData.frames,
+            delays: processedData.delays,
+            width: processedData.width,
+            height: processedData.height,
+            originalFileName: originalFile.name
+        });
+
+        // Create a modified file object that carries the cache key
+        const modifiedFile = new File([originalFile], originalFile.name, { 
+            type: originalFile.type 
+        });
+        modifiedFile._processedGifKey = processedGifKey;
+
+        this._addImageLayer(modifiedFile);
+        
+        showToast(`Added optimized GIF: ${processedData.frameCount} frames, ${processedData.width}×${processedData.height}`, false);
     }
 
     // ─── Images Only ───────────────────────────────────────────────────────────
@@ -1404,6 +1704,14 @@ export class EditorInspector {
             return;
         }
 
+        // ── Check for pre-processed optimized GIF ──────────────────────────────
+        let optimizedGifData = null;
+        if (file._processedGifKey && this._processedGifCache?.has(file._processedGifKey)) {
+            optimizedGifData = this._processedGifCache.get(file._processedGifKey);
+            // Clean up cache entry
+            this._processedGifCache.delete(file._processedGifKey);
+        }
+
         // ── Resize on upload (destructive) ───────────────────────────────────
         const maxDim = this._hdUploads ? HD_MAX_DIM : STD_MAX_DIM;
         const hdMode = this._hdUploads;
@@ -1415,7 +1723,7 @@ export class EditorInspector {
             return;
         }
         const storeBlob = resized.blob;
-        if (resized.resized) {
+        if (resized.resized && !optimizedGifData) {
             showToast(`Resized ${resized.originalW}×${resized.originalH} → ${resized.width}×${resized.height} (${formatBytes(file.size)} → ${formatBytes(storeBlob.size)})`);
         }
 
@@ -1503,7 +1811,14 @@ export class EditorInspector {
         };
         this.currentState.images.push(entry);
 
-        const texObj = { data: resized.dataURL, width: resized.width, height: resized.height, isGif: resized.isGif || false, gifSpeed: entry.gifSpeed };
+        const texObj = { 
+            data: resized.dataURL, 
+            width: optimizedGifData ? optimizedGifData.width : resized.width, 
+            height: optimizedGifData ? optimizedGifData.height : resized.height, 
+            isGif: resized.isGif || false, 
+            gifSpeed: entry.gifSpeed,
+            optimizedGifData // Pass pre-processed frames to visualizer if available
+        };
         this._mountLayerCard(entry, texObj);
         if (!resized.resized) showToast('Image layer added');
         if (this.currentState.images.length === 1) showHint();
@@ -1567,9 +1882,9 @@ export class EditorInspector {
             ${entry.isGif ? `
             <p class="layer-section-label">Animation</p>
             <div class="layer-slider-row">
-              <span class="layer-ctrl-label" data-tooltip="GIF playback speed (0.25× to 4×). Default 1.2× — most GIFs feel a touch slow at native speed.">Speed</span>
-              <input type="range" class="slider layer-gif-speed-sl" min="0.25" max="4" step="0.05"
-                value="${entry.gifSpeed}" style="--pct:${pct(entry.gifSpeed, 0.25, 4)}">
+              <span class="layer-ctrl-label" data-tooltip="GIF playback speed (0.25× to 8×). Default 1.2× — most GIFs feel a touch slow at native speed.">Speed</span>
+              <input type="range" class="slider layer-gif-speed-sl" min="0.25" max="8" step="0.05"
+                value="${entry.gifSpeed}" style="--pct:${pct(entry.gifSpeed, 0.25, 8)}">
               <span class="lsv layer-gif-speed-val">${entry.gifSpeed.toFixed(2)}×</span>
             </div>
             <div class="layer-section-divider"></div>
@@ -1891,7 +2206,15 @@ export class EditorInspector {
         nameInput.title = `Filename: ${entry.fileName || ''}`;
 
         // ── Wire controls ───────────────────────────────────────────────────
-        const refresh = () => { this._buildCompShader(); this._applyToEngine(); };
+        // Debounced: prevents 30+ shader recompiles/sec during rapid slider moves.
+        // One frame (16 ms) is enough to coalesce burst changes into a single rebuild.
+        const refresh = () => {
+            clearTimeout(this._shaderRebuildTimer);
+            this._shaderRebuildTimer = setTimeout(() => {
+                this._buildCompShader();
+                this._applyToEngine();
+            }, 16);
+        };
 
         const blendSel = card.querySelector('.layer-blend');
         const tileCb = card.querySelector('.layer-tile');
@@ -2090,7 +2413,7 @@ export class EditorInspector {
                     const v = parseFloat(gifSpeedSl.value);
                     entry.gifSpeed = v;
                     gifSpeedVal.textContent = `${v.toFixed(2)}×`;
-                    gifSpeedSl.style.setProperty('--pct', `${pct(v, 0.25, 4)}`);
+                    gifSpeedSl.style.setProperty('--pct', `${pct(v, 0.25, 8)}`);
                     this.engine.setGifAnimationSpeed(entry.texName, v);
                 });
             }
@@ -2694,11 +3017,12 @@ export class EditorInspector {
 
     // ─── Apply & sync ──────────────────────────────────────────────────────────
 
-    _applyToEngine() {
-        this._buildCompShader();
+    _applyToEngine(skipTextures = false) {
         this.engine.loadPresetObject(this.currentState, 0);
-        for (const [name, texObj] of Object.entries(this._imageTextures)) {
-            this.engine.setUserTexture(name, texObj);
+        if (!skipTextures) {
+            for (const [name, texObj] of Object.entries(this._imageTextures)) {
+                this.engine.setUserTexture(name, texObj);
+            }
         }
         this.onchange?.();
     }
@@ -2761,14 +3085,24 @@ export class EditorInspector {
             const pulse = Number(this.currentState.solidPulse || 0).toFixed(4);
             const breath = Number(this.currentState.solidBreath || 0).toFixed(4);
             const shift = Number(this.currentState.solidShift || 0).toFixed(4);
+            const reactSrc = { bass: 'bass', mid: 'mid', treb: 'treb', vol: 'vol' }[this.currentState.solidReactSource || 'bass'] || 'bass';
+            const solidCurve = this.currentState.solidReactCurve || 'linear';
+            let solidCurveExpr;
+            switch (solidCurve) {
+                case 'squared':   solidCurveExpr = '_sr_raw * _sr_raw'; break;
+                case 'cubed':     solidCurveExpr = '_sr_raw * _sr_raw * _sr_raw'; break;
+                case 'threshold': solidCurveExpr = 'step(0.3, _sr_raw)'; break;
+                default:          solidCurveExpr = '_sr_raw';
+            }
             // Breath: lerp between 1.0 (off) and a slow sine (0..1) by breath amount.
-            // Pulse:  multiplies brightness by (1 + bass * pulse).
-            // Shift:  mixes A→B by bass_att * shift, clamped 0..1. bass_att is the
-            //         attack-smoothed bass — feels like a beat, not a wobble.
+            // Pulse:  multiplies brightness by (1 + signal * pulse).
+            // Shift:  mixes A→B by shaped signal * shift, clamped 0..1.
             base = uvFold +
+                `  float _sr_raw = ${reactSrc};\n` +
+                `  float _sr = ${solidCurveExpr};\n` +
                 `  float _breath = mix(1.0, 0.5 + 0.5 * sin(time * 0.6), ${breath});\n` +
-                `  float _pulse = 1.0 + bass * ${pulse};\n` +
-                `  float _shiftT = clamp(bass_att * ${shift}, 0.0, 1.0);\n` +
+                `  float _pulse = 1.0 + _sr * ${pulse};\n` +
+                `  float _shiftT = clamp(_sr * ${shift}, 0.0, 1.0);\n` +
                 `  vec3 _colA = vec3(${aR}, ${aG}, ${aB});\n` +
                 `  vec3 _colB = vec3(${bR}, ${bG}, ${bB});\n` +
                 `  vec3 col = mix(_colA, _colB, _shiftT) * _breath * _pulse;\n`;
@@ -3288,6 +3622,10 @@ export class EditorInspector {
         this._syncSlider('sf-pulse', this.currentState.solidPulse || 0, 0, 2.0, 2);
         this._syncSlider('sf-breath', this.currentState.solidBreath || 0, 0, 1.0, 2);
         this._syncSlider('sf-shift', this.currentState.solidShift || 0, 0, 1.0, 2);
+        const reactSrcSel = document.getElementById('solid-react-source');
+        if (reactSrcSel) reactSrcSel.value = this.currentState.solidReactSource || 'bass';
+        const curveBtns = document.querySelectorAll('#solid-react-curve .lseg');
+        curveBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.curve === (this.currentState.solidReactCurve || 'linear')));
         const cb = this.currentState.solidColorB || [0, 0, 0];
         const hex = rgbToHex(cb[0], cb[1], cb[2]);
         const swatch = document.getElementById('swatch-shift');

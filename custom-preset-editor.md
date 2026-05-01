@@ -595,9 +595,10 @@ The render loop runs `visualizer.render()` every `requestAnimationFrame` (~16ms 
 |-----------|------|-------|
 | Butterchurn base render | Medium–High | Varies enormously by preset. Simple patterns: ~2–4ms. Complex pixel_eqs + warp shaders: 8–14ms. |
 | Per image layer | Low–Medium | Each layer adds GLSL texture samples + blend math. 1 layer ≈ +0.5–1.5ms. 5 layers ≈ +3–6ms. |
-| GIF animation | Low | `_tickGifAnimations()` — frame swaps only, no GPU cost beyond texture upload |
-| Comp shader rebuild | Spike | `_buildCompShader()` fires on every control change. Takes 0.1–2ms. Not a runtime cost — edit-time only. |
+| GIF animation | Low | `_tickGifAnimations()` — frame swaps only. Speed slider 0.25×–8× (raised May 2026). **Colour cycling bug fixed** — pixel-store state (UNPACK_FLIP_Y_WEBGL, UNPACK_PREMULTIPLY_ALPHA_WEBGL, UNPACK_ALIGNMENT) now saved/restored around `texSubImage2D` to prevent Butterchurn state leakage. |
+| Comp shader rebuild | Spike | `_buildCompShader()` fires on control changes. Takes 0.1–2ms. **Debounced at 16ms** for image layer slider drags (May 2026) — rapid moves coalesce into one rebuild instead of 30+/sec. |
 | AGC / audio analysis | Negligible | ~0.1ms per frame |
+| Texture rebind | Spike (avoided) | `setUserTexture()` rebinds all images on `_applyToEngine()`. **Skip flag added** (May 2026) — Motion/Wave/Palette sliders pass `skipTextures=true`, eliminating redundant rebinds when only baseVals change. |
 
 ### Budget targets
 
@@ -613,6 +614,37 @@ The render loop runs `visualizer.render()` every `requestAnimationFrame` (~16ms 
 2. **Many image layers at high resolution** — each layer adds texture sampling. HD layers (2048px) cost more than standard (1024px). 5 HD layers on a complex base preset is the worst case.
 3. **GIF layers** — texture uploads per frame swap. Low GPU cost but non-zero CPU cost for the frame tick loop.
 4. **Canvas size** — full 4K output costs ~4× more than 1080p. The editor preview is constrained by panel size so this is mostly a live-show concern.
+
+### GIF Optimizer — Implementation (May 2026)
+
+Upload-time optimization modal for large animated GIFs. Built as a response to real-world testing showing that even modest 480×360 GIFs with many frames immediately slow down when effects are applied.
+
+**Thresholds (aggressive):**
+- Frame count > 10, OR
+- Resolution > 256px (longest side), OR  
+- File size > 1MB
+
+**Files added/modified:**
+- `src/editor/gifOptimizer.js` — New module. `parseGifFile()`, `processGifFrames()`, `shouldOptimize()`, `getRecommendedSettings()`, `generateFrameStrip()`, `formatBytes()`, `estimateGpuMemory()`
+- `editor.html` — Modal HTML with stats header, frame strip, "keep every Nth" slider, size buttons (128/192/256/Original), result preview
+- `src/editor/inspector.js` — Import optimizer, `_bindGifOptimizer()`, `_handleGifUpload()`, `_showGifOptimizerModal()`, `_updateGifOptimizerPreview()`, `_addOptimizedGifLayer()`
+- `src/visualizer.js` — Modified `setUserTexture()` and `_loadGifTexture()` to accept `optimizedGifData` with pre-processed frames/delays
+
+**Flow:**
+1. Drop/pick GIF → `_handleGifUpload()` checks thresholds
+2. If over threshold → parse with `gifuct-js`, show modal with Preview.app-style stats (filename, dims, frames, file size, GPU estimate)
+3. User adjusts "keep every Nth" slider (1–20) → live preview updates with frame strip and % savings
+4. User selects resize target (128/192/256/Original) → output dims update
+5. Click "Apply & Add Layer" → `processGifFrames()` composites + resizes → frames stored in `_processedGifCache` → passed to visualizer via `file._processedGifKey`
+6. Visualizer's `_loadGifTexture()` bypasses re-parsing if `optimizedData` present
+
+**Key implementation details:**
+- Frame compositing happens in-memory with pure JS (no canvas) — same approach as visualizer
+- **Delay formula:** `adjustedDelay = originalDelay / (keepEveryN / 3)` — scales delays moderately for smooth animation with fewer frames (clamped 10-500ms)
+- Resize uses nearest-neighbor for speed (adequate for the typical output sizes)
+- Frame strip preview shows up to 20 thumbnails (80×80px) with original frame index numbers
+- GPU memory estimate: `width * height * 4 * frameCount * 1.1` (10% texture overhead)
+- Modal: 900px wide, 2-column controls layout, live preview of optimization results
 
 ### Warning system (to build)
 

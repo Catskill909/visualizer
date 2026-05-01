@@ -18,6 +18,7 @@
 | **Solo / Mute** | Multi-select toggles. Solo any layer(s); mute hides independently. Both persist in preset. |
 | **Reset this layer** | ↻ button. Restores all animation/style fields to default; preserves image identity. Undoable. |
 | **Image resize on upload** | Standard: 1024px longest side. HD toggle: 2048px. Destructive — original never stored. |
+| **GIF Optimizer** | ✅ **Shipped May 2026.** Upload-time modal for large GIFs (>10 frames, >256px, >1MB). Frame strip UI with 80×80px thumbnails, "Keep every Nth" slider (1-20), resize to 128/192/256px, Preview.app-style stats (dims, frames, file size, GPU estimate). Live % savings calculation. Three actions: "Apply & Add Layer", "Use As-Is", "Cancel". Delays scaled by `keepEveryN/3` for smooth animation with fewer frames. |
 | **File-type guard** | `accept` MIME+ext on all file inputs. JS guard rejects non-image drops with red toast. |
 | **Delete confirmation** | Modal with filename, red Delete / Cancel. Backdrop/Escape cancels, Enter confirms. |
 | **Dev HUD** | Backtick `` ` `` — frame time, VRAM estimate, layer count, last shader rebuild ms. |

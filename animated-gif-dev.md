@@ -1,8 +1,8 @@
 # Animated GIF — Audit & Research
 
-**Status:** Audit only. No code changes. Goal: identify why GIF playback feels slow and lay out the best path forward for a robust speed-control story.
+**Status:** ✅ Phase 2 complete — May 2026. Colour cycling bug fixed; speed slider raised to 8×.
 
-**Date:** 2026-04-26
+**Date:** 2026-04-26 (audit) · 2026-05-01 (fixes)
 
 ---
 
@@ -162,6 +162,31 @@ Move `parseGIF` + `decompressFrames` into a Web Worker; ship `Uint8ClampedArray`
 
 ---
 
+## 5a. Performance findings (May 2026)
+
+After fixing the colour cycling bug and raising the slider to 8×, a new observation: performance degrades when audio reactivity is enabled on GIF layers. Root causes identified:
+
+| Cost | CPU or GPU | Notes |
+|------|-----------|-------|
+| GLSL pixel shader per layer | GPU | Every image layer adds UV transform + texture sample + blend per pixel. GIFs are no different from static images here — more layers = more GPU work. |
+| `texSubImage2D` per GIF per frame | CPU→GPU bus | One GIF = fine. 3+ large GIFs at high speed = multiple CPU→GPU transfers competing per 16ms frame. |
+| `_buildCompShader()` + deep clone on every control change | CPU only | Rebuilds the entire GLSL string + `JSON.parse(JSON.stringify(...))` on every slider move. GPU idle during this. A **16ms debounce** on `_buildCompShader()` would prevent 30 recompiles/sec during rapid edits. |
+
+### Does a better GPU help automatically?
+- **Yes for GLSL execution** — faster GPU = more pixels/sec, no settings needed.
+- **Partially for `texSubImage2D`** — limited by memory bandwidth, not shader cores.
+- **No for JS CPU costs** — shader string building and deep cloning are CPU-only. GPU is idle.
+
+### Practical limits
+- 1–2 GIF layers: smooth on any device
+- 3–4 GIF layers: fine on dedicated GPU, may stutter on integrated graphics
+- 5+ GIFs or GIFs > 1024 px: expect slowdown regardless of GPU
+
+### Debounce optimisation ✅ implemented May 2026
+The per-layer `refresh()` function in `_mountLayerCard()` now uses a 16ms `setTimeout` debounce via `this._shaderRebuildTimer`. Rapid slider moves coalesce into a single `_buildCompShader()` + `_applyToEngine()` call per frame instead of 30+/sec. Undo/redo, variation switches, and palette changes are unaffected — they call `_applyToEngine()` directly and remain immediate.
+
+---
+
 ## 5. Recommended path forward
 
 **Phase 1 — Diagnose (10 min, no production code change)**
@@ -230,61 +255,96 @@ Not a block. Not a disable. Just information at the moment it's relevant.
 
 ---
 
-## 8. GIF Optimization Tool — Design Spec
+## 8. GIF Optimization Tool — ✅ SHIPPED May 2026
 
-> Captured from conversation, Apr 2026. Not yet built.
+> **Status:** Live in production. Upload-time modal with frame reduction, resize, and live preview.
+>
+> **Files:** `src/editor/gifOptimizer.js`, `editor.html` modal, `inspector.js` integration, `visualizer.js` optimized data path.
+>
+> **Key formula:** Frame delays scaled by `keepEveryN / 3` factor for smooth animation with fewer frames (clamped 10-500ms).
 
 ### Motivation
 
-The user wants a built-in tool to size and remove frames from GIFs before they hit the layer pipeline — reducing GPU cost at the source rather than trying to compensate at runtime.
+Real-world testing showed a **480×360 GIF with many frames (12MB)** immediately slows down when effects are applied. Even modestly-sized GIFs can overwhelm the GPU if they have excessive frame counts. The optimizer must intercept at upload with **much more aggressive defaults** than originally planned.
 
 ### What already exists
 
 - `resizeImageFile()` in `inspector.js` — resizes static images. Skips GIFs (just grabs first frame).
 - `gifuct-js` — already imported in `visualizer.js` for playback. Can also parse frames for editing.
-- `gifSpeed` slider — per-layer speed control (0.25×–4×). Useful for playback feel but doesn't reduce actual file weight.
+- `gifSpeed` slider — per-layer speed control (0.25×–8×). Useful for playback feel but doesn't reduce actual file weight.
+
+### Upload-Time Modal (Revised Thresholds)
+
+**When it triggers (more aggressive):**
+- Frame count > **10 frames**, OR
+- Resolution > **256px** (longest side), OR
+- File size > **1MB**
+
+Small optimized GIFs load silently. Anything larger gets the modal.
+
+**Modal stats display (match Preview.app format):**
+```
+soultrain2.gif  ·  480 × 360  ·  86 frames  ·  12 MB
+```
+- File name
+- Dimensions (width × height)
+- Frame count (with visual frame strip showing indices)
+- File size
+- Estimated GPU memory impact (frames × width × height × 4 bytes)
+
+**Three action cards:**
+
+| Card | Content |
+|------|---------|
+| **Optimize** (recommended badge) | Inline tools: <br>• Resize: 480px → **256px / 192px / 128px** (aggressive defaults) <br>• Frame trim: "Keep every Nth" with live preview <br>• Target: **4–6 frames total** for large GIFs <br>• Estimated GPU after: updates live <br>• `[Apply & Add Layer]` button |
+| **Use As-Is** | One-click escape hatch. Warning: "Large GIFs with effects may slow down. Optimize later via layer menu." |
+| **Cancel** | Dismiss, no layer added |
 
 ### Tool feature set
 
-| Feature | What it does | Effort |
-|---------|-------------|--------|
-| **Parse + frame strip** | Show thumbnail row of every frame with index and delay time | Medium — `gifuct-js` does parsing, UI is the work |
-| **Keep every Nth frame** | "Keep every 2nd frame" halves frame count, halves texture upload cost | Low — filter the frames array |
-| **Remove specific frames** | Click to toggle individual frames in/out | Low — UI toggle per frame thumbnail |
-| **Set uniform frame delay** | Override each frame's native delay with a single value | Low — set `delays[]` uniformly |
-| **Resize** | Scale all frames to a target max dimension | Low — existing canvas resize loop, once per frame |
-| **Re-encode to GIF** | Output a new `.gif` blob | Medium — needs a GIF encoder dependency |
-| **Hand off to layer pipeline** | Feed the new blob into existing `_addImageLayer()` as a fresh upload | Low — replace blob, call existing code |
+| Feature | What it does | Revised Default |
+|---------|-------------|-----------------|
+| **Parse + frame strip** | Thumbnail row with frame index numbers (like Preview.app) | Show all, numbered |
+| **Keep every Nth frame** | Reduce frame count; delays scaled by `keepEveryN / 3` for smooth playback | Target 8-12 frames for large GIFs |
+| **Remove specific frames** | Click to toggle individual frames | Optional refinement |
+| **Set uniform frame delay** | Override native delays with single value | Optional |
+| **Resize** | Scale all frames to target max dimension | **256px max** (aggressive) |
+| **Re-encode to GIF** | Output new `.gif` blob for export | Phase 2 — not required for upload optimization |
+| **Hand off to layer pipeline** | Feed optimized blob into `_addImageLayer()` | Immediate, no file saved |
 
-### GIF encoder dependency
+### Why no `gifenc` dependency for Phase 1
 
-The browser has no native GIF encoder. Best option: **`gifenc`**
-- ~15KB gzipped
-- No Web Workers required (synchronous)
-- Well maintained
-- Significantly smaller and faster than `gif.js`
+Upload-time optimization happens **in-memory** before `_loadGifTexture`:
+1. Parse with `gifuct-js` → frame array
+2. Resize: draw each frame to OffscreenCanvas at target size
+3. Frame trim: filter array, adjust delays
+4. Pass reduced frame set directly to `_loadGifTexture` — no re-encoding needed
+
+The `gifenc` dependency only becomes necessary if we add "Export optimized GIF to file" later.
 
 ### UI entry points
 
-Two natural places:
+**Primary: Upload-time modal (threshold-gated)**
+Intercept at drag-drop / file picker before layer creation. User makes informed choice with no regret.
 
-**A — On upload (if GIF is over a threshold)**
-If `frames.length > 30` or file size > 2MB, show a prompt:
-> *"This GIF has 47 frames (3.2 MB). Optimize before adding?"*
-> `[Optimize…]` `[Add as-is]`
+**Secondary: Layer card "Optimize…" button**
+Re-open optimizer for existing GIF layers. Same UI, works on source file reference.
 
-**B — On existing layer card**
-An `Optimize…` button in the GIF layer card header. Opens the tool for that layer's source file. User can add first, see how it looks, then optimize if needed. **Cleaner UX — preferred.**
+### Implementation Summary (Shipped)
 
-### Recommended implementation order
+All steps completed:
+1. ✅ Upload detection — `parseGifFile()` on drop, aggressive thresholds (>10 frames, >256px, >1MB)
+2. ✅ Modal shell — stats header + Preview.app-style display + three action cards
+3. ✅ Frame strip UI — 80×80px thumbnails with original frame index numbers (up to 20 shown)
+4. ✅ Resize + frame trim — "Keep every Nth" slider (1-20), size buttons (Original/256/192/128px)
+5. ✅ Live preview — instant recalculation of frame count, dimensions, GPU savings %
+6. ✅ Pipeline wiring — `optimizedGifData` passed through `_processedGifCache` to visualizer
+7. ✅ Delay scaling — `originalDelay × (3/keepEveryN)` for smooth animation (10-500ms clamp)
 
-1. Build the frame strip UI + frame selection
-2. Add Keep-every-N + uniform delay controls
-3. Add resize (reuse existing pipeline)
-4. Add `gifenc` and wire re-encode → hand off to `_addImageLayer`
-5. Add the card-header "Optimize…" entry point
-6. Optionally add the on-upload threshold prompt
+**Phase 2 (Future):** Layer card "Optimize…" button for re-optimizing existing layers; `gifenc` export to file.
 
-### Relationship to colour cycling bug
+### Relationship to other work
 
-The optimizer tool is independent of the colour cycling bug (§3). Both should be fixed — the bug fix is Phase 2 of the existing roadmap; the optimizer is a new separate tool. Don't block one on the other.
+- **Independent of colour cycling bug** — that was fixed in Phase 2 (May 2026)
+- **Builds on debounce optimization** — the smoother UI from §5a helps when testing optimized GIFs
+- **GPU guidance in User Guide** — see editor.html § "Animated GIFs" for user-facing performance tiers

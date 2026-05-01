@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:safe": "pkill -f vite 2>/dev/null; rm -rf node_modules/.vite node_modules/.vite-temp; vite",
     "build": "vite build",
     "preview": "vite preview",
     "start": "sirv dist --host --port 8080 --single",
