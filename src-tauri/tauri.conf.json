@@ -11,6 +11,9 @@
     "withGlobalTauri": true
   },
   "tauri": {
+    "security": {
+      "csp": "default-src 'self' tauri: asset: https://asset.localhost; connect-src ipc: http://ipc.localhost; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: asset: https://asset.localhost; media-src 'self' blob: asset: https://asset.localhost"
+    },
     "allowlist": {
       "all": false,
       "shell": {
