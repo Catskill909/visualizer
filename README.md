@@ -283,6 +283,32 @@ Coolify picks up the push automatically — the promo page immediately serves th
 
 See `macos-app-generate.md` for full packaging details and `app-output-dev.md` § 7 for the complete distribution workflow.
 
+## Windows App
+
+A standalone Windows app built via GitHub Actions on demand — produces both an `.msi` (Windows Installer) and an `.exe` (NSIS installer).
+
+### Install
+1. Download `DiscoCast-Visualizer-Windows.zip` from the [GitHub Actions artifacts](#build-from-github-actions)
+2. Run either the `.msi` or `.exe` installer
+3. Launch **DiscoCast Visualizer** from the Start menu
+4. First time using mic/USB: Windows will prompt for microphone permission — click **Allow**
+
+> Windows may show a SmartScreen warning ("Unknown publisher") on first launch. Click **More info → Run anyway**. This is expected for unsigned builds — the app is safe.
+
+### Build from GitHub Actions
+
+The Windows build runs on a GitHub-hosted Windows machine triggered manually — no Windows PC required.
+
+1. Go to your repo on **GitHub.com → Actions → Build Windows Installer**
+2. Click **Run workflow** → select branch `main` → **Run workflow**
+3. Wait ~10–15 min (first run); ~5 min after Rust cache warms up
+4. When complete, click the run → scroll to **Artifacts** → download `DiscoCast-Visualizer-Windows`
+5. Unzip — you'll find both `.msi` and `.exe` installers inside
+
+Nothing runs automatically — the build only starts when you click the button.
+
+> The workflow file lives at `.github/workflows/build-windows.yml`. It is manual-trigger only (`workflow_dispatch`) and touches no existing macOS or web build infrastructure.
+
 ## Deployment (Coolify)
 
 This app is optimized for ultra-lightweight deployment via **Coolify**. Two methods are supported:
