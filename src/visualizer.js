@@ -258,7 +258,6 @@ export class VisualizerEngine {
       if (this.audioContext.state === 'suspended') await this.audioContext.resume();
       this.disconnectSource();
       this.audioElement = new Audio();
-      this.audioElement.crossOrigin = 'anonymous';
       this.audioElement.src = URL.createObjectURL(file);
       const source = this.audioContext.createMediaElementSource(this.audioElement);
       // Path for Hearing: Source -> VolumeGain -> Destination
