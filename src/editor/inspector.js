@@ -1785,7 +1785,7 @@ export class EditorInspector {
             muted: false,       // Phase 4: hide this layer unless another layer is solo'd
             name: file.name.replace(/\.[^.]+$/, '') || 'Layer',  // Phase 4: user-editable display name
             isGif: resized.isGif || false,
-            gifSpeed: 1.2,      // playback multiplier: 2 = twice as fast, 0.5 = half speed
+            gifSpeed: 2.0,      // playback multiplier: 2 = twice as fast, 0.5 = half speed
             reactSource: 'bass',   // Phase 5: 'bass' | 'mid' | 'treb' | 'vol'
             reactCurve: 'linear',  // Phase 5: 'linear' | 'squared' | 'cubed' | 'threshold'
             orbitMode: 'circle',   // Phase 6: 'circle' | 'lissajous'

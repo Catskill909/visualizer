@@ -801,25 +801,25 @@ export class VisualizerEngine {
         imgTextures.samplers[name] = texture;
         
         gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         
         // Initial upload
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, frames[0]);
         
-        // Register animation
-        this._gifAnimations.set(name, { 
-          frames, 
-          delays, 
-          gl, 
-          texture, 
-          frameIndex: 0, 
-          nextFrameAt: performance.now(), 
-          width, 
-          height, 
-          speed 
+        // Register animation — start deadline AFTER frame 0's delay so frame 0 shows first
+        this._gifAnimations.set(name, {
+          frames,
+          delays,
+          gl,
+          texture,
+          frameIndex: 0,
+          nextFrameAt: performance.now() + delays[0],
+          width,
+          height,
+          speed
         });
         
         console.log('[DiscoCast Visualizer] Optimized GIF loaded:', name, `${width}×${height}`, frames.length + ' frames');
@@ -895,7 +895,8 @@ export class VisualizerEngine {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
-      this._gifAnimations.set(name, { frames, delays, gl, texture, frameIndex: 0, nextFrameAt: 0, width: W, height: H, speed });
+      // Start deadline AFTER frame 0's delay so frame 0 shows first
+      this._gifAnimations.set(name, { frames, delays, gl, texture, frameIndex: 0, nextFrameAt: performance.now() + delays[0], width: W, height: H, speed });
     } catch (e) {
       console.warn('[DiscoCast Visualizer] _loadGifTexture failed for', name, e.message);
     }
@@ -912,22 +913,30 @@ export class VisualizerEngine {
     for (const [, anim] of this._gifAnimations) {
       if (now < anim.nextFrameAt) continue;
       anim.frameIndex = (anim.frameIndex + 1) % anim.frames.length;
-      anim.nextFrameAt = now + anim.delays[anim.frameIndex] / (anim.speed || 1.0);
+      const frameDelay = anim.delays[anim.frameIndex] / (anim.speed || 1.0);
+      // Deadline-based: advance from the previous deadline to prevent accumulated drift.
+      // If we're more than one frame-period behind (e.g. tab was backgrounded), snap to
+      // now so we don't rapid-fire frames trying to catch up.
+      anim.nextFrameAt += frameDelay;
+      if (anim.nextFrameAt < now) anim.nextFrameAt = now + frameDelay;
       const { gl, texture, width, height } = anim;
       // Save pixel-store state — Butterchurn may have dirtied these between frames,
       // causing colour cycling when speed > 1×. Restore after upload.
-      const prevFlip   = gl.getParameter(gl.UNPACK_FLIP_Y_WEBGL);
-      const prevPremul = gl.getParameter(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL);
-      const prevAlign  = gl.getParameter(gl.UNPACK_ALIGNMENT);
+      const prevFlip       = gl.getParameter(gl.UNPACK_FLIP_Y_WEBGL);
+      const prevPremul     = gl.getParameter(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL);
+      const prevAlign      = gl.getParameter(gl.UNPACK_ALIGNMENT);
+      const prevColorspace = gl.getParameter(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL);
       gl.bindTexture(gl.TEXTURE_2D, texture);
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
       gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
       gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+      gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE);
       // texSubImage2D writes into the existing GPU allocation — no realloc, much faster than texImage2D
       gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, anim.frames[anim.frameIndex]);
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, prevFlip);
       gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, prevPremul);
       gl.pixelStorei(gl.UNPACK_ALIGNMENT, prevAlign);
+      gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, prevColorspace);
     }
   }
 

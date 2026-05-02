@@ -8,6 +8,7 @@ import { initAuthGate } from './auth-gate.js';
 
 // Wait for DOM
 document.addEventListener('DOMContentLoaded', async () => {
+  if (window.__TAURI__) window.__TAURI__.window.getCurrent().show();
   await initAuthGate();
   const canvas = document.getElementById('visualizer-canvas');
 

@@ -118,12 +118,11 @@ export async function processGifFrames(gifData, options = {}) {
         
         // Keep every Nth frame (frame 0 always kept)
         if (i % keepEveryN === 0) {
-            // Get original delay and speed up moderately
-            // GIFs with fewer frames need faster playback to look smooth
-            // Divide by keepEveryN/3 gives moderate acceleration (not hyper-fast)
-            // Example: 100ms delay, keepEveryN=10 → 100 / (10/3) = 30ms
+            // Scale delay down to compensate for reduced frame count.
+            // keepEveryN/2 strikes a balance: keepEveryN=4 → 2× faster, keepEveryN=6 → 3× faster.
+            // Floor at 1 preserves native speed when keepEveryN=1 or 2.
             const originalDelay = Math.max((f.delay || 10) * 10, 20);
-            const speedupFactor = Math.max(keepEveryN / 3, 1); // At least 1×, moderate speedup
+            const speedupFactor = Math.max(keepEveryN / 2, 1);
             const adjustedDelay = Math.max(originalDelay / speedupFactor, 10); // Floor at 10ms
             
             // Resize if needed
