@@ -1947,6 +1947,12 @@ export class EditorInspector {
                 value="${Math.sqrt((entry.size - 0.05) / 1.45).toFixed(3)}" style="--pct:${(Math.sqrt((entry.size - 0.05) / 1.45) * 100).toFixed(1)}%">
               <span class="lsv layer-size-val">${entry.size.toFixed(2)}</span>
             </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="0 = square · 0.5 = circle">Radius</span>
+              <input type="range" class="slider layer-radius-sl" min="0" max="0.5" step="0.01"
+                value="${(entry.radius || 0).toFixed(2)}" style="--pct:${pct(entry.radius || 0, 0, 0.5)}">
+              <span class="lsv layer-radius-val">${(entry.radius || 0).toFixed(2)}</span>
+            </div>
             <div class="layer-slider-row layer-spacing-row"${entry.tile ? '' : ' style="display:none"'}>
               <span class="layer-ctrl-label">Spacing</span>
               <input type="range" class="slider layer-spacing-sl" min="0" max="0.8" step="0.01"
@@ -2392,7 +2398,7 @@ export class EditorInspector {
         const sliderMins = [0, 0, 0, -2, 0, 0, 0, 0, 0, 0];
         const sliderMaxes = [1, 0.8, 0.45, 2, 1, 0.4, 4, 0.4, 2, 2];
 
-        card.querySelectorAll('.layer-slider-row input[type=range]:not(.layer-bounce-sl):not(.layer-size-sl):not(.layer-liss-sl):not(.layer-strobe-thr-sl):not(.layer-pan-x-sl):not(.layer-pan-y-sl):not(.layer-pan-range-sl):not(.layer-beat-fade-sl):not(.layer-tile-sx-sl):not(.layer-tile-sy-sl):not(.layer-shake-sl):not(.layer-persp-x-sl):not(.layer-persp-y-sl)').forEach((sl, i) => {
+        card.querySelectorAll('.layer-slider-row input[type=range]:not(.layer-bounce-sl):not(.layer-size-sl):not(.layer-liss-sl):not(.layer-strobe-thr-sl):not(.layer-pan-x-sl):not(.layer-pan-y-sl):not(.layer-pan-range-sl):not(.layer-beat-fade-sl):not(.layer-tile-sx-sl):not(.layer-tile-sy-sl):not(.layer-shake-sl):not(.layer-persp-x-sl):not(.layer-persp-y-sl):not(.layer-radius-sl)').forEach((sl, i) => {
             const valEl = sl.nextElementSibling;
             sl.addEventListener('input', () => {
                 const v = parseFloat(sl.value);
@@ -2552,6 +2558,15 @@ export class EditorInspector {
             entry.perspY = parseFloat(perspYSl.value);
             perspYVal.textContent = entry.perspY.toFixed(2);
             perspYSl.style.setProperty('--pct', `${pct(entry.perspY, -1, 1)}`);
+            refresh();
+        });
+
+        const radiusSl  = card.querySelector('.layer-radius-sl');
+        const radiusVal = card.querySelector('.layer-radius-val');
+        radiusSl.addEventListener('input', () => {
+            entry.radius = parseFloat(radiusSl.value);
+            radiusVal.textContent = entry.radius.toFixed(2);
+            radiusSl.style.setProperty('--pct', `${pct(entry.radius, 0, 0.5)}`);
             refresh();
         });
 
@@ -3217,6 +3232,8 @@ export class EditorInspector {
         const perspX = (img.perspX || 0).toFixed(4);
         const perspY = (img.perspY || 0).toFixed(4);
         const hasPersp = Math.abs(img.perspX || 0) > 0.001 || Math.abs(img.perspY || 0) > 0.001;
+        const rad = (img.radius || 0).toFixed(4);
+        const hasRadius = parseFloat(rad) > 0.001;
         const hasEdge = !!img.edgeSobel;
         // Pixel step for Sobel: 1/texW × 1/texH, falling back to 1/512
         const edgeStepX = img.texW ? (1.0 / img.texW).toFixed(6) : '0.001953';
@@ -3470,6 +3487,15 @@ export class EditorInspector {
             return m;
         };
 
+        const applyRadius = (varName, maskVar) => {
+            if (!hasRadius) return '';
+            return (
+                `    { vec2 _rq = abs(${varName} - 0.5) - (0.5 - ${rad});\n` +
+                `      float _rd = length(max(_rq, 0.0)) + min(max(_rq.x, _rq.y), 0.0) - ${rad};\n` +
+                `      ${maskVar} *= 1.0 - smoothstep(-0.004, 0.004, _rd); }\n`
+            );
+        };
+
         let pipeline = '';
         let sampleLine = '';
 
@@ -3490,10 +3516,12 @@ export class EditorInspector {
                 aspectPreScale('_uA') +
                 applyTileUV('_uA', `${sizeBase} * _tz1`, '_gapMaskA', '_dxA', '_dyA') +
                 applyMirrorUV('_uA') +
+                applyRadius('_uA', '_gapMaskA') +
                 `    vec2 _uB = _u;\n` +
                 aspectPreScale('_uB') +
                 applyTileUV('_uB', `${sizeBase} * _tz2`, '_gapMaskB', '_dxB', '_dyB') +
-                applyMirrorUV('_uB');
+                applyMirrorUV('_uB') +
+                applyRadius('_uB', '_gapMaskB');
             sampleLine =
                 `    vec4 _tA = textureGrad(${tex}, _uA, _dxA, _dyA);\n` +
                 `    vec4 _tB = textureGrad(${tex}, _uB, _dxB, _dyB);\n` +
@@ -3507,7 +3535,8 @@ export class EditorInspector {
                 `    float _gapMask = 1.0;\n` +
                 aspectPreScale('_u') +
                 applyTileUV('_u', sizeBase, '_gapMask', '_dx', '_dy') +
-                applyMirrorUV('_u');
+                applyMirrorUV('_u') +
+                applyRadius('_u', '_gapMask');
             sampleLine = `    vec4 _t = textureGrad(${tex}, _u, _dx, _dy);\n`;
         } else {
             // Non-tiled: use same aspectPreScale as tiled, but show single instance (no fract wrapping)
@@ -3524,8 +3553,9 @@ export class EditorInspector {
                 applySkew('_u') +
                 applyPersp('_u') +
                 `    vec2 _uInstanced = _u + 0.5;\n` +  // Center the UV (now range depends on aspect)
-                `    float _inBounds = step(0.0, _uInstanced.x) * step(_uInstanced.x, 1.0) * step(0.0, _uInstanced.y) * step(_uInstanced.y, 1.0);\n` +
-                `    _gapMask = _inBounds;\n` +  // Mask out-of-bounds pixels
+                `    { vec2 _rq = abs(_uInstanced - 0.5) - (0.5 - ${rad});\n` +
+                `      float _rd = length(max(_rq, 0.0)) + min(max(_rq.x, _rq.y), 0.0) - ${rad};\n` +
+                `      _gapMask = 1.0 - smoothstep(-0.004, 0.004, _rd); }\n` +
                 `    _u = clamp(_uInstanced, 0.0, 1.0);\n` +  // Clamp for texture sampling
                 applyMirrorUV('_u');
             sampleLine = `    vec4 _t = texture(${tex}, _u);\n`;
