@@ -13,6 +13,7 @@ import {
   CUSTOM_PREFIX,
 } from './customPresets.js';
 import { showImportResult } from './importResultModal.js';
+import { pickAndConnect } from './devicePicker.js';
 
 export class ControlPanel {
   constructor(engine) {
@@ -760,6 +761,7 @@ export class ControlPanel {
       this.showToast('🎤 Switched to microphone');
       await this.populateDeviceList();
     } catch (err) {
+      console.error('Mic error:', err);
       this.showPermissionError();
     }
   }
@@ -823,7 +825,7 @@ export class ControlPanel {
     if (type !== 'mic') this.els.deviceSelect.classList.add('hidden');
   }
 
-  async populateDeviceList() {
+  async populateDeviceList(selectedDeviceId = null) {
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
       const audioInputs = devices.filter(device => device.kind === 'audioinput');
@@ -834,6 +836,9 @@ export class ControlPanel {
           const option = document.createElement('option');
           option.value = device.deviceId;
           option.text = device.label || `Microphone ${this.els.deviceSelect.length + 1}`;
+          if (selectedDeviceId && device.deviceId === selectedDeviceId) {
+            option.selected = true;
+          }
           this.els.deviceSelect.appendChild(option);
         });
         this.els.deviceSelect.classList.remove('hidden');

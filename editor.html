@@ -307,6 +307,24 @@
             </a>
             <span class="editor-topbar-title">Preset Studio</span>
             <span class="editor-topbar-spacer"></span>
+
+            <!-- Live input device picker — shown only when mic is active -->
+            <div id="topbar-mic-widget" class="tmw" hidden>
+                <button class="tmw-trigger" type="button" aria-haspopup="listbox" aria-label="Audio input device">
+                    <svg class="tmw-mic-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                        <line x1="12" y1="19" x2="12" y2="23"/>
+                        <line x1="8" y1="23" x2="16" y2="23"/>
+                    </svg>
+                    <span class="tmw-label">Live Input</span>
+                    <svg class="tmw-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                        <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                </button>
+                <div class="tmw-panel" hidden role="listbox"></div>
+            </div>
+
             <button id="help-toggle" class="focus-toggle" type="button" aria-label="Open help guide" data-tooltip="User Guide">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <circle cx="12" cy="12" r="10"/>

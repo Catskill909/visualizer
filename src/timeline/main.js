@@ -6,6 +6,7 @@
 import { VisualizerEngine } from '../visualizer.js';
 import { TimelineEditor }   from './timelineEditor.js';
 import { initAuthGate }     from '../auth-gate.js';
+import { pickAndConnect } from '../devicePicker.js';
 
 initAuthGate();
 
@@ -107,6 +108,67 @@ function mountMiniPlayer(audio, filename) {
     updateUI();
 }
 
+// ─── Topbar mic input widget ──────────────────────────────────────────────────
+
+const micWidget        = document.getElementById('topbar-mic-widget');
+const micWidgetLabel   = micWidget.querySelector('.tmw-label');
+const micWidgetPanel   = micWidget.querySelector('.tmw-panel');
+const micWidgetTrigger = micWidget.querySelector('.tmw-trigger');
+
+function _tmwClose() {
+    micWidgetPanel.hidden = true;
+    micWidgetTrigger.classList.remove('is-open');
+}
+function _tmwOpen() {
+    micWidgetPanel.hidden = false;
+    micWidgetTrigger.classList.add('is-open');
+}
+
+micWidgetTrigger.addEventListener('click', e => {
+    e.stopPropagation();
+    micWidgetPanel.hidden ? _tmwOpen() : _tmwClose();
+});
+document.addEventListener('pointerdown', e => {
+    if (!micWidgetPanel.hidden && !micWidget.contains(e.target)) _tmwClose();
+});
+
+async function mountMicWidget(deviceId, label) {
+    micWidgetLabel.textContent = label || 'Live Input';
+    micWidget.hidden = false;
+    miniPlayer.hidden = true; // mic mode never needs the file transport bar
+
+    const devices     = await navigator.mediaDevices.enumerateDevices();
+    const audioInputs = devices.filter(d => d.kind === 'audioinput');
+
+    micWidgetPanel.innerHTML = '';
+    audioInputs.forEach((device, i) => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'tmw-item' + (device.deviceId === deviceId ? ' is-active' : '');
+        item.innerHTML = `
+            <svg class="tmw-check" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.5" width="13" height="13" aria-hidden="true">
+                <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            <span>${device.label || `Input ${i + 1}`}</span>
+        `;
+        item.addEventListener('click', async () => {
+            try {
+                await engine.connectMicrophone(device.deviceId);
+                const name = device.label || `Input ${i + 1}`;
+                micWidgetLabel.textContent = name;
+                micWidgetPanel.querySelectorAll('.tmw-item').forEach(el => el.classList.remove('is-active'));
+                item.classList.add('is-active');
+                _tmwClose();
+                editor?._toast('Switched to: ' + name);
+            } catch (err) {
+                console.error('[Timeline] Mic switch failed:', err);
+            }
+        });
+        micWidgetPanel.appendChild(item);
+    });
+}
+
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
 async function boot(connectAudioFn) {
@@ -205,7 +267,10 @@ function isInputFocused() {
 
 btnMic.addEventListener('click', () => {
     boot(async eng => {
-        await eng.connectMicrophone();
+        const result = await pickAndConnect(eng);
+        if (result.connected) {
+            await mountMicWidget(result.deviceId, result.label);
+        }
     });
 });
 

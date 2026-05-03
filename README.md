@@ -10,7 +10,7 @@ A modern browser-based MilkDrop music visualizer powered by [Butterchurn](https:
 - **Kick-Lock Mode** — isolated frequency analysis (low-pass 150Hz) to lock visuals exclusively to the kick drum and bassline
 - **Live Performance "Hype" Keys** — instant keyboard triggers for strobe, blackout, and color inversion
 - **Dual audio input** — live audio capture or local audio file playback (MP3, WAV, FLAC)
-- **Live device selection** — native support for selecting USB DJ controllers, external sound cards, and specific microphones
+- **Live device selection** — on every launch, a custom device picker modal enumerates all audio inputs and forces the user to choose (bypasses the browser's tendency to silently reuse the last-granted device); native support for USB DJ controllers, external sound cards, and specific microphones; single-device setups skip the picker automatically
 - **Preset browser** — searchable drawer over the full 1,144-preset library with favorites/tabs, heart + hide icons per row, and instant left-anchored tooltips
 - **Favorites-only cycling** — restrict auto-cycle to your hearted presets for curated sets
 - **Hide unwanted presets** — eye-slash icon or `X` keyboard shortcut removes a preset from the All tab, random, and auto-cycle; hidden list persists in localStorage and survives reloads. A *Show hidden* toggle in the drawer exposes them for unhiding (individually or via a clean modal-confirmed "Unhide all"). Hide beats favorite in cycle — a hidden preset never auto-plays, but the Favorites tab still shows it so nothing is ever lost.
@@ -489,7 +489,7 @@ Older research docs kept for context. Not actively maintained:
 |-----|---------------|
 | [`docs/future-dev.md`](docs/future-dev.md) | Early brainstorm — Silent Disco + live DJ enhancement ideas. Some shipped, some superseded. |
 | [`docs/audio-triggering.md`](docs/audio-triggering.md) | Winamp vs modern DJ audio triggering research. Informed the AGC + hype key implementation. |
-| [`docs/user-live.md`](docs/user-live.md) | Live audio device selection research — USB controllers, audio interfaces, mic selection. |
+| [`docs/user-live.md`](docs/user-live.md) | Live audio device selection — device picker modal implementation, flow diagram, design decisions, files changed. Archived original brainstorm (native API vs packages). |
 | [`docs/favorites.md`](docs/favorites.md) | Favorites feature brainstorm — core shipped, favorites-only cycling shipped. |
 | [`docs/more-presets.md`](docs/more-presets.md) | Baron pack + multi-pack preset loading research. Phase 1 shipped (1,144 presets). |
 | [`docs/controls-styling.md`](docs/controls-styling.md) | Museum dark aesthetic specification for control bar. |

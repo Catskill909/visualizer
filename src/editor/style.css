@@ -1296,6 +1296,74 @@ html, body {
   height: 3px;
 }
 
+/* ── Topbar mic input widget (tmw) ──────────────────────────────────────── */
+.tmw { position: relative; }
+
+.tmw-trigger {
+  display: flex; align-items: center; gap: 6px;
+  height: 28px; padding: 0 10px 0 9px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 14px;
+  color: rgba(255,255,255,0.65);
+  font-family: var(--font);
+  font-size: 12px; font-weight: 500;
+  cursor: pointer; white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.tmw-trigger:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.18);
+  color: rgba(255,255,255,0.9);
+}
+.tmw-trigger.is-open {
+  background: rgba(138,100,255,0.14);
+  border-color: rgba(138,100,255,0.45);
+  color: #c4aaff;
+}
+.tmw-mic-icon { color: #a78bfa; flex-shrink: 0; }
+.tmw-label { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+.tmw-chevron { flex-shrink: 0; opacity: 0.5; transition: transform 0.18s; }
+.tmw-trigger.is-open .tmw-chevron { transform: rotate(180deg); }
+
+.tmw-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 220px;
+  background: rgba(14,14,20,0.97);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
+  padding: 5px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04);
+  z-index: 9999;
+  animation: tmw-in 0.14s ease;
+}
+.tmw-panel[hidden] { display: none; }
+
+@keyframes tmw-in {
+  from { opacity: 0; transform: translateY(-5px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+
+.tmw-item {
+  display: flex; align-items: center; gap: 9px;
+  width: 100%; padding: 8px 10px;
+  border-radius: 8px;
+  background: none; border: none;
+  color: rgba(255,255,255,0.6);
+  font-family: var(--font);
+  font-size: 12.5px; font-weight: 400;
+  text-align: left; cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+.tmw-item:hover { background: rgba(255,255,255,0.07); color: #fff; }
+.tmw-item.is-active { color: #fff; font-weight: 500; }
+.tmw-check { flex-shrink: 0; opacity: 0; color: #a78bfa; }
+.tmw-item.is-active .tmw-check { opacity: 1; }
+
 /* ══════════════════════════════════════════════════════════════════════
    IMPORT RESULT MODAL (shared across all pages via importResultModal.js)
    ══════════════════════════════════════════════════════════════════════ */

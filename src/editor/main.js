@@ -9,6 +9,7 @@ import { EditorInspector, showToast, showOnboarding } from './inspector.js';
 import { PresetLibrary } from './presetLibrary.js';
 import { getCustomPreset, loadAllCustomPresets, CUSTOM_PREFIX } from '../customPresets.js';
 import { initAuthGate } from '../auth-gate.js';
+import { pickAndConnect } from '../devicePicker.js';
 
 initAuthGate();
 
@@ -243,6 +244,67 @@ function mountMiniPlayer(audio, filename) {
     }, { signal });
 
     updateUI();
+}
+
+// ─── Topbar mic input widget ──────────────────────────────────────────────────
+
+const micWidget        = document.getElementById('topbar-mic-widget');
+const micWidgetLabel   = micWidget.querySelector('.tmw-label');
+const micWidgetPanel   = micWidget.querySelector('.tmw-panel');
+const micWidgetTrigger = micWidget.querySelector('.tmw-trigger');
+
+function _tmwClose() {
+    micWidgetPanel.hidden = true;
+    micWidgetTrigger.classList.remove('is-open');
+}
+function _tmwOpen() {
+    micWidgetPanel.hidden = false;
+    micWidgetTrigger.classList.add('is-open');
+}
+
+micWidgetTrigger.addEventListener('click', e => {
+    e.stopPropagation();
+    micWidgetPanel.hidden ? _tmwOpen() : _tmwClose();
+});
+document.addEventListener('pointerdown', e => {
+    if (!micWidgetPanel.hidden && !micWidget.contains(e.target)) _tmwClose();
+});
+
+async function mountMicWidget(deviceId, label) {
+    micWidgetLabel.textContent = label || 'Live Input';
+    micWidget.hidden = false;
+    miniPlayer.hidden = true;
+
+    const devices     = await navigator.mediaDevices.enumerateDevices();
+    const audioInputs = devices.filter(d => d.kind === 'audioinput');
+
+    micWidgetPanel.innerHTML = '';
+    audioInputs.forEach((device, i) => {
+        const name = device.label || `Input ${i + 1}`;
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'tmw-item' + (device.deviceId === deviceId ? ' is-active' : '');
+        item.innerHTML = `
+            <svg class="tmw-check" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.5" width="13" height="13" aria-hidden="true">
+                <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            <span>${name}</span>
+        `;
+        item.addEventListener('click', async () => {
+            try {
+                await engine.connectMicrophone(device.deviceId);
+                micWidgetLabel.textContent = name;
+                micWidgetPanel.querySelectorAll('.tmw-item').forEach(el => el.classList.remove('is-active'));
+                item.classList.add('is-active');
+                _tmwClose();
+                showToast('Switched to: ' + name);
+            } catch (err) {
+                console.error('[Studio] Mic switch failed:', err);
+            }
+        });
+        micWidgetPanel.appendChild(item);
+    });
 }
 
 // ─── Remix Picker ─────────────────────────────────────────────────────────────
@@ -532,8 +594,11 @@ function _rewireSaveModal() {
 
 btnMic.addEventListener('click', () => {
     boot(async eng => {
-        await eng.connectMicrophone();
-        showToast('Microphone connected');
+        const result = await pickAndConnect(eng);
+        if (result.connected) {
+            showToast('Microphone connected: ' + result.label);
+            await mountMicWidget(result.deviceId, result.label);
+        }
     });
 });
 
