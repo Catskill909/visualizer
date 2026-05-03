@@ -957,6 +957,7 @@ export class EditorInspector {
                     this._preSnap();
                     this.currentState.sceneMirror = btn.dataset.smirror;
                     this._postSnap();
+                    this._buildCompShader();
                     this._applyToEngine();
                     smSeg.querySelectorAll('.seg').forEach(b => b.classList.toggle('active', b === btn));
                 });

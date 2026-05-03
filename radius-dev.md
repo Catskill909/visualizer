@@ -1,4 +1,4 @@
-# Radius Slider — Development Plan
+# Radius Slider — Development Plan (SHIPPED 2026-05-03 ✓)
 
 ## What We're Building
 
