@@ -56,7 +56,7 @@
       "minWidth": 800,
       "minHeight": 600,
       "center": true,
-      "visible": false
+      "visible": true
     }]
   }
 }

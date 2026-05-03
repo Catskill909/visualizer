@@ -250,6 +250,8 @@ A standalone, signed, and notarized macOS app — fully working including mic an
 
 > ⚠️ **Always use `./build-and-sign.sh` — never run `npm run tauri-build` directly.**
 > The script is the true build process. Running Tauri directly produces an unsigned, unnotarized DMG with no Applications folder shortcut that will be blocked by Gatekeeper.
+>
+> **Claude Code guardrail:** Run `./build-and-sign.sh` with no flags and NOT in background mode. Output must stream live. Never add `2>&1`. Never use `run_in_background`. If it appears to hang during notarization — it isn't; just wait.
 
 ```bash
 ./build-and-sign.sh
