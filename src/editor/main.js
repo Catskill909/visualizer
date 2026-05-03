@@ -5,7 +5,7 @@
  */
 
 import { VisualizerEngine } from '../visualizer.js';
-import { EditorInspector, showToast, showOnboarding } from './inspector.js';
+import { EditorInspector, showToast } from './inspector.js';
 import { PresetLibrary } from './presetLibrary.js';
 import { getCustomPreset, loadAllCustomPresets, CUSTOM_PREFIX } from '../customPresets.js';
 import { initAuthGate } from '../auth-gate.js';
@@ -525,9 +525,6 @@ async function boot(connectAudioFn) {
 
     // Clicking the canvas restores the panel when in focus mode
     canvasEl.addEventListener('click', () => { if (focusMode) toggleFocusMode(); });
-
-    // Show onboarding tips modal (skipped if user clicked "Never show again")
-    showOnboarding();
 
     // URL params — must run after engine + inspector are fully initialized.
     const _params = new URLSearchParams(window.location.search);
