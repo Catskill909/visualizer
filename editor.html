@@ -203,6 +203,7 @@
             </ul>
           </section>
 
+
           <section class="hm-section" id="hm-tunnel">
             <h2>Tunnel &amp; Depth Stack</h2>
             <ul class="hm-list">
@@ -382,8 +383,6 @@
                         aria-controls="tab-motion">Motion</button>
                     <button class="tab" data-tab="wave" role="tab" aria-selected="false"
                         aria-controls="tab-wave">Wave</button>
-                    <button class="tab" data-tab="feel" role="tab" aria-selected="false"
-                        aria-controls="tab-feel">Feel</button>
                 </nav>
 
                 <!-- ─── PALETTE TAB ─── -->
@@ -515,6 +514,17 @@
                             </svg>
                             Randomize motion
                         </button>
+
+                        <p class="section-label" style="margin-top:16px">Reactivity</p>
+                        <p class="section-note">Energy and Bass Sensitivity are session-only. Beat Sensitivity is saved in preset.</p>
+                        <div id="motion-feel-sliders"></div>
+                        <div class="toggle-row">
+                            <label class="toggle-label" for="toggle-agc">Auto gain control</label>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="toggle-agc" role="switch" checked />
+                                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                            </label>
+                        </div>
                     </div>
                 </div>
 
@@ -542,6 +552,13 @@
                                 <span class="toggle-track"><span class="toggle-thumb"></span></span>
                             </label>
                         </div>
+                        <div class="toggle-row">
+                            <label class="toggle-label" for="toggle-brighten">Brighten wave</label>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="toggle-brighten" role="switch" />
+                                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                            </label>
+                        </div>
 
                         <button class="ghost-btn" id="btn-randomize-wave">
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -558,22 +575,6 @@
                     </div>
                 </div>
 
-                <!-- ─── FEEL TAB ─── -->
-                <div id="tab-feel" class="tab-panel" role="tabpanel" hidden>
-                    <div class="tab-scroll">
-                        <p class="section-label">Audio Reactivity</p>
-                        <p class="section-note">Controls how sensitive the visualizer is to your audio. Not saved in the
-                            preset.</p>
-                        <div id="feel-sliders"></div>
-                        <div class="toggle-row">
-                            <label class="toggle-label" for="toggle-agc">Auto gain control</label>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="toggle-agc" role="switch" checked />
-                                <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
 
                 <!-- ─── IMAGE TAB ─── -->
                 <div id="tab-image" class="tab-panel" role="tabpanel" hidden>
@@ -629,8 +630,9 @@
                     </div>
                 </div>
 
-                <!-- Footer: new + save + reset -->
+                <!-- Footer: remix + new + save + reset -->
                 <footer class="panel-footer">
+                    <button id="btn-browse-library" class="reset-btn" type="button" data-tooltip="Browse all 1,144 library presets to remix">Remix…</button>
                     <button id="btn-new-preset-footer" class="reset-btn" type="button" data-tooltip="Start a fresh preset">+ New</button>
                     <button id="btn-save" class="save-btn" type="button">Save preset</button>
                     <button id="btn-reset" class="reset-btn" type="button">Reset</button>
@@ -670,6 +672,29 @@
                 </div><!-- /panel-library-content -->
 
             </aside>
+        </div>
+
+        <!-- ════════════════════ REMIX PICKER MODAL ════════════════════ -->
+        <div id="remix-picker-modal" class="save-modal" hidden role="dialog" aria-modal="true"
+            aria-labelledby="remix-picker-title">
+            <div class="save-modal-card remix-picker-card">
+                <div class="remix-picker-header">
+                    <div>
+                        <h2 id="remix-picker-title" class="save-modal-title" style="margin-bottom:2px">Browse Library</h2>
+                        <p class="remix-picker-hint">Pick any of the 1,144 library presets to remix.</p>
+                    </div>
+                    <button id="remix-picker-close" class="remix-picker-close" type="button" aria-label="Close">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+                <div style="padding:0 0 8px">
+                    <input type="text" id="remix-picker-search" class="save-modal-input"
+                        placeholder="Search presets…" autocomplete="off" spellcheck="false"
+                        style="margin-bottom:0" />
+                </div>
+                <div class="remix-picker-count" id="remix-picker-count"></div>
+                <ul class="remix-picker-list" id="remix-picker-list" role="listbox" aria-label="Library presets"></ul>
+            </div>
         </div>
 
         <!-- ════════════════════ SAVE MODAL ════════════════════ -->

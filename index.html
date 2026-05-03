@@ -112,6 +112,11 @@
             <path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46A11.804 11.804 0 0 0 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/>
           </svg>
         </button>
+        <button id="btn-remix-preset" class="ctrl-btn remix-btn" data-tooltip="Remix in Studio" type="button">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+          </svg>
+        </button>
         <span class="preset-label" id="preset-name">Loading preset...</span>
       </div>
 
@@ -835,24 +840,36 @@
           <!-- Preset Studio -->
           <section class="welcome-section" data-section="studio" role="tabpanel">
             <h4>Preset Studio</h4>
-            <p>A standalone creative editor for building your own audio-reactive visuals. Launch it from the start
-              screen — it opens on its own page with a live canvas on the left and an inspector panel on the right.
-              Every control is live; no page reload.</p>
-            <p class="welcome-note">📋 <strong>Note:</strong> This section is growing fast — many new controls have been
-              added and the help content hasn't caught up yet. A structured, searchable help UI is planned. For now,
-              controls are documented in the order they were shipped.</p>
+            <p>The Studio is its own separate page — not part of the main visualizer. Click it from the start screen
+              and it opens with a live canvas on the left and a tabbed control panel on the right. Everything is
+              live — drag a slider and the visual updates instantly.</p>
+            <div class="welcome-note">
+              <strong>Heads up: not every slider does something on every preset.</strong>
+              <p style="margin:6px 0 0">MilkDrop presets are little self-contained programs. Each one has its own
+                internal logic that can take over zoom, rotation, color — basically anything — on every frame. So when
+                you move a slider and nothing happens, that's not broken. That preset just isn't using that parameter.</p>
+              <p style="margin:6px 0 0">The sliders are really <em>starting values</em>. Some presets read them and
+                run with them. Others override them completely with their own code. You find out which is which by
+                trying. That's the whole game — grab a preset you like, start turning knobs, and see what responds.</p>
+              <p style="margin:6px 0 0"><strong>Tip:</strong> don't start from scratch. Find a preset in the browser
+                that's already close to what you want, load it in the Studio, and remix it from there.</p>
+            </div>
 
             <div class="welcome-feature">
-              <div class="welcome-feature-title">Five tabs</div>
+              <div class="welcome-feature-title">The four tabs — what each one does</div>
               <ul class="welcome-list">
-                <li><strong>Palette</strong> — base variations (Color, Solid Color, Pulse/Breath, Color Shift, Clear,
-                  Drift, and more), 12 one-click color palettes, three independent color swatches (Wave / Glow /
-                  Accent).</li>
-                <li><strong>Motion</strong> — Zoom, Rotation, Warp amount &amp; speed, Echo controls.</li>
-                <li><strong>Wave</strong> — 8 wave shapes, size, opacity, thickness, dots, additive blend.</li>
-                <li><strong>Feel</strong> — Decay (trail length), Gamma (brightness), warp scale/speed.</li>
-                <li><strong>Images</strong> — up to 5 animated image or GIF layers with full reactivity and mirror
-                  controls (see below).</li>
+                <li><strong>Palette</strong> — pick a starting look: solid color, pulse/breath, color shift, slow drift,
+                  and more. 12 one-click palettes, plus three independent color swatches (Wave / Glow / Accent). Color
+                  is the one thing that works on basically every preset.</li>
+                <li><strong>Motion</strong> — zoom, rotation, warp, echo, and beat sensitivity. These set the motion
+                  parameters for the preset. Some presets respond directly; others have equations that take over and
+                  you'll see little or no effect. Try it and see.</li>
+                <li><strong>Wave</strong> — controls the global audio waveform that reacts to your music. Every preset
+                  has one, but some presets hide it by default (opacity at zero). If you can't see a waveform, try
+                  bumping the opacity up.</li>
+                <li><strong>Images</strong> — add up to 5 image or GIF layers on top of whatever preset is running.
+                  These always work, on every preset, no exceptions. Full animation, effects, and audio reactivity
+                  per layer.</li>
               </ul>
             </div>
 
@@ -1329,6 +1346,7 @@
         </div>
         <div class="help-nav-group">
           <div class="help-nav-label">Preset Studio</div>
+          <a class="help-nav-link" href="#hm-studio">How it works</a>
           <a class="help-nav-link" href="#hm-image-layers">Image Layers</a>
           <a class="help-nav-link" href="#hm-animated-gifs">Animated GIFs</a>
           <a class="help-nav-link" href="#hm-transform">Transform</a>
@@ -1381,6 +1399,25 @@
               <tr><td><kbd>Esc</kbd></td><td>Close drawers &amp; menus</td></tr>
             </tbody>
           </table>
+        </section>
+
+        <section class="hm-section" id="hm-studio">
+          <h2>Preset Studio — How it works</h2>
+          <p>The Studio is its own separate page, not part of the main visualizer. Hit <kbd>E</kbd> or click it from the start screen. You get a live canvas on the left and a tabbed control panel on the right. Every change is instant — no save, no reload.</p>
+
+          <div class="hm-tip"><strong>Not every slider does something on every preset — and that's normal.</strong><br>
+            MilkDrop presets are self-contained programs. Each one has its own internal equations that can take over zoom, rotation, color, or geometry on every frame. When you move a slider and nothing happens, that preset just isn't reading that parameter. The sliders are starting values — some presets use them, others override them completely with their own code. The only way to know is to try. That's the whole point of remixing.
+          </div>
+
+          <p><strong>Best workflow:</strong> find a preset in the browser that's already close to what you want, open it in the Studio with the pencil icon, and tweak from there. Starting from a blank slate is harder.</p>
+
+          <h3 style="margin:18px 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-2,#aaa)">The four tabs</h3>
+          <ul class="hm-list">
+            <li><strong>Palette</strong> — pick a base look: solid color, pulse, drift, color shift, and more. 12 one-click color palettes plus three independent color swatches. Color is the one thing that works on basically every preset.</li>
+            <li><strong>Motion</strong> — zoom, rotation, warp, echo, beat sensitivity. Some presets respond directly; others have equations that take over and you'll see little or no effect. Try it and see.</li>
+            <li><strong>Wave</strong> — the global audio waveform that reacts to your music. Every preset has one, but some hide it by default (opacity at zero). If you can't see a waveform, bump the opacity up.</li>
+            <li><strong>Images</strong> — up to 5 image or GIF layers on top of whatever preset is running. These always work, on every preset, no exceptions.</li>
+          </ul>
         </section>
 
         <section class="hm-section" id="hm-image-layers">

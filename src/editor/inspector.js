@@ -117,6 +117,7 @@ const BLANK = {
     solidReactCurve:  'linear', // 'linear' | 'squared' | 'cubed' | 'threshold'
 };
 
+
 // ─── Base Variations ─────────────────────────────────────────────────────────
 // Full starting-point snapshots. Each overrides selected BLANK baseVals.
 // `color` is used for the card's preview strip (CSS gradient).
@@ -609,6 +610,10 @@ export class EditorInspector {
         const configs = [
             { id: 'ps-gamma', label: 'Brightness', min: 0.5, max: 4.0, step: 0.05, value: BLANK.baseVals.gammaadj, key: 'gammaadj' },
             { id: 'ps-decay', label: 'Trail', min: 0.85, max: 0.999, step: 0.001, value: BLANK.baseVals.decay, decimals: 3, key: 'decay' },
+            { id: 'ps-ob-size', label: 'Outer Border Size', min: 0, max: 0.1, step: 0.001, value: BLANK.baseVals.ob_size, decimals: 3, key: 'ob_size' },
+            { id: 'ps-ob-a', label: 'Outer Border Alpha', min: 0, max: 1.0, step: 0.01, value: BLANK.baseVals.ob_a, key: 'ob_a' },
+            { id: 'ps-ib-size', label: 'Inner Border Size', min: 0, max: 0.1, step: 0.001, value: BLANK.baseVals.ib_size, decimals: 3, key: 'ib_size' },
+            { id: 'ps-ib-a', label: 'Inner Border Alpha', min: 0, max: 1.0, step: 0.01, value: BLANK.baseVals.ib_a, key: 'ib_a' },
         ];
         configs.forEach(cfg => {
             const input = makeSlider(container, cfg);
@@ -657,6 +662,7 @@ export class EditorInspector {
             swatch.style.background = native.value;
             if (hexLabel) hexLabel.textContent = native.value.toUpperCase();
             applyFn(native.value);
+            this._syncPaletteSliders(); // sync ob_a/ob_size/ib_a/ib_size if auto-set
             this._buildCompShader();
             this._applyToEngine(true);
             this._clearPaletteActive();
@@ -697,6 +703,7 @@ export class EditorInspector {
             { id: 'ms-warp', label: 'Warp', min: 0, max: 5.00, step: 0.05, value: BLANK.baseVals.warp, key: 'warp' },
             { id: 'ms-wspd', label: 'Warp Speed', min: 0.10, max: 3.00, step: 0.05, value: BLANK.baseVals.warpanimspeed, key: 'warpanimspeed' },
             { id: 'ms-ezoom', label: 'Echo Zoom', min: 1.00, max: 4.00, step: 0.05, value: BLANK.baseVals.echo_zoom, key: 'echo_zoom' },
+            { id: 'ms-wscale', label: 'Warp Scale', min: 0.01, max: 4.00, step: 0.05, value: BLANK.baseVals.warpscale, key: 'warpscale' },
         ];
         configs.forEach(cfg => {
             const input = makeSlider(container, cfg);
@@ -720,6 +727,7 @@ export class EditorInspector {
             bv.warp = Math.random() * 4.5;
             bv.warpanimspeed = 0.20 + Math.random() * 2.60;
             bv.echo_zoom = 1.00 + Math.random() * 3.00;
+            bv.warpscale = 0.2 + Math.random() * 3.8;
             this._postSnap();
             this._applyToEngine();
             this._syncMotionSliders();
@@ -734,6 +742,7 @@ export class EditorInspector {
             ['ms-warp', 'warp', 0, 5],
             ['ms-wspd', 'warpanimspeed', 0.1, 3.0],
             ['ms-ezoom', 'echo_zoom', 1.0, 4.0],
+            ['ms-wscale', 'warpscale', 0.01, 4.0],
         ];
         map.forEach(([id, key, min, max]) => {
             const input = document.getElementById(id);
@@ -777,6 +786,7 @@ export class EditorInspector {
         const configs = [
             { id: 'ws-scale', label: 'Size', min: 0.10, max: 4.0, step: 0.05, value: BLANK.baseVals.wave_scale, key: 'wave_scale' },
             { id: 'ws-opacity', label: 'Opacity', min: 0, max: 1.0, step: 0.01, value: BLANK.baseVals.wave_a, key: 'wave_a' },
+            { id: 'ws-mystery', label: 'Mystery', min: -1.0, max: 1.0, step: 0.01, value: BLANK.baseVals.wave_mystery, key: 'wave_mystery' },
         ];
         configs.forEach(cfg => {
             const input = makeSlider(container, cfg);
@@ -823,6 +833,8 @@ export class EditorInspector {
             bv.wave_thick = Math.random() > 0.65 ? 1 : 0;
             bv.wave_usedots = Math.random() > 0.80 ? 1 : 0;
             bv.additivewave = Math.random() > 0.65 ? 1 : 0;
+            bv.wave_mystery = (Math.random() * 2) - 1;
+            bv.wave_brighten = Math.random() > 0.70 ? 1 : 0;
             this._postSnap();
             this._applyToEngine();
             this._syncWaveControls();
@@ -836,7 +848,7 @@ export class EditorInspector {
             btn.classList.toggle('active', parseInt(btn.dataset.mode) === bv.wave_mode);
         });
         // Sliders
-        const map = [['ws-scale', 'wave_scale', 0.1, 4.0], ['ws-opacity', 'wave_a', 0, 1.0]];
+        const map = [['ws-scale', 'wave_scale', 0.1, 4.0], ['ws-opacity', 'wave_a', 0, 1.0], ['ws-mystery', 'wave_mystery', -1.0, 1.0]];
         map.forEach(([id, key, min, max]) => {
             const input = document.getElementById(id);
             if (!input) return;
@@ -851,12 +863,13 @@ export class EditorInspector {
         // Toggles
         this._syncToggle('toggle-dots', 'wave_usedots');
         this._syncToggle('toggle-additive', 'additivewave');
+        this._syncToggle('toggle-brighten', 'wave_brighten');
     }
 
     // ─── Feel sliders ──────────────────────────────────────────────────────────
 
     _buildFeelSliders() {
-        const container = document.getElementById('feel-sliders');
+        const container = document.getElementById('motion-feel-sliders');
         const configs = [
             { id: 'fs-energy', label: 'Energy', min: 0.1, max: 5.0, step: 0.1, value: this.engine.energyMultiplier, decimals: 1 },
             { id: 'fs-bass', label: 'Bass Sensitivity', min: 0.1, max: 5.0, step: 0.1, value: this.engine.baseSensitivity, decimals: 1 },
@@ -875,6 +888,24 @@ export class EditorInspector {
         document.getElementById('toggle-agc')?.addEventListener('change', (e) => {
             this.engine.agcEnabled = e.target.checked;
         });
+
+        // Beat sensitivity (baseVal) — saved in preset, requires undo snap
+        const b1edCfg = { id: 'fs-b1ed', label: 'Beat Sensitivity', min: 0, max: 1.0, step: 0.01, value: BLANK.baseVals.b1ed };
+        const b1edInput = makeSlider(container, b1edCfg);
+        const b1edValEl = document.getElementById('fs-b1ed-val');
+        b1edInput.addEventListener('pointerdown', () => this._preSnap());
+        b1edInput.addEventListener('input', () => {
+            const v = parseFloat(b1edInput.value);
+            if (b1edValEl) b1edValEl.textContent = v.toFixed(2);
+            b1edInput.style.setProperty('--pct', `${v * 100}%`);
+            this.currentState.baseVals.b1ed = v;
+            this._applyToEngine(true);
+        });
+        b1edInput.addEventListener('pointerup', () => this._postSnap());
+    }
+
+    _syncFeelSliders() {
+        this._syncSlider('fs-b1ed', this.currentState.baseVals.b1ed, 0, 1.0, 2);
     }
 
     // ─── Toggles ───────────────────────────────────────────────────────────────
@@ -885,6 +916,7 @@ export class EditorInspector {
             'toggle-darken': 'darken',
             'toggle-dots': 'wave_usedots',
             'toggle-additive': 'additivewave',
+            'toggle-brighten': 'wave_brighten',
             // toggle-thick is wired in _buildWaveSliders (created dynamically)
         };
         Object.entries(map).forEach(([id, key]) => {
@@ -3601,12 +3633,14 @@ export class EditorInspector {
         );
     }
 
+
     _syncAllControls() {
         this._syncColorSwatches();
         this._syncMotionSliders();
         this._syncWaveControls();
         this._syncEchoOrient();
         this._syncPaletteSliders();
+        this._syncFeelSliders();
         this._syncSolidFx();
         this._syncToggle('toggle-invert', 'invert');
         this._syncToggle('toggle-darken', 'darken');
@@ -3616,6 +3650,10 @@ export class EditorInspector {
         const bv = this.currentState.baseVals;
         this._syncSlider('ps-gamma', bv.gammaadj, 0.5, 4.0, 2);
         this._syncSlider('ps-decay', bv.decay, 0.85, 0.999, 3);
+        this._syncSlider('ps-ob-size', bv.ob_size, 0, 0.1, 3);
+        this._syncSlider('ps-ob-a', bv.ob_a, 0, 1.0, 2);
+        this._syncSlider('ps-ib-size', bv.ib_size, 0, 0.1, 3);
+        this._syncSlider('ps-ib-a', bv.ib_a, 0, 1.0, 2);
     }
 
     _syncSolidFx() {
@@ -3702,6 +3740,99 @@ export class EditorInspector {
             isHd: false, solo: false, muted: false,
         };
         return { ...D, ...entry };
+    }
+
+    // ─── Public: load a bundled library preset into the editor ───────────────
+
+    /**
+     * Load any of the 1,144 bundled library presets into the editor for remixing.
+     * Preserves the bundled comp/warp shaders and all MilkDrop structure (shapes,
+     * waves, equations) — does NOT call _buildCompShader() so the visual is unchanged.
+     * _buildCompShader() will only run when the user actively adds image layers or
+     * changes the variation, which is the correct and intentional point of divergence.
+     *
+     * @param {string} name - exact registry key as in engine.presets (plain bundled name)
+     */
+    loadBundledPreset(name) {
+        const bundled = this.engine.presets?.[name];
+        if (!bundled) throw new Error(`Preset not found: ${name}`);
+
+        // Clear existing image layers and textures
+        const layersEl = document.getElementById('image-layers');
+        if (layersEl) layersEl.innerHTML = '';
+        for (const texName of Object.keys(this._imageTextures)) {
+            this.engine.removeGifAnimation?.(texName);
+        }
+        this._imageTextures = {};
+
+        // Build currentState: start from BLANK (all editor fields) then overlay the
+        // bundled preset's MilkDrop data.
+        this.currentState = deepClone(BLANK);
+
+        // baseVals — bundled values win over BLANK defaults
+        if (bundled.baseVals) {
+            this.currentState.baseVals = { ...deepClone(BLANK.baseVals), ...bundled.baseVals };
+        }
+
+        // Full MilkDrop structure
+        this.currentState.shapes = deepClone(bundled.shapes || []);
+        this.currentState.waves  = deepClone(bundled.waves  || []);
+        this.currentState.warp   = bundled.warp || '';
+
+        // Equation strings — handle old butterchurn naming (init_eqs → init_eqs_str)
+        this.currentState.init_eqs_str  = bundled.init_eqs_str  || bundled.init_eqs  || '';
+        this.currentState.frame_eqs_str = bundled.frame_eqs_str || bundled.frame_eqs || '';
+        this.currentState.pixel_eqs_str = bundled.pixel_eqs_str || bundled.pixel_eqs || '';
+
+        // Preserve the bundled comp shader exactly — do NOT call _buildCompShader() here.
+        // The bundled comp is what makes the preset look the way it does. It will only
+        // be replaced when the user adds image layers or picks a new variation.
+        this.currentState.comp = bundled.comp || BLANK_COMP;
+
+        // Editor-specific fields — clear solid mode (not applicable to library presets)
+        this.currentState.images          = [];
+        this.currentState.sceneMirror     = 'none';
+        this.currentState.imagesOnly      = false;
+        this.currentState.solidPulse      = 0;
+        this.currentState.solidBreath     = 0;
+        this.currentState.solidShift      = 0;
+        this.currentState.solidColorB     = [0, 0, 0];
+        this.currentState.solidReactSource = 'bass';
+        this.currentState.solidReactCurve  = 'linear';
+
+        // Track remix origin so the saved preset can reference its parent
+        this.currentState.parentPresetName = name;
+
+        // Internal editor state
+        this._solidColor = null;
+        this._imagesOnly = false;
+
+        // Apply the bundled comp/warp directly to the engine
+        this._applyToEngine();
+
+        // Sync all controls to the loaded state
+        this._syncAllControls();
+
+        // Clear variation chip active states — library preset ≠ any variation
+        document.querySelectorAll('.base-var-btn').forEach(btn => btn.classList.remove('active'));
+
+        // Reset scene mirror UI
+        document.querySelectorAll('#scene-mirror-seg .seg').forEach(s => {
+            s.classList.toggle('active', s.dataset.smirror === 'none');
+        });
+
+        // Reset Images Only toggle
+        const ioToggle = document.getElementById('toggle-images-only');
+        if (ioToggle) ioToggle.checked = false;
+
+        // Hide solid FX panel (not applicable to library presets)
+        this._updateSolidFxVisibility({ solid: null });
+
+        // Update image layer bar
+        this._updateLayersBar();
+        this._updateLayerIndices();
+
+        this.originalState = deepClone(this.currentState);
     }
 
     // ─── Public: load a saved preset into the editor ──────────────────────────

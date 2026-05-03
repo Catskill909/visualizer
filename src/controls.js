@@ -87,6 +87,7 @@ export class ControlPanel {
       backupCount: document.getElementById('backup-count'),
       btnFavorite: document.getElementById('btn-favorite'),
       btnHidePreset: document.getElementById('btn-hide-preset'),
+      btnRemixPreset: document.getElementById('btn-remix-preset'),
       btnHelp: document.getElementById('btn-help'),
       btnAudioTuning: document.getElementById('btn-audio-tuning'),
       audioTuningPanel: document.getElementById('audio-tuning-panel'),
@@ -320,6 +321,20 @@ export class ControlPanel {
     els.btnHidePreset.addEventListener('click', () => {
       const currentPreset = engine.getCurrentPresetName();
       if (currentPreset) this.toggleHidden(currentPreset, { advanceIfCurrent: true });
+    });
+
+    // --- Remix in Studio (control bar) ---
+    // Navigates same-window so the visualizer closes — works on web, macOS, and Windows builds.
+    // Bundled presets: pass ?preset=NAME so the editor loads it immediately.
+    // Custom presets: open editor without param (use the Library panel inside the editor).
+    els.btnRemixPreset?.addEventListener('click', () => {
+      const name = engine.getCurrentPresetName();
+      if (!name) { window.location.href = '/editor.html'; return; }
+      if (name.startsWith(CUSTOM_PREFIX)) {
+        window.location.href = '/editor.html';
+      } else {
+        window.location.href = `/editor.html?preset=${encodeURIComponent(name)}`;
+      }
     });
 
     // --- Fullscreen ---
@@ -1122,8 +1137,31 @@ export class ControlPanel {
 
       li.appendChild(hideSpan);
 
-      // Download + Trash icons — custom presets only
+      // Remix in Studio — bundled presets only
+      if (!name.startsWith(CUSTOM_PREFIX)) {
+        const remixSpan = document.createElement('span');
+        remixSpan.className = 'preset-remix';
+        remixSpan.setAttribute('data-tooltip', 'Remix in Studio');
+        remixSpan.innerHTML = '<svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>';
+        remixSpan.addEventListener('click', (e) => {
+          e.stopPropagation();
+          window.location.href = `/editor.html?preset=${encodeURIComponent(name)}`;
+        });
+        li.appendChild(remixSpan);
+      }
+
+      // Edit / Download / Trash icons — custom presets only
       if (name.startsWith(CUSTOM_PREFIX)) {
+        const editSpan = document.createElement('span');
+        editSpan.className = 'preset-edit';
+        editSpan.setAttribute('data-tooltip', 'Edit in Studio');
+        editSpan.innerHTML = '<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>';
+        editSpan.addEventListener('click', (e) => {
+          e.stopPropagation();
+          window.location.href = `/editor.html?custom=${encodeURIComponent(name)}`;
+        });
+        li.appendChild(editSpan);
+
         const exportSpan = document.createElement('span');
         exportSpan.className = 'preset-export';
         exportSpan.setAttribute('data-tooltip', 'Export');

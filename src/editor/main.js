@@ -7,7 +7,7 @@
 import { VisualizerEngine } from '../visualizer.js';
 import { EditorInspector, showToast, showOnboarding } from './inspector.js';
 import { PresetLibrary } from './presetLibrary.js';
-import { getCustomPreset, loadAllCustomPresets } from '../customPresets.js';
+import { getCustomPreset, loadAllCustomPresets, CUSTOM_PREFIX } from '../customPresets.js';
 import { initAuthGate } from '../auth-gate.js';
 
 initAuthGate();
@@ -245,6 +245,85 @@ function mountMiniPlayer(audio, filename) {
     updateUI();
 }
 
+// ─── Remix Picker ─────────────────────────────────────────────────────────────
+// Searchable modal that lists all 1,144 bundled library presets.
+// Opens from the "Remix…" footer button; calls loadBundledPreset on selection.
+
+let _rpNames = null; // cached bundled preset name list — built once after engine init
+
+function _rpBuild() {
+    if (_rpNames || !engine) return;
+    _rpNames = engine.getPresetNames().filter(n => !n.startsWith(CUSTOM_PREFIX));
+}
+
+function _rpRender(filter) {
+    const list  = document.getElementById('remix-picker-list');
+    const count = document.getElementById('remix-picker-count');
+    if (!list) return;
+    const lf = (filter || '').toLowerCase().trim();
+    const hits = lf ? _rpNames.filter(n => n.toLowerCase().includes(lf)) : _rpNames;
+    list.innerHTML = '';
+    const frag = document.createDocumentFragment();
+    const cap = Math.min(hits.length, 800);
+    for (let i = 0; i < cap; i++) {
+        const li = document.createElement('li');
+        li.textContent = hits[i];
+        li.dataset.name = hits[i];
+        li.addEventListener('click', () => _rpSelect(hits[i]));
+        frag.appendChild(li);
+    }
+    list.appendChild(frag);
+    if (count) count.textContent = `${hits.length} preset${hits.length !== 1 ? 's' : ''}${lf ? ` matching "${filter}"` : ''}`;
+}
+
+async function _rpSelect(name) {
+    if (!inspector) return;
+    if (isDirty) {
+        const proceed = await confirmDirty();
+        if (!proceed) return;
+    }
+    try {
+        inspector.loadBundledPreset(name);
+        const nameInput = document.getElementById('preset-name-input');
+        if (nameInput) nameInput.value = name;
+        activePresetId = null;
+        markDirty();
+        _rpClose();
+        setMode('edit');
+        showToast(`Remixing: ${name}`);
+    } catch (err) {
+        showToast('Load failed: ' + err.message, true);
+        console.warn('[Studio] Remix pick failed:', err.message);
+    }
+}
+
+function _rpOpen() {
+    _rpBuild();
+    const modal  = document.getElementById('remix-picker-modal');
+    const search = document.getElementById('remix-picker-search');
+    if (!modal || !_rpNames) return;
+    if (search) search.value = '';
+    _rpRender('');
+    modal.hidden = false;
+    setTimeout(() => search?.focus(), 50);
+}
+
+function _rpClose() {
+    const modal  = document.getElementById('remix-picker-modal');
+    const search = document.getElementById('remix-picker-search');
+    if (modal)  modal.hidden = true;
+    if (search) search.value = '';
+}
+
+// Static listeners — safe to wire once at module load (they guard on modal.hidden)
+document.getElementById('remix-picker-close')?.addEventListener('click', _rpClose);
+document.getElementById('remix-picker-modal')?.addEventListener('click', e => {
+    if (e.target === e.currentTarget) _rpClose();
+});
+document.getElementById('remix-picker-search')?.addEventListener('input', e => {
+    _rpRender(e.target.value);
+});
+
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
 async function boot(connectAudioFn) {
@@ -278,6 +357,9 @@ async function boot(connectAudioFn) {
         onNew:   handleLibraryNew,
         engine,
     });
+
+    // Wire "Remix…" button in the Edit panel footer — opens the library picker
+    document.getElementById('btn-browse-library')?.addEventListener('click', _rpOpen);
 
     // Wire New Preset button in the Edit panel footer
     document.getElementById('btn-new-preset-footer')?.addEventListener('click', async () => {
@@ -384,6 +466,37 @@ async function boot(connectAudioFn) {
 
     // Show onboarding tips modal (skipped if user clicked "Never show again")
     showOnboarding();
+
+    // URL params — must run after engine + inspector are fully initialized.
+    const _params = new URLSearchParams(window.location.search);
+
+    // ?preset=NAME — load a bundled library preset for remixing
+    const _remixName = _params.get('preset');
+    if (_remixName) {
+        const decoded = decodeURIComponent(_remixName);
+        try {
+            inspector.loadBundledPreset(decoded);
+            const nameInput = document.getElementById('preset-name-input');
+            if (nameInput) nameInput.value = decoded;
+            activePresetId = null;
+            markDirty();
+            showToast(`Remixing: ${decoded}`);
+        } catch (err) {
+            showToast(`Preset not found: ${decoded}`, true);
+            console.warn('[Studio] ?preset param load failed:', err.message);
+        }
+    }
+
+    // ?custom=REGISTRY_KEY — reopen a saved custom preset for editing.
+    // Registry key format: custom:<id>:<name> — extract id to call handleLibraryLoad.
+    const _customKey = _params.get('custom');
+    if (_customKey) {
+        const key = decodeURIComponent(_customKey);
+        const id  = key.startsWith(CUSTOM_PREFIX)
+            ? key.slice(CUSTOM_PREFIX.length).split(':')[0]
+            : key;
+        await handleLibraryLoad(id);
+    }
 }
 
 // Override the inspector's default save modal confirm to route through our
@@ -527,9 +640,11 @@ document.addEventListener('keydown', e => {
         if (inspector) openSaveModal();
     }
 
-    // Escape in library → return to edit
-    if (e.key === 'Escape' && panelEl?.dataset.mode === 'library') {
-        setMode('edit');
+    // Escape — close remix picker first; then library mode; then help modal
+    if (e.key === 'Escape') {
+        const rpModal = document.getElementById('remix-picker-modal');
+        if (rpModal && !rpModal.hidden) { _rpClose(); return; }
+        if (panelEl?.dataset.mode === 'library') { setMode('edit'); return; }
     }
 });
 

@@ -501,6 +501,8 @@ body.force-hide-ui, body.controls-hidden {
 
 .preset-heart,
 .preset-hide,
+.preset-remix,
+.preset-edit,
 .preset-delete {
   flex-shrink: 0; width: 16px; height: 16px;
   opacity: 0.35; transform: scale(0.9);
@@ -509,17 +511,24 @@ body.force-hide-ui, body.controls-hidden {
 }
 .preset-heart { margin-left: 8px; }
 .preset-hide { margin-left: 6px; }
+.preset-remix { margin-left: 6px; }
 .preset-delete { margin-left: 6px; }
 .preset-heart svg,
 .preset-hide svg,
+.preset-remix svg,
+.preset-edit svg,
 .preset-delete svg { width: 100%; height: 100%; fill: currentColor; }
 
 .drawer-list li:hover { background: var(--hover-subtle); color: var(--text-primary); }
 .drawer-list li:hover .preset-heart,
+.drawer-list li:hover .preset-remix,
+.drawer-list li:hover .preset-edit,
 .drawer-list li:hover .preset-hide,
 .drawer-list li:hover .preset-delete { opacity: 0.85; transform: scale(1); }
 .drawer-list li:hover .preset-heart:hover { color: #ff3b3b; opacity: 1; transform: scale(1.15); }
 .drawer-list li:hover .preset-hide:hover { color: #ffb84d; opacity: 1; transform: scale(1.15); }
+.drawer-list li:hover .preset-remix:hover { color: #7eb8ff; opacity: 1; transform: scale(1.15); }
+.drawer-list li:hover .preset-edit:hover  { color: #7eb8ff; opacity: 1; transform: scale(1.15); }
 .drawer-list li:hover .preset-delete:hover { color: #ff3b3b; opacity: 1; transform: scale(1.15); }
 
 .drawer-list li.is-favorite .preset-heart { opacity: 1; transform: scale(1); color: #ff3b3b; }
@@ -541,6 +550,10 @@ body.force-hide-ui, body.controls-hidden {
 /* Hide Button in Control Bar */
 .hide-btn { padding: 6px; }
 .hide-btn.is-hidden-preset { color: #ffb84d; filter: drop-shadow(0 0 6px rgba(255, 184, 77, 0.4)); }
+
+/* Remix Button in Control Bar */
+.remix-btn { padding: 6px; }
+.remix-btn:hover { color: #7eb8ff; filter: drop-shadow(0 0 6px rgba(126, 184, 255, 0.4)); }
 
 /* KEYBOARD GUIDE MODAL */
 #keyboard-guide {
@@ -946,6 +959,8 @@ kbd {
    escape the drawer's overflow clipping, and fire near-instantly. */
 .preset-heart[data-tooltip]::after,
 .preset-hide[data-tooltip]::after,
+.preset-remix[data-tooltip]::after,
+.preset-edit[data-tooltip]::after,
 .preset-delete[data-tooltip]::after,
 .preset-export[data-tooltip]::after {
   bottom: auto;
@@ -959,6 +974,8 @@ kbd {
 }
 .preset-heart[data-tooltip]:hover::after,
 .preset-hide[data-tooltip]:hover::after,
+.preset-remix[data-tooltip]:hover::after,
+.preset-edit[data-tooltip]:hover::after,
 .preset-delete[data-tooltip]:hover::after,
 .preset-export[data-tooltip]:hover::after {
   opacity: 1;

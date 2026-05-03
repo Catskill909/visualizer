@@ -13,11 +13,10 @@ and a tabbed inspector panel on the right. No page reload — every control is l
 
 | Tab | Controls |
 |---|---|
-| **Palette** | Base variation picker + color palettes + Wave/Glow/Accent color swatches |
-| **Motion** | Zoom, Rotation, Warp amount & speed, Echo zoom & orientation |
-| **Wave** | Mode grid (8 modes), Size, Opacity, Thickness toggle, Dots toggle, Additive toggle, Randomize |
-| **Feel** | Decay (trail length), Gamma (brightness), Warp scale, Warp speed |
-| **Images** | Drop up to 2 images with full per-layer controls (see below) |
+| **Palette** | Base variation picker · Quick palettes · Wave/Glow/Accent color swatches · Brightness (gammaadj) · Trail (decay) · Outer/Inner border size & alpha · Invert toggle · Darken toggle |
+| **Motion** | Zoom · Spin (rot) · Warp · Warp Speed · Warp Scale · Echo Zoom · Echo Direction · Randomize · **Reactivity** section (Energy/Bass Sensitivity session-only, Beat Sensitivity/b1ed saved, AGC toggle) |
+| **Wave** | Mode grid (8 shapes) · Size · Opacity · Mystery · Thickness toggle · Dots toggle · Additive blend toggle · Brighten wave toggle · Randomize |
+| **Images** | Canvas Mirror · Up to 5 image layers with full per-layer controls (see below) |
 
 ### Base Variations
 
@@ -243,12 +242,16 @@ The Timeline Editor lives at `/timeline.html` — fully self-contained, no chang
 - More blend modes
 - ~~Export / import preset as `.json`~~ ✅ **Done — includes images + result modal**
 - "Mine" tab in main app preset drawer (custom presets already write to the right localStorage key)
-- Remix button in main app: open editor from existing preset
+- ~~Remix button in main app: open editor from existing preset~~ ✅ **Done — Phases 1–3**
 - Beat Shake / Jitter
 - Strobe / Blink
 - Scatter / Radial Clone
 - Lissajous Path
 - Depth Stack (Z-order offset for 2-image tunnel)
+- Equation string editor (editable `<textarea>` per field) — after Phase 5 read-only display
+- Raw GLSL editor for `warp` / `comp` shaders (Monaco or textarea)
+- Shapes editor (card per shape, like image layers)
+- Custom waves editor
 
 ---
 
@@ -315,146 +318,283 @@ When 2 images are loaded, a **Z Offset** slider nudges the second image's tunnel
 
 ---
 
-## MilkDrop Settings Audit — What Exists vs What the Editor Exposes
+## MilkDrop Settings Coverage
 
-> Last audited: Apr 2026. Source: `src/editor/inspector.js` BLANK state + butterchurn preset schema.
+> Updated May 2026. All `baseVals` fully audited. See Phase 4 audit table for field-by-field detail.
 
-A full MilkDrop preset has three tiers of settings: **baseVals** (numeric parameters), **custom shapes/waves** (per-object blocks), and **equation strings** (scripting language). The editor currently covers tier 1 partially and tier 3 not at all.
+A full MilkDrop preset has four tiers of settings:
 
----
+### Tier 1 — `baseVals` ✅ 28 of 35 fields exposed
 
-### Tier 1 — `baseVals` (numeric parameters)
+The only unexposed fields are the 7 **motion vectors** (`mv_x`, `mv_y`, `mv_l`, `mv_r/g/b`, `mv_a`). Motion vectors draw small directional arrows on the canvas showing pixel-flow direction. **They are disabled in virtually every one of the 1,000+ library presets** — `mv_a = 0` is the default and almost no preset sets it otherwise. They were a debugging/diagnostic overlay from MilkDrop's early days and are rarely used even in complex community presets. Low priority to expose; not worth the UI clutter.
 
-~40 fields total. Editor exposes ~20.
+### Tier 2 — `shapes[]` and `waves[]` ⏸ Removed (was Phase 6)
 
-#### ✅ Currently exposed
+Up to 4 custom shapes and 4 custom waves per preset. Shipped briefly as an Objects tab but removed — controls had minimal visible effect on most presets (equations override geometry each frame), making the tab confusing rather than useful. Future direction: a **shape creation tool** that lets users build new shapes from scratch rather than editing existing opaque ones. Shapes/waves are still preserved in preset state and passed through to butterchurn correctly.
 
-| Field | Editor location |
-|-------|----------------|
-| `zoom` | Motion → Zoom |
-| `rot` | Motion → Spin |
-| `warp` | Motion → Warp |
-| `warpanimspeed` | Motion → Warp Speed |
-| `echo_zoom` | Motion → Echo Zoom |
-| `echo_orient` | Motion → orientation buttons |
-| `decay` | Palette → Trail |
-| `gammaadj` | Palette → Brightness |
-| `wave_mode` | Wave → 8-mode grid |
-| `wave_r/g/b` | Palette → Wave color swatch |
-| `wave_a` | Wave → Opacity |
-| `wave_scale` | Wave → Size |
-| `wave_thick` | Wave → Thickness toggle |
-| `additivewave` | Wave → Additive toggle |
-| `wave_usedots` | Wave → Dots toggle |
-| `ob_r/g/b` | Palette → Glow color swatch |
-| `ib_r/g/b` | Palette → Accent color swatch |
-| `darken` | Feel → toggle |
-| `invert` | Feel → toggle |
+### Tier 3 — Equation strings ❌ Preserved, display coming in Phase 5
 
-#### ❌ Not yet exposed
+`init_eqs_str`, `frame_eqs_str`, `pixel_eqs_str` (plus per-shape/wave variants). Preserved and executed correctly. Phase 5 will add read-only display; editable textarea comes after that.
 
-| Field | Meaning | Priority | Effort |
-|-------|---------|----------|--------|
-| `warpscale` | Spatial scale of the warp pattern — "zoomed in" vs "tiled" warp | Medium | One slider on Motion tab |
-| `wave_mystery` | Waveform position offset along its path | Low | One slider on Wave tab |
-| `wave_brighten` | Brighten the waveform vs. the background | Low | Toggle on Wave tab |
-| `ob_size` | Outer border / glow ring thickness | Medium | Slider — currently only auto-set by color picker |
-| `ob_a` | Outer border opacity | Medium | Slider — same |
-| `ib_size` | Inner border thickness | Low | Slider |
-| `ib_a` | Inner border opacity | Low | Slider |
-| `mv_x` | Motion vector grid columns | Low | Slider |
-| `mv_y` | Motion vector grid rows | Low | Slider |
-| `mv_l` | Motion vector line length | Low | Slider |
-| `mv_r/g/b` | Motion vector color | Low | Color swatch |
-| `mv_a` | Motion vector opacity | Low | Slider — 0 hides them entirely |
-| `b1ed` | Beat sensitivity curve (0=sharp, 1=smooth) | Medium | One slider on Feel tab |
+### Tier 4 — GLSL shaders (`warp`, `comp`) ❌ Preserved, not user-editable
 
-**Quick wins** (one session): `warpscale`, `ob_size`, `ob_a`, `b1ed` — four sliders that unlock a lot of variation in real MilkDrop presets and are trivial to add.
+`comp` is auto-generated by the editor from image layer state. `warp` is passed through unchanged from the source preset. Raw GLSL editing is a future phase.
 
 ---
 
-### Tier 2 — `shapes[]` and `waves[]` (custom object arrays)
+## Remix from Library — Implementation Tracker
 
-Each preset can have up to **4 custom shapes** and **4 custom waveforms**. These are what make complex presets complex — spinning geometry, hand-drawn waveforms, per-object color animation.
+> Started May 2026. See [The One Truth Goal](#the-one-truth-goal--primary-architecture-objective) for the full rationale.
 
-#### Shapes (up to 4 per preset)
+### Phase 1 — Core wiring (no new UI) ✅ Shipped May 2026
 
-Each shape object has:
+| Step | What | File(s) | Status |
+|------|------|---------|--------|
+| 1a | `loadBundledPreset(name)` method in inspector | `src/editor/inspector.js` | ✅ Done |
+| 1b | `?preset=NAME` URL param handler in editor boot | `src/editor/main.js` | ✅ Done |
+| 1c | "Remix in Studio" icon button in main app preset drawer | `src/controls.js`, `src/style.css` | ✅ Done |
+| 1d | Pencil "Remix" button in floating control bar (next to ♥ / hide) | `index.html`, `src/controls.js`, `src/style.css` | ✅ Done |
 
-| Field group | Fields |
-|-------------|--------|
-| Basic | `enabled`, `sides` (3–100), `additive`, `textured` |
-| Size / position | `x`, `y`, `radius`, `ang` (rotation), `angvel` (spin speed) |
-| Color | `r`, `g`, `b`, `a` (fill), `border_r/g/b/a/size` |
-| Audio reactivity | `rad_freq`, `rad_ang`, `rad_amp` (radial audio warp), `tex_zoom`, `tex_ang` |
-| Inner border | `inner_r/g/b/a/size` |
-| Per-shape equations | `init_eqs_str`, `frame_eqs_str` |
+**How it works:**
+- Hover any bundled preset row in the main app drawer → blue ⇌ icon appears → click → navigates same-window to `editor.html?preset=<name>`
+- Floating control bar: pencil icon always visible next to ♥ and hide → click → same-window nav with current preset
+- Editor reads `?preset=` on boot, calls `inspector.loadBundledPreset(name)` after engine + inspector init
+- `loadBundledPreset` merges BLANK + bundled data into `currentState`, preserves bundled `comp`/`warp` shaders without calling `_buildCompShader()`, syncs all controls, sets `parentPresetName`
+- First user action that needs the comp regenerated (add image layer, pick variation) triggers `_buildCompShader()` naturally — no special handling needed
 
-**Status: ❌ Not exposed.** Building a shapes editor is a medium build — card-based UI per shape (like image layers), ~15 sliders + color pickers per card.
-
-#### Custom Waves (up to 4 per preset)
-
-Each wave object has:
-
-| Field group | Fields |
-|-------------|--------|
-| Basic | `enabled`, `spectrum` (time vs freq domain), `dots`, `thick`, `additive` |
-| Color | `r`, `g`, `b`, `a` |
-| Sample / position | `scaling`, `smoothing`, `sep`, `mystery` (offset) |
-| Per-wave equations | `init_eqs_str`, `frame_eqs_str` |
-
-**Status: ❌ Not exposed.** Custom waves are what makes the waveform behavior in complex presets — they can animate independently of `wave_mode`, be positioned anywhere, and react to audio in unusual ways.
+**Key design decision — comp shader preservation:**
+`_buildCompShader()` is only called when the user actively changes image layers, the variation, solid FX, or scene mirror. On initial library load we call `_applyToEngine()` directly. This means a remixed preset starts looking exactly like the original, and only diverges when the user intentionally does something that changes it. The bundled `warp` shader is always preserved — `_buildCompShader()` only ever touches `comp`.
 
 ---
 
-### Tier 3 — Equation strings (MilkDrop scripting)
+### Phase 2 — In-editor preset picker ✅ Shipped May 2026
 
-Three global equation fields that run every frame:
+| Step | What | File(s) | Status |
+|------|------|---------|--------|
+| 2a | `Remix…` button added to panel footer | `editor.html`, `src/editor/style.css` | ✅ Done |
+| 2b | Searchable picker modal — 1,144 preset names, live filter, keyboard nav | `editor.html`, `src/editor/style.css` | ✅ Done |
+| 2c | Picker wired to `loadBundledPreset` + dirty check + name input update | `src/editor/main.js` | ✅ Done |
 
-| Field | Runs | Typical use |
-|-------|------|-------------|
-| `init_eqs_str` | Once at load | Set initial variable values |
-| `frame_eqs_str` | Every frame | Animate `zoom`, `rot`, `wave_r`, custom vars — anything |
-| `pixel_eqs_str` | Every pixel | Per-pixel UV distortion (most expensive, most powerful) |
-
-Plus per-shape and per-wave `init_eqs_str` / `frame_eqs_str`.
-
-**Status: ❌ Not exposed.** These are the MilkDrop scripting language — a C-like expression syntax that references ~100 built-in variables (`bass`, `mid`, `treb`, `time`, `zoom`, `rot`, etc.). Every complex preset uses them.
-
-**Exposing them**: a `<textarea>` per field is technically simple. Understanding them requires knowing the MilkDrop variable reference. A read-only display when loading a library preset ("this preset uses frame equations") would be a useful first step, making them editable comes after.
-
----
-
-### Tier 4 — GLSL shaders (`warp`, `comp`)
-
-| Field | Meaning |
-|-------|---------|
-| `warp` | Per-pixel warp shader — distorts the UV coordinates fed into the feedback buffer |
-| `comp` | Composite shader — blends the warp buffer with waveforms and sets final pixel color |
-
-**Status:** `comp` is auto-generated by the editor from image layer state. `warp` is passed through unchanged. Neither is user-editable yet. A raw GLSL code editor would be advanced territory — Monaco editor or a `<textarea>` with syntax highlighting.
+**How it works:**
+- `Remix…` button in the panel footer opens a 520×620px modal with a search input and a scrollable list of all 1,144 bundled preset names (custom presets excluded)
+- Typing in the search box live-filters the list; list is capped at 800 rendered rows for DOM performance
+- Clicking a name: runs the dirty-state guard → `inspector.loadBundledPreset(name)` → sets name input to preset name → `markDirty()` → closes modal
+- Escape closes the picker (priority: picker first, then library mode, then help modal)
+- Backdrop click also closes
+- Preset name list built lazily on first open from `engine.getPresetNames()` filtered to bundled-only
+- `_rp*` private functions in `main.js` — no inspector changes needed
 
 ---
 
-### Summary: what to build next
+### Phase 3 — "Continue editing" for custom presets ✅ Shipped May 2026
 
-| Priority | What | Tab | Effort |
-|----------|------|-----|--------|
-| 1 | `warpscale` slider | Motion | 30 min |
-| 2 | `ob_size` + `ob_a` sliders | Palette | 30 min |
-| 3 | `b1ed` beat sensitivity slider | Feel | 20 min |
-| 4 | `mv_a` motion vector opacity (hide at 0 = no change) | Motion | 20 min |
-| 5 | Load library preset into editor ("Remix" flow) | Architecture | 2–3 hrs |
-| 6 | `wave_mystery` + `wave_brighten` | Wave | 30 min |
-| 7 | `ib_size` + `ib_a` sliders | Palette | 30 min |
-| 8 | Full motion vector controls (`mv_x/y/l/r/g/b/a`) | Motion | 1 hr |
-| 9 | Equation string display (read-only) | New "Code" tab | 1 hr |
-| 10 | Shapes editor (card per shape, like image layers) | New "Shapes" tab | 1–2 days |
-| 11 | Custom waves editor | New "Waves" tab | 1–2 days |
-| 12 | Equation string editor (editable textarea per field) | Code tab | 1 hr (after #9) |
-| 13 | Raw GLSL editor for `warp` / `comp` | Code tab | 2 hrs |
+| Step | What | File(s) | Status |
+|------|------|---------|--------|
+| 3a | Pencil "Edit in Studio" icon added to custom preset rows in main drawer | `src/controls.js`, `src/style.css` | ✅ Done |
+| 3b | Same-window nav: `editor.html?custom=REGISTRY_KEY` | `src/controls.js` | ✅ Done |
+| 3c | Editor reads `?custom=`, parses id, calls `handleLibraryLoad(id)` | `src/editor/main.js` | ✅ Done |
 
-Items 1–4 are a single clean session and cover all the easy missing `baseVals`. Item 5 (library preset import) is the architecture unlock that makes everything else more useful — editing a blank canvas is very different from remixing a great MilkDrop preset.
+**How it works:**
+- Custom preset rows in the main app drawer now show a pencil icon on hover (alongside export + delete)
+- Clicking navigates same-window to `editor.html?custom=custom:<id>:<name>`
+- Editor boot reads `?custom=`, extracts the UUID from the registry key (`key.slice(CUSTOM_PREFIX.length).split(':')[0]`), calls `handleLibraryLoad(id)` — the existing function that restores all image layers from IndexedDB, sets `activePresetId`, and puts the editor in edit mode
+- Subsequent Cmd+S overwrites the same preset in-place (no Save As dialog needed)
+
+---
+
+### Phase 4 — Missing `baseVals` sliders ✅ Shipped May 2026
+
+| Step | What | Tab | Status |
+|------|------|-----|--------|
+| 4a | `warpscale` slider | Motion | ✅ |
+| 4b | `ob_size` + `ob_a` sliders | Palette | ✅ |
+| 4c | `b1ed` beat sensitivity slider | Feel | ✅ |
+| 4d | `wave_mystery` + `wave_brighten` | Wave | ✅ |
+| 4e | `ib_size` + `ib_a` sliders | Palette | ✅ |
+| 4f | Randomize buttons updated to include new fields | Motion + Wave | ✅ |
+| 4g | Glow/Accent swatches sync `ob_a`/`ob_size`/`ib_a`/`ib_size` sliders when auto-set | Palette | ✅ |
+
+**Slider effect notes (why some look "invisible" at first):**
+- **Borders (ob/ib):** require three things simultaneously — non-zero `ob_size`/`ib_size`, non-zero `ob_a`/`ib_a`, AND a non-black Glow/Accent swatch color. Picking a Glow color will auto-set `ob_a=0.75` and `ob_size=0.02` if they were 0 — sliders now reflect that immediately.
+- **Beat Sensitivity (`b1ed`):** controls bass-reactive edge sharpening. Requires audio playback to notice.
+- **Wave Mystery:** position/phase parameter for the waveform. Effect varies by wave mode — most visible in modes 1–3.
+- **Warp Scale:** scales the warp distortion UV space — noticeable at extremes (try 0.2 or 3.5).
+
+---
+
+### MilkDrop `baseVals` coverage — full audit (May 2026)
+
+All fields from `BLANK.baseVals` and their UI controls:
+
+| Field | UI Control | Tab | Status |
+|-------|-----------|-----|--------|
+| `zoom` | Zoom slider | Motion | ✅ |
+| `rot` | Spin slider | Motion | ✅ |
+| `warp` | Warp slider | Motion | ✅ |
+| `warpanimspeed` | Warp Speed slider | Motion | ✅ |
+| `warpscale` | Warp Scale slider | Motion | ✅ |
+| `decay` | Trail slider | Palette | ✅ |
+| `gammaadj` | Brightness slider | Palette | ✅ |
+| `echo_zoom` | Echo Zoom slider | Motion | ✅ |
+| `echo_orient` | Echo Direction segment | Motion | ✅ |
+| `wave_mode` | Wave shape grid | Wave | ✅ |
+| `wave_r/g/b` | Wave color swatch | Palette | ✅ |
+| `wave_a` | Opacity slider | Wave | ✅ |
+| `wave_scale` | Size slider | Wave | ✅ |
+| `wave_mystery` | Mystery slider | Wave | ✅ |
+| `wave_thick` | Thickness toggle | Wave | ✅ |
+| `wave_usedots` | Draw as dots toggle | Wave | ✅ |
+| `additivewave` | Additive blend toggle | Wave | ✅ |
+| `wave_brighten` | Brighten wave toggle | Wave | ✅ |
+| `ob_r/g/b` | Glow color swatch | Palette | ✅ |
+| `ob_size` | Outer Border Size slider | Palette | ✅ |
+| `ob_a` | Outer Border Alpha slider | Palette | ✅ |
+| `ib_r/g/b` | Accent color swatch | Palette | ✅ |
+| `ib_size` | Inner Border Size slider | Palette | ✅ |
+| `ib_a` | Inner Border Alpha slider | Palette | ✅ |
+| `darken` | Darken toggle | Palette | ✅ |
+| `invert` | Invert colors toggle | Palette | ✅ |
+| `b1ed` | Beat Sensitivity slider | Feel | ✅ |
+| `mv_x` | — | — | ❌ Motion vectors not exposed |
+| `mv_y` | — | — | ❌ Motion vectors not exposed |
+| `mv_l` | — | — | ❌ Motion vectors not exposed |
+| `mv_r/g/b` | — | — | ❌ Motion vectors not exposed |
+| `mv_a` | — | — | ❌ Motion vectors not exposed |
+
+**28 of 35 baseVal fields exposed via UI. Only motion vectors (7 fields) remain.**
+
+Motion vectors draw small arrows on screen showing pixel-flow direction. `mv_a = 0` by default and virtually no library preset sets it otherwise — they're a rarely-used diagnostic overlay from MilkDrop's early days. Not worth UI clutter to expose; motion vector state is preserved and passes through correctly when remixing.
+
+---
+
+### Phase 5 — Equation editor 📋 Future (low priority)
+
+**Where it lives:** `< >` button in the editor topbar → fullscreen overlay. Inspector panel slides away. Three labeled textareas (Init / Frame / Pixel equations) with the live canvas still running behind. Close button returns to normal editing mode. No new tab — completely hidden from casual users, full width for power users.
+
+**Why not a tab:** the tab bar is already full (5 tabs), and equations are a power-user tool for a small minority. They require knowing the MilkDrop scripting language and have no business being in the main flow.
+
+**Scope when built:** editable `<textarea>` per field, live apply on blur/Cmd+S, basic syntax error display. No Monaco or syntax highlighting needed for v1.
+
+---
+
+### Phase 6 — Shapes & Custom Waves editor ✅ Shipped May 2026
+
+> Deep audit completed May 2026. Data from butterchurn-presets (100 presets) + butterchurn source.
+
+#### The data reality
+
+From 100 library presets audited:
+
+| Metric | Count |
+|--------|-------|
+| Presets with enabled shapes | 52 (52%) |
+| Presets with enabled custom waves | 32 (32%) |
+| Enabled shapes that have `frame_eqs_str` | ~93% |
+| Enabled shapes that are purely static (no equations) | ~7% |
+
+**The key finding:** Almost every complex shape is animated by `frame_eqs_str`. The equations override `x`, `y`, `ang`, `rad` every frame — so sliders for those fields only set *starting values*. The visual result of editing them depends entirely on what the equations do with those values. This is fine and important to communicate clearly in the UI.
+
+Custom waves are simpler — their `frame_eqs_str` controls per-point color/position, but the core controls (color, smoothing, scaling, mode) always have direct visual effect regardless of equations.
+
+#### Full field schemas (from real presets)
+
+**Shape `baseVals`** — 25 fields:
+```
+enabled, sides, x, y, rad, ang
+r, g, b, a                    ← fill color + alpha
+r2, g2, b2, a2                ← fill color 2 (gradient inner)
+border_r, border_g, border_b, border_a  ← border color + alpha
+textured, tex_zoom, tex_ang   ← texture mapping (uses warp buffer as texture)
+additive, thickoutline        ← blend mode / border style
+num_inst                      ← multi-instance count (rare)
+```
+
+**Wave `baseVals`** — 13 fields:
+```
+enabled, r, g, b, a           ← enable + color
+spectrum                      ← 0=time domain, 1=frequency domain
+thick, usedots, additive      ← render style
+scaling, smoothing, sep       ← signal processing
+samples                       ← point count (default 512, rarely changed)
+```
+
+#### Where it lives — rename Image → Layers
+
+The Image tab becomes a unified **Layers** tab. Same card-pattern, three sections stacked vertically:
+
+```
+LAYERS TAB
+├── Canvas Mirror          (existing — stays at top)
+├── ─── Custom Shapes ─── (new, collapsible section header)
+│   ├── Shape 1 card       [collapsed if disabled]
+│   ├── Shape 2 card       [collapsed if disabled]
+│   ├── Shape 3 card       [collapsed if disabled]
+│   └── Shape 4 card       [collapsed if disabled]
+├── ─── Custom Waves ───  (new, collapsible section header)
+│   ├── Wave 1 card        [collapsed if disabled]
+│   ├── Wave 2 card        [collapsed if disabled]
+│   ├── Wave 3 card        [collapsed if disabled]
+│   └── Wave 4 card        [collapsed if disabled]
+└── ─── Image Layers ───  (existing — stays at bottom, unchanged)
+    └── [accordion cards]
+```
+
+Sections with all 4 cards disabled collapse to a single muted row ("4 shapes — all off"). Only sections that have at least one enabled object expand automatically when a preset is loaded.
+
+#### Shape card controls
+
+**Header (always visible):**
+- Index badge (#1), shape name (auto: "Shape 1"), enabled toggle, chevron expand
+
+**Card body:**
+
+| Section | Controls |
+|---------|----------|
+| **Geometry** | Sides (3–100, integer), Radius (0–2.0), Position XY pad (same component as image layer center), Angle (−π to +π) |
+| **Fill** | Color swatch (r,g,b), Opacity (a 0–1), Color 2 swatch (r2,g2,b2), Opacity 2 (a2 0–1) |
+| **Border** | Color swatch (border_r,g,b), Opacity (border_a 0–1), Thick outline toggle |
+| **Options** | Textured toggle · Tex zoom slider (0.1–4) · Additive toggle |
+| **Equations badge** | If `frame_eqs_str` present: amber pill "Animated by equations — Geometry fields set initial values" |
+
+#### Wave card controls
+
+**Header (always visible):**
+- Index badge (#1), wave name (auto: "Wave 1"), enabled toggle, chevron expand
+
+**Card body:**
+
+| Section | Controls |
+|---------|----------|
+| **Color** | Color swatch (r,g,b) + Opacity (a 0–1) |
+| **Source** | Spectrum toggle (Time / Frequency) |
+| **Style** | Thick toggle · Dots toggle · Additive toggle |
+| **Shape** | Scaling slider (0–2) · Smoothing slider (0–1) · Sep slider (−1–1) |
+| **Equations badge** | If `frame_eqs_str` present: amber pill "Per-point equations active" |
+
+#### Key design decisions
+
+1. **Always show all 4 slots** — collapsed/dimmed when disabled, expanded when enabled. User can enable a blank slot to add a new shape/wave from scratch.
+
+2. **Equations badge, not lockout** — don't disable sliders when equations are present. Color and style fields always work; geometry fields are "initial values" that equations may override. The badge explains this without blocking editing.
+
+3. **No drag reorder** — unlike image layers, shapes and waves have fixed indices (0–3) because `frame_eqs_str` often references `q1`–`q8` shared variables between shapes. Reordering would break presets.
+
+4. **Equation display (Phase 5.5)** — clicking the equations badge in a card body could expand a read-only `<pre>` showing that object's `frame_eqs_str`. Pairs naturally with Phase 5.
+
+5. **Tab button label** — rename `Image` button to `Layers` in `editor.html`. One-line change, no architectural impact.
+
+#### Build estimate
+
+| Sub-phase | What | Status |
+|-----------|------|--------|
+| 6a | Custom Wave cards (Color/Source/Style/Shape controls) | ✅ Shipped |
+| 6b | Custom Shape cards (Geometry/Fill/Border/Options controls) | ✅ Shipped |
+| 6c | Feel tab controls merged into Motion tab (Reactivity section) | ✅ Shipped |
+| 6d | Feel tab → Objects tab (4 shape cards + 4 wave cards) | ✅ Shipped, then removed |
+
+#### Note on Phase 6 removal
+
+Objects tab was shipped then pulled. Most preset shapes are equation-driven — geometry values are overridden every frame, so sliders had little visible effect. The tab created confusion for users who expected more control. Shapes/waves are still loaded and rendered correctly from preset files; the editor just no longer exposes controls for them. Future: shape creation from scratch (not editing existing ones).
 
 ---
 
