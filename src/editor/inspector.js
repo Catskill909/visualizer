@@ -1105,6 +1105,13 @@ export class EditorInspector {
     _bindReset() {
         document.getElementById('btn-reset')?.addEventListener('click', () => {
             this._preSnap();
+            // Clear image layer DOM and release textures
+            const layersEl = document.getElementById('image-layers');
+            if (layersEl) layersEl.innerHTML = '';
+            for (const texName of Object.keys(this._imageTextures)) {
+                this.engine.removeGifAnimation?.(texName);
+            }
+            this._imageTextures = {};
             this.currentState = deepClone(BLANK);
             const v0 = BASE_VARIATIONS[0];
             this._solidColor = v0.solid || null;
@@ -1127,6 +1134,7 @@ export class EditorInspector {
             this._buildCompShader();
             this._applyToEngine();
             this._syncAllControls();
+            this._updateLayersBar();
             this._clearPaletteActive();
             this._updateSolidFxVisibility(v0);
             // Re-highlight the first variation (Solid)
