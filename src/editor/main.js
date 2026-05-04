@@ -435,9 +435,7 @@ async function boot(connectAudioFn) {
     // Wire mode toggle
     initModeToggle();
 
-    // Wire the save button (existing "Save preset" → always Save As for new presets,
-    // but the modal confirm now routes through inspector.saveCurrent)
-    _rewireSaveModal();
+    _wireSaveModal();
 
     engine.stopAutoCycle();
     engine.autoCycleEnabled = false;
@@ -558,23 +556,34 @@ async function boot(connectAudioFn) {
     }
 }
 
-// Override the inspector's default save modal confirm to route through our
-// saveCurrent flow (which captures the thumbnail and tracks the active id).
-function _rewireSaveModal() {
-    const confirm   = document.getElementById('save-modal-confirm');
+function _wireSaveModal() {
     const modal     = document.getElementById('save-modal');
     const nameInput = document.getElementById('save-modal-name');
-    if (!confirm) return;
+    const confirmBtn = document.getElementById('save-modal-confirm');
+    if (!modal || !confirmBtn) return;
 
-    // Replace existing listeners by cloning the node
-    const fresh = confirm.cloneNode(true);
-    confirm.replaceWith(fresh);
+    async function attemptSave() {
+        const name = nameInput?.value?.trim() || 'Untitled preset';
+        const all  = loadAllCustomPresets();
+        const existing = Object.values(all).find(p =>
+            p.name?.toLowerCase() === name.toLowerCase()
+        );
 
-    fresh.addEventListener('click', async () => {
-        const name  = nameInput?.value?.trim() || 'Untitled preset';
+        if (existing) {
+            // Name already exists — always confirm before overwriting
+            modal.hidden = true;
+            const confirmed = await confirmOverwrite(name);
+            if (confirmed) await doSave(name, existing.id);
+        } else {
+            // New name — create
+            await doSave(name, null);
+        }
+    }
+
+    async function doSave(name, id) {
         const thumb = await captureThumb();
         try {
-            const record = inspector.saveCurrent(name, null, thumb);  // always new
+            const record = inspector.saveCurrent(name, id, thumb);
             activePresetId = record.id;
             markClean();
             modal.hidden = true;
@@ -584,6 +593,40 @@ function _rewireSaveModal() {
         } catch (err) {
             showToast('Save failed: ' + err.message, true);
         }
+    }
+
+    confirmBtn.addEventListener('click', attemptSave);
+    modal.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); attemptSave(); }
+    });
+}
+
+function confirmOverwrite(name) {
+    return new Promise(resolve => {
+        const overwriteModal = document.getElementById('overwrite-modal');
+        const msg            = document.getElementById('overwrite-modal-msg');
+        const confirmBtn     = document.getElementById('overwrite-modal-confirm');
+        const cancelBtn      = document.getElementById('overwrite-modal-cancel');
+        if (!overwriteModal) { resolve(true); return; }
+
+        if (msg) msg.textContent = `This will overwrite "${name}". This can't be undone.`;
+        overwriteModal.hidden = false;
+        confirmBtn.focus();
+
+        const close = result => {
+            overwriteModal.hidden = true;
+            document.removeEventListener('keydown', onKey);
+            resolve(result);
+        };
+
+        const onKey = e => {
+            if (e.key === 'Escape') close(false);
+            if (e.key === 'Enter')  close(true);
+        };
+
+        confirmBtn.addEventListener('click', () => close(true),  { once: true });
+        cancelBtn.addEventListener('click',  () => close(false), { once: true });
+        document.addEventListener('keydown', onKey);
     });
 }
 

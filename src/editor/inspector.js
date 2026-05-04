@@ -1079,24 +1079,10 @@ export class EditorInspector {
             setTimeout(() => nameInput?.select(), 50);
         });
 
-        confirm?.addEventListener('click', () => {
-            const name = nameInput?.value?.trim() || 'Untitled preset';
-            if (presetName) presetName.value = name;
-            try {
-                createCustomPreset({ name, ...this.currentState });
-                modal.hidden = true;
-                this.originalState = deepClone(this.currentState);
-                showToast(`"${name}" saved`);
-            } catch (err) {
-                showToast('Save failed: ' + err.message, true);
-            }
-        });
-
         cancel?.addEventListener('click', () => { if (modal) modal.hidden = true; });
 
         modal?.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') modal.hidden = true;
-            if (e.key === 'Enter') confirm?.click();
         });
     }
 

@@ -17,7 +17,7 @@
   --panel-w: 340px;
   --hdr-h:   52px;
   --tab-h:   38px;
-  --foot-h:  62px;
+  --foot-h:  48px;
   --font:    'Inter', system-ui, -apple-system, sans-serif;
   --r-s: 4px;
   --r-m: 8px;
@@ -1093,32 +1093,47 @@ html, body {
    ══════════════════════════════════════════════════════════════════════ */
 
 .panel-footer {
-  display: flex; gap: 8px;
-  padding: 11px 13px;
+  display: flex; gap: 6px;
+  padding: 9px 10px;
   border-top: 1px solid var(--border);
   flex-shrink: 0; height: var(--foot-h); align-items: center;
 }
 
+/* Primary CTA — filled white pill, grows to fill remaining space */
 .save-btn {
-  flex: 1; padding: 9px 16px;
-  background: #fff; color: #000;
-  border: none; border-radius: var(--r-s);
+  flex: 1; min-width: 0;
+  height: 30px; padding: 0 10px;
+  background: #fff; color: #111;
+  border: none; border-radius: 100px;
   font-family: var(--font); font-size: 13px; font-weight: 600;
-  cursor: pointer; transition: background 0.15s;
+  cursor: pointer;
+  transition: background 0.12s ease, box-shadow 0.12s ease;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4), 0 0 0 0 rgba(255,255,255,0);
+  white-space: nowrap;
 }
-.save-btn:hover { background: rgba(255,255,255,0.85); }
+.save-btn:hover {
+  background: rgba(255,255,255,0.9);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.45);
+}
+.save-btn:active { background: rgba(255,255,255,0.8); box-shadow: none; }
 
+/* Ghost pill buttons — Remix, +New, Reset */
 .reset-btn {
-  padding: 9px 13px;
-  background: transparent; color: var(--text-2);
-  border: 1px solid var(--border); border-radius: var(--r-s);
+  flex-shrink: 0;
+  height: 30px; padding: 0 11px;
+  background: transparent; color: rgba(255,255,255,0.6);
+  border: 1px solid rgba(255,255,255,0.13); border-radius: 100px;
   font-family: var(--font); font-size: 13px; font-weight: 500;
-  cursor: pointer; transition: all 0.15s;
+  cursor: pointer;
+  transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
+  white-space: nowrap;
 }
 .reset-btn:hover {
-  border-color: var(--border-hi); color: var(--text);
-  background: rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.28);
+  color: rgba(255,255,255,0.95);
+  background: rgba(255,255,255,0.07);
 }
+.reset-btn:active { background: rgba(255,255,255,0.11); }
 
 /* ══════════════════════════════════════════════════════════════════════
    REMIX PICKER MODAL

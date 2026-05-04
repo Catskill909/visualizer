@@ -650,7 +650,7 @@
 
                 <!-- Footer: remix + new + save + reset -->
                 <footer class="panel-footer">
-                    <button id="btn-browse-library" class="reset-btn" type="button" data-tooltip="Browse all 1,144 library presets to remix">Remix…</button>
+                    <button id="btn-browse-library" class="reset-btn" type="button" data-tooltip="Browse all 1,144 library presets to remix">Remix</button>
                     <button id="btn-new-preset-footer" class="reset-btn" type="button" data-tooltip="Start a fresh preset">+ New</button>
                     <button id="btn-save" class="save-btn" type="button">Save preset</button>
                     <button id="btn-reset" class="reset-btn" type="button">Reset</button>
@@ -726,6 +726,19 @@
                 <div class="save-modal-actions">
                     <button id="save-modal-confirm" class="save-btn" type="button">Save</button>
                     <button id="save-modal-cancel" class="reset-btn" type="button">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Overwrite existing preset modal -->
+        <div id="overwrite-modal" class="save-modal" hidden role="dialog" aria-modal="true"
+            aria-labelledby="overwrite-modal-title">
+            <div class="save-modal-card">
+                <h2 id="overwrite-modal-title" class="save-modal-title">Overwrite preset?</h2>
+                <p class="layer-delete-msg" id="overwrite-modal-msg"></p>
+                <div class="save-modal-actions">
+                    <button id="overwrite-modal-confirm" class="danger-btn" type="button">Overwrite</button>
+                    <button id="overwrite-modal-cancel" class="reset-btn" type="button">Cancel</button>
                 </div>
             </div>
         </div>
