@@ -1,4 +1,6 @@
-# fullscreen-macos-bug.md
+# Fullscreen macOS Tauri Bug
+
+> **Status:** ✅ Fixed. Kept for reference.
 
 ## Bug Summary
 The fullscreen button (`btn-fullscreen`, `F` key) in the **macOS Tauri app** does nothing.

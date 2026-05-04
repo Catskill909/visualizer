@@ -1,5 +1,7 @@
 # White Flash on Startup — Audit & Fix Plan
 
+> **Status:** ✅ Fixed. Kept for reference.
+
 ## Root Causes
 
 ### 1. Tauri: Native window has no background color set (macOS + Windows)

@@ -1,6 +1,6 @@
 # Preset Image Tools — Dev Reference
 
-> **Companion doc:** [custom-preset-editor.md](custom-preset-editor.md) · [preset-image-pan-dev.md](preset-image-pan-dev.md)
+> **Hub doc:** [../../custom-preset-editor.md](../../custom-preset-editor.md)
 > All phases 1–6 shipped ✅. Document restructured to Shipped / Up Next format.
 
 ---

@@ -1,6 +1,25 @@
 # Custom Preset Editor — Implementation Status
 
 > **Status:** ✅ Built and working. This doc reflects the actual implementation.
+> **Role:** Hub doc for everything Preset Studio. Focused subdocs live in [`docs/preset-editor/`](docs/preset-editor/) and [`docs/bugs/`](docs/bugs/).
+
+---
+
+## Subdoc Index
+
+| Doc | Status | What it covers |
+|---|---|---|
+| [docs/preset-editor/image-layer-effects.md](docs/preset-editor/image-layer-effects.md) | ✅ Shipped | Per-layer transform / motion / visual effect / audio reactivity reference. GLSL pipeline order. Up-next backlog. |
+| [docs/preset-editor/library-panel.md](docs/preset-editor/library-panel.md) | ✅ Shipped (§10 known bug) | Library panel design, dual-mode sidebar, thumbnails, save/load flow. §10 documents the export-only-saves-images bug — fix is the One Truth work below. §11 Solid FX audio reactivity. |
+| [docs/preset-editor/gif-playback.md](docs/preset-editor/gif-playback.md) | ✅ Shipped | Animated GIF playback + GIF Optimizer (frame reduction, resize, GPU memory preview). |
+| [docs/preset-editor/radius-slider.md](docs/preset-editor/radius-slider.md) | ✅ Shipped May 3, 2026 | SDF rounded-corner radius slider for image layer tiles. |
+| [docs/preset-editor/future-effects.md](docs/preset-editor/future-effects.md) | 📋 Future | Pipeline of new image-layer effects. Chromatic Aberration sets the quality bar. |
+| [docs/preset-editor/layer-header-redesign.md](docs/preset-editor/layer-header-redesign.md) | 📋 Planning | Layer card header redesign options. |
+| [docs/bugs/strobe.md](docs/bugs/strobe.md) | ✅ Fixed | Strobe slider not visible — handoff and root cause. |
+| [docs/bugs/image-mirror.md](docs/bugs/image-mirror.md) | ✅ Fixed | Canvas Mirror not rebuilding shader on click. |
+| [docs/bugs/export-tauri.md](docs/bugs/export-tauri.md) | ✅ Fixed (needs rebuild to ship) | Tauri WKWebView swallowing `<a download>`. |
+| [docs/bugs/white-flash.md](docs/bugs/white-flash.md) | ✅ Fixed | White flash on startup. |
+| [docs/bugs/fullscreen-macos.md](docs/bugs/fullscreen-macos.md) | ✅ Fixed | Fullscreen button no-op in Tauri macOS. |
 
 ---
 
@@ -598,6 +617,39 @@ Objects tab was shipped then pulled. Most preset shapes are equation-driven — 
 
 ---
 
+## ✅ Closed bug — Preset load state contamination (May 2026)
+
+> **Status:** Fixed 2026-05-04 → [docs/bugs/preset-load-contamination.md](docs/bugs/preset-load-contamination.md)
+>
+> First foundational step toward the One Truth Goal below. Preset load is now genuinely clean across all 4 entry points.
+
+**Symptom:** Loading a preset does not clear out settings from the previously-loaded preset. Affects every load entry point:
+
+1. `?preset=NAME` URL handler — main app drawer "Remix in Studio" icon, floating control bar pencil, direct link
+2. `?custom=KEY` URL handler — main app drawer "Edit in Studio" pencil on custom rows
+3. In-editor Remix picker (`Remix…` button in panel footer)
+4. Library panel card click (`handleLibraryLoad(id)`)
+
+**What was wrong (2 layers, both needed):**
+
+1. **State / DOM seam:** The 4 loader paths funnel into 2 inspector methods (`loadBundledPreset`, `loadPresetData`). Both diverged from the working `_bindReset` pattern in different ways — `loadPresetData` overlaid saved fields directly onto `currentState` (no BLANK base, so older saves missing newer fields produced `undefined → NaN` sliders), called `_buildCompShader()` *before* the image loop (so image GLSL was missing from the rebuilt comp), and never cleared variation chips, palette chips, `_solidColor`, or Solid FX panel visibility.
+2. **GPU framebuffer:** butterchurn keeps `prevTexture` / `targetTexture` framebuffers across `loadPreset` calls. The editor's auto-built comp uses `texture(sampler_main, uv) * 2.0` as base color — a 2× amplifier. Combined with butterchurn's typical `decay ≈ 0.98`, this creates an amplification loop where bright pixels from the previous preset saturate at 1.0 and never fade. Geiss's zebra warp stayed fully visible behind a fresh custom preset's image layers.
+
+**The fix:**
+- Extract `_clearForLoad()` shared by reset / `loadBundledPreset` / `loadPresetData`.
+- `loadPresetData` overlays saved fields onto BLANK (not directly into `currentState`).
+- `_buildCompShader()` runs after the image loop.
+- New `clearFeedbackBuffer()` on `VisualizerEngine` zeroes butterchurn's `prevFrameBuffer` / `targetFrameBuffer` via direct GL calls.
+
+**Architectural insights this exposed (load-bearing for future work):**
+- The 2× brightness in `_buildCompShader` is **not** removable — it matches butterchurn's own default comp's brightness boost, and removing it dims every editor preset by half. But it makes any sample-and-write-back path on `sampler_main` an amplification loop unless the framebuffer is explicitly reset at boundaries. New base-color modes that read `sampler_main` need to think about this.
+- Reaching into `visualizer.renderer.prevFrameBuffer` is private-API. Works on butterchurn 2.6.7. If butterchurn ever exposes a public `clearFeedback`, switch to it. The accessors are `?.`-chained so missing fields fail silently rather than throwing.
+- "Clean preset load" now means BOTH state-side cleanup AND framebuffer cleanup. Both must happen for a true reset.
+
+This bug is the first concrete step toward the One Truth Goal below. Fixing the load path was the prerequisite — the schema-unification work that closes the export bug ([docs/preset-editor/library-panel.md](docs/preset-editor/library-panel.md) §10) is the next step.
+
+---
+
 ## The One Truth Goal — Primary Architecture Objective
 
 > Captured Apr 2026. This is the north star for the next major dev phase.
@@ -681,6 +733,30 @@ The moment the editor invents its own field names or silently omits standard one
 - Export the saved preset — the `.json` is the complete preset, importable anywhere
 - Import that `.json` back — all settings restored perfectly, including palette, motion, wave, feel, and images
 - Strip the editor envelope fields → valid `.milk`-compatible object that any MilkDrop renderer can play
+
+### Progress so far
+
+| Step | Status |
+|---|---|
+| Load any library preset into the editor | ✅ Shipped (`?preset=`, Remix picker, "Remix in Studio" icon) |
+| Load any custom preset into the editor | ✅ Shipped (`?custom=`, Library panel) |
+| **Load is genuinely clean** — no leakage between presets, both state-side and GPU-side | ✅ Shipped 2026-05-04 — see [docs/bugs/preset-load-contamination.md](docs/bugs/preset-load-contamination.md) |
+| `currentState` always holds the complete preset object | 🟡 Partial — `loadPresetData` now overlays onto BLANK, so missing fields fall back to defaults instead of being absent. But the editor still doesn't write to all `baseVals` / shapes / waves the user could touch in a remixed library preset (the One Truth gap). |
+| Save serialises the complete preset object | 🔴 Not yet — same gap. Save writes whatever's in `currentState`, which is a strict superset of the editor's controls but a strict subset of a full library preset. |
+| Export = save | 🟡 Already true mechanically; will become correct automatically once save is correct. |
+| Strip envelope → valid `.milk` | 🔴 Not yet — depends on save being complete. |
+
+The **clean load** step (May 2026) was the unblocker. With load now reliable, the next sensible piece of One Truth work is making sure every control the user can touch in the editor maps deterministically into `currentState` — and conversely, that loading a remixed library preset preserves the parts of `baseVals` / `shapes` / `waves` / `frame_eqs_str` the editor doesn't directly expose. That alone closes the export bug as a side effect.
+
+### Tuning controls — what to keep in mind
+
+Any time we add, remove, or change a control in the editor, run it through this checklist:
+
+1. **Does the new control write to `currentState`?** All user-visible state must live there, not in a side variable. Use `_preSnap` / `_postSnap` to make it undoable.
+2. **Does `_clearForLoad` cover it?** Variation chips, palette chips, scene mirror, Images Only — all of these have UI active states that need explicit clearing on preset load. New segmented controls / chips need to follow the same pattern.
+3. **Does it have a default in `BLANK`?** If not, older saves that pre-date the field will load with `undefined` and `_syncSlider` will produce `NaN` value labels. Always extend `BLANK` when adding a slider.
+4. **Does it survive round-trip?** Save a preset with the new control set, reload via Library, verify the value is restored.
+5. **If it touches `_buildCompShader`, does it sample `sampler_main`?** If yes, audit whether the new code path could create a feedback amplification loop (any read-write-read-write cycle on `sampler_main` with a multiplier > decay). If the answer might be yes, ensure boundary clears happen via `clearFeedbackBuffer()`.
 
 ---
 

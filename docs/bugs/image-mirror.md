@@ -1,5 +1,7 @@
 # Canvas Mirror Bug — Audit & Fix
 
+> **Status:** ✅ Fixed. Kept for reference.
+
 ## Symptom
 
 Canvas Mirror (Off / H / V / Both) appeared to do nothing, or only worked intermittently after unrelated actions.

@@ -1,6 +1,6 @@
 # Export Fix — Tauri macOS File Save
 
-> **Status:** ✅ Implemented — Apr 2026. Requires `./build-and-sign.sh` rebuild for the macOS app.
+> **Status:** ✅ Fixed — Apr 2026. Kept for reference. Requires `./build-and-sign.sh` rebuild to ship in the macOS app.
 > **Date:** Apr 2026.
 
 ---

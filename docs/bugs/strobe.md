@@ -1,8 +1,8 @@
 # Strobe Slider Bug — Handoff Document
 
-> **Status:** Unresolved  
-> **File:** `src/editor/inspector.js`  
-> **Date:** 2026-04-28  
+> **Status:** ✅ Fixed. Kept for reference.
+> **File:** `src/editor/inspector.js`
+> **Date:** 2026-04-28
 > **Symptom:** Moving the Strobe slider in the Image tab of the Inspector panel produces no visible change on the canvas.
 
 ---

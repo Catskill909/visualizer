@@ -766,6 +766,38 @@ export class VisualizerEngine {
     this._gifAnimations.delete(name);
   }
 
+  /**
+   * Reset butterchurn's feedback framebuffers to black.
+   *
+   * Why: butterchurn keeps `prevTexture` / `targetTexture` framebuffers across
+   * `loadPreset` calls. The editor's auto-generated comp shader reads
+   * `sampler_main` (the warp output) and multiplies by 2.0, so any pixels left
+   * over from the previous preset are amplified rather than decayed and stay
+   * visible behind the new preset. Calling this after a preset load forces the
+   * next frame to start from a clean black buffer.
+   */
+  clearFeedbackBuffer() {
+    const renderer = this.visualizer?.renderer;
+    const gl = renderer?.image?.gl;
+    if (!renderer || !gl) return;
+
+    const prevClear = gl.getParameter(gl.COLOR_CLEAR_VALUE);
+    const prevBinding = gl.getParameter(gl.FRAMEBUFFER_BINDING);
+
+    gl.clearColor(0, 0, 0, 0);
+    if (renderer.prevFrameBuffer) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, renderer.prevFrameBuffer);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+    }
+    if (renderer.targetFrameBuffer) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, renderer.targetFrameBuffer);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+    }
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, prevBinding);
+    gl.clearColor(prevClear[0], prevClear[1], prevClear[2], prevClear[3]);
+  }
+
   /** Update playback speed of a running GIF animation (1.0 = native, 2.0 = 2× faster). */
   setGifAnimationSpeed(name, speed) {
     const anim = this._gifAnimations.get(name);

@@ -1091,14 +1091,8 @@ export class EditorInspector {
     _bindReset() {
         document.getElementById('btn-reset')?.addEventListener('click', () => {
             this._preSnap();
-            // Clear image layer DOM and release textures
-            const layersEl = document.getElementById('image-layers');
-            if (layersEl) layersEl.innerHTML = '';
-            for (const texName of Object.keys(this._imageTextures)) {
-                this.engine.removeGifAnimation?.(texName);
-            }
-            this._imageTextures = {};
-            this.currentState = deepClone(BLANK);
+            this._clearForLoad();
+
             const v0 = BASE_VARIATIONS[0];
             this._solidColor = v0.solid || null;
             this.currentState.baseVals = { ...deepClone(BLANK.baseVals), ...v0.bv };
@@ -1107,27 +1101,54 @@ export class EditorInspector {
                 this.currentState.baseVals.wave_g = v0.solid[1];
                 this.currentState.baseVals.wave_b = v0.solid[2];
             }
-            this.currentState.solidPulse = v0.solidPulse ?? 0;
+            this.currentState.solidPulse  = v0.solidPulse  ?? 0;
             this.currentState.solidBreath = v0.solidBreath ?? 0;
-            this.currentState.solidShift = v0.solidShift ?? 0;
+            this.currentState.solidShift  = v0.solidShift  ?? 0;
             this.currentState.solidColorB = (v0.solidColorB || [0, 0, 0]).slice();
             this.currentState.solidReactSource = v0.solidReactSource ?? 'bass';
             this.currentState.solidReactCurve  = v0.solidReactCurve  ?? 'linear';
-            this._imagesOnly = false;
-            const ioToggle = document.getElementById('toggle-images-only');
-            if (ioToggle) ioToggle.checked = false;
+
             this._postSnap();
             this._buildCompShader();
             this._applyToEngine();
             this._syncAllControls();
             this._updateLayersBar();
-            this._clearPaletteActive();
             this._updateSolidFxVisibility(v0);
             // Re-highlight the first variation (Solid)
             document.querySelectorAll('.base-var-btn').forEach((el, idx) => {
                 el.classList.toggle('active', idx === 0);
             });
         });
+    }
+
+    /** Reset the editor to a known-clean state. Shared by reset, loadBundledPreset,
+     *  and loadPresetData so all three start from the same baseline. Callers then
+     *  overlay their own data on top. */
+    _clearForLoad() {
+        const layersEl = document.getElementById('image-layers');
+        if (layersEl) layersEl.innerHTML = '';
+        for (const texName of Object.keys(this._imageTextures)) {
+            this.engine.removeGifAnimation?.(texName);
+        }
+        this._imageTextures = {};
+
+        this.currentState = deepClone(BLANK);
+
+        this._solidColor = null;
+        this._imagesOnly = false;
+
+        this._clearPaletteActive();
+        document.querySelectorAll('.base-var-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('#scene-mirror-seg .seg').forEach(s => {
+            s.classList.toggle('active', s.dataset.smirror === 'none');
+        });
+        const ioToggle = document.getElementById('toggle-images-only');
+        if (ioToggle) ioToggle.checked = false;
+
+        // Wipe butterchurn's feedback buffer so pixels from the previous preset
+        // don't bleed through (the auto-built comp shader samples sampler_main
+        // and amplifies it 2×, which prevents natural decay).
+        this.engine.clearFeedbackBuffer?.();
     }
 
     // ─── Image dropzone ────────────────────────────────────────────────────────
@@ -3782,24 +3803,12 @@ export class EditorInspector {
         const bundled = this.engine.presets?.[name];
         if (!bundled) throw new Error(`Preset not found: ${name}`);
 
-        // Clear existing image layers and textures
-        const layersEl = document.getElementById('image-layers');
-        if (layersEl) layersEl.innerHTML = '';
-        for (const texName of Object.keys(this._imageTextures)) {
-            this.engine.removeGifAnimation?.(texName);
-        }
-        this._imageTextures = {};
+        this._clearForLoad();
 
-        // Build currentState: start from BLANK (all editor fields) then overlay the
-        // bundled preset's MilkDrop data.
-        this.currentState = deepClone(BLANK);
-
-        // baseVals — bundled values win over BLANK defaults
+        // Overlay bundled MilkDrop data on top of the BLANK base
         if (bundled.baseVals) {
             this.currentState.baseVals = { ...deepClone(BLANK.baseVals), ...bundled.baseVals };
         }
-
-        // Full MilkDrop structure
         this.currentState.shapes = deepClone(bundled.shapes || []);
         this.currentState.waves  = deepClone(bundled.waves  || []);
         this.currentState.warp   = bundled.warp || '';
@@ -3814,46 +3823,12 @@ export class EditorInspector {
         // be replaced when the user adds image layers or picks a new variation.
         this.currentState.comp = bundled.comp || BLANK_COMP;
 
-        // Editor-specific fields — clear solid mode (not applicable to library presets)
-        this.currentState.images          = [];
-        this.currentState.sceneMirror     = 'none';
-        this.currentState.imagesOnly      = false;
-        this.currentState.solidPulse      = 0;
-        this.currentState.solidBreath     = 0;
-        this.currentState.solidShift      = 0;
-        this.currentState.solidColorB     = [0, 0, 0];
-        this.currentState.solidReactSource = 'bass';
-        this.currentState.solidReactCurve  = 'linear';
-
-        // Track remix origin so the saved preset can reference its parent
+        // Track remix origin so a save references the parent
         this.currentState.parentPresetName = name;
 
-        // Internal editor state
-        this._solidColor = null;
-        this._imagesOnly = false;
-
-        // Apply the bundled comp/warp directly to the engine
         this._applyToEngine();
-
-        // Sync all controls to the loaded state
         this._syncAllControls();
-
-        // Clear variation chip active states — library preset ≠ any variation
-        document.querySelectorAll('.base-var-btn').forEach(btn => btn.classList.remove('active'));
-
-        // Reset scene mirror UI
-        document.querySelectorAll('#scene-mirror-seg .seg').forEach(s => {
-            s.classList.toggle('active', s.dataset.smirror === 'none');
-        });
-
-        // Reset Images Only toggle
-        const ioToggle = document.getElementById('toggle-images-only');
-        if (ioToggle) ioToggle.checked = false;
-
-        // Hide solid FX panel (not applicable to library presets)
         this._updateSolidFxVisibility({ solid: null });
-
-        // Update image layer bar
         this._updateLayersBar();
         this._updateLayerIndices();
 
@@ -3868,25 +3843,24 @@ export class EditorInspector {
      * @param {object} presetData - preset object as returned by loadAllCustomPresets()
      */
     async loadPresetData(presetData) {
-        // 1. Clear existing image layers
-        const layersEl = document.getElementById('image-layers');
-        if (layersEl) layersEl.innerHTML = '';
-        for (const texName of Object.keys(this._imageTextures)) {
-            this.engine.removeGifAnimation?.(texName);
-        }
-        this._imageTextures = {};
+        this._clearForLoad();
 
-        // 2. Set state from preset (strip library-only metadata)
+        // Strip library-only metadata
         const { id: _id, name: _name, schemaVersion: _sv, createdAt: _ca, updatedAt: _ua,
                 thumbnailDataUrl: _th, ...stateFields } = presetData;
-        this.currentState = deepClone({ ...stateFields, images: [] });
-        this.originalState = deepClone(this.currentState);
 
-        // 3. Sync all non-image controls
-        this._buildCompShader();
-        this._syncAllControls();
+        // Overlay onto BLANK so fields missing from older saves fall back to defaults
+        // (avoids `undefined` propagating into _syncSlider → NaN value labels).
+        this.currentState = {
+            ...deepClone(BLANK),
+            ...deepClone(stateFields),
+            images: [],
+        };
 
-        // 4. Restore image layers (async — fetch blobs from IndexedDB)
+        // Restore internal flags from the loaded state
+        this._imagesOnly = !!this.currentState.imagesOnly;
+
+        // Restore image layers (async — fetch blobs from IndexedDB)
         const savedImages = stateFields.images || [];
         for (const savedEntry of savedImages) {
             try {
@@ -3917,19 +3891,24 @@ export class EditorInspector {
             }
         }
 
+        // Build comp AFTER images are loaded so the GLSL includes their layer code.
+        this._buildCompShader();
         this._applyToEngine();
+
+        this._syncAllControls();
+        this._updateSolidFxVisibility({ solid: this._solidColor });
         this._updateLayersBar();
         this._updateLayerIndices();
 
-        // Sync scene mirror segment
-        const smSeg = document.querySelectorAll('#scene-mirror-seg .seg');
+        // Sync scene mirror + Images Only from the loaded currentState
+        // (clearForLoad reset them to defaults; now restore from saved state)
         const sm = this.currentState.sceneMirror || 'none';
-        smSeg.forEach(s => s.classList.toggle('active', s.dataset.smirror === sm));
-
-        // Sync Images Only toggle
+        document.querySelectorAll('#scene-mirror-seg .seg').forEach(s =>
+            s.classList.toggle('active', s.dataset.smirror === sm));
         const ioToggle = document.getElementById('toggle-images-only');
         if (ioToggle) ioToggle.checked = !!this.currentState.imagesOnly;
-        this._imagesOnly = !!this.currentState.imagesOnly;
+
+        this.originalState = deepClone(this.currentState);
     }
 }
 
