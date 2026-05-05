@@ -84,8 +84,64 @@ async function resizeImageFile(file, maxDim) {
 
 // ─── Blank start state ────────────────────────────────────────────────────────
 
+// Generates inline GLSL to apply sat/hue to `col` (vec3 background) BEFORE image
+// layers are composited. Returns empty string at defaults → zero cost.
+function buildSatHueOnColGlsl(sat, hue) {
+    const s = (typeof sat === 'number' && isFinite(sat)) ? sat : 1.0;
+    const h = (typeof hue === 'number' && isFinite(hue)) ? hue : 0;
+    const satLine = (Math.abs(s - 1.0) < 0.001) ? '' :
+        `  float _bg_lum = dot(col, vec3(0.299, 0.587, 0.114));
+  col = mix(vec3(_bg_lum), col, ${s.toFixed(4)});
+`;
+    const rad = h * Math.PI / 180;
+    const cosA = Math.cos(rad).toFixed(6);
+    const sinA = Math.sin(rad).toFixed(6);
+    const oneMinusCos = (1 - Math.cos(rad)).toFixed(6);
+    const hueLine = (Math.abs(h) < 0.01) ? '' :
+        `  { vec3 _bgk = vec3(0.57735);
+  col = col * ${cosA} + cross(_bgk, col) * ${sinA} + _bgk * dot(_bgk, col) * ${oneMinusCos}; }
+`;
+    return satLine + hueLine;
+}
+
+function buildStudioPostFxGlsl(sat, hue) {
+    const s = (typeof sat === 'number' && isFinite(sat)) ? sat : 1.0;
+    const h = (typeof hue === 'number' && isFinite(hue)) ? hue : 0;
+    const rad = h * Math.PI / 180;
+    const cosA = Math.cos(rad).toFixed(6);
+    const sinA = Math.sin(rad).toFixed(6);
+    const oneMinusCos = (1 - Math.cos(rad)).toFixed(6);
+    const satLine = (Math.abs(s - 1.0) < 0.001) ? '' :
+        `\n    float _lum = dot(ret.rgb, vec3(0.299, 0.587, 0.114));\n    ret.rgb = mix(vec3(_lum), ret.rgb, ${s.toFixed(4)});`;
+    const hueLine = (Math.abs(h) < 0.01) ? '' :
+        `\n    vec3 _k = vec3(0.57735);\n    ret.rgb = ret.rgb * ${cosA} + cross(_k, ret.rgb) * ${sinA} + _k * dot(_k, ret.rgb) * ${oneMinusCos};`;
+    return `    /* STUDIO_POST_FX */\n    if (brighten != 0) ret = sqrt(ret);\n    if (darken != 0) ret = ret * ret;\n    if (solarize != 0) ret = ret * (1.0 - ret) * 4.0;\n    if (invert != 0) ret = 1.0 - ret;${satLine}${hueLine}\n`;
+}
+
+function stripStudioPostFx(compText) {
+    if (!compText) return compText;
+    const markerPos = compText.indexOf('/* STUDIO_POST_FX */');
+    if (markerPos === -1) return compText;
+    const nlBefore = compText.lastIndexOf('\n', markerPos - 1);
+    const lastCurly = compText.lastIndexOf('}');
+    if (nlBefore === -1 || lastCurly === -1) return compText;
+    return compText.slice(0, nlBefore) + compText.slice(lastCurly);
+}
+
+function injectStudioPostFx(compText, opts) {
+    if (!compText || compText.indexOf('shader_body') === -1) return compText;
+    const clean = stripStudioPostFx(compText);
+    const lastCurly = clean.lastIndexOf('}');
+    if (lastCurly === -1) return clean;
+    const sat = (opts && opts.sat != null) ? opts.sat : 1.0;
+    const hue = (opts && opts.hue != null) ? opts.hue : 0;
+    const glsl = buildStudioPostFxGlsl(sat, hue);
+    return `${clean.slice(0, lastCurly)}\n${glsl}${clean.slice(lastCurly)}`;
+}
+
 // Minimal passthrough comp shader — butterchurn won't accept an empty string.
-const BLANK_COMP = ' shader_body { \n  vec4 tmpvar_1;\n  tmpvar_1.w = 1.0;\n  tmpvar_1.xyz = (texture (sampler_main, uv).xyz * 2.0);\n  ret = tmpvar_1.xyz;\n }';
+const BLANK_COMP_RAW = ' shader_body { \n  vec4 tmpvar_1;\n  tmpvar_1.w = 1.0;\n  tmpvar_1.xyz = (texture (sampler_main, uv).xyz * 2.0);\n  ret = tmpvar_1.xyz;\n }';
+const BLANK_COMP = injectStudioPostFx(BLANK_COMP_RAW);
 
 const BLANK = {
     baseVals: {
@@ -104,7 +160,10 @@ const BLANK = {
         ob_size: 0.0, ob_r: 0.0, ob_g: 0.0, ob_b: 0.0, ob_a: 0.0,
         ib_size: 0.0, ib_r: 0.0, ib_g: 0.0, ib_b: 0.0, ib_a: 0.0,
         mv_x: 12, mv_y: 9, mv_l: 0.9, mv_r: 0.0, mv_g: 0.0, mv_b: 1.0, mv_a: 0.0,
-        darken: 0, invert: 0, b1ed: 0.5,
+        darken: 0, invert: 0, brighten: 0, solarize: 0, darken_center: 0,
+        modwavealphabyvolume: 0,
+        studio_saturation: 1.0, studio_hue_rotate: 0,
+        b1ed: 0.5,
     },
     shapes: [], waves: [],
     warp: '',          // empty warp is valid
@@ -233,22 +292,24 @@ const BASE_VARIATIONS = [
     },
 ];
 
+const DEFAULT_VARIATION_INDEX = 1; // Shift
+
 // ─── Palettes ─────────────────────────────────────────────────────────────────
-// Each entry: wave colour + glow colour (ob_r/g/b), both normalised 0-1.
+// Each entry: wave + glow + accent colours, normalized 0-1.
 
 const PALETTES = [
-    { name: 'Mono', wave: [1.00, 1.00, 1.00], glow: [0.80, 0.80, 0.80] },
-    { name: 'Neon', wave: [0.00, 0.90, 1.00], glow: [0.00, 0.30, 1.00] },
-    { name: 'Electric', wave: [0.20, 1.00, 0.40], glow: [0.00, 0.60, 0.20] },
-    { name: 'Fire', wave: [1.00, 0.30, 0.00], glow: [1.00, 0.70, 0.00] },
-    { name: 'Violet', wave: [0.80, 0.20, 1.00], glow: [0.40, 0.00, 0.90] },
-    { name: 'Ocean', wave: [0.10, 0.70, 1.00], glow: [0.00, 0.20, 0.80] },
-    { name: 'Sunset', wave: [1.00, 0.40, 0.20], glow: [0.90, 0.10, 0.70] },
-    { name: 'Ice', wave: [0.70, 0.90, 1.00], glow: [0.50, 0.80, 1.00] },
-    { name: 'Gold', wave: [1.00, 0.80, 0.00], glow: [1.00, 0.40, 0.10] },
-    { name: 'Rose', wave: [1.00, 0.30, 0.60], glow: [0.90, 0.10, 0.40] },
-    { name: 'Acid', wave: [0.80, 1.00, 0.00], glow: [0.30, 0.90, 0.10] },
-    { name: 'Plasma', wave: [1.00, 0.00, 0.80], glow: [0.20, 0.80, 1.00] },
+    { name: 'Mono', wave: [1.00, 1.00, 1.00], glow: [0.80, 0.80, 0.80], accent: [0.50, 0.50, 0.50] },
+    { name: 'Neon', wave: [0.00, 0.90, 1.00], glow: [0.00, 0.30, 1.00], accent: [1.00, 0.00, 0.50] },
+    { name: 'Electric', wave: [0.20, 1.00, 0.40], glow: [0.00, 0.60, 0.20], accent: [0.60, 0.00, 1.00] },
+    { name: 'Fire', wave: [1.00, 0.30, 0.00], glow: [1.00, 0.70, 0.00], accent: [1.00, 0.55, 0.00] },
+    { name: 'Violet', wave: [0.80, 0.20, 1.00], glow: [0.40, 0.00, 0.90], accent: [0.00, 0.90, 0.90] },
+    { name: 'Ocean', wave: [0.10, 0.70, 1.00], glow: [0.00, 0.20, 0.80], accent: [1.00, 0.40, 0.20] },
+    { name: 'Sunset', wave: [1.00, 0.40, 0.20], glow: [0.90, 0.10, 0.70], accent: [1.00, 0.75, 0.00] },
+    { name: 'Ice', wave: [0.70, 0.90, 1.00], glow: [0.50, 0.80, 1.00], accent: [0.90, 1.00, 1.00] },
+    { name: 'Gold', wave: [1.00, 0.80, 0.00], glow: [1.00, 0.40, 0.10], accent: [1.00, 0.10, 0.00] },
+    { name: 'Rose', wave: [1.00, 0.30, 0.60], glow: [0.90, 0.10, 0.40], accent: [0.70, 0.20, 1.00] },
+    { name: 'Acid', wave: [0.80, 1.00, 0.00], glow: [0.30, 0.90, 0.10], accent: [0.00, 0.50, 1.00] },
+    { name: 'Plasma', wave: [1.00, 0.00, 0.80], glow: [0.20, 0.80, 1.00], accent: [1.00, 0.40, 0.00] },
 ];
 
 // ─── Wave mode definitions ────────────────────────────────────────────────────
@@ -342,9 +403,10 @@ export class EditorInspector {
         this._abActive = false;
         this._imageTextures = {};     // texName → { data, width, height } — survives preset reloads
         this._imagesOnly = false;     // when true: black comp base, no wave
-        this._solidColor = BASE_VARIATIONS[0].solid || null;  // solid color base for first variation
+        this._solidColor = BASE_VARIATIONS[DEFAULT_VARIATION_INDEX].solid || null;
         this._hdUploads = false;      // when true: next upload is resized to HD_MAX_DIM instead of STD_MAX_DIM
         this._lastBuildMs = 0;        // dev monitor: last shader rebuild time
+        this._baseComp = BLANK_COMP_RAW;  // pre-injection comp; re-injected when sat/hue change
 
         this.onchange = null;   // set by main.js for dirty-state tracking
 
@@ -372,9 +434,8 @@ export class EditorInspector {
         this._initDevHud();
         this._updateLayersBar();
 
-        // Apply the first variation (Solid) as the startup state — gives users
-        // something to look at immediately instead of a black screen.
-        const v0 = BASE_VARIATIONS[0];
+        // Apply the default variation (Shift) as the startup state.
+        const v0 = BASE_VARIATIONS[DEFAULT_VARIATION_INDEX];
         this.currentState.baseVals = { ...deepClone(BLANK.baseVals), ...v0.bv };
         if (v0.solid) {
             this.currentState.baseVals.wave_r = v0.solid[0];
@@ -418,7 +479,7 @@ export class EditorInspector {
         if (!grid) return;
         BASE_VARIATIONS.forEach((v, i) => {
             const btn = document.createElement('button');
-            btn.className = 'base-var-btn' + (i === 0 ? ' active' : '');
+            btn.className = 'base-var-btn' + (i === DEFAULT_VARIATION_INDEX ? ' active' : '');
             btn.dataset.variation = i;
             btn.setAttribute('data-tooltip', v.desc);
             btn.innerHTML = `
@@ -573,6 +634,7 @@ export class EditorInspector {
         PALETTES.forEach((p, i) => {
             const wHex = rgbToHex(...p.wave);
             const gHex = rgbToHex(...p.glow);
+            const aHex = rgbToHex(...p.accent);
             const btn = document.createElement('button');
             btn.className = 'palette-chip';
             btn.setAttribute('data-tooltip', p.name);
@@ -581,6 +643,7 @@ export class EditorInspector {
         <span class="chip-dots">
           <span class="chip-dot" style="background:${wHex}"></span>
           <span class="chip-dot chip-dot--glow" style="background:${gHex}"></span>
+          <span class="chip-dot chip-dot--accent" style="background:${aHex}"></span>
         </span>
         <span class="chip-name">${p.name}</span>
       `;
@@ -595,13 +658,17 @@ export class EditorInspector {
         const bv = this.currentState.baseVals;
         [bv.wave_r, bv.wave_g, bv.wave_b] = p.wave;
         [bv.ob_r, bv.ob_g, bv.ob_b] = p.glow;
+        [bv.ib_r, bv.ib_g, bv.ib_b] = p.accent;
         bv.ob_a = 0.75;
         bv.ob_size = 0.02;
+        if (!bv.ib_a) bv.ib_a = 0.5;
+        if (!bv.ib_size) bv.ib_size = 0.01;
         this._postSnap();
         // Rebuild comp shader so solid-color base picks up the new wave_r/g/b
         this._buildCompShader();
         this._applyToEngine();
         this._syncColorSwatches();
+        this._syncPaletteSliders();
         // Highlight active chip
         document.querySelectorAll('.palette-chip').forEach((el, idx) => {
             el.classList.toggle('active', idx === i);
@@ -619,6 +686,9 @@ export class EditorInspector {
             { id: 'ps-ob-a', label: 'Outer Border Alpha', min: 0, max: 1.0, step: 0.01, value: BLANK.baseVals.ob_a, key: 'ob_a' },
             { id: 'ps-ib-size', label: 'Inner Border Size', min: 0, max: 0.1, step: 0.001, value: BLANK.baseVals.ib_size, decimals: 3, key: 'ib_size' },
             { id: 'ps-ib-a', label: 'Inner Border Alpha', min: 0, max: 1.0, step: 0.01, value: BLANK.baseVals.ib_a, key: 'ib_a' },
+            { id: 'ps-wavefade', label: 'Fade Wave in Silence', min: 0, max: 2.0, step: 0.01, value: BLANK.baseVals.modwavealphabyvolume, key: 'modwavealphabyvolume' },
+            { id: 'ps-saturation', label: 'Saturation', min: 0, max: 2.0, step: 0.01, value: 1.0, key: 'studio_saturation', reInject: true },
+            { id: 'ps-hue', label: 'Hue Rotate', min: 0, max: 360, step: 1, value: 0, key: 'studio_hue_rotate', reInject: true },
         ];
         configs.forEach(cfg => {
             const input = makeSlider(container, cfg);
@@ -629,10 +699,31 @@ export class EditorInspector {
                 if (valEl) valEl.textContent = v.toFixed(cfg.decimals ?? 2);
                 input.style.setProperty('--pct', `${((v - cfg.min) / (cfg.max - cfg.min)) * 100}%`);
                 this.currentState.baseVals[cfg.key] = v;
-                this._applyToEngine(true);
+                if (cfg.reInject) this._rebuildPostFx();
+                else this._applyToEngine(true);
             });
             input.addEventListener('pointerup', () => this._postSnap());
         });
+    }
+
+    // ─── Post-FX shader rebuild (saturation / hue rotate) ────────────────────
+
+    _rebuildPostFx() {
+        const bv = this.currentState.baseVals;
+        const opts = { sat: bv.studio_saturation ?? 1.0, hue: bv.studio_hue_rotate ?? 0 };
+        // When images are present, sat/hue must be baked inline into `col` BEFORE
+        // image layers blend in (_buildCompShader handles this). The end-block
+        // strip+re-inject can't reach that position, so delegate to a full rebuild.
+        if ((this.currentState.images || []).length > 0) {
+            this._buildCompShader();
+            this._applyToEngine(true);
+            return;
+        }
+        // No images — strip old post-FX from current comp and re-inject with new values.
+        // Do NOT use this._baseComp here — solid-mode variations build their comp
+        // through a separate path that doesn't update _baseComp.
+        this.currentState.comp = injectStudioPostFx(this.currentState.comp, opts);
+        this._applyToEngine(true);
     }
 
     // ─── Color swatches ────────────────────────────────────────────────────────
@@ -984,6 +1075,9 @@ export class EditorInspector {
         const map = {
             'toggle-invert': 'invert',
             'toggle-darken': 'darken',
+            'toggle-brighten-fx': 'brighten',
+            'toggle-solarize': 'solarize',
+            'toggle-darken-center': 'darken_center',
             'toggle-dots': 'wave_usedots',
             'toggle-additive': 'additivewave',
             'toggle-brighten': 'wave_brighten',
@@ -1163,7 +1257,7 @@ export class EditorInspector {
             this._preSnap();
             this._clearForLoad();
 
-            const v0 = BASE_VARIATIONS[0];
+            const v0 = BASE_VARIATIONS[DEFAULT_VARIATION_INDEX];
             this._solidColor = v0.solid || null;
             this.currentState.baseVals = { ...deepClone(BLANK.baseVals), ...v0.bv };
             if (v0.solid) {
@@ -1184,9 +1278,9 @@ export class EditorInspector {
             this._syncAllControls();
             this._updateLayersBar();
             this._updateSolidFxVisibility(v0);
-            // Re-highlight the first variation (Solid)
+            // Re-highlight the default variation (Shift)
             document.querySelectorAll('.base-var-btn').forEach((el, idx) => {
-                el.classList.toggle('active', idx === 0);
+                el.classList.toggle('active', idx === DEFAULT_VARIATION_INDEX);
             });
         });
     }
@@ -1203,6 +1297,7 @@ export class EditorInspector {
         this._imageTextures = {};
 
         this.currentState = deepClone(BLANK);
+        this._baseComp = BLANK_COMP_RAW;
 
         this._solidColor = null;
         this._imagesOnly = false;
@@ -1940,6 +2035,8 @@ export class EditorInspector {
             tintG: 1.00,
             tintB: 1.00,
             hueSpinSpeed: 0.00, // tint hue rotation speed (cycles/sec)
+            imageSaturation: 1.00, // per-layer saturation (0=grey, 1=original, 2=vivid)
+            imageHue: 0,           // per-layer static hue offset in degrees (0–360)
             tile: true,
             blendMode: 'overlay',
             audioPulse: 0.00,  // bass drives size
@@ -2292,6 +2389,18 @@ export class EditorInspector {
                 value="${entry.hueSpinSpeed}" style="--pct:${pct(entry.hueSpinSpeed, 0, 2)}">
               <span class="lsv">${entry.hueSpinSpeed.toFixed(2)}</span>
             </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Saturation of this image layer (0=greyscale, 1=original, 2=vivid)">Saturation</span>
+              <input type="range" class="slider layer-img-sat-sl" min="0" max="2" step="0.01"
+                value="${(entry.imageSaturation ?? 1.0).toFixed(2)}" style="--pct:${pct(entry.imageSaturation ?? 1.0, 0, 2)}">
+              <span class="lsv layer-img-sat-val">${(entry.imageSaturation ?? 1.0).toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Static hue rotation for this image layer (0–360°)">Hue</span>
+              <input type="range" class="slider layer-img-hue-sl" min="0" max="360" step="1"
+                value="${(entry.imageHue ?? 0)}" style="--pct:${pct(entry.imageHue ?? 0, 0, 360)}">
+              <span class="lsv layer-img-hue-val">${(entry.imageHue ?? 0).toFixed(0)}°</span>
+            </div>
             <div class="layer-section-divider"></div>
             <p class="layer-section-label">Visual Effects</p>
             <p class="layer-section-sub">Fluid color effects independent of audio.</p>
@@ -2633,6 +2742,30 @@ export class EditorInspector {
 
         // Tint color swatch
         const tintSwatch = card.querySelector('.layer-tint-swatch');
+        // Per-layer Saturation slider
+        const imgSatSl = card.querySelector('.layer-img-sat-sl');
+        const imgSatVal = card.querySelector('.layer-img-sat-val');
+        if (imgSatSl) {
+            imgSatSl.addEventListener('input', () => {
+                entry.imageSaturation = parseFloat(imgSatSl.value);
+                imgSatVal.textContent = entry.imageSaturation.toFixed(2);
+                imgSatSl.style.setProperty('--pct', `${(entry.imageSaturation / 2 * 100).toFixed(1)}%`);
+                refresh();
+            });
+        }
+
+        // Per-layer Hue slider
+        const imgHueSl = card.querySelector('.layer-img-hue-sl');
+        const imgHueVal = card.querySelector('.layer-img-hue-val');
+        if (imgHueSl) {
+            imgHueSl.addEventListener('input', () => {
+                entry.imageHue = parseFloat(imgHueSl.value);
+                imgHueVal.textContent = entry.imageHue.toFixed(0) + '°';
+                imgHueSl.style.setProperty('--pct', `${(entry.imageHue / 360 * 100).toFixed(1)}%`);
+                refresh();
+            });
+        }
+
         const tintPicker = card.querySelector('.layer-tint-picker');
         const rgbToHexLocal = (r, g, b) => '#' + [r, g, b].map(v => Math.round(v * 255).toString(16).padStart(2, '0')).join('');
         tintSwatch.addEventListener('click', () => tintPicker.click());
@@ -3343,12 +3476,28 @@ export class EditorInspector {
         } else {
             base = uvFold + `  vec3 col = ${mainSample};\n`;
         }
+        const _bv = this.currentState.baseVals;
+        const _sat = _bv.studio_saturation ?? 1.0;
+        const _hue = _bv.studio_hue_rotate ?? 0;
+        const _hasImages = visibleImages.length > 0;
+
         let body = base;
+        // When images are present, apply sat/hue to `col` HERE — after `col` is
+        // initialised from the MilkDrop background but BEFORE any image layer is
+        // composited into it.  That way image pixels are never colour-shifted.
+        if (_hasImages) {
+            const _satHue = buildSatHueOnColGlsl(_sat, _hue);
+            if (_satHue) body += _satHue;
+        }
         for (const img of visibleImages) {
             body += this._buildImageBlock(img);
         }
         body += '  ret = col;\n';
-        this.currentState.comp = `${uniforms}\n shader_body {\n${body} }`;
+        const _rawComp = `${uniforms}\n shader_body {\n${body} }`;
+        this._baseComp = _rawComp;
+        // With images: end-block uses defaults (sat=1, hue=0) — sat/hue already applied above.
+        // Without images: end-block carries the full sat/hue as before.
+        this.currentState.comp = injectStudioPostFx(_rawComp, _hasImages ? { sat: 1.0, hue: 0 } : { sat: _sat, hue: _hue });
         this._lastBuildMs = performance.now() - _t0;
     }
 
@@ -3843,6 +3992,25 @@ export class EditorInspector {
                     return `    _src *= vec3(${tintR}, ${tintG}, ${tintB});\n`;
                 }
             })() : '') +
+            (() => {
+                const _iSat = (img.imageSaturation !== undefined ? img.imageSaturation : 1.0);
+                const _iHue = (img.imageHue !== undefined ? img.imageHue : 0);
+                const hasSat = Math.abs(_iSat - 1.0) >= 0.001;
+                const hasHue = Math.abs(_iHue) >= 0.01;
+                if (!hasSat && !hasHue) return '';
+                const satLine = hasSat
+                    ? `    { float _isl = dot(_src, vec3(0.299, 0.587, 0.114)); _src = mix(vec3(_isl), _src, ${_iSat.toFixed(4)}); }\n`
+                    : '';
+                let hueLine = '';
+                if (hasHue) {
+                    const _iRad = _iHue * Math.PI / 180;
+                    const _icA = Math.cos(_iRad).toFixed(6);
+                    const _isA = Math.sin(_iRad).toFixed(6);
+                    const _ioC = (1 - Math.cos(_iRad)).toFixed(6);
+                    hueLine = `    { vec3 _ihk = vec3(0.57735); _src = _src * ${_icA} + cross(_ihk, _src) * ${_isA} + _ihk * dot(_ihk, _src) * ${_ioC}; }\n`;
+                }
+                return satLine + hueLine;
+            })() +
             (hasPosterize ? `    { float _pn = ${posterize}.0; _src = floor(_src * _pn + 0.5) / _pn; }\n` : '') +
             (img.alphaMode === 'preserve'
                 ? `    float _alphaMask = step(0.1, _t.w);\n    float _op = _alphaMask * _gapMask * clamp(${op} + _r * ${opa}, 0.0, 1.0);\n`
@@ -3863,6 +4031,9 @@ export class EditorInspector {
         this._syncSolidFx();
         this._syncToggle('toggle-invert', 'invert');
         this._syncToggle('toggle-darken', 'darken');
+        this._syncToggle('toggle-brighten-fx', 'brighten');
+        this._syncToggle('toggle-solarize', 'solarize');
+        this._syncToggle('toggle-darken-center', 'darken_center');
     }
 
     _syncPaletteSliders() {
@@ -3873,6 +4044,9 @@ export class EditorInspector {
         this._syncSlider('ps-ob-a', bv.ob_a, 0, 1.0, 2);
         this._syncSlider('ps-ib-size', bv.ib_size, 0, 0.1, 3);
         this._syncSlider('ps-ib-a', bv.ib_a, 0, 1.0, 2);
+        this._syncSlider('ps-wavefade', bv.modwavealphabyvolume, 0, 2.0, 2);
+        this._syncSlider('ps-saturation', bv.studio_saturation ?? 1.0, 0, 2.0, 2);
+        this._syncSlider('ps-hue', bv.studio_hue_rotate ?? 0, 0, 360, 0);
     }
 
     _syncSolidFx() {
@@ -3954,7 +4128,7 @@ export class EditorInspector {
             angle: 0.00, skewX: 0.00, skewY: 0.00, shakeAmp: 0.00, posterize: 0, depthOffset: 0.00, edgeSobel: false, perspX: 0.00, perspY: 0.00,
             audioPulse: 0.00, pulseInvert: false,
             blendMode: 'overlay', tile: true, groupSpin: false,
-            hueSpinSpeed: 0.00, tintR: 1.0, tintG: 1.0, tintB: 1.0,
+            hueSpinSpeed: 0.00, imageSaturation: 1.00, imageHue: 0, tintR: 1.0, tintG: 1.0, tintB: 1.0,
             name: 'Layer', fileName: '', collapsed: false,
             isHd: false, solo: false, muted: false,
         };
@@ -3994,7 +4168,10 @@ export class EditorInspector {
         // Preserve the bundled comp shader exactly — do NOT call _buildCompShader() here.
         // The bundled comp is what makes the preset look the way it does. It will only
         // be replaced when the user adds image layers or picks a new variation.
-        this.currentState.comp = bundled.comp || BLANK_COMP;
+        const _bundledRaw = stripStudioPostFx(bundled.comp || BLANK_COMP_RAW);
+        this._baseComp = _bundledRaw;
+        const _bbv = this.currentState.baseVals;
+        this.currentState.comp = injectStudioPostFx(_bundledRaw, { sat: _bbv.studio_saturation ?? 1.0, hue: _bbv.studio_hue_rotate ?? 0 });
 
         // Track remix origin so a save references the parent
         this.currentState.parentPresetName = name;

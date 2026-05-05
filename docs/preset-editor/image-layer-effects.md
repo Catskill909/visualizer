@@ -63,6 +63,8 @@
 | **Tint** | RGB color picker | Multiplies sampled color. |
 | **Hue Spin** | 0–2 rad/s | Animated RGB rotation matrix — cycles through full spectrum. |
 | **Chromatic** | 0–1 (squared curve) | RGB channel split with animated offset. Speed sub-slider. |
+| **Saturation** | 0–2 | 0 = full greyscale, 1 = original, 2 = hyper-vivid. Luminance-mix on `_src`, after tint + hue spin, before posterize. |
+| **Hue** | 0–360° | Rodrigues RGB rotation — shifts image hue independently of the Palette tab. After tint + hue spin + saturation. |
 | **Posterize** | Off / 2 / 4 / 8 / 16 | `floor(_src * n + 0.5) / n` per channel, after tint. |
 | **Edge / Sobel** | Off / On | 3×3 Sobel kernel → luminance gradient magnitude replaces `_src`. Best with Tint + Hue Spin. |
 | **Mirror** | Off / H / V / Quad / Kaleido | Scope: Per Tile or Whole Image. |
@@ -99,6 +101,8 @@ chromatic         R/B channel offset resample
 _src              base color
 Sobel kernel      edge detection (edgeSobel ON)
 tint / hue spin   color transform
+saturation        luminance mix (imageSaturation)
+hue rotate        Rodrigues RGB rotation (imageHue)
 posterize         color quantize
 opacity           _op = opacity × opacityPulse × gapMask
 blend             composite into col
