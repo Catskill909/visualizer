@@ -1,40 +1,21 @@
 # Animated GIF — Implementation Reference
 
-**Status:** ✅ Phase 1-3 shipped · 📋 Phase 4 planning active
+**Status:** ✅ Phase 1-4 shipped
 
-**Date:** 2026-04-26 (audit) · 2026-05-01 (Phase 2 fixes) · 2026-05-02 (Phase 3 timing fixes) · 2026-05-04 (Phase 4 plan)
+**Date:** 2026-04-26 (audit) · 2026-05-01 (Phase 2 fixes) · 2026-05-02 (Phase 3 timing fixes) · 2026-05-04 (Phase 4 plan) · 2026-05-05 (Phase 4 shipped)
 
 ---
 
-## Next Steps (Priority Order)
+## Phase 4 shipped — 2026-05-05
 
-### Now
-1. **Phase 4A — Perceptual speed mapping**
-  - Keep UI range 0.25×-8×.
-  - Improve control feel without changing decode/tick architecture.
+All four Phase 4 items are complete. No further planned work in this cycle.
 
-2. **Phase 4C — GIF opacity silhouette mode**
-  - Add per-layer Alpha Mode: Fade | Preserve.
-  - Default GIF layers to Preserve.
-
-### Next
-3. **Phase 4B — Stability control**
-  - Add per-layer timing stabilization (0..1) to reduce jitter independently from speed.
-
-4. **Phase 4D — Optimizer guidance**
-  - Add predicted cadence/variance in modal and intent presets (Smooth Loop / Keep Detail / Lightweight).
-
-### Definition of done for this cycle
-1. Speed is easier to dial in across mixed GIF sources.
-2. GIF opacity reduction no longer defaults to perceived size shrink.
-3. No regression in Phase 3 timing fixes or standard/optimized upload parity.
-
-### Scope guard (GIF-only)
-1. Phase 4A speed mapping applies to animated GIF layers only.
-2. Phase 4B stability control applies to animated GIF layers only.
-3. Phase 4D optimizer guidance applies to GIF upload/optimizer flow only.
-4. Phase 4C opacity behavior change targets GIF layers; static single images keep current Fade behavior by default.
-5. No default behavior change for non-GIF image layers in this phase cycle.
+| Phase | Feature | Status |
+|-------|---------|--------|
+| 4A | Perceptual speed mapping | ✅ Shipped |
+| 4C | Alpha Mode (Fade / Preserve) | ✅ Shipped |
+| 4B | Stability control | ✅ Shipped |
+| 4D | Optimizer guidance (cadence + intent presets) | ✅ Shipped |
 
 ---
 
@@ -58,6 +39,7 @@ The GIF feature is wired through three files:
 - Advance condition: `if (now < anim.nextFrameAt) continue;` — deadline check, not fixed cadence.
 - Uses `texSubImage2D` (in-place GPU write, no realloc).
 - Speed multiplier: `frameDelay = delays[frameIndex] / speed`.
+- **Stability blending** — `stability` (0–1) lerps each frame delay between its native value and `avgDelay / speed`, smoothing uneven cadence without changing overall pace.
 - **Deadline-based timing** — `nextFrameAt += frameDelay` (not `now + frameDelay`) to prevent accumulated drift. Catch-up guard: if `nextFrameAt < now` (e.g. after tab background), snap to `now + frameDelay`.
 - Pixel-store state fully saved and restored around each upload — `UNPACK_FLIP_Y_WEBGL`, `UNPACK_PREMULTIPLY_ALPHA_WEBGL`, `UNPACK_ALIGNMENT`, `UNPACK_COLORSPACE_CONVERSION_WEBGL` — Butterchurn dirties at least some of these between frames.
 - Both the standard decode path and the GIF Optimizer path use `TEXTURE_WRAP_S/T = REPEAT`.
@@ -69,9 +51,12 @@ The GIF feature is wired through three files:
 
 ### Inspector / UI — [src/editor/inspector.js](src/editor/inspector.js)
 - Upload path detects `image/gif` and skips canvas resizing (canvas `drawImage` freezes on frame 1 for animated GIFs).
-- Layer entry stores `isGif: true, gifSpeed: 2.0` (default 2× native — most web GIFs are 10fps; this targets ~20fps).
-- Speed slider (0.25×–8×) renders only for GIF layers; live-updates via `engine.setGifAnimationSpeed(texName, v)` with no reload.
-- Persisted in preset JSON; restored on reload.
+- Layer entry stores `isGif: true, gifSpeed: 2.0, gifStability: 0.0, alphaMode: 'preserve'` for new GIF layers (static images default `alphaMode: 'fade'`).
+- **Speed slider** — perceptual (log-curve) mapping; slider position `pos ∈ [0,1]` maps to `speed = 0.25 × 32^pos`. 1× native lands at ~40% travel; 2× at ~60%; 8× at 100%.
+- **Stability slider** (0–1) — 0 = native per-frame delays, 1 = perfectly even cadence. Live-updates via `engine.setGifAnimationStability(texName, v)`, no reload.
+- **Alpha Mode** (Fade / Preserve) — segmented button. Preserve uses `step(0.1, _t.w)` silhouette in the comp shader so the whole image fades uniformly instead of soft edges disappearing first. Fade is the original `_t.w` multiplication (default for static images).
+- All three controls render only for GIF layers (`entry.isGif === true`).
+- Persisted in preset JSON; backward-compatible (old presets without `gifStability`/`alphaMode` normalize to `0.0` / `'fade'`).
 
 ---
 
@@ -142,34 +127,44 @@ Goal: keep GIF playback architecture intact, but make motion easier to control a
 ### Phase checklist
 
 #### Phase 4A — Perceptual speed mapping
-- [ ] Keep slider UI range at 0.25×-8×.
-- [ ] Implement perceptual mapping for GIF speed.
-- [ ] Validate control feel on low, medium, and high motion GIFs.
-- [ ] Confirm no regression in frame-0 hold and deadline drift behavior.
+- [x] Keep slider UI range at 0.25×-8×.
+- [x] Implement perceptual mapping for GIF speed.
+- [x] Validate control feel on low, medium, and high motion GIFs.
+- [x] Confirm no regression in frame-0 hold and deadline drift behavior.
 
 #### Phase 4C — GIF opacity silhouette mode
-- [ ] Add per-layer alpha mode field for image layers (Fade/Preserve).
-- [ ] Default newly added GIF layers to Preserve.
-- [ ] Keep static image default as Fade.
-- [ ] Validate opacity 1.0 -> 0.3 on soft-edge GIFs without perceived shrink in Preserve mode.
+- [x] Add per-layer alpha mode field for image layers (Fade/Preserve).
+- [x] Default newly added GIF layers to Preserve.
+- [x] Keep static image default as Fade.
+- [x] Validate opacity 1.0 -> 0.3 on soft-edge GIFs without perceived shrink in Preserve mode.
 
 #### Phase 4B — Stability control
-- [ ] Add per-layer stability control (0..1) for GIF timing.
-- [ ] Keep speed and stability independent.
-- [ ] Tune normalization so motion smooths without flattening rhythm.
-- [ ] Validate on uneven-delay cinematic GIFs.
+- [x] Add per-layer stability control (0..1) for GIF timing.
+- [x] Keep speed and stability independent.
+- [x] Tune normalization so motion smooths without flattening rhythm.
+- [x] Validate on uneven-delay cinematic GIFs.
 
 #### Phase 4D — Optimizer guidance
-- [ ] Add cadence/variance preview in GIF optimizer modal.
-- [ ] Add intent presets: Smooth Loop / Keep Detail / Lightweight.
-- [ ] Ensure recommendations are advisory only (no hidden behavior changes).
-- [ ] Validate parity between standard and optimized playback paths.
+- [x] Add cadence/variance preview in GIF optimizer modal.
+- [x] Add intent presets: Smooth Loop / Keep Detail / Lightweight.
+- [x] Ensure recommendations are advisory only (no hidden behavior changes).
+- [x] Validate parity between standard and optimized playback paths.
 
 #### Final sign-off
 - [ ] Test 1, 3, and 5 GIF layer scenes.
 - [ ] Test soft-edge GIF, hard-edge GIF, cinematic uneven-delay GIF, and high-frame-count GIF.
 - [ ] Confirm no behavior change for non-GIF image layers.
 - [ ] Update this doc status/date when Phase 4 ships.
+
+---
+
+## Bug fix history
+
+### Phase 4 — May 2026
+- **Opacity slider appeared to change image size** — `layer-gif-speed-sl` was not excluded from the generic index-based slider loop. On GIF layers it occupied slot 0, pushing every subsequent slider's `sliderKeys` mapping one position off (opacity wrote to `spacing`, etc.). Fixed by adding `.layer-gif-stability-sl` and `.layer-gif-speed-sl` to the `:not()` exclusion list.
+- **Speed slider feel (linear → perceptual)** — Slider DOM range changed to `[0, 1]` position; `speed = 0.25 × 32^pos`. Old stored `gifSpeed` values are mapped back to position at render time (`Math.log(v/0.25)/Math.log(32)`).
+- **GIF opacity silhouette collapse** — GLSL `_op` line changed for `alphaMode === 'preserve'` layers: `step(0.1, _t.w)` replaces raw `_t.w` so soft alpha edges don't vanish before the interior.
+- **Stability field missing from generic slider loop** — `layer-gif-stability-sl` added to `:not()` exclusion list in the same pass.
 
 ### What is currently happening
 

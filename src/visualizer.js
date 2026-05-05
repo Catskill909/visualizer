@@ -194,20 +194,20 @@ export class VisualizerEngine {
     this.canvas = canvas;
 
     // Share the primary's audio graph — do NOT create new nodes
-    this.audioContext       = primaryEngine.audioContext;
-    this.analyser           = primaryEngine.analyser;
-    this.kickFilter         = primaryEngine.kickFilter;
+    this.audioContext = primaryEngine.audioContext;
+    this.analyser = primaryEngine.analyser;
+    this.kickFilter = primaryEngine.kickFilter;
     this.visualizerGainNode = primaryEngine.visualizerGainNode;
-    this.agcDataArray       = primaryEngine.agcDataArray;
+    this.agcDataArray = primaryEngine.agcDataArray;
 
     // Share preset registry (read-only — no copy needed)
-    this.presets      = primaryEngine.presets;
-    this.presetNames  = primaryEngine.presetNames;
+    this.presets = primaryEngine.presets;
+    this.presetNames = primaryEngine.presetNames;
     this.favoritePool = primaryEngine.favoritePool;
-    this.hiddenPool   = primaryEngine.hiddenPool;
+    this.hiddenPool = primaryEngine.hiddenPool;
     this.favoritesOnly = primaryEngine.favoritesOnly;
 
-    const w = canvas.width  || window.innerWidth;
+    const w = canvas.width || window.innerWidth;
     const h = canvas.height || window.innerHeight;
 
     const butterchurnLib = resolveModule(butterchurnImport, 'butterchurn', 'createVisualizer');
@@ -804,6 +804,12 @@ export class VisualizerEngine {
     if (anim) anim.speed = Math.max(0.01, speed);
   }
 
+  /** Update timing stability of a running GIF (0 = native per-frame delays, 1 = perfectly even cadence). */
+  setGifAnimationStability(name, stability) {
+    const anim = this._gifAnimations.get(name);
+    if (anim) anim.stability = Math.max(0, Math.min(1, stability));
+  }
+
   /**
    * Decode a GIF dataURL into pre-composited per-frame Uint8ClampedArray snapshots,
    * then create a WebGL texture directly on Butterchurn's samplers map.
@@ -821,27 +827,28 @@ export class VisualizerEngine {
         console.warn('[DiscoCast Visualizer] No GL context for GIF texture');
         return;
       }
-      
+
       const gl = imgTextures.gl;
-      
+
       // If pre-processed optimized data is provided, use it directly
       if (optimizedData && optimizedData.frames && optimizedData.delays) {
         const { frames, delays, width, height } = optimizedData;
-        
+
         // Create texture
         const texture = gl.createTexture();
         imgTextures.samplers[name] = texture;
-        
+
         gl.bindTexture(gl.TEXTURE_2D, texture);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        
+
         // Initial upload
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, frames[0]);
-        
+
         // Register animation — start deadline AFTER frame 0's delay so frame 0 shows first
+        const avgDelay0 = delays.reduce((a, b) => a + b, 0) / delays.length;
         this._gifAnimations.set(name, {
           frames,
           delays,
@@ -851,13 +858,15 @@ export class VisualizerEngine {
           nextFrameAt: performance.now() + delays[0],
           width,
           height,
-          speed
+          speed,
+          stability: 0,
+          avgDelay: avgDelay0
         });
-        
+
         console.log('[DiscoCast Visualizer] Optimized GIF loaded:', name, `${width}×${height}`, frames.length + ' frames');
         return;
       }
-      
+
       // Decode base64 data URL → ArrayBuffer without fetch()
       const base64 = dataURL.split(',')[1];
       const binary = atob(base64);
@@ -898,7 +907,7 @@ export class VisualizerEngine {
             const s = srcRow + x * 4;
             const d = dstRow + x * 4;
             if (f.patch[s + 3] > 0) {
-              composite[d]     = f.patch[s];
+              composite[d] = f.patch[s];
               composite[d + 1] = f.patch[s + 1];
               composite[d + 2] = f.patch[s + 2];
               composite[d + 3] = f.patch[s + 3];
@@ -928,7 +937,8 @@ export class VisualizerEngine {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
       // Start deadline AFTER frame 0's delay so frame 0 shows first
-      this._gifAnimations.set(name, { frames, delays, gl, texture, frameIndex: 0, nextFrameAt: performance.now() + delays[0], width: W, height: H, speed });
+      const avgDelayStd = delays.reduce((a, b) => a + b, 0) / delays.length;
+      this._gifAnimations.set(name, { frames, delays, gl, texture, frameIndex: 0, nextFrameAt: performance.now() + delays[0], width: W, height: H, speed, stability: 0, avgDelay: avgDelayStd });
     } catch (e) {
       console.warn('[DiscoCast Visualizer] _loadGifTexture failed for', name, e.message);
     }
@@ -945,7 +955,12 @@ export class VisualizerEngine {
     for (const [, anim] of this._gifAnimations) {
       if (now < anim.nextFrameAt) continue;
       anim.frameIndex = (anim.frameIndex + 1) % anim.frames.length;
-      const frameDelay = anim.delays[anim.frameIndex] / (anim.speed || 1.0);
+      const _spd = anim.speed || 1.0;
+      const _nativeDelay = anim.delays[anim.frameIndex] / _spd;
+      const _stab = anim.stability || 0;
+      const frameDelay = _stab > 0
+        ? _nativeDelay * (1 - _stab) + (anim.avgDelay / _spd) * _stab
+        : _nativeDelay;
       // Deadline-based: advance from the previous deadline to prevent accumulated drift.
       // If we're more than one frame-period behind (e.g. tab was backgrounded), snap to
       // now so we don't rapid-fire frames trying to catch up.
@@ -954,9 +969,9 @@ export class VisualizerEngine {
       const { gl, texture, width, height } = anim;
       // Save pixel-store state — Butterchurn may have dirtied these between frames,
       // causing colour cycling when speed > 1×. Restore after upload.
-      const prevFlip       = gl.getParameter(gl.UNPACK_FLIP_Y_WEBGL);
-      const prevPremul     = gl.getParameter(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL);
-      const prevAlign      = gl.getParameter(gl.UNPACK_ALIGNMENT);
+      const prevFlip = gl.getParameter(gl.UNPACK_FLIP_Y_WEBGL);
+      const prevPremul = gl.getParameter(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL);
+      const prevAlign = gl.getParameter(gl.UNPACK_ALIGNMENT);
       const prevColorspace = gl.getParameter(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL);
       gl.bindTexture(gl.TEXTURE_2D, texture);
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);

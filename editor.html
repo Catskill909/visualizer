@@ -53,245 +53,423 @@
                     Load Track
                 </button>
             </div>
-            <input type="file" id="start-file-input" accept="audio/mpeg,audio/wav,audio/ogg,audio/flac,audio/aac,audio/mp4,audio/x-m4a,.mp3,.wav,.ogg,.flac,.aac,.m4a" hidden />
+            <input type="file" id="start-file-input"
+                accept="audio/mpeg,audio/wav,audio/ogg,audio/flac,audio/aac,audio/mp4,audio/x-m4a,.mp3,.wav,.ogg,.flac,.aac,.m4a"
+                hidden />
             <a href="/index.html" class="start-back">← Back to DiscoCast Visualizer</a>
         </div>
     </div>
 
     <!-- ════════════════════ HELP MODAL ════════════════════ -->
     <div id="help-modal" class="help-modal-backdrop" hidden role="dialog" aria-modal="true" aria-label="User Guide">
-      <div class="help-modal-shell">
-        <div class="help-modal-sidebar">
-          <div class="help-modal-search-wrap">
-            <input type="search" id="hm-search" placeholder="Search…" autocomplete="off" spellcheck="false">
-          </div>
-          <div id="hm-search-results" class="hm-search-results" style="display:none"></div>
-          <div id="hm-nav-tree">
-          <div class="help-nav-group">
-            <div class="help-nav-label">Getting Started</div>
-            <a class="help-nav-link active" href="#hm-quick-start">Quick Start</a>
-            <a class="help-nav-link" href="#hm-shortcuts">Keyboard Shortcuts</a>
-          </div>
-          <div class="help-nav-group">
-            <div class="help-nav-label">Preset Studio</div>
-            <a class="help-nav-link" href="#hm-image-layers">Image Layers</a>
-            <a class="help-nav-link" href="#hm-animated-gifs">Animated GIFs</a>
-            <a class="help-nav-link" href="#hm-transform">Transform</a>
-            <a class="help-nav-link" href="#hm-motion">Motion</a>
-            <a class="help-nav-link" href="#hm-tunnel">Tunnel &amp; Depth Stack</a>
-            <a class="help-nav-link" href="#hm-effects">Visual Effects</a>
-            <a class="help-nav-link" href="#hm-mirror">Mirror</a>
-            <a class="help-nav-link" href="#hm-reactivity">Audio Reactivity</a>
-            <a class="help-nav-link" href="#hm-workflow">Workflow</a>
-          </div>
-          <div class="help-nav-group">
-            <div class="help-nav-label">Tips &amp; Combos</div>
-            <a class="help-nav-link" href="#hm-tips">Curated Combos</a>
-          </div>
-          </div><!-- /hm-nav-tree -->
+        <div class="help-modal-shell">
+            <div class="help-modal-sidebar">
+                <div class="help-modal-search-wrap">
+                    <input type="search" id="hm-search" placeholder="Search…" autocomplete="off" spellcheck="false">
+                </div>
+                <div id="hm-search-results" class="hm-search-results" style="display:none"></div>
+                <div id="hm-nav-tree">
+                    <div class="help-nav-group">
+                        <div class="help-nav-label">Getting Started</div>
+                        <a class="help-nav-link active" href="#hm-quick-start">Quick Start</a>
+                        <a class="help-nav-link" href="#hm-shortcuts">Keyboard Shortcuts</a>
+                    </div>
+                    <div class="help-nav-group">
+                        <div class="help-nav-label">Preset Studio</div>
+                        <a class="help-nav-link" href="#hm-image-layers">Image Layers</a>
+                        <a class="help-nav-link" href="#hm-animated-gifs">Animated GIFs</a>
+                        <a class="help-nav-link" href="#hm-transform">Transform</a>
+                        <a class="help-nav-link" href="#hm-motion">Motion</a>
+                        <a class="help-nav-link" href="#hm-tunnel">Tunnel &amp; Depth Stack</a>
+                        <a class="help-nav-link" href="#hm-effects">Visual Effects</a>
+                        <a class="help-nav-link" href="#hm-mirror">Mirror</a>
+                        <a class="help-nav-link" href="#hm-reactivity">Audio Reactivity</a>
+                        <a class="help-nav-link" href="#hm-workflow">Workflow</a>
+                    </div>
+                    <div class="help-nav-group">
+                        <div class="help-nav-label">Tips &amp; Combos</div>
+                        <a class="help-nav-link" href="#hm-tips">Curated Combos</a>
+                    </div>
+                </div><!-- /hm-nav-tree -->
+            </div>
+            <div class="help-modal-content" id="help-modal-content">
+                <button class="help-modal-close" id="help-modal-close" aria-label="Close help">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+
+                <section class="hm-section" id="hm-quick-start">
+                    <h2>Quick Start</h2>
+                    <div class="hm-card">
+                        <h4>1 · Load a track</h4>
+                        <p>Click the folder icon in the control bar or press <kbd>Space</kbd>. Supported: MP3, WAV, OGG,
+                            FLAC, AAC, M4A.</p>
+                    </div>
+                    <div class="hm-card">
+                        <h4>2 · Pick a preset</h4>
+                        <p>Click the preset name to open the browser. Press <kbd>R</kbd> for random, <kbd>←</kbd> /
+                            <kbd>→</kbd> to step through.</p>
+                    </div>
+                    <div class="hm-card">
+                        <h4>3 · Add an image layer</h4>
+                        <p>Click <strong>Add Layer</strong> and drop an image or GIF. It composites over the visualizer
+                            in real time.</p>
+                    </div>
+                    <div class="hm-card">
+                        <h4>4 · Preview full screen</h4>
+                        <p>Click the expand icon in this topbar (or press <kbd>\</kbd>) to hide the panel. Click the
+                            canvas to restore.</p>
+                    </div>
+                </section>
+
+                <section class="hm-section" id="hm-shortcuts">
+                    <h2>Keyboard Shortcuts</h2>
+                    <table class="hm-table">
+                        <thead>
+                            <tr>
+                                <th>Key</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><kbd>Space</kbd></td>
+                                <td>Play / Pause</td>
+                            </tr>
+                            <tr>
+                                <td><kbd>← →</kbd></td>
+                                <td>Previous / Next preset</td>
+                            </tr>
+                            <tr>
+                                <td><kbd>R</kbd></td>
+                                <td>Random preset</td>
+                            </tr>
+                            <tr>
+                                <td><kbd>E</kbd></td>
+                                <td>Toggle editor</td>
+                            </tr>
+                            <tr>
+                                <td><kbd>F</kbd></td>
+                                <td>Fullscreen</td>
+                            </tr>
+                            <tr>
+                                <td><kbd>\</kbd></td>
+                                <td>Focus / Preview mode</td>
+                            </tr>
+                            <tr>
+                                <td><kbd>S</kbd></td>
+                                <td>Strobe (hold)</td>
+                            </tr>
+                            <tr>
+                                <td><kbd>B</kbd></td>
+                                <td>Blackout (hold)</td>
+                            </tr>
+                            <tr>
+                                <td><kbd>I</kbd></td>
+                                <td>Invert colors (hold)</td>
+                            </tr>
+                            <tr>
+                                <td><kbd>⌘Z / ⌘⇧Z</kbd></td>
+                                <td>Undo / Redo</td>
+                            </tr>
+                            <tr>
+                                <td><kbd>`</kbd></td>
+                                <td>Dev HUD</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </section>
+
+                <section class="hm-section" id="hm-image-layers">
+                    <h2>Image Layers</h2>
+                    <p>Up to 5 image or GIF layers, each compositing over the visualizer with its own blend mode and
+                        full animation controls.</p>
+                    <ul class="hm-list">
+                        <li><strong>Add Layer</strong> — accepts JPG, PNG, GIF, WebP, SVG, AVIF.</li>
+                        <li><strong>Drag to reorder</strong> — grab the ⠿ handle. Top of list = drawn on top.</li>
+                        <li><strong>Solo / Mute</strong> — audition one layer or hide it without deleting.</li>
+                        <li><strong>Reset ↻</strong> — restores all animation fields to default, keeps the image.
+                            Undoable.</li>
+                        <li><strong>HD toggle</strong> — sets the upload size ceiling: OFF = 1024 px, ON = 2048 px
+                            (longest side). Images larger than the ceiling are scaled down proportionally — aspect ratio
+                            is always preserved, nothing is cropped or stretched. Images already smaller than the
+                            ceiling are passed through untouched (a 300×300 image stays 300×300 regardless of the
+                            toggle). Set the toggle <em>before</em> uploading — the resize happens once at upload time
+                            and is not reversible without re-uploading. HD layers use ~4× more GPU memory than standard;
+                            use HD only when fine detail matters at large projection sizes. <strong>GIFs are not
+                                resized</strong> — they always upload at their native resolution.</li>
+                    </ul>
+                </section>
+
+                <section class="hm-section" id="hm-animated-gifs">
+                    <h2>Animated GIFs</h2>
+                    <p>GIFs animate as real GPU textures — every effect (mirror, tunnel, hue spin, audio reactivity)
+                        applies to every frame in real time.</p>
+                    <ul class="hm-list">
+                        <li><strong>Speed slider</strong> — 0.25× to 8×. Default is 1.2× because most web GIFs are
+                            encoded slow (10 fps native). Drag right for fast-forward, left for slow-motion freeze-frame
+                            feel.</li>
+                        <li><strong>All effects work</strong> — Tile, Mirror, Kaleido, Tunnel, Pulse, Strobe, Hue Spin,
+                            Chromatic, Edge — everything applies per frame.</li>
+                        <li><strong>GIFs are not resized on upload</strong> — they load at native resolution. A
+                            1200×1200 GIF uses significantly more GPU memory than a 512×512 one.</li>
+                    </ul>
+                    <div class="hm-tip"><strong>Performance guide:</strong>
+                        <ul class="hm-list" style="margin-top:6px">
+                            <li>1–2 GIF layers — smooth on any device.</li>
+                            <li>3–4 GIF layers — fine on a dedicated GPU, may stutter on integrated graphics.</li>
+                            <li>5+ GIFs or large GIFs (1024 px+) — expect slowdown regardless of GPU. Use smaller or
+                                fewer-frame GIFs.</li>
+                            <li>Adding audio reactivity to a GIF layer costs extra GPU work per frame. If things slow
+                                down, reduce the number of audio-reactive GIF layers first.</li>
+                        </ul>
+                    </div>
+                    <div class="hm-tip"><strong>Tips for smooth GIFs:</strong>
+                        <ul class="hm-list" style="margin-top:6px">
+                            <li>Use GIFs under 512 px for best performance. Larger GIFs look great but cost more.</li>
+                            <li>Fewer frames = faster. A 10-frame loop at 8× looks identical to a 30-frame loop at
+                                natural speed and uses 3× less memory.</li>
+                            <li>Mute GIF layers you're not currently using — muted layers cost nothing.</li>
+                            <li>A dedicated GPU (MacBook Pro, gaming PC) handles more GIF layers automatically — no
+                                settings to change.</li>
+                        </ul>
+                    </div>
+                    <div class="hm-tip"
+                        style="background:var(--accent);color:white;padding:16px 20px;border-radius:10px;margin-top:16px;">
+                        <strong style="font-size:15px;display:block;margin-bottom:10px;">🚀 GIF Optimizer — Now
+                            Available!</strong>
+                        <p style="font-size:13px;opacity:0.95;margin-bottom:12px;line-height:1.5;">
+                            When you upload a large GIF (>10 frames, >256px, or >1MB), the optimizer modal appears
+                            automatically.
+                            Preview frame-by-frame thumbnails with original indices, adjust "Keep every Nth" to reduce
+                            frame count,
+                            resize to 128/192/256px, and see live GPU memory savings before committing.
+                        </p>
+                        <p style="font-size:13px;opacity:0.95;margin-bottom:8px;line-height:1.5;">
+                            <strong>Three options:</strong> "Apply & Add Layer" uses your optimized settings,
+                            "Use As-Is" adds the original GIF unchanged, "Cancel" aborts the upload.
+                        </p>
+                        <p
+                            style="font-size:12px;opacity:0.85;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.2);line-height:1.4;">
+                            <strong>Note:</strong> These are general guidelines — every machine is different.
+                            Experiment with frame count, size, and the speed slider to find the sweet spot
+                            for <em>your</em> GPU. MacBook Airs need more aggressive optimization than MacBook Pros.
+                            When in doubt: fewer frames + smaller dimensions = smoother performance.
+                        </p>
+                    </div>
+                </section>
+
+                <section class="hm-section" id="hm-transform">
+                    <h2>Transform</h2>
+                    <ul class="hm-list">
+                        <li><strong>Size</strong> — scales the image or each tile. Pulse adds audio-reactive size.</li>
+                        <li><strong>Angle</strong> — static rotation offset, composes with Spin.</li>
+                        <li><strong>Skew X / Y</strong> — shears the image into a parallelogram. Works in all modes.
+                        </li>
+                        <li><strong>Persp X / Y</strong> — projective warp, lines converge to a vanishing point. Persp Y
+                            + Tile = infinite floor grid.</li>
+                        <li><strong>Width / Height</strong> — independent tile cell shape (Tile mode only).</li>
+                    </ul>
+                </section>
+
+                <section class="hm-section" id="hm-motion">
+                    <h2>Motion</h2>
+                    <ul class="hm-list">
+                        <li><strong>Spin</strong> — continuous rotation. Per-tile when Tile ON.</li>
+                        <li><strong>Orbit</strong> — circular path around anchor. Switch to Lissajous for figure-8 /
+                            clover paths.</li>
+                        <li><strong>Bounce</strong> — bass-driven upward displacement on every beat.</li>
+                        <li><strong>Beat Shake</strong> — random-direction UV impulse 24×/sec, scales with audio.</li>
+                        <li><strong>Sway</strong> — sinusoidal horizontal pendulum.</li>
+                        <li><strong>Wander</strong> — dual-sine organic drift in X and Y.</li>
+                        <li><strong>Pan</strong> — Drift = continuous scroll; Bounce = ping-pong around anchor.</li>
+                    </ul>
+                </section>
+
+
+                <section class="hm-section" id="hm-tunnel">
+                    <h2>Tunnel &amp; Depth Stack</h2>
+                    <ul class="hm-list">
+                        <li><strong>Tunnel</strong> — seamless zoom-through animation. Tile must be ON. Negative = zoom
+                            out.</li>
+                        <li><strong>Depth</strong> — offsets a layer's zoom phase. 0.5 = 180° = maximum parallax between
+                            layers.</li>
+                    </ul>
+                    <div class="hm-tip"><strong>Classic move:</strong> Two layers, same image, same Tunnel speed. Layer
+                        1 Depth = 0, Layer 2 Depth = 0.5. Tiles zoom past each other at different Z depths.</div>
+                </section>
+
+                <section class="hm-section" id="hm-effects">
+                    <h2>Visual Effects</h2>
+                    <ul class="hm-list">
+                        <li><strong>Tint + Hue Spin</strong> — colorize and cycle through the full spectrum
+                            continuously.</li>
+                        <li><strong>Chromatic</strong> — RGB channel split with animated offset. Glitchy color fringe.
+                        </li>
+                        <li><strong>Posterize</strong> — Off / 2 / 4 / 8 / 16 color steps. Pop-art quantize effect.</li>
+                        <li><strong>Edge / Sobel</strong> — 3×3 Sobel kernel replaces image with luminance edge outline.
+                            Neon line-art. Best with Tint + Hue Spin.</li>
+                    </ul>
+                    <div class="hm-tip"><strong>Best combo:</strong> Edge ON · Tint = vivid color · Hue Spin = 0.3 ·
+                        Blend = Additive.</div>
+                </section>
+
+                <section class="hm-section" id="hm-mirror">
+                    <h2>Mirror</h2>
+                    <ul class="hm-list">
+                        <li><strong>Off / H / V / Quad / Kaleido</strong> — fold the image symmetrically.</li>
+                        <li><strong>Per Tile</strong> — folds inside each tile cell.</li>
+                        <li><strong>Whole Image</strong> — folds the entire tiled field as one unit.</li>
+                    </ul>
+                </section>
+
+                <section class="hm-section" id="hm-reactivity">
+                    <h2>Audio Reactivity</h2>
+                    <ul class="hm-list">
+                        <li><strong>Source</strong> — Bass / Mid / Treble / Volume. Drives Pulse, Bounce, Shake, Strobe,
+                            Opacity Pulse.</li>
+                        <li><strong>Curve</strong> — Linear / Squared / Cubed / Gate. Shapes how the signal maps to
+                            motion.</li>
+                        <li><strong>Strobe</strong> — hard binary opacity cut. Threshold sets the trigger level.</li>
+                    </ul>
+                    <div class="hm-tip"><strong>Tip:</strong> One layer on Bass, another on Treble — they react to
+                        different parts of the beat for automatic depth.</div>
+                </section>
+
+                <section class="hm-section" id="hm-workflow">
+                    <h2>Workflow</h2>
+                    <ul class="hm-list">
+                        <li><strong>Undo / Redo</strong> — <kbd>⌘Z</kbd> / <kbd>⌘⇧Z</kbd>. 50-step history. Every action
+                            is undoable.</li>
+                        <li><strong>A/B compare</strong> — hold the A/B button to preview the last saved state.</li>
+                        <li><strong>Save</strong> — persists preset + images to browser storage. Appears in My Presets.
+                        </li>
+                        <li><strong>Focus mode</strong> — expand icon (or <kbd>\</kbd>) hides the panel. Click canvas to
+                            restore.</li>
+                    </ul>
+                </section>
+
+                <section class="hm-section" id="hm-tips">
+                    <h2>Curated Combos</h2>
+
+                    <div class="hm-combo">
+                        <h4>Neon Line-Art</h4>
+                        <p>Edge ON · Tint → vivid color · Hue Spin → 0.3 · Blend → Additive.<br>Stack a second layer
+                            (Edge OFF) underneath at low opacity for a ghost fill behind the outlines.</p>
+                    </div>
+
+                    <div class="hm-combo">
+                        <h4>3D Parallax Tunnel</h4>
+                        <p>Two layers, same image, same Tunnel speed.<br>Layer 1: Depth = 0. Layer 2: Depth = 0.5 +
+                            different Tint color.<br>Tiles zoom past each other at different Z depths — true parallax
+                            without any 3D math.</p>
+                    </div>
+
+                    <div class="hm-combo">
+                        <h4>Infinite Floor Grid</h4>
+                        <p>Tile ON · Persp Y → 0.6 · Tunnel → 0.5 · Spin → 0.05 · Mirror → Quad.<br>Add Bounce → 0.15
+                            (Bass) so the floor heaves on every kick.</p>
+                    </div>
+
+                    <div class="hm-combo">
+                        <h4>Pop-Art Pulse</h4>
+                        <p>Posterize → 4 · Tint → bright primary · Hue Spin → 0.1 · Bounce → 0.3 · Curve → Cubed.<br>The
+                            Cubed curve means only hard hits trigger the jump — clean on sparse beats, explosive on
+                            drops.</p>
+                    </div>
+
+                    <div class="hm-combo">
+                        <h4>Glitch Stack</h4>
+                        <p>Layer 1: Chromatic → 0.6 · Beat Shake → 0.08 · Blend → Overlay.<br>Layer 2: Edge ON · Strobe
+                            → 0.8 · Blend → Additive · Source → Treble.<br>Layer 1 tracks bass, Layer 2 strobes hi-hats
+                            — two independent reactive personalities.</p>
+                    </div>
+
+                    <div class="hm-combo">
+                        <h4>Kaleidoscope Vortex</h4>
+                        <p>Tile ON · Mirror → Kaleido · Spin → 0.4 · Orbit radius → 0.08 · Hue Spin → 0.2.<br>Use a
+                            symmetrical image (mandala, snowflake) for tightest results. Reduce Spin to 0.1 for a
+                            meditative slow spin.</p>
+                    </div>
+
+                    <div class="hm-combo">
+                        <h4>Breathing Logo</h4>
+                        <p>Single image, Tile OFF · Size → 0.35 · Pulse → 0.25 · Opacity → 0.9 · Bounce → 0.1 · Source →
+                            Bass · Curve → Squared.<br>Logo swells gently on every beat. Add Hue Spin → 0.05 for a very
+                            slow rainbow drift.</p>
+                    </div>
+
+                    <div class="hm-combo">
+                        <h4>Warp Speed Stars</h4>
+                        <p>Use a star field or dot texture. Tile ON · Tunnel → 1.8 · Spacing → 0.3 · Size → 0.15 · Blend
+                            → Additive.<br>Crank Tunnel to 2.0 for warp drive on a drop. Pair with a dark MilkDrop
+                            preset underneath.</p>
+                    </div>
+
+                    <div class="hm-combo">
+                        <h4>Liquid Mirror</h4>
+                        <p>Tile ON · Mirror → Quad, Scope → Whole Image · Sway Amt → 0.08 · Sway Speed → 0.4 · Wander
+                            Amt → 0.04.<br>No Tunnel — the image slowly morphs and sways. Works beautifully with
+                            abstract or liquid pour textures.</p>
+                    </div>
+
+                    <div class="hm-combo">
+                        <h4>GIF Strobe Burst</h4>
+                        <p>Load an animated GIF · Speed → 0.5 · Strobe → 0.9 · Threshold → 0.4 · Source → Bass · Blend →
+                            Additive.<br>At low GIF speed the frames barely move, then the strobe fires them on every
+                            kick for a burst effect.</p>
+                    </div>
+
+                    <div class="hm-combo">
+                        <h4>Diamond Tile Grid</h4>
+                        <p>Tile ON · Angle → 45° · Skew X → 0.3 · Skew Y → −0.3 · Width → 0.7 · Height → 0.7 · Spin →
+                            0.03.<br>Creates a rotating diamond/rhombus tile pattern. Add Mirror → Quad for four-way
+                            symmetry.</p>
+                    </div>
+
+                    <div class="hm-combo">
+                        <h4>Depth Hue Shift</h4>
+                        <p>Three layers, all the same image, Tunnel = 0.6.<br>Layer 1: Depth = 0 · Tint = cyan. Layer 2:
+                            Depth = 0.33 · Tint = magenta. Layer 3: Depth = 0.66 · Tint = yellow.<br>Each color plane
+                            zooms past the others — full RGB separation in 3D space.</p>
+                    </div>
+
+                    <div class="hm-combo">
+                        <h4>Retro VHS Scan</h4>
+                        <p>Layer 1: original image · Blend → Screen · Opacity → 0.6.<br>Layer 2: same image offset ·
+                            Chromatic → 0.4 · Posterize → 8 · Pan → Drift · Speed Y → 0.02.<br>Slow vertical drift + RGB
+                            glitch + color banding = VHS tape distortion feel.</p>
+                    </div>
+
+                    <div class="hm-combo">
+                        <h4>Perspective Billboard</h4>
+                        <p>Tile OFF · Persp X → 0.4 · Angle → −5° · Size → 0.55 · Bounce → 0.12 · Source →
+                            Bass.<br>Image leans like a roadside billboard that bounces on every beat. Great for logos
+                            at live events.</p>
+                    </div>
+
+                    <div class="hm-combo">
+                        <h4>Lissajous Orbit Pair</h4>
+                        <p>Two layers, Path → Lissajous. Layer 1: Freq X = 2, Freq Y = 3, Phase = 0. Layer 2: Freq X =
+                            3, Freq Y = 4, Phase = 0.5.<br>They trace different figure patterns out of sync with each
+                            other — hypnotic and never repeating exactly.</p>
+                    </div>
+
+                    <div class="hm-combo">
+                        <h4>Bass Strobe + Treble Shimmer</h4>
+                        <p>Layer 1: Opacity Pulse → 0.6 · Source → Bass · Curve → Cubed — hard hits drive a full
+                            flash.<br>Layer 2: Hue Spin → 1.0 · Chromatic → 0.2 · Source → Treble · Blend → Screen —
+                            hi-hats drive shimmer.<br>Set different images and watch them independently react to
+                            different parts of the mix.</p>
+                    </div>
+
+                </section>
+
+            </div>
         </div>
-        <div class="help-modal-content" id="help-modal-content">
-          <button class="help-modal-close" id="help-modal-close" aria-label="Close help">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
-
-          <section class="hm-section" id="hm-quick-start">
-            <h2>Quick Start</h2>
-            <div class="hm-card"><h4>1 · Load a track</h4><p>Click the folder icon in the control bar or press <kbd>Space</kbd>. Supported: MP3, WAV, OGG, FLAC, AAC, M4A.</p></div>
-            <div class="hm-card"><h4>2 · Pick a preset</h4><p>Click the preset name to open the browser. Press <kbd>R</kbd> for random, <kbd>←</kbd> / <kbd>→</kbd> to step through.</p></div>
-            <div class="hm-card"><h4>3 · Add an image layer</h4><p>Click <strong>Add Layer</strong> and drop an image or GIF. It composites over the visualizer in real time.</p></div>
-            <div class="hm-card"><h4>4 · Preview full screen</h4><p>Click the expand icon in this topbar (or press <kbd>\</kbd>) to hide the panel. Click the canvas to restore.</p></div>
-          </section>
-
-          <section class="hm-section" id="hm-shortcuts">
-            <h2>Keyboard Shortcuts</h2>
-            <table class="hm-table">
-              <thead><tr><th>Key</th><th>Action</th></tr></thead>
-              <tbody>
-                <tr><td><kbd>Space</kbd></td><td>Play / Pause</td></tr>
-                <tr><td><kbd>← →</kbd></td><td>Previous / Next preset</td></tr>
-                <tr><td><kbd>R</kbd></td><td>Random preset</td></tr>
-                <tr><td><kbd>E</kbd></td><td>Toggle editor</td></tr>
-                <tr><td><kbd>F</kbd></td><td>Fullscreen</td></tr>
-                <tr><td><kbd>\</kbd></td><td>Focus / Preview mode</td></tr>
-                <tr><td><kbd>S</kbd></td><td>Strobe (hold)</td></tr>
-                <tr><td><kbd>B</kbd></td><td>Blackout (hold)</td></tr>
-                <tr><td><kbd>I</kbd></td><td>Invert colors (hold)</td></tr>
-                <tr><td><kbd>⌘Z / ⌘⇧Z</kbd></td><td>Undo / Redo</td></tr>
-                <tr><td><kbd>`</kbd></td><td>Dev HUD</td></tr>
-              </tbody>
-            </table>
-          </section>
-
-          <section class="hm-section" id="hm-image-layers">
-            <h2>Image Layers</h2>
-            <p>Up to 5 image or GIF layers, each compositing over the visualizer with its own blend mode and full animation controls.</p>
-            <ul class="hm-list">
-              <li><strong>Add Layer</strong> — accepts JPG, PNG, GIF, WebP, SVG, AVIF.</li>
-              <li><strong>Drag to reorder</strong> — grab the ⠿ handle. Top of list = drawn on top.</li>
-              <li><strong>Solo / Mute</strong> — audition one layer or hide it without deleting.</li>
-              <li><strong>Reset ↻</strong> — restores all animation fields to default, keeps the image. Undoable.</li>
-              <li><strong>HD toggle</strong> — sets the upload size ceiling: OFF = 1024 px, ON = 2048 px (longest side). Images larger than the ceiling are scaled down proportionally — aspect ratio is always preserved, nothing is cropped or stretched. Images already smaller than the ceiling are passed through untouched (a 300×300 image stays 300×300 regardless of the toggle). Set the toggle <em>before</em> uploading — the resize happens once at upload time and is not reversible without re-uploading. HD layers use ~4× more GPU memory than standard; use HD only when fine detail matters at large projection sizes. <strong>GIFs are not resized</strong> — they always upload at their native resolution.</li>
-            </ul>
-          </section>
-
-          <section class="hm-section" id="hm-animated-gifs">
-            <h2>Animated GIFs</h2>
-            <p>GIFs animate as real GPU textures — every effect (mirror, tunnel, hue spin, audio reactivity) applies to every frame in real time.</p>
-            <ul class="hm-list">
-              <li><strong>Speed slider</strong> — 0.25× to 8×. Default is 1.2× because most web GIFs are encoded slow (10 fps native). Drag right for fast-forward, left for slow-motion freeze-frame feel.</li>
-              <li><strong>All effects work</strong> — Tile, Mirror, Kaleido, Tunnel, Pulse, Strobe, Hue Spin, Chromatic, Edge — everything applies per frame.</li>
-              <li><strong>GIFs are not resized on upload</strong> — they load at native resolution. A 1200×1200 GIF uses significantly more GPU memory than a 512×512 one.</li>
-            </ul>
-            <div class="hm-tip"><strong>Performance guide:</strong>
-              <ul class="hm-list" style="margin-top:6px">
-                <li>1–2 GIF layers — smooth on any device.</li>
-                <li>3–4 GIF layers — fine on a dedicated GPU, may stutter on integrated graphics.</li>
-                <li>5+ GIFs or large GIFs (1024 px+) — expect slowdown regardless of GPU. Use smaller or fewer-frame GIFs.</li>
-                <li>Adding audio reactivity to a GIF layer costs extra GPU work per frame. If things slow down, reduce the number of audio-reactive GIF layers first.</li>
-              </ul>
-            </div>
-            <div class="hm-tip"><strong>Tips for smooth GIFs:</strong>
-              <ul class="hm-list" style="margin-top:6px">
-                <li>Use GIFs under 512 px for best performance. Larger GIFs look great but cost more.</li>
-                <li>Fewer frames = faster. A 10-frame loop at 8× looks identical to a 30-frame loop at natural speed and uses 3× less memory.</li>
-                <li>Mute GIF layers you're not currently using — muted layers cost nothing.</li>
-                <li>A dedicated GPU (MacBook Pro, gaming PC) handles more GIF layers automatically — no settings to change.</li>
-              </ul>
-            </div>
-            <div class="hm-tip" style="background:var(--accent);color:white;padding:16px 20px;border-radius:10px;margin-top:16px;">
-              <strong style="font-size:15px;display:block;margin-bottom:10px;">🚀 GIF Optimizer — Now Available!</strong>
-              <p style="font-size:13px;opacity:0.95;margin-bottom:12px;line-height:1.5;">
-                When you upload a large GIF (>10 frames, >256px, or >1MB), the optimizer modal appears automatically. 
-                Preview frame-by-frame thumbnails with original indices, adjust "Keep every Nth" to reduce frame count, 
-                resize to 128/192/256px, and see live GPU memory savings before committing.
-              </p>
-              <p style="font-size:13px;opacity:0.95;margin-bottom:8px;line-height:1.5;">
-                <strong>Three options:</strong> "Apply & Add Layer" uses your optimized settings, 
-                "Use As-Is" adds the original GIF unchanged, "Cancel" aborts the upload.
-              </p>
-              <p style="font-size:12px;opacity:0.85;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.2);line-height:1.4;">
-                <strong>Note:</strong> These are general guidelines — every machine is different. 
-                Experiment with frame count, size, and the speed slider to find the sweet spot 
-                for <em>your</em> GPU. MacBook Airs need more aggressive optimization than MacBook Pros. 
-                When in doubt: fewer frames + smaller dimensions = smoother performance.
-              </p>
-            </div>
-          </section>
-
-          <section class="hm-section" id="hm-transform">
-            <h2>Transform</h2>
-            <ul class="hm-list">
-              <li><strong>Size</strong> — scales the image or each tile. Pulse adds audio-reactive size.</li>
-              <li><strong>Angle</strong> — static rotation offset, composes with Spin.</li>
-              <li><strong>Skew X / Y</strong> — shears the image into a parallelogram. Works in all modes.</li>
-              <li><strong>Persp X / Y</strong> — projective warp, lines converge to a vanishing point. Persp Y + Tile = infinite floor grid.</li>
-              <li><strong>Width / Height</strong> — independent tile cell shape (Tile mode only).</li>
-            </ul>
-          </section>
-
-          <section class="hm-section" id="hm-motion">
-            <h2>Motion</h2>
-            <ul class="hm-list">
-              <li><strong>Spin</strong> — continuous rotation. Per-tile when Tile ON.</li>
-              <li><strong>Orbit</strong> — circular path around anchor. Switch to Lissajous for figure-8 / clover paths.</li>
-              <li><strong>Bounce</strong> — bass-driven upward displacement on every beat.</li>
-              <li><strong>Beat Shake</strong> — random-direction UV impulse 24×/sec, scales with audio.</li>
-              <li><strong>Sway</strong> — sinusoidal horizontal pendulum.</li>
-              <li><strong>Wander</strong> — dual-sine organic drift in X and Y.</li>
-              <li><strong>Pan</strong> — Drift = continuous scroll; Bounce = ping-pong around anchor.</li>
-            </ul>
-          </section>
-
-
-          <section class="hm-section" id="hm-tunnel">
-            <h2>Tunnel &amp; Depth Stack</h2>
-            <ul class="hm-list">
-              <li><strong>Tunnel</strong> — seamless zoom-through animation. Tile must be ON. Negative = zoom out.</li>
-              <li><strong>Depth</strong> — offsets a layer's zoom phase. 0.5 = 180° = maximum parallax between layers.</li>
-            </ul>
-            <div class="hm-tip"><strong>Classic move:</strong> Two layers, same image, same Tunnel speed. Layer 1 Depth = 0, Layer 2 Depth = 0.5. Tiles zoom past each other at different Z depths.</div>
-          </section>
-
-          <section class="hm-section" id="hm-effects">
-            <h2>Visual Effects</h2>
-            <ul class="hm-list">
-              <li><strong>Tint + Hue Spin</strong> — colorize and cycle through the full spectrum continuously.</li>
-              <li><strong>Chromatic</strong> — RGB channel split with animated offset. Glitchy color fringe.</li>
-              <li><strong>Posterize</strong> — Off / 2 / 4 / 8 / 16 color steps. Pop-art quantize effect.</li>
-              <li><strong>Edge / Sobel</strong> — 3×3 Sobel kernel replaces image with luminance edge outline. Neon line-art. Best with Tint + Hue Spin.</li>
-            </ul>
-            <div class="hm-tip"><strong>Best combo:</strong> Edge ON · Tint = vivid color · Hue Spin = 0.3 · Blend = Additive.</div>
-          </section>
-
-          <section class="hm-section" id="hm-mirror">
-            <h2>Mirror</h2>
-            <ul class="hm-list">
-              <li><strong>Off / H / V / Quad / Kaleido</strong> — fold the image symmetrically.</li>
-              <li><strong>Per Tile</strong> — folds inside each tile cell.</li>
-              <li><strong>Whole Image</strong> — folds the entire tiled field as one unit.</li>
-            </ul>
-          </section>
-
-          <section class="hm-section" id="hm-reactivity">
-            <h2>Audio Reactivity</h2>
-            <ul class="hm-list">
-              <li><strong>Source</strong> — Bass / Mid / Treble / Volume. Drives Pulse, Bounce, Shake, Strobe, Opacity Pulse.</li>
-              <li><strong>Curve</strong> — Linear / Squared / Cubed / Gate. Shapes how the signal maps to motion.</li>
-              <li><strong>Strobe</strong> — hard binary opacity cut. Threshold sets the trigger level.</li>
-            </ul>
-            <div class="hm-tip"><strong>Tip:</strong> One layer on Bass, another on Treble — they react to different parts of the beat for automatic depth.</div>
-          </section>
-
-          <section class="hm-section" id="hm-workflow">
-            <h2>Workflow</h2>
-            <ul class="hm-list">
-              <li><strong>Undo / Redo</strong> — <kbd>⌘Z</kbd> / <kbd>⌘⇧Z</kbd>. 50-step history. Every action is undoable.</li>
-              <li><strong>A/B compare</strong> — hold the A/B button to preview the last saved state.</li>
-              <li><strong>Save</strong> — persists preset + images to browser storage. Appears in My Presets.</li>
-              <li><strong>Focus mode</strong> — expand icon (or <kbd>\</kbd>) hides the panel. Click canvas to restore.</li>
-            </ul>
-          </section>
-
-          <section class="hm-section" id="hm-tips">
-            <h2>Curated Combos</h2>
-
-            <div class="hm-combo"><h4>Neon Line-Art</h4><p>Edge ON · Tint → vivid color · Hue Spin → 0.3 · Blend → Additive.<br>Stack a second layer (Edge OFF) underneath at low opacity for a ghost fill behind the outlines.</p></div>
-
-            <div class="hm-combo"><h4>3D Parallax Tunnel</h4><p>Two layers, same image, same Tunnel speed.<br>Layer 1: Depth = 0. Layer 2: Depth = 0.5 + different Tint color.<br>Tiles zoom past each other at different Z depths — true parallax without any 3D math.</p></div>
-
-            <div class="hm-combo"><h4>Infinite Floor Grid</h4><p>Tile ON · Persp Y → 0.6 · Tunnel → 0.5 · Spin → 0.05 · Mirror → Quad.<br>Add Bounce → 0.15 (Bass) so the floor heaves on every kick.</p></div>
-
-            <div class="hm-combo"><h4>Pop-Art Pulse</h4><p>Posterize → 4 · Tint → bright primary · Hue Spin → 0.1 · Bounce → 0.3 · Curve → Cubed.<br>The Cubed curve means only hard hits trigger the jump — clean on sparse beats, explosive on drops.</p></div>
-
-            <div class="hm-combo"><h4>Glitch Stack</h4><p>Layer 1: Chromatic → 0.6 · Beat Shake → 0.08 · Blend → Overlay.<br>Layer 2: Edge ON · Strobe → 0.8 · Blend → Additive · Source → Treble.<br>Layer 1 tracks bass, Layer 2 strobes hi-hats — two independent reactive personalities.</p></div>
-
-            <div class="hm-combo"><h4>Kaleidoscope Vortex</h4><p>Tile ON · Mirror → Kaleido · Spin → 0.4 · Orbit radius → 0.08 · Hue Spin → 0.2.<br>Use a symmetrical image (mandala, snowflake) for tightest results. Reduce Spin to 0.1 for a meditative slow spin.</p></div>
-
-            <div class="hm-combo"><h4>Breathing Logo</h4><p>Single image, Tile OFF · Size → 0.35 · Pulse → 0.25 · Opacity → 0.9 · Bounce → 0.1 · Source → Bass · Curve → Squared.<br>Logo swells gently on every beat. Add Hue Spin → 0.05 for a very slow rainbow drift.</p></div>
-
-            <div class="hm-combo"><h4>Warp Speed Stars</h4><p>Use a star field or dot texture. Tile ON · Tunnel → 1.8 · Spacing → 0.3 · Size → 0.15 · Blend → Additive.<br>Crank Tunnel to 2.0 for warp drive on a drop. Pair with a dark MilkDrop preset underneath.</p></div>
-
-            <div class="hm-combo"><h4>Liquid Mirror</h4><p>Tile ON · Mirror → Quad, Scope → Whole Image · Sway Amt → 0.08 · Sway Speed → 0.4 · Wander Amt → 0.04.<br>No Tunnel — the image slowly morphs and sways. Works beautifully with abstract or liquid pour textures.</p></div>
-
-            <div class="hm-combo"><h4>GIF Strobe Burst</h4><p>Load an animated GIF · Speed → 0.5 · Strobe → 0.9 · Threshold → 0.4 · Source → Bass · Blend → Additive.<br>At low GIF speed the frames barely move, then the strobe fires them on every kick for a burst effect.</p></div>
-
-            <div class="hm-combo"><h4>Diamond Tile Grid</h4><p>Tile ON · Angle → 45° · Skew X → 0.3 · Skew Y → −0.3 · Width → 0.7 · Height → 0.7 · Spin → 0.03.<br>Creates a rotating diamond/rhombus tile pattern. Add Mirror → Quad for four-way symmetry.</p></div>
-
-            <div class="hm-combo"><h4>Depth Hue Shift</h4><p>Three layers, all the same image, Tunnel = 0.6.<br>Layer 1: Depth = 0 · Tint = cyan. Layer 2: Depth = 0.33 · Tint = magenta. Layer 3: Depth = 0.66 · Tint = yellow.<br>Each color plane zooms past the others — full RGB separation in 3D space.</p></div>
-
-            <div class="hm-combo"><h4>Retro VHS Scan</h4><p>Layer 1: original image · Blend → Screen · Opacity → 0.6.<br>Layer 2: same image offset · Chromatic → 0.4 · Posterize → 8 · Pan → Drift · Speed Y → 0.02.<br>Slow vertical drift + RGB glitch + color banding = VHS tape distortion feel.</p></div>
-
-            <div class="hm-combo"><h4>Perspective Billboard</h4><p>Tile OFF · Persp X → 0.4 · Angle → −5° · Size → 0.55 · Bounce → 0.12 · Source → Bass.<br>Image leans like a roadside billboard that bounces on every beat. Great for logos at live events.</p></div>
-
-            <div class="hm-combo"><h4>Lissajous Orbit Pair</h4><p>Two layers, Path → Lissajous. Layer 1: Freq X = 2, Freq Y = 3, Phase = 0. Layer 2: Freq X = 3, Freq Y = 4, Phase = 0.5.<br>They trace different figure patterns out of sync with each other — hypnotic and never repeating exactly.</p></div>
-
-            <div class="hm-combo"><h4>Bass Strobe + Treble Shimmer</h4><p>Layer 1: Opacity Pulse → 0.6 · Source → Bass · Curve → Cubed — hard hits drive a full flash.<br>Layer 2: Hue Spin → 1.0 · Chromatic → 0.2 · Source → Treble · Blend → Screen — hi-hats drive shimmer.<br>Set different images and watch them independently react to different parts of the mix.</p></div>
-
-          </section>
-
-        </div>
-      </div>
     </div>
 
     <!-- ════════════════════ EDITOR SHELL ════════════════════ -->
@@ -311,31 +489,39 @@
             <!-- Live input device picker — shown only when mic is active -->
             <div id="topbar-mic-widget" class="tmw" hidden>
                 <button class="tmw-trigger" type="button" aria-haspopup="listbox" aria-label="Audio input device">
-                    <svg class="tmw-mic-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                        <line x1="12" y1="19" x2="12" y2="23"/>
-                        <line x1="8" y1="23" x2="16" y2="23"/>
+                    <svg class="tmw-mic-icon" width="13" height="13" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                        aria-hidden="true">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                        <line x1="12" y1="19" x2="12" y2="23" />
+                        <line x1="8" y1="23" x2="16" y2="23" />
                     </svg>
                     <span class="tmw-label">Live Input</span>
-                    <svg class="tmw-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                        <polyline points="6 9 12 15 18 9"/>
+                    <svg class="tmw-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                        <polyline points="6 9 12 15 18 9" />
                     </svg>
                 </button>
                 <div class="tmw-panel" hidden role="listbox"></div>
             </div>
 
-            <button id="help-toggle" class="focus-toggle" type="button" aria-label="Open help guide" data-tooltip="User Guide">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <circle cx="12" cy="12" r="10"/>
-                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
-                <line x1="12" y1="17" x2="12.01" y2="17"/>
-              </svg>
+            <button id="help-toggle" class="focus-toggle" type="button" aria-label="Open help guide"
+                data-tooltip="User Guide">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
             </button>
-            <button id="focus-toggle" class="focus-toggle" type="button" aria-label="Toggle preview mode" data-tooltip="Hide panel — click anywhere to restore">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
-              </svg>
+            <button id="focus-toggle" class="focus-toggle" type="button" aria-label="Toggle preview mode"
+                data-tooltip="Hide panel — click anywhere to restore">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    aria-hidden="true">
+                    <path
+                        d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+                </svg>
             </button>
         </nav>
 
@@ -348,18 +534,20 @@
                 <!-- Mode toggle: Edit | Library -->
                 <div class="mode-toggle" id="mode-toggle" role="group" aria-label="Panel mode">
                     <button class="mode-seg active" data-mode="edit">
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.2" aria-hidden="true">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                         </svg>
                         Edit
                     </button>
                     <button class="mode-seg" data-mode="library" data-tooltip="My Presets (P)">
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
-                            <rect x="3" y="3" width="7" height="7" rx="1"/>
-                            <rect x="14" y="3" width="7" height="7" rx="1"/>
-                            <rect x="14" y="14" width="7" height="7" rx="1"/>
-                            <rect x="3" y="14" width="7" height="7" rx="1"/>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.2" aria-hidden="true">
+                            <rect x="3" y="3" width="7" height="7" rx="1" />
+                            <rect x="14" y="3" width="7" height="7" rx="1" />
+                            <rect x="14" y="14" width="7" height="7" rx="1" />
+                            <rect x="3" y="14" width="7" height="7" rx="1" />
                         </svg>
                         Library
                     </button>
@@ -368,301 +556,312 @@
                 <!-- Edit mode content -->
                 <div class="panel-edit-content">
 
-                <!-- Header: name input + undo / redo / A/B -->
-                <header class="panel-header">
-                    <input type="text" id="preset-name-input" class="panel-name-input" placeholder="Untitled preset"
-                        value="Untitled preset" aria-label="Preset name" maxlength="64" spellcheck="false" />
-                    <div class="panel-header-btns">
-                        <button id="btn-undo" class="phb" disabled data-tooltip="Undo (⌘Z)">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <path d="M3 7v6h6" />
-                                <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
-                            </svg>
-                        </button>
-                        <button id="btn-redo" class="phb" disabled data-tooltip="Redo (⌘⇧Z)">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <path d="M21 7v6h-6" />
-                                <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13" />
-                            </svg>
-                        </button>
-                        <button id="btn-ab" class="phb phb--ab" data-tooltip="Hold to compare original">A/B</button>
-                    </div>
-                </header>
+                    <!-- Header: name input + undo / redo / A/B -->
+                    <header class="panel-header">
+                        <input type="text" id="preset-name-input" class="panel-name-input" placeholder="Untitled preset"
+                            value="Untitled preset" aria-label="Preset name" maxlength="64" spellcheck="false" />
+                        <div class="panel-header-btns">
+                            <button id="btn-undo" class="phb" disabled data-tooltip="Undo (⌘Z)">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M3 7v6h6" />
+                                    <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
+                                </svg>
+                            </button>
+                            <button id="btn-redo" class="phb" disabled data-tooltip="Redo (⌘⇧Z)">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M21 7v6h-6" />
+                                    <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13" />
+                                </svg>
+                            </button>
+                            <button id="btn-ab" class="phb phb--ab" data-tooltip="Hold to compare original">A/B</button>
+                        </div>
+                    </header>
 
-                <!-- Tab bar -->
-                <nav class="tab-bar" role="tablist" aria-label="Editor sections">
-                    <button class="tab active" data-tab="palette" role="tab" aria-selected="true"
-                        aria-controls="tab-palette">Palette</button>
-                    <button class="tab" data-tab="image" role="tab" aria-selected="false"
-                        aria-controls="tab-image">Image</button>
-                    <button class="tab" data-tab="motion" role="tab" aria-selected="false"
-                        aria-controls="tab-motion">Motion</button>
-                    <button class="tab" data-tab="wave" role="tab" aria-selected="false"
-                        aria-controls="tab-wave">Wave</button>
-                </nav>
+                    <!-- Tab bar -->
+                    <nav class="tab-bar" role="tablist" aria-label="Editor sections">
+                        <button class="tab active" data-tab="palette" role="tab" aria-selected="true"
+                            aria-controls="tab-palette">Palette</button>
+                        <button class="tab" data-tab="image" role="tab" aria-selected="false"
+                            aria-controls="tab-image">Image</button>
+                        <button class="tab" data-tab="motion" role="tab" aria-selected="false"
+                            aria-controls="tab-motion">Motion</button>
+                        <button class="tab" data-tab="wave" role="tab" aria-selected="false"
+                            aria-controls="tab-wave">Wave</button>
+                    </nav>
 
-                <!-- ─── PALETTE TAB ─── -->
-                <div id="tab-palette" class="tab-panel" role="tabpanel">
-                    <div class="tab-scroll">
-                        <p class="section-label">Start from</p>
-                        <div class="base-var-grid" id="base-var-grid"></div>
+                    <!-- ─── PALETTE TAB ─── -->
+                    <div id="tab-palette" class="tab-panel" role="tabpanel">
+                        <div class="tab-scroll">
+                            <p class="section-label">Start from</p>
+                            <div class="base-var-grid" id="base-var-grid"></div>
 
-                        <!-- Solid-mode FX: visible only when Solid or Shift is active.
+                            <!-- Solid-mode FX: visible only when Solid or Shift is active.
                              Pulse/Breath apply to both; Shift row appears for Shift only. -->
-                        <div id="solid-fx-panel" hidden>
-                            <p class="section-label" id="solid-fx-label">Pulse &amp; Breath</p>
-                            <p class="section-note">Source &amp; Curve shape the audio signal driving Pulse and Shift.</p>
-                            <div class="layer-row-inline" style="gap:8px;margin-bottom:6px">
-                                <span class="layer-ctrl-label" data-tooltip="Which frequency band drives Pulse and Shift — Bass = kicks, Mid = melody, Treble = hi-hats, Volume = overall mix">Source</span>
-                                <select id="solid-react-source" class="layer-react-source">
-                                    <option value="bass">Bass</option>
-                                    <option value="mid">Mid</option>
-                                    <option value="treb">Treble</option>
-                                    <option value="vol">Volume</option>
-                                </select>
-                            </div>
-                            <div class="layer-row-inline" style="gap:8px;margin-bottom:8px">
-                                <span class="layer-ctrl-label" data-tooltip="How the signal is shaped — Squared suppresses quiet hits, Cubed reserves reaction for loudest peaks, Gate flips binary on/off">Curve</span>
-                                <div id="solid-react-curve" class="layer-react-curve" role="group" aria-label="Reactivity curve">
-                                    <button class="lseg active" data-curve="linear">Linear</button>
-                                    <button class="lseg" data-curve="squared">Squared</button>
-                                    <button class="lseg" data-curve="cubed">Cubed</button>
-                                    <button class="lseg" data-curve="threshold">Gate</button>
+                            <div id="solid-fx-panel" hidden>
+                                <p class="section-label" id="solid-fx-label">Pulse &amp; Breath</p>
+                                <p class="section-note">Source &amp; Curve shape the audio signal driving Pulse and
+                                    Shift.</p>
+                                <div class="layer-row-inline" style="gap:8px;margin-bottom:6px">
+                                    <span class="layer-ctrl-label"
+                                        data-tooltip="Which frequency band drives Pulse and Shift — Bass = kicks, Mid = melody, Treble = hi-hats, Volume = overall mix">Source</span>
+                                    <select id="solid-react-source" class="layer-react-source">
+                                        <option value="bass">Bass</option>
+                                        <option value="mid">Mid</option>
+                                        <option value="treb">Treble</option>
+                                        <option value="vol">Volume</option>
+                                    </select>
+                                </div>
+                                <div class="layer-row-inline" style="gap:8px;margin-bottom:8px">
+                                    <span class="layer-ctrl-label"
+                                        data-tooltip="How the signal is shaped — Squared suppresses quiet hits, Cubed reserves reaction for loudest peaks, Gate flips binary on/off">Curve</span>
+                                    <div id="solid-react-curve" class="layer-react-curve" role="group"
+                                        aria-label="Reactivity curve">
+                                        <button class="lseg active" data-curve="linear">Linear</button>
+                                        <button class="lseg" data-curve="squared">Squared</button>
+                                        <button class="lseg" data-curve="cubed">Cubed</button>
+                                        <button class="lseg" data-curve="threshold">Gate</button>
+                                    </div>
+                                </div>
+                                <div id="solid-fx-sliders"></div>
+                                <div class="color-row" id="solid-colorb-row" hidden>
+                                    <span class="color-row-label">Shift color</span>
+                                    <div class="color-swatch-wrap">
+                                        <span class="color-swatch" id="swatch-shift" style="background:#1a33e6"
+                                            aria-label="Shift target color"></span>
+                                        <input type="color" id="color-shift" class="color-native" value="#1a33e6"
+                                            tabindex="-1" />
+                                    </div>
+                                    <span class="color-row-hex" id="hex-shift">#1A33E6</span>
                                 </div>
                             </div>
-                            <div id="solid-fx-sliders"></div>
-                            <div class="color-row" id="solid-colorb-row" hidden>
-                                <span class="color-row-label">Shift color</span>
-                                <div class="color-swatch-wrap">
-                                    <span class="color-swatch" id="swatch-shift" style="background:#1a33e6"
-                                        aria-label="Shift target color"></span>
-                                    <input type="color" id="color-shift" class="color-native" value="#1a33e6"
-                                        tabindex="-1" />
+
+                            <p class="section-label">Quick Palettes</p>
+                            <div class="palette-grid" id="palette-grid"></div>
+
+                            <p class="section-label">Colors</p>
+                            <div class="color-rows">
+
+                                <div class="color-row">
+                                    <span class="color-row-label" id="wave-row-label">Wave</span>
+                                    <div class="color-swatch-wrap">
+                                        <span class="color-swatch" id="swatch-wave" style="background:#ffffff"
+                                            aria-label="Wave color"></span>
+                                        <input type="color" id="color-wave" class="color-native" value="#ffffff"
+                                            tabindex="-1" />
+                                    </div>
+                                    <span class="color-row-hex" id="hex-wave">#FFFFFF</span>
                                 </div>
-                                <span class="color-row-hex" id="hex-shift">#1A33E6</span>
-                            </div>
-                        </div>
 
-                        <p class="section-label">Quick Palettes</p>
-                        <div class="palette-grid" id="palette-grid"></div>
-
-                        <p class="section-label">Colors</p>
-                        <div class="color-rows">
-
-                            <div class="color-row">
-                                <span class="color-row-label" id="wave-row-label">Wave</span>
-                                <div class="color-swatch-wrap">
-                                    <span class="color-swatch" id="swatch-wave" style="background:#ffffff"
-                                        aria-label="Wave color"></span>
-                                    <input type="color" id="color-wave" class="color-native" value="#ffffff"
-                                        tabindex="-1" />
+                                <div class="color-row">
+                                    <span class="color-row-label">Glow</span>
+                                    <div class="color-swatch-wrap">
+                                        <span class="color-swatch" id="swatch-glow" style="background:#ffffff"
+                                            aria-label="Outer glow color"></span>
+                                        <input type="color" id="color-glow" class="color-native" value="#ffffff"
+                                            tabindex="-1" />
+                                    </div>
+                                    <span class="color-row-hex" id="hex-glow">#FFFFFF</span>
                                 </div>
-                                <span class="color-row-hex" id="hex-wave">#FFFFFF</span>
-                            </div>
 
-                            <div class="color-row">
-                                <span class="color-row-label">Glow</span>
-                                <div class="color-swatch-wrap">
-                                    <span class="color-swatch" id="swatch-glow" style="background:#ffffff"
-                                        aria-label="Outer glow color"></span>
-                                    <input type="color" id="color-glow" class="color-native" value="#ffffff"
-                                        tabindex="-1" />
+                                <div class="color-row">
+                                    <span class="color-row-label">Accent</span>
+                                    <div class="color-swatch-wrap">
+                                        <span class="color-swatch" id="swatch-accent" style="background:#000000"
+                                            aria-label="Inner accent color"></span>
+                                        <input type="color" id="color-accent" class="color-native" value="#000000"
+                                            tabindex="-1" />
+                                    </div>
+                                    <span class="color-row-hex" id="hex-accent">#000000</span>
                                 </div>
-                                <span class="color-row-hex" id="hex-glow">#FFFFFF</span>
-                            </div>
 
-                            <div class="color-row">
-                                <span class="color-row-label">Accent</span>
-                                <div class="color-swatch-wrap">
-                                    <span class="color-swatch" id="swatch-accent" style="background:#000000"
-                                        aria-label="Inner accent color"></span>
-                                    <input type="color" id="color-accent" class="color-native" value="#000000"
-                                        tabindex="-1" />
-                                </div>
-                                <span class="color-row-hex" id="hex-accent">#000000</span>
                             </div>
 
-                        </div>
+                            <p class="section-label">Appearance</p>
+                            <div id="palette-sliders"></div>
 
-                        <p class="section-label">Appearance</p>
-                        <div id="palette-sliders"></div>
-
-                        <div class="toggle-row">
-                            <label class="toggle-label" for="toggle-invert">Invert colors</label>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="toggle-invert" role="switch" />
-                                <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                            </label>
-                        </div>
-                        <div class="toggle-row">
-                            <label class="toggle-label" for="toggle-darken">Darken</label>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="toggle-darken" role="switch" />
-                                <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ─── MOTION TAB ─── -->
-                <div id="tab-motion" class="tab-panel" role="tabpanel" hidden>
-                    <div class="tab-scroll">
-                        <p class="section-label">Movement</p>
-                        <div id="motion-sliders"></div>
-
-                        <p class="section-label">Echo Direction</p>
-                        <div class="seg-control" id="echo-orient-seg" role="group" aria-label="Echo orientation">
-                            <button class="seg active" data-orient="0">Normal</button>
-                            <button class="seg" data-orient="1">↔ Flip H</button>
-                            <button class="seg" data-orient="2">↕ Flip V</button>
-                            <button class="seg" data-orient="3">↔↕ Both</button>
-                        </div>
-                        <div id="motion-echo-alpha"></div>
-
-                        <p class="section-label" style="margin-top:16px">Drift &amp; Stretch</p>
-                        <div id="motion-drift-sliders"></div>
-
-                        <p class="section-label" style="margin-top:16px">Warp Center</p>
-                        <p class="section-note">Move the pivot point for zoom, spin, and warp. Default sits at canvas center — slide off to break out of the radial-from-center default.</p>
-                        <div id="motion-center-sliders"></div>
-
-                        <button class="ghost-btn" id="btn-randomize-motion">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="1.5">
-                                <rect x="2" y="2" width="20" height="20" rx="4" />
-                                <circle cx="8" cy="8" r="1.5" fill="currentColor" />
-                                <circle cx="16" cy="8" r="1.5" fill="currentColor" />
-                                <circle cx="8" cy="16" r="1.5" fill="currentColor" />
-                                <circle cx="16" cy="16" r="1.5" fill="currentColor" />
-                                <circle cx="12" cy="12" r="1.5" fill="currentColor" />
-                            </svg>
-                            Randomize motion
-                        </button>
-
-                        <p class="section-label" style="margin-top:16px">Reactivity</p>
-                        <p class="section-note">Energy and Bass Sensitivity are session-only. Beat Sensitivity is saved in preset.</p>
-                        <div id="motion-feel-sliders"></div>
-                        <div class="toggle-row">
-                            <label class="toggle-label" for="toggle-agc">Auto gain control</label>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="toggle-agc" role="switch" checked />
-                                <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ─── WAVE TAB ─── -->
-                <div id="tab-wave" class="tab-panel" role="tabpanel" hidden>
-                    <div class="tab-scroll">
-                        <p class="section-label">Shape</p>
-                        <div class="wave-mode-grid" id="wave-mode-grid" role="group" aria-label="Wave shape"></div>
-
-                        <p class="section-label">Style</p>
-                        <div id="wave-sliders"></div>
-
-                        <p class="section-label">Options</p>
-                        <div class="toggle-row">
-                            <label class="toggle-label" for="toggle-dots">Draw as dots</label>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="toggle-dots" role="switch" />
-                                <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                            </label>
-                        </div>
-                        <div class="toggle-row">
-                            <label class="toggle-label" for="toggle-additive">Additive blend</label>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="toggle-additive" role="switch" />
-                                <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                            </label>
-                        </div>
-                        <div class="toggle-row">
-                            <label class="toggle-label" for="toggle-brighten">Brighten wave</label>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="toggle-brighten" role="switch" />
-                                <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                            </label>
-                        </div>
-
-                        <button class="ghost-btn" id="btn-randomize-wave">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="1.5">
-                                <rect x="2" y="2" width="20" height="20" rx="4" />
-                                <circle cx="8" cy="8" r="1.5" fill="currentColor" />
-                                <circle cx="16" cy="8" r="1.5" fill="currentColor" />
-                                <circle cx="8" cy="16" r="1.5" fill="currentColor" />
-                                <circle cx="16" cy="16" r="1.5" fill="currentColor" />
-                                <circle cx="12" cy="12" r="1.5" fill="currentColor" />
-                            </svg>
-                            Randomize wave
-                        </button>
-                    </div>
-                </div>
-
-
-                <!-- ─── IMAGE TAB ─── -->
-                <div id="tab-image" class="tab-panel" role="tabpanel" hidden>
-                    <div class="tab-scroll">
-
-                        <p class="section-label">Canvas Mirror</p>
-                        <p class="section-note" style="margin-bottom:8px">Splits the scene in half — one side reflects
-                            the other.</p>
-                        <div class="seg-control" id="scene-mirror-seg" role="group" aria-label="Canvas mirror">
-                            <button class="seg active" data-smirror="none">Off</button>
-                            <button class="seg" data-smirror="h">↔ H</button>
-                            <button class="seg" data-smirror="v">↕ V</button>
-                            <button class="seg" data-smirror="both">↔↕ Both</button>
-                        </div>
-
-                        <div class="images-header" style="margin-top:16px">
-                            <p class="section-label" style="margin:0">Image Layers</p>
-                            <label class="images-only-row"
-                                data-tooltip="Hide the base visualizer — show only uploaded images over black">
-                                <span class="images-only-label">Images Only</span>
-                                <label class="toggle-switch toggle-switch--sm">
-                                    <input type="checkbox" id="toggle-images-only" />
+                            <div class="toggle-row">
+                                <label class="toggle-label" for="toggle-invert">Invert colors</label>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="toggle-invert" role="switch" />
                                     <span class="toggle-track"><span class="toggle-thumb"></span></span>
                                 </label>
-                            </label>
-                        </div>
-                        <p class="section-note">Add up to 5 images. Choose how they react to the music.</p>
-                        <div class="layers-bar">
-                            <span class="layers-count" id="layers-count">Layers: 0 / 5</span>
-                            <label class="hd-upload-row"
-                                data-tooltip="Next upload gets resized to 2048px (HD) instead of 1024px. Uses more VRAM.">
-                                <span class="hd-upload-label">HD uploads</span>
-                                <label class="toggle-switch toggle-switch--sm">
-                                    <input type="checkbox" id="toggle-hd-uploads" />
+                            </div>
+                            <div class="toggle-row">
+                                <label class="toggle-label" for="toggle-darken">Darken</label>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="toggle-darken" role="switch" />
                                     <span class="toggle-track"><span class="toggle-thumb"></span></span>
                                 </label>
-                            </label>
-                            <button class="mini-btn" id="btn-collapse-all" type="button"
-                                data-tooltip="Collapse / expand all layers">⇕</button>
+                            </div>
                         </div>
-                        <div class="image-dropzone" id="image-dropzone" role="button" tabindex="0"
-                            aria-label="Drop image here or click to browse">
-                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="1" stroke-opacity="0.4" aria-hidden="true">
-                                <rect x="3" y="3" width="18" height="18" rx="2" />
-                                <circle cx="8.5" cy="8.5" r="1.5" />
-                                <polyline points="21 15 16 10 5 21" />
-                            </svg>
-                            <span>Drop image here or click to browse</span>
-                            <input type="file" id="image-file-input" accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml,image/avif,.jpg,.jpeg,.png,.gif,.webp,.svg,.avif" hidden />
-                        </div>
-                        <div class="image-layers" id="image-layers"></div>
                     </div>
-                </div>
 
-                <!-- Footer: remix + new + save + reset -->
-                <footer class="panel-footer">
-                    <button id="btn-browse-library" class="reset-btn" type="button" data-tooltip="Browse all 1,144 library presets to remix">Remix</button>
-                    <button id="btn-new-preset-footer" class="reset-btn" type="button" data-tooltip="Start a fresh preset">+ New</button>
-                    <button id="btn-save" class="save-btn" type="button">Save preset</button>
-                    <button id="btn-reset" class="reset-btn" type="button">Reset</button>
-                </footer>
+                    <!-- ─── MOTION TAB ─── -->
+                    <div id="tab-motion" class="tab-panel" role="tabpanel" hidden>
+                        <div class="tab-scroll">
+                            <p class="section-label">Movement</p>
+                            <div id="motion-sliders"></div>
+
+                            <p class="section-label">Echo Direction</p>
+                            <div class="seg-control" id="echo-orient-seg" role="group" aria-label="Echo orientation">
+                                <button class="seg active" data-orient="0">Normal</button>
+                                <button class="seg" data-orient="1">↔ Flip H</button>
+                                <button class="seg" data-orient="2">↕ Flip V</button>
+                                <button class="seg" data-orient="3">↔↕ Both</button>
+                            </div>
+                            <div id="motion-echo-alpha"></div>
+
+                            <p class="section-label" style="margin-top:16px">Drift &amp; Stretch</p>
+                            <div id="motion-drift-sliders"></div>
+
+                            <p class="section-label" style="margin-top:16px">Warp Center</p>
+                            <p class="section-note">Move the pivot point for zoom, spin, and warp. Default sits at
+                                canvas center — slide off to break out of the radial-from-center default.</p>
+                            <div id="motion-center-sliders"></div>
+
+                            <button class="ghost-btn" id="btn-randomize-motion">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="1.5">
+                                    <rect x="2" y="2" width="20" height="20" rx="4" />
+                                    <circle cx="8" cy="8" r="1.5" fill="currentColor" />
+                                    <circle cx="16" cy="8" r="1.5" fill="currentColor" />
+                                    <circle cx="8" cy="16" r="1.5" fill="currentColor" />
+                                    <circle cx="16" cy="16" r="1.5" fill="currentColor" />
+                                    <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+                                </svg>
+                                Randomize motion
+                            </button>
+
+                            <p class="section-label" style="margin-top:16px">Reactivity</p>
+                            <p class="section-note">Energy and Bass Sensitivity are session-only. Beat Sensitivity is
+                                saved in preset.</p>
+                            <div id="motion-feel-sliders"></div>
+                            <div class="toggle-row">
+                                <label class="toggle-label" for="toggle-agc">Auto gain control</label>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="toggle-agc" role="switch" checked />
+                                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ─── WAVE TAB ─── -->
+                    <div id="tab-wave" class="tab-panel" role="tabpanel" hidden>
+                        <div class="tab-scroll">
+                            <p class="section-label">Shape</p>
+                            <div class="wave-mode-grid" id="wave-mode-grid" role="group" aria-label="Wave shape"></div>
+
+                            <p class="section-label">Style</p>
+                            <div id="wave-sliders"></div>
+
+                            <p class="section-label">Options</p>
+                            <div class="toggle-row">
+                                <label class="toggle-label" for="toggle-dots">Draw as dots</label>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="toggle-dots" role="switch" />
+                                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                                </label>
+                            </div>
+                            <div class="toggle-row">
+                                <label class="toggle-label" for="toggle-additive">Additive blend</label>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="toggle-additive" role="switch" />
+                                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                                </label>
+                            </div>
+                            <div class="toggle-row">
+                                <label class="toggle-label" for="toggle-brighten">Brighten wave</label>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="toggle-brighten" role="switch" />
+                                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                                </label>
+                            </div>
+
+                            <button class="ghost-btn" id="btn-randomize-wave">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="1.5">
+                                    <rect x="2" y="2" width="20" height="20" rx="4" />
+                                    <circle cx="8" cy="8" r="1.5" fill="currentColor" />
+                                    <circle cx="16" cy="8" r="1.5" fill="currentColor" />
+                                    <circle cx="8" cy="16" r="1.5" fill="currentColor" />
+                                    <circle cx="16" cy="16" r="1.5" fill="currentColor" />
+                                    <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+                                </svg>
+                                Randomize wave
+                            </button>
+                        </div>
+                    </div>
+
+
+                    <!-- ─── IMAGE TAB ─── -->
+                    <div id="tab-image" class="tab-panel" role="tabpanel" hidden>
+                        <div class="tab-scroll">
+
+                            <p class="section-label">Canvas Mirror</p>
+                            <p class="section-note" style="margin-bottom:8px">Splits the scene in half — one side
+                                reflects
+                                the other.</p>
+                            <div class="seg-control" id="scene-mirror-seg" role="group" aria-label="Canvas mirror">
+                                <button class="seg active" data-smirror="none">Off</button>
+                                <button class="seg" data-smirror="h">↔ H</button>
+                                <button class="seg" data-smirror="v">↕ V</button>
+                                <button class="seg" data-smirror="both">↔↕ Both</button>
+                            </div>
+
+                            <div class="images-header" style="margin-top:16px">
+                                <p class="section-label" style="margin:0">Image Layers</p>
+                                <label class="images-only-row"
+                                    data-tooltip="Hide the base visualizer — show only uploaded images over black">
+                                    <span class="images-only-label">Images Only</span>
+                                    <label class="toggle-switch toggle-switch--sm">
+                                        <input type="checkbox" id="toggle-images-only" />
+                                        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                                    </label>
+                                </label>
+                            </div>
+                            <p class="section-note">Add up to 5 images. Choose how they react to the music.</p>
+                            <div class="layers-bar">
+                                <span class="layers-count" id="layers-count">Layers: 0 / 5</span>
+                                <label class="hd-upload-row"
+                                    data-tooltip="Next upload gets resized to 2048px (HD) instead of 1024px. Uses more VRAM.">
+                                    <span class="hd-upload-label">HD uploads</span>
+                                    <label class="toggle-switch toggle-switch--sm">
+                                        <input type="checkbox" id="toggle-hd-uploads" />
+                                        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                                    </label>
+                                </label>
+                                <button class="mini-btn" id="btn-collapse-all" type="button"
+                                    data-tooltip="Collapse / expand all layers">⇕</button>
+                            </div>
+                            <div class="image-dropzone" id="image-dropzone" role="button" tabindex="0"
+                                aria-label="Drop image here or click to browse">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="1" stroke-opacity="0.4" aria-hidden="true">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                                    <circle cx="8.5" cy="8.5" r="1.5" />
+                                    <polyline points="21 15 16 10 5 21" />
+                                </svg>
+                                <span>Drop image here or click to browse</span>
+                                <input type="file" id="image-file-input"
+                                    accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml,image/avif,.jpg,.jpeg,.png,.gif,.webp,.svg,.avif"
+                                    hidden />
+                            </div>
+                            <div class="image-layers" id="image-layers"></div>
+                        </div>
+                    </div>
+
+                    <!-- Footer: remix + new + save + reset -->
+                    <footer class="panel-footer">
+                        <button id="btn-browse-library" class="reset-btn" type="button"
+                            data-tooltip="Browse all 1,144 library presets to remix">Remix</button>
+                        <button id="btn-new-preset-footer" class="reset-btn" type="button"
+                            data-tooltip="Start a fresh preset">+ New</button>
+                        <button id="btn-save" class="save-btn" type="button">Save preset</button>
+                        <button id="btn-reset" class="reset-btn" type="button">Reset</button>
+                    </footer>
 
                 </div><!-- /panel-edit-content -->
 
@@ -672,7 +871,8 @@
                         <div class="library-topbar">
                             <span id="library-count" class="library-count">0 presets</span>
                             <div class="library-topbar-right">
-                                <button id="btn-new-preset" class="library-new-btn" data-tooltip="Start a new preset">+ New</button>
+                                <button id="btn-new-preset" class="library-new-btn" data-tooltip="Start a new preset">+
+                                    New</button>
                                 <select id="library-sort" class="library-sort-select" aria-label="Sort presets">
                                     <option value="recent">Recent</option>
                                     <option value="oldest">Oldest</option>
@@ -682,11 +882,13 @@
                             </div>
                         </div>
                         <div class="library-search-wrap">
-                            <svg class="library-search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                <circle cx="11" cy="11" r="8"/>
-                                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                            <svg class="library-search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <circle cx="11" cy="11" r="8" />
+                                <line x1="21" y1="21" x2="16.65" y2="16.65" />
                             </svg>
-                            <input id="library-search" class="library-search-input" type="text" placeholder="Search presets…" aria-label="Search presets" />
+                            <input id="library-search" class="library-search-input" type="text"
+                                placeholder="Search presets…" aria-label="Search presets" />
                         </div>
                         <div id="library-grid" class="library-grid"></div>
                         <div class="library-footer">
@@ -706,17 +908,21 @@
             <div class="save-modal-card remix-picker-card">
                 <div class="remix-picker-header">
                     <div>
-                        <h2 id="remix-picker-title" class="save-modal-title" style="margin-bottom:2px">Browse Library</h2>
+                        <h2 id="remix-picker-title" class="save-modal-title" style="margin-bottom:2px">Browse Library
+                        </h2>
                         <p class="remix-picker-hint">Pick any of the 1,144 library presets to remix.</p>
                     </div>
                     <button id="remix-picker-close" class="remix-picker-close" type="button" aria-label="Close">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.5" stroke-linecap="round">
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
                     </button>
                 </div>
                 <div style="padding:0 0 8px">
-                    <input type="text" id="remix-picker-search" class="save-modal-input"
-                        placeholder="Search presets…" autocomplete="off" spellcheck="false"
-                        style="margin-bottom:0" />
+                    <input type="text" id="remix-picker-search" class="save-modal-input" placeholder="Search presets…"
+                        autocomplete="off" spellcheck="false" style="margin-bottom:0" />
                 </div>
                 <div class="remix-picker-count" id="remix-picker-count"></div>
                 <ul class="remix-picker-list" id="remix-picker-list" role="listbox" aria-label="Library presets"></ul>
@@ -783,12 +989,15 @@
             aria-labelledby="gif-optimizer-title">
             <div class="save-modal-card" style="width:min(900px, 95vw);max-height:90vh;overflow-y:auto;">
                 <h2 id="gif-optimizer-title" class="save-modal-title">Optimize GIF</h2>
-                
+
                 <!-- Stats header -->
-                <div id="gif-opt-stats" class="gif-opt-stats" style="background:var(--bg-2);padding:16px 20px;border-radius:8px;margin-bottom:16px;font-size:14px;color:var(--text-2);">
-                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap;">
+                <div id="gif-opt-stats" class="gif-opt-stats"
+                    style="background:var(--bg-2);padding:16px 20px;border-radius:8px;margin-bottom:16px;font-size:14px;color:var(--text-2);">
+                    <div
+                        style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap;">
                         <div>
-                            <div id="gif-opt-filename" style="font-weight:600;color:var(--text-1);margin-bottom:6px;font-size:15px;"></div>
+                            <div id="gif-opt-filename"
+                                style="font-weight:600;color:var(--text-1);margin-bottom:6px;font-size:15px;"></div>
                             <div id="gif-opt-dims" style="display:flex;gap:20px;flex-wrap:wrap;">
                                 <span id="gif-opt-size"></span>
                                 <span id="gif-opt-frames"></span>
@@ -796,25 +1005,56 @@
                                 <span id="gif-opt-gpu" style="color:var(--accent);font-weight:500;"></span>
                             </div>
                         </div>
-                        <div id="gif-opt-warning" style="color:var(--danger);font-weight:500;display:none;background:var(--bg-1);padding:8px 12px;border-radius:6px;max-width:300px;"></div>
+                        <div id="gif-opt-warning"
+                            style="color:var(--danger);font-weight:500;display:none;background:var(--bg-1);padding:8px 12px;border-radius:6px;max-width:300px;">
+                        </div>
                     </div>
                 </div>
 
                 <!-- Frame strip preview -->
-                <div id="gif-opt-frame-strip" class="gif-opt-frame-strip" style="display:flex;gap:6px;overflow-x:auto;padding:10px;background:var(--bg-1);border-radius:8px;margin-bottom:16px;max-height:100px;scrollbar-width:thin;">
+                <div id="gif-opt-frame-strip" class="gif-opt-frame-strip"
+                    style="display:flex;gap:6px;overflow-x:auto;padding:10px;background:var(--bg-1);border-radius:8px;margin-bottom:16px;max-height:100px;scrollbar-width:thin;">
                     <!-- Thumbnails injected here -->
                 </div>
 
+                <!-- Intent presets -->
+                <div style="margin-bottom:16px;">
+                    <div
+                        style="font-size:12px;color:var(--text-3);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.06em;">
+                        Quick presets</div>
+                    <div style="display:flex;gap:8px;">
+                        <button type="button" class="gif-opt-intent-btn" data-intent="smooth"
+                            style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg-1);cursor:pointer;font-size:13px;text-align:left;">
+                            <div style="font-weight:600;margin-bottom:2px;">Smooth Loop</div>
+                            <div style="font-size:11px;color:var(--text-3);">All frames · original size</div>
+                        </button>
+                        <button type="button" class="gif-opt-intent-btn" data-intent="detail"
+                            style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg-1);cursor:pointer;font-size:13px;text-align:left;">
+                            <div style="font-weight:600;margin-bottom:2px;">Keep Detail</div>
+                            <div style="font-size:11px;color:var(--text-3);">Half frames · original size</div>
+                        </button>
+                        <button type="button" class="gif-opt-intent-btn" data-intent="light"
+                            style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg-1);cursor:pointer;font-size:13px;text-align:left;">
+                            <div style="font-weight:600;margin-bottom:2px;">Lightweight</div>
+                            <div style="font-size:11px;color:var(--text-3);">Reduced frames · 128px</div>
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Controls -->
-                <div class="gif-opt-controls" style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:16px;">
+                <div class="gif-opt-controls"
+                    style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:16px;">
                     <div>
-                        <label style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:14px;">
-                            <span>Keep every <strong id="gif-opt-nth-val" style="color:var(--accent);font-size:16px;">1</strong> frame</span>
+                        <label
+                            style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:14px;">
+                            <span>Keep every <strong id="gif-opt-nth-val"
+                                    style="color:var(--accent);font-size:16px;">1</strong> frame</span>
                             <span id="gif-opt-result-frames" style="color:var(--text-3);"></span>
                         </label>
                         <input type="range" id="gif-opt-nth" min="1" max="20" value="1" step="1"
                             style="width:100%;accent-color:var(--accent);height:6px;">
-                        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-3);margin-top:6px;">
+                        <div
+                            style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-3);margin-top:6px;">
                             <span>Keep all</span>
                             <span>Reduce</span>
                             <span>Keep 1/20</span>
@@ -822,29 +1062,39 @@
                     </div>
 
                     <div>
-                        <label style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:14px;">
+                        <label
+                            style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:14px;">
                             <span>Max dimension</span>
                             <span id="gif-opt-resize-dims" style="color:var(--text-3);"></span>
                         </label>
                         <div style="display:flex;gap:10px;">
-                            <button type="button" class="gif-opt-size-btn" data-size="0" style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg-1);cursor:pointer;font-size:13px;">Original</button>
-                            <button type="button" class="gif-opt-size-btn" data-size="256" style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg-1);cursor:pointer;font-size:13px;">256px</button>
-                            <button type="button" class="gif-opt-size-btn" data-size="192" style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg-1);cursor:pointer;font-size:13px;">192px</button>
-                            <button type="button" class="gif-opt-size-btn" data-size="128" style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg-1);cursor:pointer;font-size:13px;">128px</button>
+                            <button type="button" class="gif-opt-size-btn" data-size="0"
+                                style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg-1);cursor:pointer;font-size:13px;">Original</button>
+                            <button type="button" class="gif-opt-size-btn" data-size="256"
+                                style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg-1);cursor:pointer;font-size:13px;">256px</button>
+                            <button type="button" class="gif-opt-size-btn" data-size="192"
+                                style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg-1);cursor:pointer;font-size:13px;">192px</button>
+                            <button type="button" class="gif-opt-size-btn" data-size="128"
+                                style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg-1);cursor:pointer;font-size:13px;">128px</button>
                         </div>
                     </div>
                 </div>
 
                 <!-- Result preview -->
-                <div id="gif-opt-result" style="background:linear-gradient(135deg, var(--bg-2) 0%, var(--bg-1) 100%);padding:16px 20px;border-radius:10px;margin-bottom:20px;font-size:14px;border:1px solid var(--border);">
-                    <div style="font-weight:600;margin-bottom:10px;color:var(--text-1);font-size:15px;">After optimization:</div>
+                <div id="gif-opt-result"
+                    style="background:linear-gradient(135deg, var(--bg-2) 0%, var(--bg-1) 100%);padding:16px 20px;border-radius:10px;margin-bottom:20px;font-size:14px;border:1px solid var(--border);">
+                    <div style="font-weight:600;margin-bottom:10px;color:var(--text-1);font-size:15px;">After
+                        optimization:</div>
                     <div id="gif-opt-result-text" style="color:var(--text-2);font-size:14px;line-height:1.5;"></div>
                 </div>
 
                 <div class="save-modal-actions" style="display:flex;gap:12px;justify-content:flex-end;">
-                    <button id="gif-opt-cancel" class="reset-btn" type="button" style="padding:10px 20px;">Cancel</button>
-                    <button id="gif-opt-as-is" class="secondary-btn" type="button" style="padding:10px 20px;">Use As-Is</button>
-                    <button id="gif-opt-apply" class="primary-btn" type="button" style="padding:10px 24px;font-weight:500;">Apply & Add Layer</button>
+                    <button id="gif-opt-cancel" class="reset-btn" type="button"
+                        style="padding:10px 20px;">Cancel</button>
+                    <button id="gif-opt-as-is" class="secondary-btn" type="button" style="padding:10px 20px;">Use
+                        As-Is</button>
+                    <button id="gif-opt-apply" class="primary-btn" type="button"
+                        style="padding:10px 24px;font-weight:500;">Apply & Add Layer</button>
                 </div>
             </div>
         </div>
@@ -853,73 +1103,80 @@
         <div id="toast" class="toast" hidden role="status" aria-live="polite"></div>
 
         <!-- Onboarding modal — shows every session until "Never show again" -->
-        <div id="onboarding-modal" class="onboarding-modal" hidden role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
-          <div class="onboarding-card">
-            <div class="onboarding-header">
-              <div class="onboarding-logo">🎛️</div>
-              <div class="onboarding-header-text">
-                <h2 class="onboarding-title" id="onboarding-title">Welcome to Preset Studio</h2>
-                <p class="onboarding-subtitle">A few tips to get you moving fast</p>
-              </div>
+        <div id="onboarding-modal" class="onboarding-modal" hidden role="dialog" aria-modal="true"
+            aria-labelledby="onboarding-title">
+            <div class="onboarding-card">
+                <div class="onboarding-header">
+                    <div class="onboarding-logo">🎛️</div>
+                    <div class="onboarding-header-text">
+                        <h2 class="onboarding-title" id="onboarding-title">Welcome to Preset Studio</h2>
+                        <p class="onboarding-subtitle">A few tips to get you moving fast</p>
+                    </div>
+                </div>
+                <div class="onboarding-tips">
+                    <div class="onboarding-tip">
+                        <div class="onboarding-tip-icon">↩️</div>
+                        <div>
+                            <p class="onboarding-tip-title">Double-click a label to reset</p>
+                            <p class="onboarding-tip-desc">Any slider label with a dashed underline snaps back to its
+                                default on double-click.</p>
+                        </div>
+                    </div>
+                    <div class="onboarding-tip">
+                        <div class="onboarding-tip-icon">🖱️</div>
+                        <div>
+                            <p class="onboarding-tip-title">Drag the anchor dot</p>
+                            <p class="onboarding-tip-desc">Click the canvas to place the XY anchor — Orbit, Sway and
+                                Bounce all pivot around it.</p>
+                        </div>
+                    </div>
+                    <div class="onboarding-tip">
+                        <div class="onboarding-tip-icon">⌘Z</div>
+                        <div>
+                            <p class="onboarding-tip-title">Undo / Redo</p>
+                            <p class="onboarding-tip-desc">50-step history. ⌘Z to undo, ⌘⇧Z to redo — every slider move
+                                is captured.</p>
+                        </div>
+                    </div>
+                    <div class="onboarding-tip">
+                        <div class="onboarding-tip-icon">📂</div>
+                        <div>
+                            <p class="onboarding-tip-title">Collapse layer cards</p>
+                            <p class="onboarding-tip-desc">Click a layer header to collapse it. New layers auto-collapse
+                                the rest.</p>
+                        </div>
+                    </div>
+                    <div class="onboarding-tip">
+                        <div class="onboarding-tip-icon">💾</div>
+                        <div>
+                            <p class="onboarding-tip-title">Save stays in your browser</p>
+                            <p class="onboarding-tip-desc">Hit Save, then open the main app → My Presets to play it back
+                                live.</p>
+                        </div>
+                    </div>
+                    <div class="onboarding-tip">
+                        <div class="onboarding-tip-icon">🔀</div>
+                        <div>
+                            <p class="onboarding-tip-title">A/B compare</p>
+                            <p class="onboarding-tip-desc">Hold the A/B button to preview the last saved state. Release
+                                to return.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="onboarding-footer">
+                    <button class="onboarding-help-link" id="onboarding-help-btn">Open full Help guide →</button>
+                    <div class="onboarding-footer-btns">
+                        <button class="onboarding-never-btn" id="onboarding-never-btn">Never show again</button>
+                        <button class="onboarding-got-it-btn" id="onboarding-got-it-btn">Got it</button>
+                    </div>
+                </div>
             </div>
-            <div class="onboarding-tips">
-              <div class="onboarding-tip">
-                <div class="onboarding-tip-icon">↩️</div>
-                <div>
-                  <p class="onboarding-tip-title">Double-click a label to reset</p>
-                  <p class="onboarding-tip-desc">Any slider label with a dashed underline snaps back to its default on double-click.</p>
-                </div>
-              </div>
-              <div class="onboarding-tip">
-                <div class="onboarding-tip-icon">🖱️</div>
-                <div>
-                  <p class="onboarding-tip-title">Drag the anchor dot</p>
-                  <p class="onboarding-tip-desc">Click the canvas to place the XY anchor — Orbit, Sway and Bounce all pivot around it.</p>
-                </div>
-              </div>
-              <div class="onboarding-tip">
-                <div class="onboarding-tip-icon">⌘Z</div>
-                <div>
-                  <p class="onboarding-tip-title">Undo / Redo</p>
-                  <p class="onboarding-tip-desc">50-step history. ⌘Z to undo, ⌘⇧Z to redo — every slider move is captured.</p>
-                </div>
-              </div>
-              <div class="onboarding-tip">
-                <div class="onboarding-tip-icon">📂</div>
-                <div>
-                  <p class="onboarding-tip-title">Collapse layer cards</p>
-                  <p class="onboarding-tip-desc">Click a layer header to collapse it. New layers auto-collapse the rest.</p>
-                </div>
-              </div>
-              <div class="onboarding-tip">
-                <div class="onboarding-tip-icon">💾</div>
-                <div>
-                  <p class="onboarding-tip-title">Save stays in your browser</p>
-                  <p class="onboarding-tip-desc">Hit Save, then open the main app → My Presets to play it back live.</p>
-                </div>
-              </div>
-              <div class="onboarding-tip">
-                <div class="onboarding-tip-icon">🔀</div>
-                <div>
-                  <p class="onboarding-tip-title">A/B compare</p>
-                  <p class="onboarding-tip-desc">Hold the A/B button to preview the last saved state. Release to return.</p>
-                </div>
-              </div>
-            </div>
-            <div class="onboarding-footer">
-              <button class="onboarding-help-link" id="onboarding-help-btn">Open full Help guide →</button>
-              <div class="onboarding-footer-btns">
-                <button class="onboarding-never-btn" id="onboarding-never-btn">Never show again</button>
-                <button class="onboarding-got-it-btn" id="onboarding-got-it-btn">Got it</button>
-              </div>
-            </div>
-          </div>
         </div>
 
         <!-- First-use hint (distinct from system toasts) -->
         <div id="hint" class="hint" hidden role="status" aria-live="polite">
-          <span class="hint-icon">💡</span>
-          <span class="hint-text"><strong>Tip:</strong> Double-click any slider label to reset it to default</span>
+            <span class="hint-icon">💡</span>
+            <span class="hint-text"><strong>Tip:</strong> Double-click any slider label to reset it to default</span>
         </div>
 
         <!-- Dev overhead monitor — toggle with Shift+F12 -->
@@ -944,7 +1201,8 @@
                     <svg id="mp-icon-play" viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
                         <path d="M8 5v14l11-7z" />
                     </svg>
-                    <svg id="mp-icon-pause" viewBox="0 0 24 24" fill="currentColor" width="14" height="14" style="display:none">
+                    <svg id="mp-icon-pause" viewBox="0 0 24 24" fill="currentColor" width="14" height="14"
+                        style="display:none">
                         <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
                     </svg>
                 </button>
@@ -954,10 +1212,13 @@
                     title="Volume" style="--pct:100%">
                 <button id="mp-load" class="mp-btn" type="button" data-tooltip="Load audio file">
                     <svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13">
-                        <path d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z"/>
+                        <path
+                            d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z" />
                     </svg>
                 </button>
-                <input id="mp-file-input" type="file" accept="audio/mpeg,audio/wav,audio/ogg,audio/flac,audio/aac,audio/mp4,audio/x-m4a,.mp3,.wav,.ogg,.flac,.aac,.m4a" hidden>
+                <input id="mp-file-input" type="file"
+                    accept="audio/mpeg,audio/wav,audio/ogg,audio/flac,audio/aac,audio/mp4,audio/x-m4a,.mp3,.wav,.ogg,.flac,.aac,.m4a"
+                    hidden>
             </div>
         </div>
 

@@ -152,6 +152,32 @@ export async function deleteImage(imageId) {
     });
 }
 
+function dataUrlToBlob(dataUrl) {
+    if (typeof dataUrl !== 'string') {
+        throw new Error('Invalid inlined image data');
+    }
+
+    const match = /^data:([^;,]+)?(;base64)?,(.*)$/s.exec(dataUrl);
+    if (!match) {
+        throw new Error('Invalid inlined image data');
+    }
+
+    const mime = match[1] || 'application/octet-stream';
+    const isBase64 = !!match[2];
+    const payload = match[3] || '';
+
+    if (isBase64) {
+        const binary = atob(payload);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+        }
+        return new Blob([bytes], { type: mime });
+    }
+
+    return new Blob([decodeURIComponent(payload)], { type: mime });
+}
+
 // ---------------------------------------------------------------------------
 // Export / Import (JSON, images inlined as data-URLs)
 // ---------------------------------------------------------------------------
@@ -207,8 +233,7 @@ export async function importPreset(json) {
 
     for (const img of data.images || []) {
         if (img._inlinedDataUrl) {
-            const res = await fetch(img._inlinedDataUrl);
-            const blob = await res.blob();
+            const blob = dataUrlToBlob(img._inlinedDataUrl);
             const newId = generateId();
             await storeImage(newId, blob);
             const { _inlinedDataUrl: _discarded, ...imgClean } = img;

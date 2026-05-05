@@ -119,7 +119,7 @@ const BLANK = {
     solidShift: 0,        // beat-driven mix amount toward solidColorB (uses bass_att)
     solidColorB: [0, 0, 0],
     solidReactSource: 'bass',  // 'bass' | 'mid' | 'treb' | 'vol'
-    solidReactCurve:  'linear', // 'linear' | 'squared' | 'cubed' | 'threshold'
+    solidReactCurve: 'linear', // 'linear' | 'squared' | 'cubed' | 'threshold'
 };
 
 
@@ -386,7 +386,7 @@ export class EditorInspector {
         this.currentState.solidShift = v0.solidShift ?? 0;
         this.currentState.solidColorB = (v0.solidColorB || [0, 0, 0]).slice();
         this.currentState.solidReactSource = v0.solidReactSource ?? 'bass';
-        this.currentState.solidReactCurve  = v0.solidReactCurve  ?? 'linear';
+        this.currentState.solidReactCurve = v0.solidReactCurve ?? 'linear';
         // _buildCompShader must run here so the solid-color GLSL is baked into
         // currentState.comp before the first _applyToEngine call.
         this._buildCompShader();
@@ -451,7 +451,7 @@ export class EditorInspector {
         this.currentState.solidShift = v.solidShift ?? 0;
         this.currentState.solidColorB = (v.solidColorB || [0, 0, 0]).slice();
         this.currentState.solidReactSource = v.solidReactSource ?? 'bass';
-        this.currentState.solidReactCurve  = v.solidReactCurve  ?? 'linear';
+        this.currentState.solidReactCurve = v.solidReactCurve ?? 'linear';
         // Reset equations but preserve comp (may have image layers)
         this.currentState.init_eqs_str = '';
         this.currentState.frame_eqs_str = '';
@@ -1171,12 +1171,12 @@ export class EditorInspector {
                 this.currentState.baseVals.wave_g = v0.solid[1];
                 this.currentState.baseVals.wave_b = v0.solid[2];
             }
-            this.currentState.solidPulse  = v0.solidPulse  ?? 0;
+            this.currentState.solidPulse = v0.solidPulse ?? 0;
             this.currentState.solidBreath = v0.solidBreath ?? 0;
-            this.currentState.solidShift  = v0.solidShift  ?? 0;
+            this.currentState.solidShift = v0.solidShift ?? 0;
             this.currentState.solidColorB = (v0.solidColorB || [0, 0, 0]).slice();
             this.currentState.solidReactSource = v0.solidReactSource ?? 'bass';
-            this.currentState.solidReactCurve  = v0.solidReactCurve  ?? 'linear';
+            this.currentState.solidReactCurve = v0.solidReactCurve ?? 'linear';
 
             this._postSnap();
             this._buildCompShader();
@@ -1285,7 +1285,7 @@ export class EditorInspector {
         try {
             // Parse the GIF to check if optimization is needed
             const gifData = await parseGifFile(file);
-            
+
             // If it doesn't need optimization, add directly
             if (!shouldOptimize(gifData)) {
                 this._addImageLayer(file);
@@ -1315,11 +1315,13 @@ export class EditorInspector {
             gifData,
             keepEveryN: 1,
             targetSize: 0,
-            processed: null
+            processed: null,
+            _rec: null
         };
 
         // Get recommendations
         const rec = getRecommendedSettings(gifData);
+        this._gifOptimizerState._rec = rec;
         this._gifOptimizerState.keepEveryN = rec.keepEveryN;
         this._gifOptimizerState.targetSize = rec.targetSize;
 
@@ -1328,7 +1330,7 @@ export class EditorInspector {
         document.getElementById('gif-opt-size').textContent = `${gifData.width} × ${gifData.height}`;
         document.getElementById('gif-opt-frames').textContent = `${gifData.frameCount} frames`;
         document.getElementById('gif-opt-filesize').textContent = formatBytes(gifData.fileSize);
-        
+
         const gpuBytes = estimateGpuMemory(gifData.width, gifData.height, gifData.frameCount);
         document.getElementById('gif-opt-gpu').textContent = `~${formatBytes(gpuBytes)} GPU`;
 
@@ -1380,11 +1382,21 @@ export class EditorInspector {
         const originalBytes = estimateGpuMemory(gifData.width, gifData.height, gifData.frameCount);
         const newBytes = estimateGpuMemory(processed.width, processed.height, processed.frameCount);
         const savings = ((originalBytes - newBytes) / originalBytes * 100).toFixed(0);
-        
+
+        // Cadence stats from processed delays
+        const avgMs = Math.round(processed.delays.reduce((a, b) => a + b, 0) / processed.delays.length);
+        const minMs = Math.min(...processed.delays);
+        const maxMs = Math.max(...processed.delays);
+        const variance = maxMs - minMs;
+        const cadenceStr = variance <= 5
+            ? `${avgMs}ms/frame (even)`
+            : `${avgMs}ms/frame avg · ±${Math.round(variance / 2)}ms`;
+
         document.getElementById('gif-opt-result-frames').textContent = `${processed.frameCount} frames`;
-        document.getElementById('gif-opt-result-text').innerHTML = 
+        document.getElementById('gif-opt-result-text').innerHTML =
             `${processed.width} × ${processed.height} · ${processed.frameCount} frames · ~${formatBytes(newBytes)} GPU ` +
-            `<span style="color:var(--success);">(${savings}% smaller)</span>`;
+            `<span style="color:var(--success);">(${savings}% smaller)</span>` +
+            `<br><span style="color:var(--text-3);font-size:12px;">Cadence: ${cadenceStr}</span>`;
 
         // Update resize dims text
         if (targetSize > 0 && (gifData.width > targetSize || gifData.height > targetSize)) {
@@ -1399,7 +1411,7 @@ export class EditorInspector {
         // Generate frame strip preview
         const strip = document.getElementById('gif-opt-frame-strip');
         strip.innerHTML = '';
-        
+
         const previews = await generateFrameStrip(processed, 20);
         previews.forEach((preview, idx) => {
             const thumb = document.createElement('div');
@@ -1441,7 +1453,7 @@ export class EditorInspector {
             if (!state?.processed) return;
 
             this._closeGifOptimizer(false);
-            
+
             // Create a modified file with processed frames
             // We pass the processed data directly to _addImageLayer
             await this._addOptimizedGifLayer(state.file, state.processed);
@@ -1464,7 +1476,7 @@ export class EditorInspector {
                 const size = parseInt(btn.dataset.size);
                 if (this._gifOptimizerState) {
                     this._gifOptimizerState.targetSize = size;
-                    
+
                     // Update button styling
                     document.querySelectorAll('.gif-opt-size-btn').forEach(b => {
                         const bSize = parseInt(b.dataset.size);
@@ -1477,9 +1489,47 @@ export class EditorInspector {
                             b.style.color = '';
                         }
                     });
-                    
+
                     await this._updateGifOptimizerPreview();
                 }
+            });
+        });
+
+        // Intent preset buttons
+        document.querySelectorAll('.gif-opt-intent-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                if (!this._gifOptimizerState) return;
+                const { intent } = btn.dataset;
+                const rec = this._gifOptimizerState._rec || { keepEveryN: 3 };
+                const presets = {
+                    smooth: { keepEveryN: 1, targetSize: 0 },
+                    detail: { keepEveryN: 2, targetSize: 0 },
+                    light: { keepEveryN: Math.max(rec.keepEveryN, 3), targetSize: 128 },
+                };
+                const p = presets[intent];
+                if (!p) return;
+                this._gifOptimizerState.keepEveryN = p.keepEveryN;
+                this._gifOptimizerState.targetSize = p.targetSize;
+
+                // Sync nth slider
+                const nthSlider = document.getElementById('gif-opt-nth');
+                if (nthSlider) { nthSlider.value = p.keepEveryN; document.getElementById('gif-opt-nth-val').textContent = p.keepEveryN; }
+
+                // Sync size buttons
+                document.querySelectorAll('.gif-opt-size-btn').forEach(b => {
+                    const bSize = parseInt(b.dataset.size);
+                    b.classList.toggle('active', bSize === p.targetSize);
+                    b.style.background = bSize === p.targetSize ? 'var(--accent)' : 'var(--bg-1)';
+                    b.style.color = bSize === p.targetSize ? 'white' : '';
+                });
+
+                // Highlight active intent
+                document.querySelectorAll('.gif-opt-intent-btn').forEach(b => {
+                    b.style.borderColor = b === btn ? 'var(--accent)' : 'var(--border)';
+                    b.style.color = b === btn ? 'var(--accent)' : '';
+                });
+
+                await this._updateGifOptimizerPreview();
             });
         });
     }
@@ -1493,20 +1543,20 @@ export class EditorInspector {
     async _addOptimizedGifLayer(originalFile, processedData) {
         // Create a wrapper that the visualizer will recognize as a pre-processed GIF
         // We need to pass the processed frames directly to avoid re-parsing
-        
+
         // Generate a data URL from the first frame as the "preview"
         const canvas = document.createElement('canvas');
         canvas.width = processedData.width;
         canvas.height = processedData.height;
         const ctx = canvas.getContext('2d');
-        
+
         if (processedData.frames.length > 0) {
             const imageData = new ImageData(processedData.frames[0], processedData.width, processedData.height);
             ctx.putImageData(imageData, 0, 0);
         }
-        
+
         const previewDataUrl = canvas.toDataURL('image/png');
-        
+
         // Store processed data for the visualizer to pick up
         const processedGifKey = `processed_gif_${Date.now()}`;
         this._processedGifCache = this._processedGifCache || new Map();
@@ -1519,13 +1569,13 @@ export class EditorInspector {
         });
 
         // Create a modified file object that carries the cache key
-        const modifiedFile = new File([originalFile], originalFile.name, { 
-            type: originalFile.type 
+        const modifiedFile = new File([originalFile], originalFile.name, {
+            type: originalFile.type
         });
         modifiedFile._processedGifKey = processedGifKey;
 
         this._addImageLayer(modifiedFile);
-        
+
         showToast(`Added optimized GIF: ${processedData.frameCount} frames, ${processedData.width}×${processedData.height}`, false);
     }
 
@@ -1904,6 +1954,8 @@ export class EditorInspector {
             name: file.name.replace(/\.[^.]+$/, '') || 'Layer',  // Phase 4: user-editable display name
             isGif: resized.isGif || false,
             gifSpeed: 2.0,      // playback multiplier: 2 = twice as fast, 0.5 = half speed
+            gifStability: 0.0,  // timing smoothing: 0 = native delays, 1 = perfectly even cadence
+            alphaMode: (resized.isGif || false) ? 'preserve' : 'fade',  // 'fade' = raw alpha (default for stills), 'preserve' = silhouette stays solid while opacity fades
             reactSource: 'bass',   // Phase 5: 'bass' | 'mid' | 'treb' | 'vol'
             reactCurve: 'linear',  // Phase 5: 'linear' | 'squared' | 'cubed' | 'threshold'
             orbitMode: 'circle',   // Phase 6: 'circle' | 'lissajous'
@@ -1929,11 +1981,11 @@ export class EditorInspector {
         };
         this.currentState.images.push(entry);
 
-        const texObj = { 
-            data: resized.dataURL, 
-            width: optimizedGifData ? optimizedGifData.width : resized.width, 
-            height: optimizedGifData ? optimizedGifData.height : resized.height, 
-            isGif: resized.isGif || false, 
+        const texObj = {
+            data: resized.dataURL,
+            width: optimizedGifData ? optimizedGifData.width : resized.width,
+            height: optimizedGifData ? optimizedGifData.height : resized.height,
+            isGif: resized.isGif || false,
             gifSpeed: entry.gifSpeed,
             optimizedGifData // Pass pre-processed frames to visualizer if available
         };
@@ -2001,9 +2053,22 @@ export class EditorInspector {
             <p class="layer-section-label">Animation</p>
             <div class="layer-slider-row">
               <span class="layer-ctrl-label" data-tooltip="GIF playback speed (0.25× to 8×). Default 1.2× — most GIFs feel a touch slow at native speed.">Speed</span>
-              <input type="range" class="slider layer-gif-speed-sl" min="0.25" max="8" step="0.05"
-                value="${entry.gifSpeed}" style="--pct:${pct(entry.gifSpeed, 0.25, 8)}">
+              <input type="range" class="slider layer-gif-speed-sl" min="0" max="1" step="0.001"
+                value="${(Math.log(entry.gifSpeed / 0.25) / Math.log(32)).toFixed(4)}" style="--pct:${((Math.log(entry.gifSpeed / 0.25) / Math.log(32)) * 100).toFixed(1)}%">
               <span class="lsv layer-gif-speed-val">${entry.gifSpeed.toFixed(2)}×</span>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Smooths uneven per-frame timing — 0 = native GIF delays, 1 = perfectly even cadence. Helps stuttery GIFs.">Stability</span>
+              <input type="range" class="slider layer-gif-stability-sl" min="0" max="1" step="0.01"
+                value="${(entry.gifStability || 0).toFixed(2)}" style="--pct:${((entry.gifStability || 0) * 100).toFixed(1)}%">
+              <span class="lsv layer-gif-stability-val">${(entry.gifStability || 0).toFixed(2)}</span>
+            </div>
+            <div class="layer-row-inline" style="margin-top:4px">
+              <span class="layer-ctrl-label" data-tooltip="Fade: opacity multiplies raw alpha — soft edges disappear first. Preserve: silhouette is held solid, the whole image fades uniformly.">Alpha</span>
+              <div class="layer-alpha-mode-seg" role="group" aria-label="Alpha mode">
+                <button class="lseg${(entry.alphaMode || 'fade') === 'fade' ? ' active' : ''}" data-alpha-mode="fade">Fade</button>
+                <button class="lseg${(entry.alphaMode || 'fade') === 'preserve' ? ' active' : ''}" data-alpha-mode="preserve">Preserve</button>
+              </div>
             </div>
             <div class="layer-section-divider"></div>
             ` : ''}
@@ -2245,10 +2310,10 @@ export class EditorInspector {
             <div class="layer-row-inline" style="margin-top:4px">
               <span class="layer-ctrl-label">Posterize</span>
               <div class="layer-posterize-seg" role="group" aria-label="Posterize levels">
-                <button class="lseg${(entry.posterize || 0) === 0  ? ' active' : ''}" data-posterize="0">Off</button>
-                <button class="lseg${(entry.posterize || 0) === 2  ? ' active' : ''}" data-posterize="2">2</button>
-                <button class="lseg${(entry.posterize || 0) === 4  ? ' active' : ''}" data-posterize="4">4</button>
-                <button class="lseg${(entry.posterize || 0) === 8  ? ' active' : ''}" data-posterize="8">8</button>
+                <button class="lseg${(entry.posterize || 0) === 0 ? ' active' : ''}" data-posterize="0">Off</button>
+                <button class="lseg${(entry.posterize || 0) === 2 ? ' active' : ''}" data-posterize="2">2</button>
+                <button class="lseg${(entry.posterize || 0) === 4 ? ' active' : ''}" data-posterize="4">4</button>
+                <button class="lseg${(entry.posterize || 0) === 8 ? ' active' : ''}" data-posterize="8">8</button>
                 <button class="lseg${(entry.posterize || 0) === 16 ? ' active' : ''}" data-posterize="16">16</button>
               </div>
             </div>
@@ -2484,7 +2549,7 @@ export class EditorInspector {
         const sliderMins = [0, 0, 0, -2, 0, 0, 0, 0, 0, 0];
         const sliderMaxes = [1, 0.8, 0.45, 2, 1, 0.4, 4, 0.4, 2, 2];
 
-        card.querySelectorAll('.layer-slider-row input[type=range]:not(.layer-bounce-sl):not(.layer-size-sl):not(.layer-liss-sl):not(.layer-strobe-thr-sl):not(.layer-pan-x-sl):not(.layer-pan-y-sl):not(.layer-pan-range-sl):not(.layer-beat-fade-sl):not(.layer-tile-sx-sl):not(.layer-tile-sy-sl):not(.layer-shake-sl):not(.layer-persp-x-sl):not(.layer-persp-y-sl):not(.layer-radius-sl)').forEach((sl, i) => {
+        card.querySelectorAll('.layer-slider-row input[type=range]:not(.layer-bounce-sl):not(.layer-size-sl):not(.layer-liss-sl):not(.layer-strobe-thr-sl):not(.layer-pan-x-sl):not(.layer-pan-y-sl):not(.layer-pan-range-sl):not(.layer-beat-fade-sl):not(.layer-tile-sx-sl):not(.layer-tile-sy-sl):not(.layer-shake-sl):not(.layer-persp-x-sl):not(.layer-persp-y-sl):not(.layer-radius-sl):not(.layer-gif-speed-sl):not(.layer-gif-stability-sl)').forEach((sl, i) => {
             const valEl = sl.nextElementSibling;
             sl.addEventListener('input', () => {
                 const v = parseFloat(sl.value);
@@ -2534,11 +2599,34 @@ export class EditorInspector {
             const gifSpeedVal = card.querySelector('.layer-gif-speed-val');
             if (gifSpeedSl) {
                 gifSpeedSl.addEventListener('input', () => {
-                    const v = parseFloat(gifSpeedSl.value);
+                    const pos = parseFloat(gifSpeedSl.value);
+                    const v = 0.25 * Math.pow(32, pos);
                     entry.gifSpeed = v;
                     gifSpeedVal.textContent = `${v.toFixed(2)}×`;
-                    gifSpeedSl.style.setProperty('--pct', `${pct(v, 0.25, 8)}`);
+                    gifSpeedSl.style.setProperty('--pct', `${(pos * 100).toFixed(1)}%`);
                     this.engine.setGifAnimationSpeed(entry.texName, v);
+                });
+            }
+
+            const alphaModebtns = card.querySelectorAll('.layer-alpha-mode-seg .lseg');
+            alphaModebtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    alphaModebtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    entry.alphaMode = btn.dataset.alphaMode;
+                    refresh();
+                });
+            });
+
+            const gifStabilitySl = card.querySelector('.layer-gif-stability-sl');
+            const gifStabilityVal = card.querySelector('.layer-gif-stability-val');
+            if (gifStabilitySl) {
+                gifStabilitySl.addEventListener('input', () => {
+                    const v = parseFloat(gifStabilitySl.value);
+                    entry.gifStability = v;
+                    gifStabilityVal.textContent = v.toFixed(2);
+                    gifStabilitySl.style.setProperty('--pct', `${(v * 100).toFixed(1)}%`);
+                    this.engine.setGifAnimationStability(entry.texName, v);
                 });
             }
         }
@@ -2647,7 +2735,7 @@ export class EditorInspector {
             refresh();
         });
 
-        const radiusSl  = card.querySelector('.layer-radius-sl');
+        const radiusSl = card.querySelector('.layer-radius-sl');
         const radiusVal = card.querySelector('.layer-radius-val');
         radiusSl.addEventListener('input', () => {
             entry.radius = parseFloat(radiusSl.value);
@@ -2743,7 +2831,7 @@ export class EditorInspector {
         const panPadCtx = panPad.getContext('2d');
         const PAN_PAD = 96;
         const PAN_MAX = 2.0;
-        const panCurve    = (t) => Math.sign(t) * t * t * PAN_MAX;          // pos → speed
+        const panCurve = (t) => Math.sign(t) * t * t * PAN_MAX;          // pos → speed
         const panCurveInv = (s) => { const f = s / PAN_MAX; return Math.sign(f) * Math.sqrt(Math.abs(f)); }; // speed → pos
 
         const drawPanPad = () => {
@@ -2788,8 +2876,8 @@ export class EditorInspector {
             const rect = panPad.getBoundingClientRect();
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-            const tx = Math.max(-1, Math.min(1, ((clientX - rect.left) / rect.width  - 0.5) * 2));
-            const ty = Math.max(-1, Math.min(1, ((clientY - rect.top)  / rect.height - 0.5) * 2));
+            const tx = Math.max(-1, Math.min(1, ((clientX - rect.left) / rect.width - 0.5) * 2));
+            const ty = Math.max(-1, Math.min(1, ((clientY - rect.top) / rect.height - 0.5) * 2));
             entry.panSpeedX = panCurve(tx);
             entry.panSpeedY = panCurve(ty);
             panPadReadout.textContent = `${entry.panSpeedX.toFixed(2)} / ${entry.panSpeedY.toFixed(2)}`;
@@ -3045,8 +3133,21 @@ export class EditorInspector {
         const savedHd = this._hdUploads;
         this._hdUploads = origHdMode;
         try {
-            const resp = await fetch(texObj.data);
-            const blob = await resp.blob();
+            const blob = (() => {
+                const dataUrl = texObj.data;
+                const match = /^data:([^;,]+)?(;base64)?,(.*)$/s.exec(dataUrl);
+                if (!match) throw new Error('Invalid cached texture data URL');
+                const mime = match[1] || 'image/png';
+                const isBase64 = !!match[2];
+                const payload = match[3] || '';
+                if (isBase64) {
+                    const binary = atob(payload);
+                    const bytes = new Uint8Array(binary.length);
+                    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                    return new Blob([bytes], { type: mime });
+                }
+                return new Blob([decodeURIComponent(payload)], { type: mime });
+            })();
             const file = new File([blob], origFileName, { type: blob.type || 'image/png' });
             await this._addImageLayer(file);
         } finally {
@@ -3222,10 +3323,10 @@ export class EditorInspector {
             const solidCurve = this.currentState.solidReactCurve || 'linear';
             let solidCurveExpr;
             switch (solidCurve) {
-                case 'squared':   solidCurveExpr = '_sr_raw * _sr_raw'; break;
-                case 'cubed':     solidCurveExpr = '_sr_raw * _sr_raw * _sr_raw'; break;
+                case 'squared': solidCurveExpr = '_sr_raw * _sr_raw'; break;
+                case 'cubed': solidCurveExpr = '_sr_raw * _sr_raw * _sr_raw'; break;
                 case 'threshold': solidCurveExpr = 'step(0.3, _sr_raw)'; break;
-                default:          solidCurveExpr = '_sr_raw';
+                default: solidCurveExpr = '_sr_raw';
             }
             // Breath: lerp between 1.0 (off) and a slow sine (0..1) by breath amount.
             // Pulse:  multiplies brightness by (1 + signal * pulse).
@@ -3331,14 +3432,14 @@ export class EditorInspector {
         const curve = img.reactCurve || 'linear';
         let curveExpr;
         switch (curve) {
-            case 'squared':   curveExpr = '_r_raw * _r_raw'; break;
-            case 'cubed':     curveExpr = '_r_raw * _r_raw * _r_raw'; break;
+            case 'squared': curveExpr = '_r_raw * _r_raw'; break;
+            case 'cubed': curveExpr = '_r_raw * _r_raw * _r_raw'; break;
             case 'threshold': curveExpr = 'step(0.3, _r_raw)'; break;
-            default:          curveExpr = '_r_raw'; // linear
+            default: curveExpr = '_r_raw'; // linear
         }
         const strobeLines = hasStrobe
             ? `    float _strobeFq = ${stbThr} * 6.0 * (1.0 + _r_raw * 2.0);\n` +
-              `    float _strobeWave = step(0.5, fract(time * _strobeFq));\n`
+            `    float _strobeWave = step(0.5, fract(time * _strobeFq));\n`
             : '';
         const reactLines =
             `    float _r_raw = ${reactSrc};
@@ -3523,10 +3624,10 @@ export class EditorInspector {
             let s = `    {\n`;
             if (Math.abs(img.perspY || 0) > 0.001)
                 s += `      float _dpx = clamp(1.0 + ${perspY} * ${varName}.y, 0.1, 10.0);\n` +
-                     `      ${varName}.x /= _dpx;\n`;
+                    `      ${varName}.x /= _dpx;\n`;
             if (Math.abs(img.perspX || 0) > 0.001)
                 s += `      float _dpy = clamp(1.0 + ${perspX} * ${varName}.x, 0.1, 10.0);\n` +
-                     `      ${varName}.y /= _dpy;\n`;
+                    `      ${varName}.y /= _dpy;\n`;
             s += `    }\n`;
             return s;
         };
@@ -3629,7 +3730,7 @@ export class EditorInspector {
             // After scaling, check if UV is within [0,1] range of the first image instance
             const rotLines = hasSpin
                 ? `    float _ca = cos(_spinAng); float _sa = sin(_spinAng);\n` +
-                  `    _u = vec2(_ca*_u.x - _sa*_u.y, _sa*_u.x + _ca*_u.y);\n`
+                `    _u = vec2(_ca*_u.x - _sa*_u.y, _sa*_u.x + _ca*_u.y);\n`
                 : '';
             pipeline =
                 `    float _gapMask = 1.0;\n` +
@@ -3701,20 +3802,20 @@ export class EditorInspector {
                 // _suv is the UV used for the primary sample (already in scope from pipeline).
                 const suv = hasTunnel ? `mix(_uA, _uB, _tf)` : `_u`;
                 return (
-                  `    { float _ex = ${edgeStepX}; float _ey = ${edgeStepY};\n` +
-                  `      vec2 _suv = ${suv};\n` +
-                  `      float _e00 = dot(texture(${tex}, clamp(_suv + vec2(-_ex,-_ey), 0.0, 1.0)).xyz, vec3(0.299,0.587,0.114));\n` +
-                  `      float _e10 = dot(texture(${tex}, clamp(_suv + vec2( 0.0,-_ey), 0.0, 1.0)).xyz, vec3(0.299,0.587,0.114));\n` +
-                  `      float _e20 = dot(texture(${tex}, clamp(_suv + vec2( _ex,-_ey), 0.0, 1.0)).xyz, vec3(0.299,0.587,0.114));\n` +
-                  `      float _e01 = dot(texture(${tex}, clamp(_suv + vec2(-_ex, 0.0), 0.0, 1.0)).xyz, vec3(0.299,0.587,0.114));\n` +
-                  `      float _e21 = dot(texture(${tex}, clamp(_suv + vec2( _ex, 0.0), 0.0, 1.0)).xyz, vec3(0.299,0.587,0.114));\n` +
-                  `      float _e02 = dot(texture(${tex}, clamp(_suv + vec2(-_ex, _ey), 0.0, 1.0)).xyz, vec3(0.299,0.587,0.114));\n` +
-                  `      float _e12 = dot(texture(${tex}, clamp(_suv + vec2( 0.0, _ey), 0.0, 1.0)).xyz, vec3(0.299,0.587,0.114));\n` +
-                  `      float _e22 = dot(texture(${tex}, clamp(_suv + vec2( _ex, _ey), 0.0, 1.0)).xyz, vec3(0.299,0.587,0.114));\n` +
-                  `      float _gx = -_e00 + _e20 - 2.0*_e01 + 2.0*_e21 - _e02 + _e22;\n` +
-                  `      float _gy = -_e00 - 2.0*_e10 - _e20 + _e02 + 2.0*_e12 + _e22;\n` +
-                  `      float _edge = clamp(sqrt(_gx*_gx + _gy*_gy) * 4.0, 0.0, 1.0);\n` +
-                  `      _src = vec3(_edge); }\n`
+                    `    { float _ex = ${edgeStepX}; float _ey = ${edgeStepY};\n` +
+                    `      vec2 _suv = ${suv};\n` +
+                    `      float _e00 = dot(texture(${tex}, clamp(_suv + vec2(-_ex,-_ey), 0.0, 1.0)).xyz, vec3(0.299,0.587,0.114));\n` +
+                    `      float _e10 = dot(texture(${tex}, clamp(_suv + vec2( 0.0,-_ey), 0.0, 1.0)).xyz, vec3(0.299,0.587,0.114));\n` +
+                    `      float _e20 = dot(texture(${tex}, clamp(_suv + vec2( _ex,-_ey), 0.0, 1.0)).xyz, vec3(0.299,0.587,0.114));\n` +
+                    `      float _e01 = dot(texture(${tex}, clamp(_suv + vec2(-_ex, 0.0), 0.0, 1.0)).xyz, vec3(0.299,0.587,0.114));\n` +
+                    `      float _e21 = dot(texture(${tex}, clamp(_suv + vec2( _ex, 0.0), 0.0, 1.0)).xyz, vec3(0.299,0.587,0.114));\n` +
+                    `      float _e02 = dot(texture(${tex}, clamp(_suv + vec2(-_ex, _ey), 0.0, 1.0)).xyz, vec3(0.299,0.587,0.114));\n` +
+                    `      float _e12 = dot(texture(${tex}, clamp(_suv + vec2( 0.0, _ey), 0.0, 1.0)).xyz, vec3(0.299,0.587,0.114));\n` +
+                    `      float _e22 = dot(texture(${tex}, clamp(_suv + vec2( _ex, _ey), 0.0, 1.0)).xyz, vec3(0.299,0.587,0.114));\n` +
+                    `      float _gx = -_e00 + _e20 - 2.0*_e01 + 2.0*_e21 - _e02 + _e22;\n` +
+                    `      float _gy = -_e00 - 2.0*_e10 - _e20 + _e02 + 2.0*_e12 + _e22;\n` +
+                    `      float _edge = clamp(sqrt(_gx*_gx + _gy*_gy) * 4.0, 0.0, 1.0);\n` +
+                    `      _src = vec3(_edge); }\n`
                 );
             })() : '') +
             (hasTint ? (() => {
@@ -3743,7 +3844,9 @@ export class EditorInspector {
                 }
             })() : '') +
             (hasPosterize ? `    { float _pn = ${posterize}.0; _src = floor(_src * _pn + 0.5) / _pn; }\n` : '') +
-            `    float _op = _t.w * _gapMask * clamp(${op} + _r * ${opa}, 0.0, 1.0);\n` +
+            (img.alphaMode === 'preserve'
+                ? `    float _alphaMask = step(0.1, _t.w);\n    float _op = _alphaMask * _gapMask * clamp(${op} + _r * ${opa}, 0.0, 1.0);\n`
+                : `    float _op = _t.w * _gapMask * clamp(${op} + _r * ${opa}, 0.0, 1.0);\n`) +
             `    ${blendLine}\n` +
             `  }\n`
         );
@@ -3842,7 +3945,7 @@ export class EditorInspector {
             swayAmt: 0.00, swaySpeed: 1.00, wanderAmt: 0.00, wanderSpeed: 0.50,
             panMode: 'off', panSpeedX: 0.00, panSpeedY: 0.00, panRange: 0.20,
             mirror: 'none', mirrorScope: 'tile',
-            isGif: false, gifSpeed: 1.0,
+            isGif: false, gifSpeed: 1.0, gifStability: 0.0, alphaMode: 'fade',
             reactSource: 'bass', reactCurve: 'linear',
             orbitMode: 'circle', lissFreqX: 0.50, lissFreqY: 0.75, lissPhase: 0.25,
             strobeAmp: 0.00, strobeThr: 0.40,
@@ -3880,11 +3983,11 @@ export class EditorInspector {
             this.currentState.baseVals = { ...deepClone(BLANK.baseVals), ...bundled.baseVals };
         }
         this.currentState.shapes = deepClone(bundled.shapes || []);
-        this.currentState.waves  = deepClone(bundled.waves  || []);
-        this.currentState.warp   = bundled.warp || '';
+        this.currentState.waves = deepClone(bundled.waves || []);
+        this.currentState.warp = bundled.warp || '';
 
         // Equation strings — handle old butterchurn naming (init_eqs → init_eqs_str)
-        this.currentState.init_eqs_str  = bundled.init_eqs_str  || bundled.init_eqs  || '';
+        this.currentState.init_eqs_str = bundled.init_eqs_str || bundled.init_eqs || '';
         this.currentState.frame_eqs_str = bundled.frame_eqs_str || bundled.frame_eqs || '';
         this.currentState.pixel_eqs_str = bundled.pixel_eqs_str || bundled.pixel_eqs || '';
 
@@ -3917,7 +4020,7 @@ export class EditorInspector {
 
         // Strip library-only metadata
         const { id: _id, name: _name, schemaVersion: _sv, createdAt: _ca, updatedAt: _ua,
-                thumbnailDataUrl: _th, ...stateFields } = presetData;
+            thumbnailDataUrl: _th, ...stateFields } = presetData;
 
         // Overlay onto BLANK so fields missing from older saves fall back to defaults
         // (avoids `undefined` propagating into _syncSlider → NaN value labels).
