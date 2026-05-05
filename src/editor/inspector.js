@@ -180,6 +180,12 @@ const BLANK = {
         warpSpeedAmt: 0.00,
         driftXAmt: 0.00,
         driftYAmt: 0.00,
+        pulseAmp: 0.00,
+        bounceAmp: 0.00,
+        shakeAmp: 0.00,
+        beatFadeAmp: 0.00,
+        strobeAmp: 0.00,
+        shrink: 0,
     },
     // Solid-mode fx — only applied when a variation with a `solid:` base is active.
     // All default to 0 so "Solid" out of the box is truly static (no breath, no pulse).
@@ -1043,6 +1049,7 @@ export class EditorInspector {
     _buildMotionReactPanel() {
         const container = document.getElementById('motion-react-sliders');
         if (!container) return;
+        const fxContainer = document.getElementById('motion-react-fx-sliders');
 
         const srcSel = document.getElementById('motion-react-source');
         if (srcSel) {
@@ -1090,6 +1097,40 @@ export class EditorInspector {
             });
             input.addEventListener('pointerup', () => this._postSnap());
         });
+
+        if (fxContainer) {
+            const fxConfigs = [
+                { id: 'mrf-pulse', label: 'Pulse', min: 0, max: 2.0, step: 0.01, value: 0, key: 'pulseAmp' },
+                { id: 'mrf-bounce', label: 'Bounce', min: 0, max: 2.0, step: 0.01, value: 0, key: 'bounceAmp' },
+                { id: 'mrf-shake', label: 'Shake', min: 0, max: 2.0, step: 0.01, value: 0, key: 'shakeAmp' },
+                { id: 'mrf-beatfade', label: 'Beat Fade', min: 0, max: 2.0, step: 0.01, value: 0, key: 'beatFadeAmp' },
+                { id: 'mrf-strobe', label: 'Strobe', min: 0, max: 2.0, step: 0.01, value: 0, key: 'strobeAmp' },
+            ];
+            fxConfigs.forEach(cfg => {
+                const input = makeSlider(fxContainer, cfg);
+                const valEl = document.getElementById(`${cfg.id}-val`);
+                input.addEventListener('pointerdown', () => this._preSnap());
+                input.addEventListener('input', () => {
+                    const v = parseFloat(input.value);
+                    if (valEl) valEl.textContent = v.toFixed(2);
+                    input.style.setProperty('--pct', `${((v - cfg.min) / (cfg.max - cfg.min)) * 100}%`);
+                    this.currentState.motionReact[cfg.key] = v;
+                    this._applyToEngine(true);
+                });
+                input.addEventListener('pointerup', () => this._postSnap());
+            });
+        }
+
+        const shrinkToggle = document.getElementById('motion-react-shrink');
+        if (shrinkToggle) {
+            shrinkToggle.checked = !!this.currentState.motionReact?.shrink;
+            shrinkToggle.addEventListener('change', () => {
+                this._preSnap();
+                this.currentState.motionReact.shrink = shrinkToggle.checked ? 1 : 0;
+                this._postSnap();
+                this._applyToEngine(true);
+            });
+        }
     }
 
     _syncMotionReact() {
@@ -1106,6 +1147,11 @@ export class EditorInspector {
             ['mr-wspd', 'warpSpeedAmt', -1.00, 1.00],
             ['mr-dx', 'driftXAmt', -0.08, 0.08],
             ['mr-dy', 'driftYAmt', -0.08, 0.08],
+            ['mrf-pulse', 'pulseAmp', 0, 2.0],
+            ['mrf-bounce', 'bounceAmp', 0, 2.0],
+            ['mrf-shake', 'shakeAmp', 0, 2.0],
+            ['mrf-beatfade', 'beatFadeAmp', 0, 2.0],
+            ['mrf-strobe', 'strobeAmp', 0, 2.0],
         ];
         map.forEach(([id, key, min, max]) => {
             const input = document.getElementById(id);
@@ -1116,6 +1162,8 @@ export class EditorInspector {
             if (valEl) valEl.textContent = v.toFixed(2);
             input.style.setProperty('--pct', `${((v - min) / (max - min)) * 100}%`);
         });
+        const shrinkToggle = document.getElementById('motion-react-shrink');
+        if (shrinkToggle) shrinkToggle.checked = !!mr.shrink;
     }
 
     // ─── Feel sliders ──────────────────────────────────────────────────────────
@@ -3486,8 +3534,15 @@ export class EditorInspector {
         const warpSpeedAmt = Number(conf.warpSpeedAmt || 0).toFixed(4);
         const driftXAmt = Number(conf.driftXAmt || 0).toFixed(4);
         const driftYAmt = Number(conf.driftYAmt || 0).toFixed(4);
+        const pulseAmp = Number(conf.pulseAmp || 0).toFixed(4);
+        const bounceAmp = Number(conf.bounceAmp || 0).toFixed(4);
+        const shakeAmp = Number(conf.shakeAmp || 0).toFixed(4);
+        const beatFadeAmp = Number(conf.beatFadeAmp || 0).toFixed(4);
+        const strobeAmp = Number(conf.strobeAmp || 0).toFixed(4);
+        const shrink = conf.shrink ? 1 : 0;
 
-        const hasAny = [zoomAmt, rotAmt, warpAmt, warpSpeedAmt, driftXAmt, driftYAmt]
+        const hasAny = [zoomAmt, rotAmt, warpAmt, warpSpeedAmt, driftXAmt, driftYAmt,
+            pulseAmp, bounceAmp, shakeAmp, beatFadeAmp, strobeAmp]
             .some(v => Math.abs(Number(v)) > 0.00001);
         if (!hasAny) return '';
 
@@ -3505,6 +3560,17 @@ export class EditorInspector {
             `a.warpanimspeed=Math.max(0.05,Math.min(5.00,a.warpanimspeed+_mr*${warpSpeedAmt}));`,
             `a.dx=Math.max(-0.25,Math.min(0.25,a.dx+_mr*${driftXAmt}));`,
             `a.dy=Math.max(-0.25,Math.min(0.25,a.dy+_mr*${driftYAmt}));`,
+            `var _pulseDir=${shrink ? '-1.0' : '1.0'};`,
+            `a.zoom=Math.max(0.30,Math.min(2.50,a.zoom+(_mr*${pulseAmp}*0.0600*_pulseDir)));`,
+            `a.dy=Math.max(-0.25,Math.min(0.25,a.dy+(Math.sin(a.time*16.0)*_mr*${bounceAmp}*0.0200)));`,
+            `var _shake=(Math.sin(a.time*57.0)+Math.sin(a.time*91.0))*0.5;`,
+            `a.dx=Math.max(-0.25,Math.min(0.25,a.dx+(_shake*_mr*${shakeAmp}*0.0150)));`,
+            `a.rot=Math.max(-2.00,Math.min(2.00,a.rot+(_shake*_mr*${shakeAmp}*0.0800)));`,
+            // Beat Fade: proportional reduction so it respects preset-native decay value
+            `a.decay=Math.max(0.85,a.decay*(1.0-(_mr*${beatFadeAmp}*0.0400)));`,
+            // Strobe: multiplicative brightness spike — scales from preset-native gammaadj, never blows past 4.0
+            `var _strobe=(_mr>0.40)?1.0:0.0;`,
+            `a.gammaadj=Math.max(0.50,Math.min(4.00,a.gammaadj*(1.0+(_strobe*${strobeAmp}*0.6000))));`,
         ].join('\n');
     }
 

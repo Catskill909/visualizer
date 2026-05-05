@@ -149,11 +149,14 @@ What was done:
 - Audited full execution paths for Image and Motion reactivity
 - Established architecture contract: Image controls = image-layer-only, Motion controls = preset/MilkDrop-only
 - Removed AGC, Energy, Bass Sensitivity from Motion tab (they were global engine conditioning, not preset-local)
-- Added preset-only Motion reactivity UI: Source, Curve, and six modulation sliders (Zoom, Spin, Warp, Warp Speed, Drift H, Drift V)
+- Added preset-only Motion reactivity UI: Source, Curve, six modulation sliders (Zoom, Spin, Warp, Warp Speed, Drift H, Drift V), plus Image-style Audio FX block (Pulse, Bounce, Shake, Beat Fade, Strobe, Shrink toggle)
 - Implemented _buildRuntimePreset and frame_eqs injection so modulation runs at preset-eval level, not engine gain level
+- Beat Fade and Strobe use proportional math (multiplicative on preset-native values) so they cannot override preset-authored dynamics
+- Shrink toggle reverses Pulse zoom direction only; tooltip added so intent is clear
 - Beat Sensitivity (b1ed) kept in Motion tab — it is preset-saved and belongs there
 - Image tab and image-layer reactivity left completely untouched
-- Production build passes, DOM smoke check passed
+- Fixed critical crash: frame_eqs_str was emitting bare MilkDrop identifiers; corrected to butterchurn JS (a.* + Math.*)
+- Production build passes
 
 What was deferred:
 - AGC toggle, Energy slider, Bass Sensitivity slider have no UI home (removed from Motion, not yet placed in Global)
