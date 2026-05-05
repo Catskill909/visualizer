@@ -5,6 +5,10 @@
 > **Date:** 2026-04-28
 > **Symptom:** Moving the Strobe slider in the Image tab of the Inspector panel produces no visible change on the canvas.
 
+> **⚠️ Disambiguation — two separate "Strobe" controls exist as of 2026-05-05:**
+> - **Image tab Strobe** (this doc) — GLSL comp shader, controls image-layer opacity flicker via `stbAmp`/`stbThr` uniforms. Fixed 2026-04-28.
+> - **Motion tab Strobe** — `frame_eqs` injection via `_buildMotionReactFrameEqs`, controls MilkDrop `gammaadj` brightness spike on beat. Added 2026-05-05. Uses multiplicative math: `a.gammaadj *= (1.0 + strobe * strobeAmp * 0.60)`. Architecturally unrelated — different pipeline, different variables, no shared code.
+
 ---
 
 ## 1. What Works vs. What Doesn't

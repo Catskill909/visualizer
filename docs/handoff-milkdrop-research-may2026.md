@@ -9,7 +9,40 @@
 
 ---
 
-## What happened this session
+## Session: 2026-05-05 — Motion reactivity separation + Audio FX controls
+
+### 1. Critical crash fix — butterchurn JS syntax ✅
+
+`_buildMotionReactFrameEqs` was emitting bare MilkDrop identifiers (`bass`, `zoom`, `max`). butterchurn compiles `frame_eqs_str` via `new Function('a', ...)` — raw JavaScript, not MilkDrop syntax. Every frame threw `ReferenceError`, crashed the engine, and froze all Palette and Motion controls.
+
+Fix: rewrote all emitted code to use `a.bass`, `a.zoom`, `Math.max`, etc. All temp locals declared with `var`.
+
+### 2. Architecture contract formalised ✅
+
+- **Image controls** — GLSL comp shader only. Never touch MilkDrop params.
+- **Motion controls** — `frame_eqs` injection via `_buildRuntimePreset`. Never touch image layer state.
+- **Global controls** — session-only, no preset save. Currently unhoused (AGC/Energy/Bass Sensitivity removed from Motion, not yet in Global tab — Phase A deferred).
+
+Full tracking: [docs/performance-control-roadmap.md](../performance-control-roadmap.md)
+
+### 3. Motion Reactivity Audio FX block added ✅
+
+Added Image-style audio FX controls to the Motion Reactivity section (additive on top of existing manual Motion sliders):
+
+| Control | MilkDrop variable | Math |
+|---|---|---|
+| Pulse | `a.zoom` | `+= signal * amp * _pulseDir` |
+| Bounce | `a.dy` | `+= sin(time*16) * signal * amp` |
+| Shake | `a.dx`, `a.rot` | `+= random-sin * signal * amp` |
+| Beat Fade | `a.decay` | `*= (1 - signal * amp)` |
+| Strobe | `a.gammaadj` | `*= (1 + strobe * amp)` |
+| Shrink | reverses Pulse | `_pulseDir = -1.0` |
+
+Beat Fade and Strobe are multiplicative so they respect preset-native `decay`/`gammaadj` values. See [docs/bugs/strobe.md](strobe.md) for disambiguation from Image tab Strobe.
+
+---
+
+## Session: 2026-05-04 — Preset load contamination + MilkDrop research
 
 ### 1. Preset load contamination — SHIPPED ✅
 
