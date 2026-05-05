@@ -300,7 +300,7 @@ export async function importFromFile(json) {
     }
 
     const failed = [];
-    const names   = [];
+    const names = [];
     let imported = 0;
     for (const preset of list) {
         try {
