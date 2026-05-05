@@ -23,20 +23,19 @@
       <h2 id="beta-modal-title">Thanks for helping test The DiscoCast Visualizer.</h2>
       <p id="beta-modal-copy">
       <p>This is an early beta build — the core visualizer, preset browser, and studio are solid, but the Timeline
-        Editor (still actively being built) is a work in prorgress.
+        Editor (still actively being built) is a work in progress.
 
       </p>
       <p>Quick tip: When you are in the Preset Editor remixing a preset not all sliders work if the setting is not in
-        the preset or the setting is very subtle. Differnt presets have diffrent reactions to differnt sliders. Image
-        layers have their own seperate settings in the Image tab of the Preset Editor</p>
+        the preset or the setting is very subtle. Different presets have different reactions to different sliders. Image
+        layers have their own separate settings in the Image tab of the Preset Editor</p>
       </p>
       <p id="beta-modal-copy">
-        Latest additions: animated GIF support <br>
-        Windows build!<br>
-        Radius in images<br>
-        Audio Reactivity controls for Milkdrop or Custom presets in the Preset Editor<br>
-        Better gif animaton contorls<br>
-        More image layer controls<br>
+        Latest additions: Motion Audio Reactivity for MilkDrop presets (Pulse, Bounce, Shake, Beat Fade, Strobe)<br>
+        Animated GIF layers with speed control, Alpha Mode, and timing smoothing<br>
+        Per-layer Saturation and Hue Rotate<br>
+        Radius — rounded corners on image tiles<br>
+        Windows build<br>
         Bug fixes<br>
       <p>Send feedback to
         <a href="mailto:paul@rarefunk.com">paul@rarefunk.com</a>.
@@ -148,6 +147,10 @@
             only through the good stuff.</p>
         </div>
         <div class="feature-card fade-in">
+          <h3>Animated GIF Layers</h3>
+          <p>Drop any animated GIF straight into a preset layer. Perceptual speed control (0.25×–8×), Alpha Mode for silhouette cutouts, and timing smoothing for choppy source files.</p>
+        </div>
+        <div class="feature-card fade-in">
           <h3>GIF Optimizer</h3>
           <p>Upload-time tool for large animated GIFs. Shows frame stats, keeps every Nth frame, resizes, and calculates
             GPU savings — all before adding to your preset.</p>
@@ -189,13 +192,25 @@
               <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              12 one-click palettes · 3 independent color swatches (Wave / Glow / Accent)
+              12 one-click palettes · 3 independent color swatches (Wave / Glow / Accent) · per-preset Saturation, Hue Rotate, and brightness toggles
             </li>
             <li>
               <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
               4 tabbed sections: Palette, Motion, Wave, Images
+            </li>
+            <li>
+              <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              Motion Audio Reactivity — add Pulse, Bounce, Shake, Beat Fade, or Strobe to any MilkDrop preset via Source + Curve controls
+            </li>
+            <li>
+              <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              Animated GIF layers — perceptual speed (0.25×–8×), Alpha Mode (Fade / Silhouette), timing smoothing
             </li>
             <li>
               <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -252,6 +267,7 @@
               <div class="il-item"><span class="il-dot"></span>Tile Width / Height — independent cell shape</div>
               <div class="il-item"><span class="il-dot"></span>Aspect-correct tiling — portrait/square/landscape without
                 distortion</div>
+              <div class="il-item"><span class="il-dot"></span>Radius — SDF rounded-corner blend on tile edges</div>
             </div>
           </div>
 
@@ -260,6 +276,8 @@
             <div class="image-layers-grid">
               <div class="il-item"><span class="il-dot"></span>Chromatic aberration — animated RGB channel split</div>
               <div class="il-item"><span class="il-dot"></span>Tint + Hue Spin — color wheel animation</div>
+              <div class="il-item"><span class="il-dot"></span>Saturation — 0 = greyscale → 1 = original → 2 = hyper-vivid</div>
+              <div class="il-item"><span class="il-dot"></span>Hue Rotate — shift image hue independently of the palette (0–360°)</div>
               <div class="il-item"><span class="il-dot"></span>Mirror — H / V / Quad / Kaleidoscope (per-tile or whole)
               </div>
               <div class="il-item"><span class="il-dot"></span>Canvas Mirror — folds the entire scene</div>
@@ -278,6 +296,16 @@
               <div class="il-item"><span class="il-dot"></span>Opacity Pulse — audio-reactive fade independent of base
                 opacity</div>
               <div class="il-item"><span class="il-dot"></span>All motion + effects driven by same audio signal</div>
+            </div>
+          </div>
+
+          <div class="il-category">
+            <div class="il-category-title">Animated GIF</div>
+            <div class="image-layers-grid">
+              <div class="il-item"><span class="il-dot"></span>Perceptual speed — 0.25×–8× log-curve control; consistent feel across fast and slow GIFs</div>
+              <div class="il-item"><span class="il-dot"></span>Alpha Mode — Fade (blend) or Preserve Silhouette (cutout)</div>
+              <div class="il-item"><span class="il-dot"></span>Timing Stability — 0–1 variance smoothing for choppy source files</div>
+              <div class="il-item"><span class="il-dot"></span>GIF Optimizer — frame reduction, resize, and GPU savings preview before adding to preset</div>
             </div>
           </div>
         </div>
