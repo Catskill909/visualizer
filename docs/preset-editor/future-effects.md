@@ -367,6 +367,11 @@
 | Z-Depth Parallax | High | Low | Medium | **P6** |
 | Audio Waveform | Medium | Low | Medium | **P6** |
 | Beat Flash | Medium | Very Low | Low | **P6** |
+| **Float Field / Depth Scatter** ⚠️ | **Very High** | Medium | Medium | **P6** |
+| **Radial / Ring Clone** | **High** | Low | Low | **P6** |
+| **Continuous Spin** | High | Very Low | Very Low | **P1** |
+| **Warp-Follow UV** | High | Low | Low | **P2** |
+| **Pulse Opacity** | Medium | Very Low | Very Low | **P1** |
 
 ---
 
@@ -410,6 +415,57 @@ float _effectAmp = baseAmp + _r * audioAmount;
 - Displacement Map (extra texture sampling)
 - Radial/Zoom Blur (many samples per pixel)
 - Liquid/Oil-on-Water (multi-octave curl noise)
+
+---
+
+## Phase 6 — New Render Modes (Beyond Single / Tile / Tunnel)
+
+Current image layer render modes are **Single** (one centered image), **Tile** (regular UV grid), and **Tunnel** (infinite zoom path). These are a new top-level mode dropdown — alternative ways the image is *instanced* across the canvas, not effects applied to a single instance.
+
+---
+
+### 6.1 Float Field (Depth Scatter)
+
+**Visual:** N copies of the same image scattered across the canvas at randomised positions and sizes. Size implies depth — big instances feel close, small ones feel far away. The field slowly drifts and breathes. On a bass hit, closer (bigger) instances pulse or jolt harder than distant ones, giving a genuine depth-of-field reaction. Feels like floating through a cloud of the image — logos, faces, icons all at different distances.
+
+**Why it's different from Tile:** Tile is a regular UV grid — every cell is the same size. Float Field is randomised position + scale per instance, creating an organic, non-uniform distribution that reads as 3D depth.
+
+**Parameters:**
+- **Count** (4–64) — number of instances (baked at shader-build time so no runtime loop overhead)
+- **Size Min / Max** (0.03–0.5) — scale range; min = farthest instances, max = closest
+- **Spread** (0–1) — how far instances can stray from center (0 = clustered, 1 = full canvas)
+- **Drift Speed** (0–1) — how fast positions drift over time (organic float)
+- **Depth Reactivity** — bass makes large instances pulse opacity/scale, small ones stay calm
+- **Opacity by Depth** (0–1) — distant (small) instances can fade out, simulating atmosphere
+
+**GLSL approach:** At shader build time, unroll N UV sample blocks with per-instance center/scale values. Positions update via `sin(time × driftSpeed × seedN)` per instance (co-prime frequencies for non-repeating motion — same trick as Wander). No loop needed — unrolled at JS build time, same as how the Scatter/Radial Clone idea handles multiple instances.
+
+**Audio reactivity layer:** Each instance has a depth value (derived from its scale). Deep instances (large) get `_r × audioStrength × depthWeight`, shallow instances (small) get less — so a bass hit makes the close-up copies jump while background copies stay calm.
+
+**Performance:** Medium. 20 instances adds 20 texture samples per pixel to the shader. Recommend a soft cap at 32 instances with a "⚠ High GPU" warning above 20. Same tradeoff as adding image layers.
+
+**Connection to existing features:** Works naturally with Tunnel (each instance at a different tunnel depth = true 3D parallax), Wander (each instance gets an independent wander phase), Mirror (mirrored instances look like a kaleidoscope field). The Depth Stack entry in the brainstorm section is a simpler version of this for 2-layer setups.
+
+---
+
+### 6.2 Radial / Ring Clone
+
+**Visual:** N copies arranged in a ring around the anchor point, like flower petals or a clock face. All copies are the same size, equidistant from the center. With audio reactivity the ring can expand/contract (ring radius pulses to beat) or rotate (all copies orbit together). With the Spin animation, each copy also spins in place.
+
+**Parameters:**
+- **Count** (2–16) — number of copies (baked at shader build time)
+- **Ring Radius** (0–0.45) — distance from anchor
+- **Mirror Alternating** toggle — flip every other copy for a kaleidoscope feel
+- **Orbit Speed** (0–2) — the ring itself rotates over time (distinct from per-copy Spin)
+- **Radius Reactivity** — bass pulses the ring radius outward
+
+**GLSL approach:** Unroll N UV sample blocks. Per-instance center = `anchor + vec2(sin(2π×i/N + orbitAngle), cos(2π×i/N + orbitAngle)) × ringRadius`.
+
+**Note:** Already sketched in `custom-preset-editor.md` Brainstorm as "Scatter / Radial Clone". Promoting here for full spec.
+
+---
+
+*Document initiated April 2026. Phase 6 added May 2026.*
 
 ---
 

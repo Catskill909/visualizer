@@ -476,12 +476,21 @@ These are the entry points. Each one references its focused subdocs in `docs/`.
 | [`midi-dev.md`](midi-dev.md) | 📋 Planning | MIDI controller integration — action registry, MIDI learn UX, phased plan. |
 | [`docs/user-guide-redesign.md`](docs/user-guide-redesign.md) | 📋 Planning | In-app user guide redesign — searchable help centre, contextual `?` deep links. |
 
-### Bug / Handoff Docs ([`docs/bugs/`](docs/bugs/))
+### Handoff Docs ([`docs/`](docs/))
+
+Session handoffs — pick up exactly where the last conversation ended.
+
+| Doc | What it covers |
+|-----|---------------|
+| [`docs/handoff-milkdrop-research-may2026.md`](docs/handoff-milkdrop-research-may2026.md) | May 2026 — MilkDrop external editor research, full gap analysis, Phase 7-12 plan. Start here for next control additions. |
+
+### Bug Docs ([`docs/bugs/`](docs/bugs/))
 
 All fixed — kept for reference.
 
 | Doc | What it covers |
 |-----|---------------|
+| [`docs/bugs/preset-load-contamination.md`](docs/bugs/preset-load-contamination.md) | Preset load not clearing previous state — `_clearForLoad()` + `clearFeedbackBuffer()` fix. Root cause: `sampler_main * 2.0` amplification loop. |
 | [`docs/bugs/strobe.md`](docs/bugs/strobe.md) | Strobe slider bug — handoff document, root cause analysis. |
 | [`docs/bugs/image-mirror.md`](docs/bugs/image-mirror.md) | Canvas Mirror not rebuilding shader on click — one-line fix. |
 | [`docs/bugs/export-tauri.md`](docs/bugs/export-tauri.md) | Tauri WKWebView swallowing `<a download>` — Rust `save_file` command + `downloadFile` JS helper. Requires `./build-and-sign.sh` rebuild to ship in macOS app. |

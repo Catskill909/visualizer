@@ -90,11 +90,16 @@ const BLANK_COMP = ' shader_body { \n  vec4 tmpvar_1;\n  tmpvar_1.w = 1.0;\n  tm
 const BLANK = {
     baseVals: {
         zoom: 1.0, rot: 0.0, warp: 0.0, warpanimspeed: 1.0, warpscale: 1.0,
+        zoomexp: 1.0,
         decay: 0.98, gammaadj: 2.0,
-        echo_zoom: 1.0, echo_orient: 0,
+        echo_zoom: 1.0, echo_orient: 0, echo_alpha: 0,
+        dx: 0, dy: 0,
+        sx: 1.0, sy: 1.0,
+        cx: 0.5, cy: 0.5,
         wave_mode: 3,
         wave_r: 1.0, wave_g: 1.0, wave_b: 1.0, wave_a: 0.8,
         wave_scale: 1.0, wave_mystery: 0.0,
+        wave_smoothing: 0.75, wave_x: 0.5, wave_y: 0.5,
         wave_thick: 0, additivewave: 0, wave_usedots: 0, wave_brighten: 0,
         ob_size: 0.0, ob_r: 0.0, ob_g: 0.0, ob_b: 0.0, ob_a: 0.0,
         ib_size: 0.0, ib_r: 0.0, ib_g: 0.0, ib_b: 0.0, ib_a: 0.0,
@@ -696,27 +701,61 @@ export class EditorInspector {
     // ─── Motion sliders ────────────────────────────────────────────────────────
 
     _buildMotionSliders() {
-        const container = document.getElementById('motion-sliders');
-        const configs = [
-            { id: 'ms-zoom', label: 'Zoom', min: 0.50, max: 1.80, step: 0.01, value: BLANK.baseVals.zoom, key: 'zoom' },
-            { id: 'ms-rot', label: 'Spin', min: -1.0, max: 1.00, step: 0.01, value: BLANK.baseVals.rot, key: 'rot' },
-            { id: 'ms-warp', label: 'Warp', min: 0, max: 5.00, step: 0.05, value: BLANK.baseVals.warp, key: 'warp' },
-            { id: 'ms-wspd', label: 'Warp Speed', min: 0.10, max: 3.00, step: 0.05, value: BLANK.baseVals.warpanimspeed, key: 'warpanimspeed' },
-            { id: 'ms-ezoom', label: 'Echo Zoom', min: 1.00, max: 4.00, step: 0.05, value: BLANK.baseVals.echo_zoom, key: 'echo_zoom' },
-            { id: 'ms-wscale', label: 'Warp Scale', min: 0.01, max: 4.00, step: 0.05, value: BLANK.baseVals.warpscale, key: 'warpscale' },
+        // Each entry pairs a container id with its slider configs.
+        // Splitting into sections keeps the Motion tab scannable as it grows.
+        const sections = [
+            {
+                container: 'motion-sliders',
+                configs: [
+                    { id: 'ms-zoom', label: 'Zoom', min: 0.50, max: 1.80, step: 0.01, value: BLANK.baseVals.zoom, key: 'zoom' },
+                    { id: 'ms-rot', label: 'Spin', min: -1.0, max: 1.00, step: 0.01, value: BLANK.baseVals.rot, key: 'rot' },
+                    { id: 'ms-warp', label: 'Warp', min: 0, max: 5.00, step: 0.05, value: BLANK.baseVals.warp, key: 'warp' },
+                    { id: 'ms-wspd', label: 'Warp Speed', min: 0.10, max: 3.00, step: 0.05, value: BLANK.baseVals.warpanimspeed, key: 'warpanimspeed' },
+                    { id: 'ms-ezoom', label: 'Echo Zoom', min: 1.00, max: 4.00, step: 0.05, value: BLANK.baseVals.echo_zoom, key: 'echo_zoom' },
+                    { id: 'ms-wscale', label: 'Warp Scale', min: 0.01, max: 4.00, step: 0.05, value: BLANK.baseVals.warpscale, key: 'warpscale' },
+                ],
+            },
+            {
+                container: 'motion-echo-alpha',
+                configs: [
+                    { id: 'ms-ealpha', label: 'Echo Opacity', min: 0, max: 1.00, step: 0.01, value: BLANK.baseVals.echo_alpha, key: 'echo_alpha' },
+                ],
+            },
+            {
+                container: 'motion-drift-sliders',
+                configs: [
+                    { id: 'ms-dx', label: 'Drift H', min: -0.10, max: 0.10, step: 0.005, value: BLANK.baseVals.dx, key: 'dx' },
+                    { id: 'ms-dy', label: 'Drift V', min: -0.10, max: 0.10, step: 0.005, value: BLANK.baseVals.dy, key: 'dy' },
+                    { id: 'ms-sx', label: 'Stretch H', min: 0.80, max: 1.20, step: 0.005, value: BLANK.baseVals.sx, key: 'sx' },
+                    { id: 'ms-sy', label: 'Stretch V', min: 0.80, max: 1.20, step: 0.005, value: BLANK.baseVals.sy, key: 'sy' },
+                    { id: 'ms-zexp', label: 'Zoom Curve', min: 0.50, max: 2.00, step: 0.01, value: BLANK.baseVals.zoomexp, key: 'zoomexp' },
+                ],
+            },
+            {
+                container: 'motion-center-sliders',
+                configs: [
+                    { id: 'ms-cx', label: 'Warp Center X', min: 0, max: 1.00, step: 0.01, value: BLANK.baseVals.cx, key: 'cx' },
+                    { id: 'ms-cy', label: 'Warp Center Y', min: 0, max: 1.00, step: 0.01, value: BLANK.baseVals.cy, key: 'cy' },
+                ],
+            },
         ];
-        configs.forEach(cfg => {
-            const input = makeSlider(container, cfg);
-            const valEl = document.getElementById(`${cfg.id}-val`);
-            input.addEventListener('pointerdown', () => this._preSnap());
-            input.addEventListener('input', () => {
-                const v = parseFloat(input.value);
-                if (valEl) valEl.textContent = v.toFixed(2);
-                input.style.setProperty('--pct', `${((v - cfg.min) / (cfg.max - cfg.min)) * 100}%`);
-                this.currentState.baseVals[cfg.key] = v;
-                this._applyToEngine(true);
+
+        sections.forEach(({ container: containerId, configs }) => {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            configs.forEach(cfg => {
+                const input = makeSlider(container, cfg);
+                const valEl = document.getElementById(`${cfg.id}-val`);
+                input.addEventListener('pointerdown', () => this._preSnap());
+                input.addEventListener('input', () => {
+                    const v = parseFloat(input.value);
+                    if (valEl) valEl.textContent = v.toFixed(2);
+                    input.style.setProperty('--pct', `${((v - cfg.min) / (cfg.max - cfg.min)) * 100}%`);
+                    this.currentState.baseVals[cfg.key] = v;
+                    this._applyToEngine(true);
+                });
+                input.addEventListener('pointerup', () => this._postSnap());
             });
-            input.addEventListener('pointerup', () => this._postSnap());
         });
 
         document.getElementById('btn-randomize-motion')?.addEventListener('click', () => {
@@ -728,6 +767,16 @@ export class EditorInspector {
             bv.warpanimspeed = 0.20 + Math.random() * 2.60;
             bv.echo_zoom = 1.00 + Math.random() * 3.00;
             bv.warpscale = 0.2 + Math.random() * 3.8;
+            // Phase 8 fields — conservative ranges. Most rolls leave these near defaults
+            // so randomize doesn't feel chaotic; occasionally a bigger value lands.
+            bv.echo_alpha = Math.random() < 0.7 ? 0 : 0.2 + Math.random() * 0.4;
+            bv.dx = Math.random() < 0.65 ? 0 : (Math.random() - 0.5) * 0.04;
+            bv.dy = Math.random() < 0.65 ? 0 : (Math.random() - 0.5) * 0.04;
+            bv.sx = 0.95 + Math.random() * 0.10;
+            bv.sy = 0.95 + Math.random() * 0.10;
+            bv.zoomexp = 0.80 + Math.random() * 0.50;
+            bv.cx = Math.random() < 0.7 ? 0.5 : 0.3 + Math.random() * 0.4;
+            bv.cy = Math.random() < 0.7 ? 0.5 : 0.3 + Math.random() * 0.4;
             this._postSnap();
             this._applyToEngine();
             this._syncMotionSliders();
@@ -743,6 +792,14 @@ export class EditorInspector {
             ['ms-wspd', 'warpanimspeed', 0.1, 3.0],
             ['ms-ezoom', 'echo_zoom', 1.0, 4.0],
             ['ms-wscale', 'warpscale', 0.01, 4.0],
+            ['ms-ealpha', 'echo_alpha', 0, 1.0],
+            ['ms-dx', 'dx', -0.1, 0.1],
+            ['ms-dy', 'dy', -0.1, 0.1],
+            ['ms-sx', 'sx', 0.8, 1.2],
+            ['ms-sy', 'sy', 0.8, 1.2],
+            ['ms-zexp', 'zoomexp', 0.5, 2.0],
+            ['ms-cx', 'cx', 0, 1.0],
+            ['ms-cy', 'cy', 0, 1.0],
         ];
         map.forEach(([id, key, min, max]) => {
             const input = document.getElementById(id);
@@ -786,7 +843,10 @@ export class EditorInspector {
         const configs = [
             { id: 'ws-scale', label: 'Size', min: 0.10, max: 4.0, step: 0.05, value: BLANK.baseVals.wave_scale, key: 'wave_scale' },
             { id: 'ws-opacity', label: 'Opacity', min: 0, max: 1.0, step: 0.01, value: BLANK.baseVals.wave_a, key: 'wave_a' },
+            { id: 'ws-smoothing', label: 'Smoothing', min: 0, max: 1.0, step: 0.01, value: BLANK.baseVals.wave_smoothing, key: 'wave_smoothing' },
             { id: 'ws-mystery', label: 'Mystery', min: -1.0, max: 1.0, step: 0.01, value: BLANK.baseVals.wave_mystery, key: 'wave_mystery' },
+            { id: 'ws-pos-x', label: 'Position X', min: 0, max: 1.0, step: 0.01, value: BLANK.baseVals.wave_x, key: 'wave_x' },
+            { id: 'ws-pos-y', label: 'Position Y', min: 0, max: 1.0, step: 0.01, value: BLANK.baseVals.wave_y, key: 'wave_y' },
         ];
         configs.forEach(cfg => {
             const input = makeSlider(container, cfg);
@@ -834,6 +894,9 @@ export class EditorInspector {
             bv.wave_usedots = Math.random() > 0.80 ? 1 : 0;
             bv.additivewave = Math.random() > 0.65 ? 1 : 0;
             bv.wave_mystery = (Math.random() * 2) - 1;
+            bv.wave_smoothing = Math.random();
+            bv.wave_x = 0.3 + Math.random() * 0.4;
+            bv.wave_y = 0.3 + Math.random() * 0.4;
             bv.wave_brighten = Math.random() > 0.70 ? 1 : 0;
             this._postSnap();
             this._applyToEngine();
@@ -848,7 +911,14 @@ export class EditorInspector {
             btn.classList.toggle('active', parseInt(btn.dataset.mode) === bv.wave_mode);
         });
         // Sliders
-        const map = [['ws-scale', 'wave_scale', 0.1, 4.0], ['ws-opacity', 'wave_a', 0, 1.0], ['ws-mystery', 'wave_mystery', -1.0, 1.0]];
+        const map = [
+            ['ws-scale', 'wave_scale', 0.1, 4.0],
+            ['ws-opacity', 'wave_a', 0, 1.0],
+            ['ws-smoothing', 'wave_smoothing', 0, 1.0],
+            ['ws-mystery', 'wave_mystery', -1.0, 1.0],
+            ['ws-pos-x', 'wave_x', 0, 1.0],
+            ['ws-pos-y', 'wave_y', 0, 1.0],
+        ];
         map.forEach(([id, key, min, max]) => {
             const input = document.getElementById(id);
             if (!input) return;
@@ -3851,9 +3921,12 @@ export class EditorInspector {
 
         // Overlay onto BLANK so fields missing from older saves fall back to defaults
         // (avoids `undefined` propagating into _syncSlider → NaN value labels).
+        // baseVals is merged at the inner level — top-level spread alone replaces it
+        // wholesale, which would drop BLANK defaults for any field not in the saved file.
         this.currentState = {
             ...deepClone(BLANK),
             ...deepClone(stateFields),
+            baseVals: { ...deepClone(BLANK.baseVals), ...deepClone(stateFields.baseVals || {}) },
             images: [],
         };
 
