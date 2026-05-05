@@ -758,16 +758,33 @@
                             </button>
 
                             <p class="section-label" style="margin-top:16px">Reactivity</p>
-                            <p class="section-note">Energy and Bass Sensitivity are session-only. Beat Sensitivity is
-                                saved in preset.</p>
-                            <div id="motion-feel-sliders"></div>
-                            <div class="toggle-row">
-                                <label class="toggle-label" for="toggle-agc">Auto gain control</label>
-                                <label class="toggle-switch">
-                                    <input type="checkbox" id="toggle-agc" role="switch" checked />
-                                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                                </label>
+                            <p class="section-note">Preset-only motion reactivity. These controls affect MilkDrop
+                                preset motion and do not modify Image layer reactivity.</p>
+                            <div class="layer-row-inline" style="gap:8px;margin-bottom:6px">
+                                <span class="layer-ctrl-label"
+                                    data-tooltip="Which frequency band drives preset motion modulation">Source</span>
+                                <select id="motion-react-source" class="layer-react-source">
+                                    <option value="bass">Bass</option>
+                                    <option value="mid">Mid</option>
+                                    <option value="treb">Treble</option>
+                                    <option value="vol">Volume</option>
+                                </select>
                             </div>
+                            <div class="layer-row-inline" style="gap:8px;margin-bottom:8px">
+                                <span class="layer-ctrl-label"
+                                    data-tooltip="How the signal is shaped before driving motion modulation">Curve</span>
+                                <div id="motion-react-curve" class="layer-react-curve" role="group"
+                                    aria-label="Motion reactivity curve">
+                                    <button class="lseg active" data-curve="linear">Linear</button>
+                                    <button class="lseg" data-curve="squared">Squared</button>
+                                    <button class="lseg" data-curve="cubed">Cubed</button>
+                                    <button class="lseg" data-curve="threshold">Gate</button>
+                                </div>
+                            </div>
+                            <div id="motion-react-sliders"></div>
+                            <p class="section-note" style="margin-top:10px">Beat Sensitivity is preset-saved and
+                                applies to MilkDrop beat behavior.</p>
+                            <div id="motion-feel-sliders"></div>
                         </div>
                     </div>
 

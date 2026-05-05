@@ -171,6 +171,16 @@ const BLANK = {
     init_eqs_str: '', frame_eqs_str: '', pixel_eqs_str: '',
     images: [],
     sceneMirror: 'none',  // 'none' | 'h' | 'v' | 'both'
+    motionReact: {
+        source: 'bass',
+        curve: 'linear',
+        zoomAmt: 0.00,
+        rotAmt: 0.00,
+        warpAmt: 0.00,
+        warpSpeedAmt: 0.00,
+        driftXAmt: 0.00,
+        driftYAmt: 0.00,
+    },
     // Solid-mode fx — only applied when a variation with a `solid:` base is active.
     // All default to 0 so "Solid" out of the box is truly static (no breath, no pulse).
     solidPulse: 0,        // bass multiplier: col *= (1 + bass * pulse)
@@ -415,6 +425,7 @@ export class EditorInspector {
         this._buildPaletteSliders();
         this._buildSolidFxPanel();
         this._buildMotionSliders();
+        this._buildMotionReactPanel();
         this._buildWaveModeGrid();
         this._buildWaveSliders();
         this._buildFeelSliders();
@@ -1027,28 +1038,91 @@ export class EditorInspector {
         this._syncToggle('toggle-brighten', 'wave_brighten');
     }
 
+    // ─── Motion reactivity (preset-only) ─────────────────────────────────────
+
+    _buildMotionReactPanel() {
+        const container = document.getElementById('motion-react-sliders');
+        if (!container) return;
+
+        const srcSel = document.getElementById('motion-react-source');
+        if (srcSel) {
+            srcSel.value = this.currentState.motionReact?.source || 'bass';
+            srcSel.addEventListener('change', () => {
+                this._preSnap();
+                this.currentState.motionReact.source = srcSel.value;
+                this._postSnap();
+                this._applyToEngine(true);
+            });
+        }
+
+        const curveBtns = document.querySelectorAll('#motion-react-curve .lseg');
+        curveBtns.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.curve === (this.currentState.motionReact?.curve || 'linear'));
+            btn.addEventListener('click', () => {
+                this._preSnap();
+                curveBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.currentState.motionReact.curve = btn.dataset.curve;
+                this._postSnap();
+                this._applyToEngine(true);
+            });
+        });
+
+        const configs = [
+            { id: 'mr-zoom', label: 'Zoom', min: -0.25, max: 0.25, step: 0.01, value: 0, key: 'zoomAmt' },
+            { id: 'mr-rot', label: 'Spin', min: -0.30, max: 0.30, step: 0.01, value: 0, key: 'rotAmt' },
+            { id: 'mr-warp', label: 'Warp', min: -2.00, max: 2.00, step: 0.05, value: 0, key: 'warpAmt' },
+            { id: 'mr-wspd', label: 'Warp Speed', min: -1.00, max: 1.00, step: 0.02, value: 0, key: 'warpSpeedAmt' },
+            { id: 'mr-dx', label: 'Drift H', min: -0.08, max: 0.08, step: 0.002, value: 0, key: 'driftXAmt' },
+            { id: 'mr-dy', label: 'Drift V', min: -0.08, max: 0.08, step: 0.002, value: 0, key: 'driftYAmt' },
+        ];
+
+        configs.forEach(cfg => {
+            const input = makeSlider(container, cfg);
+            const valEl = document.getElementById(`${cfg.id}-val`);
+            input.addEventListener('pointerdown', () => this._preSnap());
+            input.addEventListener('input', () => {
+                const v = parseFloat(input.value);
+                if (valEl) valEl.textContent = v.toFixed(2);
+                input.style.setProperty('--pct', `${((v - cfg.min) / (cfg.max - cfg.min)) * 100}%`);
+                this.currentState.motionReact[cfg.key] = v;
+                this._applyToEngine(true);
+            });
+            input.addEventListener('pointerup', () => this._postSnap());
+        });
+    }
+
+    _syncMotionReact() {
+        const mr = this.currentState.motionReact || (this.currentState.motionReact = deepClone(BLANK.motionReact));
+        const srcSel = document.getElementById('motion-react-source');
+        if (srcSel) srcSel.value = mr.source || 'bass';
+        const curveBtns = document.querySelectorAll('#motion-react-curve .lseg');
+        curveBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.curve === (mr.curve || 'linear')));
+
+        const map = [
+            ['mr-zoom', 'zoomAmt', -0.25, 0.25],
+            ['mr-rot', 'rotAmt', -0.30, 0.30],
+            ['mr-warp', 'warpAmt', -2.00, 2.00],
+            ['mr-wspd', 'warpSpeedAmt', -1.00, 1.00],
+            ['mr-dx', 'driftXAmt', -0.08, 0.08],
+            ['mr-dy', 'driftYAmt', -0.08, 0.08],
+        ];
+        map.forEach(([id, key, min, max]) => {
+            const input = document.getElementById(id);
+            if (!input) return;
+            const v = Number(mr[key] || 0);
+            input.value = v;
+            const valEl = document.getElementById(`${id}-val`);
+            if (valEl) valEl.textContent = v.toFixed(2);
+            input.style.setProperty('--pct', `${((v - min) / (max - min)) * 100}%`);
+        });
+    }
+
     // ─── Feel sliders ──────────────────────────────────────────────────────────
 
     _buildFeelSliders() {
         const container = document.getElementById('motion-feel-sliders');
-        const configs = [
-            { id: 'fs-energy', label: 'Energy', min: 0.1, max: 5.0, step: 0.1, value: this.engine.energyMultiplier, decimals: 1 },
-            { id: 'fs-bass', label: 'Bass Sensitivity', min: 0.1, max: 5.0, step: 0.1, value: this.engine.baseSensitivity, decimals: 1 },
-        ];
-        configs.forEach(cfg => {
-            const input = makeSlider(container, cfg);
-            const valEl = document.getElementById(`${cfg.id}-val`);
-            input.addEventListener('input', () => {
-                const v = parseFloat(input.value);
-                if (valEl) valEl.textContent = v.toFixed(1);
-                input.style.setProperty('--pct', `${((v - cfg.min) / (cfg.max - cfg.min)) * 100}%`);
-                if (cfg.id === 'fs-energy') this.engine.energyMultiplier = v;
-                if (cfg.id === 'fs-bass') this.engine.baseSensitivity = v;
-            });
-        });
-        document.getElementById('toggle-agc')?.addEventListener('change', (e) => {
-            this.engine.agcEnabled = e.target.checked;
-        });
+        if (!container) return;
 
         // Beat sensitivity (baseVal) — saved in preset, requires undo snap
         const b1edCfg = { id: 'fs-b1ed', label: 'Beat Sensitivity', min: 0, max: 1.0, step: 0.01, value: BLANK.baseVals.b1ed };
@@ -1215,13 +1289,13 @@ export class EditorInspector {
         btn.addEventListener('pointerdown', () => {
             this._abActive = true;
             btn.classList.add('active');
-            this.engine.loadPresetObject(this.originalState, 0);
+            this._loadStateToEngine(this.originalState);
         });
         const end = () => {
             if (!this._abActive) return;
             this._abActive = false;
             btn.classList.remove('active');
-            this.engine.loadPresetObject(this.currentState, 0);
+            this._loadStateToEngine(this.currentState);
         };
         btn.addEventListener('pointerup', end);
         btn.addEventListener('pointerleave', end);
@@ -3384,8 +3458,58 @@ export class EditorInspector {
 
     // ─── Apply & sync ──────────────────────────────────────────────────────────
 
+    _loadStateToEngine(state) {
+        this.engine.loadPresetObject(this._buildRuntimePreset(state), 0);
+    }
+
+    _buildRuntimePreset(state) {
+        const runtime = deepClone(state);
+        const injected = this._buildMotionReactFrameEqs(state.motionReact);
+        const baseFrame = runtime.frame_eqs_str || '';
+        runtime.frame_eqs_str = injected
+            ? `${baseFrame}\n${injected}`.trim()
+            : baseFrame;
+        return runtime;
+    }
+
+    _buildMotionReactFrameEqs(mr) {
+        // butterchurn compiles frame_eqs_str as JavaScript with `a` as scope.
+        // Use a.* properties and Math.* helpers (not bare MilkDrop identifiers).
+        const conf = mr || BLANK.motionReact;
+        const srcMap = { bass: 'a.bass', mid: 'a.mid', treb: 'a.treb', vol: 'a.vol' };
+        const src = srcMap[conf.source] || 'a.bass';
+        const curve = conf.curve || 'linear';
+
+        const zoomAmt = Number(conf.zoomAmt || 0).toFixed(4);
+        const rotAmt = Number(conf.rotAmt || 0).toFixed(4);
+        const warpAmt = Number(conf.warpAmt || 0).toFixed(4);
+        const warpSpeedAmt = Number(conf.warpSpeedAmt || 0).toFixed(4);
+        const driftXAmt = Number(conf.driftXAmt || 0).toFixed(4);
+        const driftYAmt = Number(conf.driftYAmt || 0).toFixed(4);
+
+        const hasAny = [zoomAmt, rotAmt, warpAmt, warpSpeedAmt, driftXAmt, driftYAmt]
+            .some(v => Math.abs(Number(v)) > 0.00001);
+        if (!hasAny) return '';
+
+        let curveExpr = '_mr_raw';
+        if (curve === 'squared') curveExpr = '_mr_raw*_mr_raw';
+        else if (curve === 'cubed') curveExpr = '_mr_raw*_mr_raw*_mr_raw';
+        else if (curve === 'threshold') curveExpr = 'Math.max(0,Math.min(1,(_mr_raw-0.3)*8))';
+
+        return [
+            `var _mr_raw=${src};`,
+            `var _mr=${curveExpr};`,
+            `a.zoom=Math.max(0.30,Math.min(2.50,a.zoom+_mr*${zoomAmt}));`,
+            `a.rot=Math.max(-2.00,Math.min(2.00,a.rot+_mr*${rotAmt}));`,
+            `a.warp=Math.max(0.00,Math.min(5.00,a.warp+_mr*${warpAmt}));`,
+            `a.warpanimspeed=Math.max(0.05,Math.min(5.00,a.warpanimspeed+_mr*${warpSpeedAmt}));`,
+            `a.dx=Math.max(-0.25,Math.min(0.25,a.dx+_mr*${driftXAmt}));`,
+            `a.dy=Math.max(-0.25,Math.min(0.25,a.dy+_mr*${driftYAmt}));`,
+        ].join('\n');
+    }
+
     _applyToEngine(skipTextures = false) {
-        this.engine.loadPresetObject(this.currentState, 0);
+        this._loadStateToEngine(this.currentState);
         if (!skipTextures) {
             for (const [name, texObj] of Object.entries(this._imageTextures)) {
                 this.engine.setUserTexture(name, texObj);
@@ -4024,6 +4148,7 @@ export class EditorInspector {
     _syncAllControls() {
         this._syncColorSwatches();
         this._syncMotionSliders();
+        this._syncMotionReact();
         this._syncWaveControls();
         this._syncEchoOrient();
         this._syncPaletteSliders();

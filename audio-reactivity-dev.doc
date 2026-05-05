@@ -1,0 +1,162 @@
+# Audio Reactivity Audit and Implementation Plan
+
+Date: 2026-05-05
+Scope: Preset Studio separation of Image audio reactivity vs Preset (MilkDrop) audio reactivity
+
+## 1) Conversation decision audit (locked requirements)
+
+The user requirement is now clear and explicit:
+
+1. Image audio reactivity must remain exactly as it is.
+2. Motion tab needs an Image-style reactivity interface.
+3. Motion reactivity must affect MilkDrop presets only (imported packs + scratch presets).
+4. Motion controls must not alter Image layer reactivity behavior.
+5. Keep audio reactivity capability for presets; do not remove it.
+
+This plan is built to those requirements.
+
+## 2) Code audit summary (current behavior)
+
+### A. Image tab reactivity is mature and isolated at layer-logic level
+
+Image controls write per-layer state and are consumed in image-layer GLSL generation.
+Current image reactivity fields include:
+
+- reactSource
+- reactCurve
+- audioPulse
+- bounceAmp
+- shakeAmp
+- opacityPulse
+- strobeAmp
+- strobeThr
+
+These are baked in _buildImageBlock(img) and apply per image layer.
+
+### B. Motion tab "Reactivity" is currently mixed with global controls
+
+Current Motion tab controls are:
+
+- Energy -> engine.energyMultiplier (session)
+- Bass Sensitivity -> engine.baseSensitivity (session)
+- Beat Sensitivity -> baseVals.b1ed (preset)
+- Auto gain control -> engine.agcEnabled (session)
+
+This creates UX confusion because the section is named like preset-level reactivity but includes engine-level conditioning.
+
+### C. Why users perceive cross-coupling
+
+Image and Preset logic paths are separate, but both read the same analyzed audio bands.
+Global conditioning (AGC/Energy/Bass Sensitivity) changes upstream signal intensity, so both can feel stronger/weaker even though settings are separate.
+
+## 3) Target architecture (best for app + user control)
+
+This is the recommended direction.
+
+1. Preserve Image tab exactly (no behavior or wiring changes).
+2. Add Preset-only Motion reactivity controls that mirror Image UX:
+	- Source (Bass/Mid/Treble/Volume)
+	- Curve (Linear/Squared/Cubed/Gate)
+	- Per-target modulation amounts for preset motion fields.
+3. Apply Motion reactivity as an overlay on MilkDrop preset motion values only.
+4. Keep global input-conditioning controls separate from creative tab semantics.
+
+Result:
+
+- Imported preset packs keep identity but gain controllable extra motion reactivity.
+- Scratch presets get the same predictable control model.
+- Image layer behavior remains untouched.
+
+## 4) Implementation plan (safe sequence)
+
+### Phase 1: Separation contract and state model
+
+1. Add new preset-level motion reactivity state object in editor state.
+2. Keep all existing image fields unchanged.
+3. Keep persisted compatibility: defaults produce zero added modulation.
+
+Proposed state sketch:
+
+- motionReact.enabled
+- motionReact.source
+- motionReact.curve
+- motionReact.zoomAmt
+- motionReact.rotAmt
+- motionReact.warpAmt
+- motionReact.warpSpeedAmt
+- motionReact.driftXAmt
+- motionReact.driftYAmt
+
+### Phase 2: Motion tab UI upgrade (Image-style UX)
+
+1. Replace current Motion "Reactivity" block with Source + Curve + target sliders.
+2. Keep Beat Sensitivity as preset-owned control (still valid).
+3. Move Energy/Bass Sensitivity/AGC to a clearly named Global Audio section (outside Motion semantics).
+
+### Phase 3: Preset-only modulation engine
+
+1. Implement modulation in preset generation/apply path only.
+2. Derive one shaped signal from source + curve.
+3. Apply only to MilkDrop motion parameters (zoom/rot/warp/etc) with clamps.
+4. Do not touch image-layer shader logic or image state reads.
+
+### Phase 4: Compatibility and guardrails
+
+1. Imported presets with no new motionReact state should render unchanged by default.
+2. Scratch presets with defaults should render unchanged until user turns up sliders.
+3. Add clamps to prevent runaway values and visual breakage.
+
+## 5) Verification checklist (must-pass)
+
+Image safety checks:
+
+1. Image Source/Curve/Pulse/Bounce/Shake/Beat Fade/Strobe behavior unchanged.
+2. Existing saved presets with image layers render identically before/after with motionReact defaults.
+
+Preset-only checks:
+
+1. Imported pack preset responds to new Motion Reactivity sliders.
+2. Scratch preset responds the same way.
+3. Turning Motion reactivity to zero restores base preset motion exactly.
+
+Separation checks:
+
+1. Changing Motion reactivity does not alter any image layer control values.
+2. Image tab edits do not alter motionReact values.
+
+## 6) Decision
+
+Yes, this is the best path for app clarity and user control:
+
+1. Preserve the proven Image system.
+2. Add equal-quality Preset reactivity UX in Motion.
+3. Enforce strict separation by architecture, not just labeling.
+
+## 7) Approval gate before code changes
+
+If approved, implementation starts with Phase 1 + Phase 2 scaffolding, then Phase 3 modulation wiring.
+
+Reply with: yes or go ahead.
+
+## 8) Implementation status (completed on 2026-05-05)
+
+Completed:
+
+1. Motion tab now includes a preset-only Source + Curve + modulation slider interface.
+2. Motion tab no longer hosts AGC/Energy/Bass Sensitivity controls (global conditioning removed from Motion semantics).
+3. Preset-only runtime modulation is injected via frame_eqs overlay at load time for editor preview.
+4. Works for imported presets and scratch presets because modulation is applied to the active preset state before loadPresetObject().
+5. Image tab reactivity code path was not modified.
+
+Notes:
+
+1. Modulation defaults are all zero, preserving backward-compatible visual output until user enables Motion reactivity.
+2. Gate curve uses a clamp-based shaping expression to avoid parser-specific conditional syntax risk.
+
+## 9) Forward tracking location
+
+For all follow-on session-level input/performance work (Global tab, calibration, runtime stability), use:
+
+- [docs/performance-control-roadmap.md](docs/performance-control-roadmap.md)
+
+This keeps future development separate from the Motion/Image reactivity implementation notes in this file.
