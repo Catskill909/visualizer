@@ -1,8 +1,40 @@
 # Animated GIF — Implementation Reference
 
-**Status:** ✅ Complete — May 2026. All known bugs fixed. Speed slider 0.25×–8×. GIF Optimizer shipped.
+**Status:** ✅ Phase 1-3 shipped · 📋 Phase 4 planning active
 
-**Date:** 2026-04-26 (audit) · 2026-05-01 (Phase 2 fixes) · 2026-05-02 (Phase 3 timing fixes)
+**Date:** 2026-04-26 (audit) · 2026-05-01 (Phase 2 fixes) · 2026-05-02 (Phase 3 timing fixes) · 2026-05-04 (Phase 4 plan)
+
+---
+
+## Next Steps (Priority Order)
+
+### Now
+1. **Phase 4A — Perceptual speed mapping**
+  - Keep UI range 0.25×-8×.
+  - Improve control feel without changing decode/tick architecture.
+
+2. **Phase 4C — GIF opacity silhouette mode**
+  - Add per-layer Alpha Mode: Fade | Preserve.
+  - Default GIF layers to Preserve.
+
+### Next
+3. **Phase 4B — Stability control**
+  - Add per-layer timing stabilization (0..1) to reduce jitter independently from speed.
+
+4. **Phase 4D — Optimizer guidance**
+  - Add predicted cadence/variance in modal and intent presets (Smooth Loop / Keep Detail / Lightweight).
+
+### Definition of done for this cycle
+1. Speed is easier to dial in across mixed GIF sources.
+2. GIF opacity reduction no longer defaults to perceived size shrink.
+3. No regression in Phase 3 timing fixes or standard/optimized upload parity.
+
+### Scope guard (GIF-only)
+1. Phase 4A speed mapping applies to animated GIF layers only.
+2. Phase 4B stability control applies to animated GIF layers only.
+3. Phase 4D optimizer guidance applies to GIF upload/optimizer flow only.
+4. Phase 4C opacity behavior change targets GIF layers; static single images keep current Fade behavior by default.
+5. No default behavior change for non-GIF image layers in this phase cycle.
 
 ---
 
@@ -79,7 +111,7 @@ Upload-time modal that intercepts large GIFs before layer creation.
 **What it does:**
 1. Parses with `gifuct-js` → full frame composite array
 2. Frame trim — "Keep every Nth" (slider 1–20); delays scaled by `keepEveryN / 2` factor (e.g. keepEveryN=4 → 2× faster per frame, keepEveryN=6 → 3× faster); floored at 1× so keepEveryN=1–2 preserves native delay
-3. Resize — bilinear-quality nearest-neighbor downscale to 256 / 192 / 128px max
+3. Resize — nearest-neighbor downscale to 256 / 192 / 128px max
 4. Hands pre-processed `{ frames, delays, width, height }` directly to `_loadGifTexture` — no re-encoding, no file I/O
 
 **UI:** Three action cards — Optimize (recommended), Use As-Is (with warning), Cancel.
@@ -100,6 +132,147 @@ Upload-time modal that intercepts large GIFs before layer creation.
 - **Timing drift** — `nextFrameAt = now + delay` accumulated render latency each frame. Fixed: deadline-based `nextFrameAt += delay` with catch-up guard for tab backgrounding.
 - **Missing `UNPACK_COLORSPACE_CONVERSION_WEBGL`** — pixel-store guard saved/restored Flip/Premul/Align but not colorspace. Added to the save/restore block with `gl.NONE` before upload.
 - **Inconsistent texture wrapping** — GIF Optimizer path used `CLAMP_TO_EDGE`; standard path used `REPEAT`. Same GIF behaved differently depending on upload path. Both now use `REPEAT`.
+
+---
+
+## Phase 4 Development Plan (single source of truth)
+
+Goal: keep GIF playback architecture intact, but make motion easier to control and fix the GIF-only opacity behavior that can look like image shrink.
+
+### Phase checklist
+
+#### Phase 4A — Perceptual speed mapping
+- [ ] Keep slider UI range at 0.25×-8×.
+- [ ] Implement perceptual mapping for GIF speed.
+- [ ] Validate control feel on low, medium, and high motion GIFs.
+- [ ] Confirm no regression in frame-0 hold and deadline drift behavior.
+
+#### Phase 4C — GIF opacity silhouette mode
+- [ ] Add per-layer alpha mode field for image layers (Fade/Preserve).
+- [ ] Default newly added GIF layers to Preserve.
+- [ ] Keep static image default as Fade.
+- [ ] Validate opacity 1.0 -> 0.3 on soft-edge GIFs without perceived shrink in Preserve mode.
+
+#### Phase 4B — Stability control
+- [ ] Add per-layer stability control (0..1) for GIF timing.
+- [ ] Keep speed and stability independent.
+- [ ] Tune normalization so motion smooths without flattening rhythm.
+- [ ] Validate on uneven-delay cinematic GIFs.
+
+#### Phase 4D — Optimizer guidance
+- [ ] Add cadence/variance preview in GIF optimizer modal.
+- [ ] Add intent presets: Smooth Loop / Keep Detail / Lightweight.
+- [ ] Ensure recommendations are advisory only (no hidden behavior changes).
+- [ ] Validate parity between standard and optimized playback paths.
+
+#### Final sign-off
+- [ ] Test 1, 3, and 5 GIF layer scenes.
+- [ ] Test soft-edge GIF, hard-edge GIF, cinematic uneven-delay GIF, and high-frame-count GIF.
+- [ ] Confirm no behavior change for non-GIF image layers.
+- [ ] Update this doc status/date when Phase 4 ships.
+
+### What is currently happening
+
+1. GIF speed uses one global multiplier (`frameDelay = nativeDelay / speed`).
+2. Timing is technically stable, but user control feel is inconsistent across different source GIF delay patterns.
+3. GIF opacity in the image shader multiplies sampled texture alpha and layer opacity together.
+4. On soft-edge GIFs this can make edges disappear first, which reads as visual size shrink even when scale is unchanged.
+
+### What should happen instead
+
+1. Speed should feel predictable across low, medium, and high motion GIFs.
+2. Users should be able to tame jitter separately from overall pace.
+3. Lowering opacity on GIF stickers should not default to silhouette collapse.
+4. Existing presets should continue to load with no behavioral breakage.
+
+### Phase 4A — Control feel foundation (recommended first)
+
+Scope:
+- Keep existing 0.25×-8× UI range.
+- Change internal mapping to a perceptual (log-like) curve.
+- No new architecture, no decode path changes.
+
+Why:
+- Biggest UX win for lowest risk.
+- Makes the slider less twitchy at high speed and less coarse around 1×-2×.
+
+Acceptance:
+- Users reach target speed in fewer slider moves vs current baseline.
+
+### Phase 4B — Timing stabilization controls
+
+Scope:
+- Add a separate per-layer stability control (0..1) that compresses delay variance.
+- Keep speed and stability independent.
+- Add optional mode toggle later: Multiplier vs Target FPS (8/12/15/20/24/30).
+
+Why:
+- One control handles pace; one handles jitter.
+- Prevents "faster but messier" tradeoff.
+
+Acceptance:
+- High-jitter GIFs look smoother at higher stability without obvious rhythm flattening.
+
+### Phase 4C — GIF opacity silhouette bug
+
+Bug:
+- Opacity slider can make some animated GIFs look smaller.
+
+Root cause hypothesis (high confidence):
+- Not geometric scaling.
+- Soft alpha edges in GIF frames fade before interior when global opacity is reduced.
+- The eye interprets edge-loss as shrink.
+
+Scope:
+- Add per-layer Alpha Mode in Image tab:
+  - Fade (current behavior)
+  - Preserve (silhouette-stable fade)
+- Default GIF layers to Preserve.
+- Keep static images on Fade by default.
+
+Acceptance:
+- On representative soft-edge GIFs, opacity 1.0 -> 0.3 in Preserve mode should not show obvious silhouette contraction.
+- Fade mode must remain equivalent to current behavior.
+
+### Phase 4D — Optimizer guidance pass
+
+Scope:
+- Show predicted playback outcome in optimizer modal:
+  - estimated average cadence/FPS
+  - delay variance indicator
+- Add one-click intent presets:
+  - Smooth Loop
+  - Keep Detail
+  - Lightweight
+
+Why:
+- Reduces guesswork before layer creation.
+- Prevents accidental compounding of frame trim + high speed.
+
+### Planned implementation order
+
+1. Phase 4A (perceptual speed mapping)
+2. Phase 4C (opacity silhouette mode)
+3. Phase 4B (stability control)
+4. Phase 4D (optimizer guidance)
+
+Rationale:
+- 4A and 4C solve current user pain fastest.
+- 4B adds deeper control once baseline feel is improved.
+- 4D is UX polish that amplifies the earlier work.
+
+### Validation set for all Phase 4 work
+
+Test with:
+1. Soft-edge animated sticker GIF (transparent edges)
+2. Hard-edge GIF
+3. Medium cinematic GIF with uneven native delays
+4. Large high-frame-count GIF
+
+Validate:
+1. 1, 3, and 5 GIF layer scenes
+2. Standard path and optimizer path
+3. No regression in Phase 3 timing fixes (frame-0 hold, drift guard, pixel-store restore)
 
 ---
 
