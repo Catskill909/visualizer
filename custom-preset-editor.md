@@ -324,18 +324,18 @@ Color swatch sets `tintR/G/B` which is multiplied onto `_src` before blending. W
 
 ---
 
-### 🔄 Continuous Spin
-The image rotates continuously around its anchor at a settable speed, independent of Orbit or Sway. Controls: **Spin Speed** (−3 to 3 — negative = counter-clockwise) and optionally an **Audio Reactive** amount that adds a momentary kick-driven speed burst. This is different from the static `angle` we already have — Spin accumulates over time. Pairs with Wander for a free-floating spinning orb.
+### ✅ Continuous Spin — BUILT
+Already shipped as the per-layer `spinSpeed` slider (−3 to +3 cycles/sec). Rotates the image continuously around its anchor; pairs with Wander for a free-floating spinning orb. *(I added this as a future idea on 2026-05-04 without checking the codebase first — already-built feature.)*
 
 ---
 
-### 🌊 Warp-Follow / UV Distortion
-Image texture UVs are displaced by the butterchurn warp field — the same field that drives the base MilkDrop pattern. The image writhes and melts with the music, feeling organically connected to the base visualizer rather than floating on top of it. Controls: **Warp Strength** (0–0.5) and a **Blend** mode (add distortion on top of existing UV pipeline vs replace). Technically: sample the warp buffer at the image's current UV position, use the resulting delta as an offset to the texture sample. Performance: one extra texture lookup per layer — very cheap.
+### ❌ Warp-Follow / UV Distortion — TRIED & REJECTED 2026-05-05
+Sampled `sampler_main` at canvas UV, used RG channels as a 2D displacement vector applied to the image's sample UV before texture lookup. Visually it just made each image instance wiggle slightly within its own bounds — not what the original "multiple floating images at different depths" ask was about. Reverted same day. Real ask is **Float Field / Depth Scatter** (see `docs/preset-editor/future-effects.md` Phase 6.1) — a multi-instance render mode, not a single-image displacement.
 
 ---
 
-### 💓 Pulse Opacity
-Image alpha breathes to the beat — soft fade in and out driven by bass/mid/treble. Different from Bounce (which moves position) and Beat Shake (which jolts position). Controls: **Depth** (0–1 — how much alpha swings), **Floor** (minimum opacity so image never fully disappears), **Source** (bass / mid / treble). Creates a heartbeat feel — the image swells toward you on every kick.
+### ✅ Pulse Opacity — BUILT
+Already shipped as the per-layer `opacityPulse` slider (cubed curve). Bass drives alpha up from the layer's base opacity. Different from Bounce (position) and Beat Shake (jolt). *(I added this as a future idea on 2026-05-04 without checking the codebase first — already-built feature.)*
 
 ---
 

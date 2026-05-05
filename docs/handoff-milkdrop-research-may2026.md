@@ -1,7 +1,11 @@
 # Handoff — MilkDrop Research & Control Gap Analysis (May 2026)
 
 > **Conversation ended:** 2026-05-04 (usage limit).
-> **Pick up at:** Phase 9 implementation — Blur range controls (power-user, shader-aware). Phases 7 + 8 shipped 2026-05-04.
+> **Pick up at:** **Float Field / Depth Scatter** (image-effects Phase 6.1 in `docs/preset-editor/future-effects.md`) — multi-instance render mode with size-as-depth. This is the original 2026-05-04 user ask ("multiple floating images at different depths and sizes") that I missed, instead building Warp-Follow UV which was reverted same day. Phases 7 + 8 baseVals work shipped 2026-05-04.
+>
+> **Phase 9 (blur range controls) dropped** — user direction 2026-05-05. Low impact / shader-dependent; not worth the UI surface.
+>
+> **Warp-Follow UV reverted 2026-05-05** — the per-layer UV displacement just wiggled images inside their own bounds; visually it had nothing to do with multi-depth scatter. Code and docs cleaned out.
 
 ---
 
@@ -219,7 +223,9 @@ Quick reference:
 |---|---|---|
 | 7 | Wave smoothing + wave XY position | ✅ Shipped 2026-05-04 |
 | 8 | Echo alpha, dx/dy drift, zoomexp, sx/sy stretch, **cx/cy warp center** | ✅ Shipped 2026-05-04 |
-| 9 | Blur range sliders, modwavealphabyvolume | 📋 Next |
+| 9 | Blur range sliders, modwavealphabyvolume | ❌ Dropped 2026-05-05 (low impact, shader-dependent) |
+| Image P2 | Warp-Follow UV | ❌ Tried & reverted 2026-05-05 — only wiggled images inside their bounds; not the multi-depth scatter the user actually asked for |
+| Image P6.1 | **Float Field / Depth Scatter** — N copies of an image at randomised positions/sizes (size = depth). The original 2026-05-04 ask. | 📋 **Next image-track task** |
 | 10 | EEL2 equation editor — unlocks **multi-vortex / off-center** via `per_pixel_eqs` | 📋 Future |
 | 11 | Raw shader editor | 📋 Future |
 | 12 | .milk import / export | 📋 Future |
@@ -236,6 +242,10 @@ Quick reference:
 |---|---|
 | `src/editor/inspector.js` | `_clearForLoad()` extracted; `loadBundledPreset` + `loadPresetData` refactored to use it; `_buildCompShader()` moved after image loop; BLANK overlay pattern for `loadPresetData`. **Phase 7 (2026-05-04):** `wave_smoothing`, `wave_x`, `wave_y` added to BLANK + Wave tab sliders + randomize + sync map. **`loadPresetData` shallow-merge bug fix (2026-05-04):** explicit `baseVals: { ...BLANK.baseVals, ...stateFields.baseVals }` so older saves missing newer fields actually fall back to defaults. **Phase 8 (2026-05-04):** `echo_alpha`, `dx`, `dy`, `zoomexp`, `sx`, `sy`, `cx`, `cy` added to BLANK; `_buildMotionSliders()` refactored to a sections array driving 4 containers; `_syncMotionSliders()` map extended; randomize handler extended with conservative ranges. |
 | `editor.html` | **Phase 8 (2026-05-04):** Motion tab gained three new DOM blocks — `#motion-echo-alpha` (Echo Opacity), `#motion-drift-sliders` (Drift & Stretch section), `#motion-center-sliders` (Warp Center section with explanatory note). |
+| `src/editor/inspector.js` | **Warp-Follow UV (2026-05-05) — TRIED & REVERTED same day.** Built and removed: `warpFollow` field, Visual Effects slider, squared-curve handler, GLSL `sampler_main`-displacement injection in three render paths. Visually it just wiggled each image instance inside its own bounds — not the multi-instance depth-scatter the user originally asked for. Code is clean of all references. |
+| `docs/preset-editor/image-layer-effects.md` | **2026-05-05:** Warp Follow row briefly added then removed. |
+| `docs/preset-editor/future-effects.md` | **2026-05-05:** Priority matrix — Continuous Spin and Pulse Opacity marked already-built (had been incorrectly listed as future ideas the day before); Warp-Follow flipped to ❌ tried & reverted with pointer to Float Field 6.1. |
+| `custom-preset-editor.md` | **2026-05-05:** Brainstorm section corrected — Continuous Spin and Pulse Opacity flipped from 🔄/💓 (future) to ✅ BUILT; Warp-Follow flipped to ❌ tried & rejected. |
 | `src/visualizer.js` | `clearFeedbackBuffer()` added — zeroes `prevFrameBuffer` + `targetFrameBuffer` via direct GL calls |
 | `custom-preset-editor.md` | Bug section added + closed; One Truth progress table; Tuning controls checklist; Phase 7-12 added; research section added |
 | `docs/bugs/preset-load-contamination.md` | Created — full bug plan, fix, root cause analysis (§10) |
@@ -251,16 +261,12 @@ Quick reference:
 
 **New phases captured this session (Phase 13 / 14)** — Phase 13 is the placement-first Shape Composer (replaces the removed Phase 6 with a different framing — independent x/y per shape = multi-center composition). Phase 14 is an in-app tooltip pass leveraging the existing `[data-tooltip]` CSS to add hover help to every editor control; also tracks promoting cx/cy from sliders to a draggable XY pad.
 
-1. **Phase 9 — Blur range controls** (next task — power-user / shader-aware):
-   - `blur1_min` / `blur1_max` sliders (0–1, defaults 0, 1)
-   - `blur2_min` / `blur2_max` sliders (0–1, defaults 0, 1)
-   - `blur3_min` / `blur3_max` sliders (0–1, defaults 0, 1)
-   - `modwavealphabyvolume` toggle (0/1, default 0)
-   - **Show/hide approach:** these are only meaningful when the loaded preset's `warp` or `comp` shader source contains `sampler_blur1/2/3`. Default to a collapsed sub-section; consider auto-expanding when `currentState.warp`/`comp` contains the substring.
-   - All pure baseVals writes — same pattern as Phases 7/8.
-
-2. **Phase 13 — Shape Composer** (heavier lift — the off-center primitive):
+1. **Phase 13 — Shape Composer** (next baseVals-track task — the off-center primitive):
    - Replace the failed Phase 6 "edit all 25 shape fields" approach with placement-first design
    - Card-stack mirroring image layers; per-card position XY pad, size, sides, color, border, additive/textured toggles
    - Drag-on-canvas placement using existing image-layer XY pad pattern
    - Up to 4 shapes = up to 4 independent visual centers — the strongest "off-center" tool short of per-pixel equations
+
+2. **Image-track candidates** (smaller / quicker wins on the image-effects side):
+   - **Float Field / Depth Scatter** (P6 in `future-effects.md`) — N copies at randomised positions/sizes, size = depth. The conceptual "multi-floating-images" mode the user described 2026-05-05.
+   - **Tooltip pass** (Phase 14) — add `data-tooltip` to remaining controls; promote `cx`/`cy` from sliders to a draggable XY pad.

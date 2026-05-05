@@ -369,9 +369,9 @@
 | Beat Flash | Medium | Very Low | Low | **P6** |
 | **Float Field / Depth Scatter** ⚠️ | **Very High** | Medium | Medium | **P6** |
 | **Radial / Ring Clone** | **High** | Low | Low | **P6** |
-| **Continuous Spin** | High | Very Low | Very Low | **P1** |
-| **Warp-Follow UV** | High | Low | Low | **P2** |
-| **Pulse Opacity** | Medium | Very Low | Very Low | **P1** |
+| ✅ Continuous Spin (already shipped as `spinSpeed`) | High | Very Low | Very Low | ✅ Built |
+| ❌ Warp-Follow UV | Low (in practice) | Low | Low | ❌ Tried & reverted 2026-05-05 — real ask was Float Field, see 6.1 |
+| ✅ Pulse Opacity (already shipped as `opacityPulse`) | Medium | Very Low | Very Low | ✅ Built |
 
 ---
 
