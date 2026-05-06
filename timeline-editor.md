@@ -1,7 +1,7 @@
 # Timeline Editor — Design & Planning Doc
 
-**Status:** Phases 1–4.3 complete ✅ — Phase 4.4 next.  
-**Last updated:** 2026-05-05  
+**Status:** Phases 1–4.3 complete ✅ — Phase 4.4 next (Loop & Regions).  
+**Last updated:** 2026-05-06  
 **Architecture:** Standalone page (`/timeline.html`) — self-contained MPA entry in Vite.
 
 ## Phased Rollout

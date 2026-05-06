@@ -1120,6 +1120,13 @@
               <kbd>L</kbd> from inside the main app.</p>
 
             <div class="welcome-feature">
+              <div class="welcome-feature-title">🎛️ VJ Mode — The Show Never Stops</div>
+              <p><strong>Stop pauses the timeline, but visuals keep playing.</strong> The last preset stays visible — 
+                no black screens, no awkward silences. Press Play to resume timeline progression. Drag the ruler to 
+                scrub through time while keeping visuals alive. Perfect for live VJ sets where the show must go on.</p>
+            </div>
+
+            <div class="welcome-feature">
               <div class="welcome-feature-title">Timelines & Blocks</div>
               <p>A timeline is a playlist of preset blocks, each with a fixed start time, duration, and blend-in
                 transition. Blocks sit on a scrollable strip — drag them to any position, resize their right edge to
@@ -1127,42 +1134,33 @@
             </div>
 
             <div class="welcome-feature">
-              <div class="welcome-feature-title">Zones — Multiple Screen Regions</div>
-              <p>Split the canvas into up to four simultaneous regions, each running its own preset independently. Six
-                predefined layouts are available:</p>
-              <ul class="welcome-list">
-                <li><strong>Full Screen</strong> — single zone, whole canvas.</li>
-                <li><strong>Left | Right</strong> — two side-by-side halves.</li>
-                <li><strong>Top / Bottom</strong> — two stacked halves.</li>
-                <li><strong>4 Quadrants</strong> — four equal tiles.</li>
-                <li><strong>Center + Frame</strong> — a framing overlay blended over the main canvas.</li>
-                <li><strong>Top Banner</strong> — a horizontal strip blended above the main canvas.</li>
-              </ul>
-              <p>Click <strong>⊞ Zones</strong> in the transport bar to pick a layout. Each zone gets its own row in the
-                strip. All zones share the same audio signal.</p>
+              <div class="welcome-feature-title">Transport & Navigation</div>
+              <p>Use <kbd>Space</kbd> to play/pause, <kbd>Home</kbd> to jump to start (keeping visuals playing).
+                Navigate blocks with <kbd>←</kbd> / <kbd>→</kbd>, fine-tune with <kbd>↑</kbd> / <kbd>↓</kbd> 
+                (±1s, or ±5s with Shift). Drag the ruler to scrub — playhead follows your mouse for live auditioning.</p>
             </div>
 
             <div class="welcome-feature">
-              <div class="welcome-feature-title">Playback & Seeking</div>
-              <p>Press Play to start all zones simultaneously from t=0. Click anywhere on the ruler to seek — all zones
-                restart from that point in sync. Enable Loop to repeat the full sequence automatically. The playhead
-                advances in real time and can be watched while the visualizer plays full-screen behind the strip.</p>
+              <div class="welcome-feature-title">Multi-Zone Output</div>
+              <p>Split the canvas into up to four simultaneous regions, each running its own preset independently.
+                Define rectangular zones and assign timelines to each. The canvas splits to show all active
+                zones — perfect for multi-projector venues. Launch from <strong>Output Settings → Zones</strong>.</p>
             </div>
 
             <div class="welcome-feature">
-              <div class="welcome-feature-title">Adding & Editing Blocks</div>
-              <p>Click <strong>+ Add Preset</strong> in the transport, or the <strong>+</strong> button on any zone row,
-                to open the preset picker (All / Favorites / My Presets tabs with search). Each block has three inline
-                action buttons on hover — Edit, Duplicate, Delete — plus a right-click context menu. The Edit popover
-                lets you set Duration (5–600 s), Blend time (0–10 s), and an optional text Label.</p>
+              <div class="welcome-feature-title">Markers & Cues</div>
+              <p>Double-click the timeline ruler to drop markers. Right-click a flag to change its action:
+                <strong>Stop</strong> pauses playback (great for talk breaks), <strong>Loop</strong> jumps back to
+                the previous loop-start marker. Jump to markers instantly with <kbd>1</kbd>–<kbd>9</kbd>.
+                Use markers to create interactive cue points during live shows.</p>
             </div>
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Saving & Managing Timelines</div>
               <p>New timelines are held in memory until you click <strong>Save</strong>. Once saved, the button dims to
                 <em>Saved</em> and shows a dot whenever you have unsaved changes. Use <strong>+ New</strong> to start
-                fresh, or the dropdown to switch between saved timelines (a discard prompt fires if you have unsaved
-                edits). Copy / Paste JSON buttons let you back up or share a timeline as text.</p>
+                fresh, or the dropdown to switch between saved timelines. Copy / Paste JSON buttons let you back up 
+                or share a timeline as text.</p>
             </div>
 
             <div class="welcome-feature">
@@ -1170,6 +1168,16 @@
               <p>All overlays (topbar, transport, timeline strip) fade after 3.5 s of inactivity — the same pattern as
                 the main app. The <strong>≡</strong> button in the top-right corner pins them permanently; click again
                 to unpin. Press <kbd>T</kbd> to toggle the strip panel on and off without touching the mouse.</p>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Pro Tips</div>
+              <ul style="margin: 8px 0 0 0; padding-left: 18px; font-size: 0.9em;">
+                <li>Overlap presets for smooth crossfades — no black gaps</li>
+                <li>Use markers to create loop sections or stop points for live cues</li>
+                <li>Scrub the ruler to audition any moment before going live</li>
+                <li>Multi-zone setups let you run different visuals on different screens</li>
+              </ul>
             </div>
           </section>
 
@@ -1286,6 +1294,15 @@
                 <div class="guide-row"><kbd>F</kbd><span>Fullscreen</span></div>
                 <div class="guide-row"><kbd>?</kbd> / <kbd>/</kbd><span>Keyboard guide</span></div>
                 <div class="guide-row"><kbd>Esc</kbd><span>Close drawers &amp; menus</span></div>
+
+                <h5 style="margin-top: 20px;">Timeline Editor</h5>
+                <div class="guide-row"><kbd>Space</kbd><span>Play / Pause (VJ mode)</span></div>
+                <div class="guide-row"><kbd>Home</kbd><span>Go to start (keep visuals)</span></div>
+                <div class="guide-row"><kbd>←</kbd> / <kbd>→</kbd><span>Prev / Next block</span></div>
+                <div class="guide-row"><kbd>↑</kbd> / <kbd>↓</kbd><span>Nudge ±1s (±5s Shift)</span></div>
+                <div class="guide-row"><kbd>1</kbd> - <kbd>9</kbd><span>Jump to marker</span></div>
+                <div class="guide-row"><kbd>L</kbd><span>Open Timeline Editor</span></div>
+                <div class="guide-row"><kbd>?</kbd><span>Keyboard shortcuts</span></div>
               </div>
             </div>
           </section>

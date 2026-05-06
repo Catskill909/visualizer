@@ -210,6 +210,7 @@ async function boot(connectAudioFn) {
 
     // Create the editor
     editor = new TimelineEditor({ engine, canvasContainer });
+    window.editor = editor;
 
     // Handle query params
     const params = new URLSearchParams(window.location.search);

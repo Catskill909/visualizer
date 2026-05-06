@@ -294,6 +294,10 @@
       <a class="nav-link sub" href="#workflow">Workflow</a>
     </div>
     <div class="nav-group">
+      <div class="nav-group-label">Timeline Editor</div>
+      <a class="nav-link" href="#timeline-editor">Timeline Editor</a>
+    </div>
+    <div class="nav-group">
       <div class="nav-group-label">Output</div>
       <a class="nav-link" href="#output-settings">Output Settings</a>
       <a class="nav-link sub" href="#render-resolution">Render Resolution</a>
@@ -382,6 +386,22 @@
           <tr><td><kbd>⌘Z</kbd></td><td>Undo (editor)</td></tr>
           <tr><td><kbd>⌘⇧Z</kbd></td><td>Redo (editor)</td></tr>
           <tr><td><kbd>`</kbd></td><td>Dev HUD — frame time, VRAM, shader ms</td></tr>
+          <tr><td><kbd>L</kbd></td><td>Open Timeline Editor</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top: 24px; font-size: 1.1rem;">Timeline Editor Shortcuts</h3>
+      <table class="shortcut-table">
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>Space</kbd></td><td>Play / Pause</td></tr>
+          <tr><td><kbd>Home</kbd></td><td>Go to start (keep visuals)</td></tr>
+          <tr><td><kbd>←</kbd> / <kbd>→</kbd></td><td>Prev / Next block</td></tr>
+          <tr><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>Nudge ±1s (±5s with Shift)</td></tr>
+          <tr><td><kbd>1</kbd> – <kbd>9</kbd></td><td>Jump to marker 1-9</td></tr>
+          <tr><td><kbd>F</kbd></td><td>Fullscreen</td></tr>
+          <tr><td><kbd>?</kbd></td><td>Keyboard shortcuts</td></tr>
+          <tr><td>Drag ruler</td><td>Scrub with live preview</td></tr>
         </tbody>
       </table>
     </section>
@@ -668,6 +688,74 @@
           <li>Click the <strong>expand icon</strong> in the editor topbar (or press <kbd>\</kbd>) to hide the editor panel — the canvas fills the full window.</li>
           <li>Click anywhere on the canvas (or press <kbd>\</kbd> again) to restore the editor.</li>
           <li>Useful for checking how a preset looks without the panel taking up space.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ══ TIMELINE EDITOR ══ -->
+    <section class="help-section" id="timeline-editor">
+      <h2>Timeline Editor</h2>
+      <p>A dedicated page for scripting a full live show. Arrange presets into timed blocks on a horizontal strip,
+        then hit Play — the visualizer runs your sequence automatically. Launch it from the start screen or press
+        <kbd>L</kbd> from inside the main app.</p>
+
+      <div class="help-sub">
+        <h3>🎛️ VJ Mode — The Show Never Stops</h3>
+        <ul class="help-list">
+          <li><strong>Stop pauses the timeline, but visuals keep playing.</strong> The last preset stays visible — no black screens.</li>
+          <li>Press Play to resume timeline progression.</li>
+          <li>Drag the ruler to scrub through time while keeping visuals alive.</li>
+          <li>Perfect for live VJ sets where the show must go on.</li>
+        </ul>
+      </div>
+
+      <div class="help-sub">
+        <h3>Timelines & Blocks</h3>
+        <ul class="help-list">
+          <li>A timeline is a playlist of preset blocks, each with a fixed start time, duration, and blend-in transition.</li>
+          <li>Drag blocks to any position, resize their right edge to change duration.</li>
+          <li>Multiple timelines can be saved and switched between.</li>
+        </ul>
+      </div>
+
+      <div class="help-sub">
+        <h3>Transport & Navigation</h3>
+        <ul class="help-list">
+          <li><kbd>Space</kbd> — Play / Pause</li>
+          <li><kbd>Home</kbd> — Go to start (keeps visuals playing)</li>
+          <li><kbd>←</kbd> / <kbd>→</kbd> — Prev / Next block</li>
+          <li><kbd>↑</kbd> / <kbd>↓</kbd> — Nudge ±1s (±5s with Shift)</li>
+          <li><kbd>1</kbd>–<kbd>9</kbd> — Jump to markers 1-9</li>
+          <li><kbd>F</kbd> — Fullscreen</li>
+          <li>Drag ruler — Scrub with live preview</li>
+        </ul>
+      </div>
+
+      <div class="help-sub">
+        <h3>Multi-Zone Output</h3>
+        <ul class="help-list">
+          <li>Split the canvas into up to four simultaneous regions.</li>
+          <li>Each zone runs its own preset independently.</li>
+          <li>Launch from <strong>Output Settings → Zones</strong>.</li>
+        </ul>
+      </div>
+
+      <div class="help-sub">
+        <h3>Markers & Cues</h3>
+        <ul class="help-list">
+          <li>Double-click the ruler to drop markers.</li>
+          <li>Right-click a flag to set action: <strong>Stop</strong> or <strong>Loop</strong>.</li>
+          <li>Use markers for talk breaks, loops, and interactive cues.</li>
+        </ul>
+      </div>
+
+      <div class="help-sub">
+        <h3>Pro Tips</h3>
+        <ul class="help-list">
+          <li>Overlap presets for smooth crossfades — no black gaps</li>
+          <li>Use markers to create loop sections or stop points</li>
+          <li>Scrub the ruler to audition any moment before going live</li>
+          <li>Multi-zone setups for different visuals on different screens</li>
         </ul>
       </div>
     </section>
