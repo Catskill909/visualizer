@@ -241,7 +241,13 @@ export class ControlPanel {
     // --- Preset Studio (editor) --- control bar button
     if (els.btnOpenEditor) {
       els.btnOpenEditor.addEventListener('click', () => {
-        window.location.href = '/editor.html';
+        const name = engine.getCurrentPresetName();
+        if (!name) { window.location.href = '/editor.html'; return; }
+        if (name.startsWith(CUSTOM_PREFIX)) {
+          window.location.href = `/editor.html?custom=${encodeURIComponent(name)}`;
+        } else {
+          window.location.href = `/editor.html?preset=${encodeURIComponent(name)}`;
+        }
       });
     }
     els.btnCloseDrawer.addEventListener('click', () => this.closeDrawer());
@@ -332,7 +338,7 @@ export class ControlPanel {
       const name = engine.getCurrentPresetName();
       if (!name) { window.location.href = '/editor.html'; return; }
       if (name.startsWith(CUSTOM_PREFIX)) {
-        window.location.href = '/editor.html';
+        window.location.href = `/editor.html?custom=${encodeURIComponent(name)}`;
       } else {
         window.location.href = `/editor.html?preset=${encodeURIComponent(name)}`;
       }
