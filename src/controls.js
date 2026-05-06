@@ -974,13 +974,13 @@ export class ControlPanel {
   // ===================== WELCOME GUIDE (start screen) =====================
 
   openWelcomeGuide() {
-    const modal = document.getElementById('help-modal');
-    if (modal) modal.hidden = false;
+    const modal = document.getElementById('welcome-guide');
+    if (modal) modal.classList.remove('hidden');
   }
 
   closeWelcomeGuide() {
-    const modal = document.getElementById('help-modal');
-    if (modal) modal.hidden = true;
+    const modal = document.getElementById('welcome-guide');
+    if (modal) modal.classList.add('hidden');
   }
 
   selectWelcomeSection(name) {

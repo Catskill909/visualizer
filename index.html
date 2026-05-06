@@ -1116,8 +1116,7 @@
           <section class="welcome-section" data-section="timeline" role="tabpanel">
             <h4>Timeline Editor</h4>
             <p>A dedicated page for scripting a full live show. Arrange presets into timed blocks on a horizontal strip,
-              then hit Play — the visualizer runs your sequence automatically. Launch it from the start screen or press
-              <kbd>L</kbd> from inside the main app.</p>
+              then hit Play — the visualizer runs your sequence automatically. Launch it from the start screen.</p>
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">🎛️ VJ Mode — The Show Never Stops</div>
@@ -1264,45 +1263,70 @@
           <!-- Keyboard Shortcuts -->
           <section class="welcome-section" data-section="shortcuts" role="tabpanel">
             <h4>Keyboard Shortcuts</h4>
-            <div class="welcome-shortcuts">
-              <div class="welcome-shortcut-col">
-                <h5>Performance</h5>
-                <div class="guide-row"><kbd>V</kbd><span>Strobe flash</span></div>
-                <div class="guide-row"><kbd>B</kbd><span>Blackout</span></div>
-                <div class="guide-row"><kbd>I</kbd><span>Invert colors</span></div>
-                <div class="guide-row"><kbd>H</kbd><span>Hide UI instantly</span></div>
-                <div class="guide-row"><kbd>Shift</kbd><span>Hold for Energy boost</span></div>
+            <p class="welcome-note" style="margin-bottom: 20px;">Shortcuts work on the main visualizer canvas. Some keys have different functions in the Timeline Editor — see the separate section below.</p>
 
-                <h5>Audio</h5>
-                <div class="guide-row"><kbd>A</kbd><span>Toggle Auto-Gain</span></div>
-                <div class="guide-row"><kbd>K</kbd><span>Toggle Kick-Lock</span></div>
-                <div class="guide-row"><kbd>T</kbd><span>Open tuning panel</span></div>
-                <div class="guide-row"><kbd>Space</kbd><span>Play / pause (file mode)</span></div>
+            <!-- Main Visualizer Shortcuts -->
+            <div class="welcome-feature" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+              <div class="welcome-feature-title" style="font-size: 1.1rem; color: var(--accent); margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 1.2em;">🎛️</span> Main Visualizer
+                <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 400; margin-left: auto;">Default view</span>
               </div>
-              <div class="welcome-shortcut-col">
-                <h5>Navigation</h5>
-                <div class="guide-row"><kbd>←</kbd> / <kbd>→</kbd><span>Previous / next preset</span></div>
-                <div class="guide-row"><kbd>R</kbd><span>Toggle auto-cycle</span></div>
-                <div class="guide-row"><kbd>C</kbd><span>Open cycle settings</span></div>
-                <div class="guide-row"><kbd>P</kbd><span>Open presets drawer</span></div>
-                <div class="guide-row"><kbd>O</kbd><span>Output settings</span></div>
-                <div class="guide-row"><kbd>E</kbd><span>Open Preset Studio</span></div>
-                <div class="guide-row"><kbd>S</kbd><span>Toggle favorite</span></div>
-                <div class="guide-row"><kbd>X</kbd><span>Hide current preset</span></div>
+              <div class="welcome-shortcuts">
+                <div class="welcome-shortcut-col">
+                  <h5>Performance</h5>
+                  <div class="guide-row"><kbd>V</kbd><span>Strobe flash</span></div>
+                  <div class="guide-row"><kbd>B</kbd><span>Blackout</span></div>
+                  <div class="guide-row"><kbd>I</kbd><span>Invert colors</span></div>
+                  <div class="guide-row"><kbd>H</kbd><span>Hide UI instantly</span></div>
+                  <div class="guide-row"><kbd>Shift</kbd><span>Hold for Energy boost</span></div>
 
-                <h5>View</h5>
-                <div class="guide-row"><kbd>F</kbd><span>Fullscreen</span></div>
-                <div class="guide-row"><kbd>?</kbd> / <kbd>/</kbd><span>Keyboard guide</span></div>
-                <div class="guide-row"><kbd>Esc</kbd><span>Close drawers &amp; menus</span></div>
+                  <h5>Audio</h5>
+                  <div class="guide-row"><kbd>A</kbd><span>Toggle Auto-Gain</span></div>
+                  <div class="guide-row"><kbd>K</kbd><span>Toggle Kick-Lock</span></div>
+                  <div class="guide-row"><kbd>T</kbd><span>Open tuning panel</span></div>
+                  <div class="guide-row"><kbd>Space</kbd><span>Play / pause (file mode)</span></div>
+                </div>
+                <div class="welcome-shortcut-col">
+                  <h5>Navigation</h5>
+                  <div class="guide-row"><kbd>←</kbd> / <kbd>→</kbd><span>Previous / next preset</span></div>
+                  <div class="guide-row"><kbd>R</kbd><span>Toggle auto-cycle</span></div>
+                  <div class="guide-row"><kbd>C</kbd><span>Open cycle settings</span></div>
+                  <div class="guide-row"><kbd>P</kbd><span>Open presets drawer</span></div>
+                  <div class="guide-row"><kbd>O</kbd><span>Output settings</span></div>
+                  <div class="guide-row"><kbd>E</kbd><span>Open Preset Studio</span></div>
+                  <div class="guide-row"><kbd>S</kbd><span>Toggle favorite</span></div>
+                  <div class="guide-row"><kbd>X</kbd><span>Hide current preset</span></div>
 
-                <h5 style="margin-top: 20px;">Timeline Editor</h5>
-                <div class="guide-row"><kbd>Space</kbd><span>Play / Pause (VJ mode)</span></div>
-                <div class="guide-row"><kbd>Home</kbd><span>Go to start (keep visuals)</span></div>
-                <div class="guide-row"><kbd>←</kbd> / <kbd>→</kbd><span>Prev / Next block</span></div>
-                <div class="guide-row"><kbd>↑</kbd> / <kbd>↓</kbd><span>Nudge ±1s (±5s Shift)</span></div>
-                <div class="guide-row"><kbd>1</kbd> - <kbd>9</kbd><span>Jump to marker</span></div>
-                <div class="guide-row"><kbd>L</kbd><span>Open Timeline Editor</span></div>
-                <div class="guide-row"><kbd>?</kbd><span>Keyboard shortcuts</span></div>
+                  <h5>View</h5>
+                  <div class="guide-row"><kbd>F</kbd><span>Fullscreen</span></div>
+                  <div class="guide-row"><kbd>?</kbd> / <kbd>/</kbd><span>Keyboard guide</span></div>
+                  <div class="guide-row"><kbd>Esc</kbd><span>Close drawers &amp; menus</span></div>
+
+                </div>
+              </div>
+            </div>
+
+            <!-- Timeline Editor Shortcuts -->
+            <div class="welcome-feature" style="background: rgba(167,139,250,0.08); border: 1px solid rgba(167,139,250,0.2); border-radius: 12px; padding: 20px;">
+              <div class="welcome-feature-title" style="font-size: 1.1rem; color: var(--accent); margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 1.2em;">🎬</span> Timeline Editor
+                <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 400; margin-left: auto;">Separate page</span>
+              </div>
+              <p style="font-size: 0.9em; color: var(--text-secondary); margin-bottom: 16px;">These shortcuts only work when you're in the Timeline Editor page. To open the Timeline Editor, click its button on the start screen or in the control bar.</p>
+              <div class="welcome-shortcuts">
+                <div class="welcome-shortcut-col">
+                  <h5>Transport</h5>
+                  <div class="guide-row"><kbd>Space</kbd><span>Play / Pause (VJ mode)</span></div>
+                  <div class="guide-row"><kbd>Home</kbd><span>Go to start (keep visuals)</span></div>
+                  <div class="guide-row"><kbd>←</kbd> / <kbd>→</kbd><span>Prev / Next block</span></div>
+                  <div class="guide-row"><kbd>↑</kbd> / <kbd>↓</kbd><span>Nudge ±1s (±5s with Shift)</span></div>
+                </div>
+                <div class="welcome-shortcut-col">
+                  <h5>Navigation</h5>
+                  <div class="guide-row"><kbd>1</kbd> - <kbd>9</kbd><span>Jump to marker</span></div>
+                  <div class="guide-row"><kbd>?</kbd><span>Keyboard shortcuts</span></div>
+                  <div class="guide-row"><kbd>F</kbd><span>Fullscreen</span></div>
+                </div>
               </div>
             </div>
           </section>

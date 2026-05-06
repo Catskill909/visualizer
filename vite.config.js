@@ -22,7 +22,6 @@ export default defineConfig({
         editor: resolve(__dirname, 'editor.html'),
         timeline: resolve(__dirname, 'timeline.html'),
         promo: resolve(__dirname, 'promo/index.html'),
-        help: resolve(__dirname, 'help.html'),
       },
       output: {
         manualChunks(id) {
