@@ -16,6 +16,7 @@ const startEl     = document.getElementById('tl-start');
 const shellEl     = document.getElementById('tl-shell');
 const btnMic      = document.getElementById('start-mic');
 const btnFile     = document.getElementById('start-file');
+const btnNoAudio  = document.getElementById('start-no-audio');
 const fileInput   = document.getElementById('start-file-input');
 
 // Mini player
@@ -72,7 +73,13 @@ function mountMiniPlayer(audio, filename) {
     const { signal } = playerAbortCtrl;
 
     mpFilename.textContent = filename.length > 32 ? filename.slice(0, 30) + '…' : filename;
+    mpFilename.dataset.tooltip = filename; // Set tooltip to full filename
     miniPlayer.hidden = false;
+    // Re-enable controls (in case they were disabled from No Audio mode)
+    mpPlay.disabled = false;
+    mpSeek.disabled = false;
+    mpPlay.style.opacity = '';
+    mpSeek.style.opacity = '';
 
     const updateUI = () => {
         const cur = audio.currentTime;
@@ -332,6 +339,23 @@ fileInput.addEventListener('change', () => {
         const audio = await eng.connectAudioFile(file);
         audio.play();
         mountMiniPlayer(audio, file.name);
+    });
+});
+
+btnNoAudio?.addEventListener('click', () => {
+    boot(async () => {
+        // No audio connected — show empty mini player so user can load later
+        miniPlayer.hidden = false;
+        mpFilename.textContent = 'No audio loaded';
+        mpFilename.dataset.tooltip = 'Click Load button to add audio';
+        mpTime.textContent = '— / —';
+        mpSeek.value = 0;
+        mpSeek.style.setProperty('--pct', '0%');
+        // Disable play/seek - only load button works until audio added
+        mpPlay.disabled = true;
+        mpSeek.disabled = true;
+        mpPlay.style.opacity = '0.4';
+        mpSeek.style.opacity = '0.4';
     });
 });
 

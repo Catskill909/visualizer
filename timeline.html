@@ -47,6 +47,14 @@
                 </svg>
                 Load Track
             </button>
+            <button id="start-no-audio" class="start-btn start-btn--secondary" type="button">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                    <line x1="23" y1="9" x2="17" y2="15"/>
+                    <line x1="17" y1="9" x2="23" y2="15"/>
+                </svg>
+                No Audio
+            </button>
         </div>
         <input type="file" id="start-file-input" accept="audio/*" hidden />
         <a href="/index.html" class="start-back">← Back to DiscoCast Visualizer</a>
@@ -384,7 +392,7 @@
     <!-- ─── MINI PLAYER ─── -->
     <div id="mini-player" class="mini-player tl-overlay" hidden>
         <div class="mp-track">
-            <span id="mp-filename" class="mp-filename">—</span>
+            <span id="mp-filename" class="mp-filename has-tooltip" data-tooltip="Filename">—</span>
             <span id="mp-time" class="mp-time">0:00 / 0:00</span>
         </div>
         <div class="mp-controls">
@@ -394,7 +402,7 @@
             </button>
             <input id="mp-seek" class="mp-seek slider" type="range" min="0" max="1" step="0.001" value="0" style="--pct:0%" aria-label="Seek" />
             <input id="mp-vol"  class="mp-vol  slider" type="range" min="0" max="1" step="0.01"  value="1" style="--pct:100%" title="Volume" />
-            <button id="mp-load" class="mp-btn" type="button" title="Load audio file">
+            <button id="mp-load" class="mp-btn has-tooltip" type="button" data-tooltip="Load audio file">
                 <svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13">
                     <path d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z"/>
                 </svg>
