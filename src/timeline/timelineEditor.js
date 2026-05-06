@@ -130,8 +130,9 @@ export class TimelineEditor {
         // Playback — wall-clock based, per-zone
         this._playing      = false;
         this._looping      = false;
+        this._currentTime  = 0;          // persistent playhead position in seconds
         this._playStartWall = 0;
-        this._zoneTimers   = new Map();  // zoneId → timer handle
+        this._zoneTimers   = new Map();  // zoneId → timer handle[]
         this._masterTimer  = null;
         this._rafId        = null;
 
@@ -609,7 +610,11 @@ export class TimelineEditor {
             // Create or reposition the per-zone black cover
             if (!this._zoneCovers.has(zone.id)) {
                 const cover = document.createElement('div');
-                Object.assign(cover.style, { position: 'absolute', background: '#000', zIndex: '10', pointerEvents: 'none' });
+                Object.assign(cover.style, {
+                    position: 'absolute', background: '#000',
+                    zIndex: '10', pointerEvents: 'none',
+                    opacity: '1', transition: 'none',
+                });
                 this._canvasContainer.appendChild(cover);
                 this._zoneCovers.set(zone.id, cover);
             }
@@ -618,11 +623,39 @@ export class TimelineEditor {
             Object.assign(cover.style, {
                 left: `${r.x * 100}%`, top: `${r.y * 100}%`,
                 width: `${r.width * 100}%`, height: `${r.height * 100}%`,
-                display: '',
+                opacity: '1',
             });
         }
 
         this._updateStripHeight();
+    }
+
+    /**
+     * Fade a zone cover to a target opacity over `durationSec` seconds.
+     * @param {string} zoneId   — zone to target
+     * @param {number} opacity  — 0 (reveal canvas) or 1 (cover with black)
+     * @param {number} durationSec — 0 for instant snap, >0 for animated fade
+     * @param {string} style    — transition type (future extensibility hook)
+     *   'fade-black'  → default, opacity transition with black cover
+     *   'cut'         → instant, ignores durationSec (always 0)
+     *   Future: 'fade-white', 'flash', 'dip-to-black', etc.
+     */
+    _fadeZoneCover(zoneId, opacity, durationSec = 0, style = 'fade-black') {
+        const cover = this._zoneCovers.get(zoneId);
+        if (!cover) return;
+
+        // Future: switch on `style` for different transition types
+        if (style === 'cut') durationSec = 0;
+
+        if (durationSec > 0) {
+            // Set transition, force reflow, then animate
+            cover.style.transition = `opacity ${durationSec}s ease`;
+            cover.offsetHeight;  // force reflow so transition takes effect
+            cover.style.opacity = String(opacity);
+        } else {
+            cover.style.transition = 'none';
+            cover.style.opacity = String(opacity);
+        }
     }
 
     _positionCanvas(canvas, zone) {
@@ -768,8 +801,7 @@ export class TimelineEditor {
             if (entry) {
                 const zd = this._zoneMap.get(entry.zoneId);
                 if (zd) zd.engine.stopRenderLoop();
-                const cover = this._zoneCovers.get(entry.zoneId);
-                if (cover) cover.style.display = '';
+                this._fadeZoneCover(entry.zoneId, 1, 0);  // instant cover
             }
         }
         this._tl.entries = this._tl.entries.filter(e => e.id !== id);
@@ -1146,8 +1178,7 @@ export class TimelineEditor {
                 if (!eng.isRunning) eng.startRenderLoop();
                 eng.loadPreset(name, 1.0).catch(() => {});
                 // Lift only this zone's cover — other zones stay hidden
-                const cover = this._zoneCovers.get(this._pickerZoneId);
-                if (cover) cover.style.display = 'none';
+                this._fadeZoneCover(this._pickerZoneId, 0, 0);  // instant reveal
             });
             this._pickerList.appendChild(item);
         }
@@ -1227,10 +1258,13 @@ export class TimelineEditor {
         }
         if (this._playing) return;
         this._playing      = true;
-        this._playStartWall = performance.now();
+
+        // Start from the parked playhead position
+        const from = this._currentTime;
+        this._playStartWall = performance.now() - from * 1000;
 
         // Re-cover all zones; _playZone() lifts each cover when its first entry fires
-        for (const [, cover] of this._zoneCovers) cover.style.display = '';
+        for (const [zId] of this._zoneCovers) this._fadeZoneCover(zId, 1, 0);  // instant cover all
         // Ensure all zone engines are rendering
         for (const [, zd] of this._zoneMap) {
             if (!zd.engine.isRunning) zd.engine.startRenderLoop();
@@ -1241,47 +1275,72 @@ export class TimelineEditor {
         this._psStopIcon.style.display = '';
         this._psLabel.textContent = 'Stop';
 
-        // Launch per-zone playback chains
+        // Launch per-zone playback chains from the parked position
         for (const zone of (this._tl.zones || [])) {
-            this._playZone(zone.id);
+            this._playZone(zone.id, from);
         }
 
-        // Master stop timer at total duration (handles loop / end)
-        const total = this._totalDuration();
+        // Master stop timer — remaining duration from current position
+        const total     = this._totalDuration();
+        const remaining = total - from;
+        if (remaining <= 0) { this.stop(); return; }
+
         this._masterTimer = setTimeout(() => {
             if (!this._playing) return;
             if (this._looping) {
+                this._currentTime = 0;
                 this.stop();
                 requestAnimationFrame(() => this.play());
             } else {
+                // Natural end — stop and rewind
                 this.stop();
+                this._currentTime = 0;
+                this._playheadEl.style.left = '0px';
+                this._updateTimeDisplay(0);
             }
-        }, total * 1000);
+        }, remaining * 1000);
 
         this._rafId = requestAnimationFrame(() => this._tickPlayhead());
     }
 
     // Schedule all entries for a zone from `fromTime` seconds.
     // The entry active at fromTime is loaded immediately (instant, no blend).
-    // All future entries are scheduled and use butterchurn's crossfade via blendTime.
-    // Covers are never shown mid-playback — last frame holds between entries.
+    // Future entries fade in from black; entries ending before a gap fade out.
+    // Transition style is extensible via the `style` param in _fadeZoneCover.
     _playZone(zoneId, fromTime = 0) {
         const entries = this._zoneEntriesFor(zoneId);
         const zd      = this._zoneMap.get(zoneId);
         if (!zd || !entries.length) return;
+
+        const zone = (this._tl.zones || []).find(z => z.id === zoneId);
+        const shouldBlackout = !zone || zone.gapBehavior !== 'hold';
 
         const timers = [];
 
         // Load the entry active right now (if any) instantly, then skip it in
         // the scheduling loop below so it isn't loaded a second time.
         let immediateEntryId = null;
-        for (const entry of entries) {
+        for (let i = 0; i < entries.length; i++) {
+            const entry = entries[i];
             const st = entry.startTime ?? 0;
             if (st <= fromTime && fromTime < st + entry.duration) {
                 immediateEntryId = entry.id;
-                const cover = this._zoneCovers.get(zoneId);
-                if (cover) cover.style.display = 'none';
+                this._fadeZoneCover(zoneId, 0, 0);  // instant reveal (scrub/seek)
                 zd.engine.loadPreset(entry.presetName, 0).catch(() => {});
+
+                // Schedule fade-out at end of this entry if there's a gap after it
+                const entryEnd = st + entry.duration;
+                const next = entries[i + 1];
+                const nextStart = next ? (next.startTime ?? 0) : Infinity;
+                if (shouldBlackout && entryEnd < nextStart) {
+                    const fadeDur  = Math.min(entry.blendTime, entry.duration);
+                    const fadeStart = entryEnd - fadeDur;
+                    const fadeDelay = Math.max(0, (fadeStart - fromTime) * 1000);
+                    timers.push(setTimeout(() => {
+                        if (!this._playing) return;
+                        this._fadeZoneCover(zoneId, 1, fadeDur);  // fade to black
+                    }, fadeDelay));
+                }
                 break;
             }
         }
@@ -1296,13 +1355,49 @@ export class TimelineEditor {
             // Only schedule entries that haven't started yet
             if (st < fromTime) continue;
 
+            // Determine if there's a gap before this entry (fade in from black)
+            const prev = entries[i - 1];
+            const prevEnd = prev ? ((prev.startTime ?? 0) + prev.duration) : -Infinity;
+            const hasGapBefore = st > prevEnd;
+            // If there's a gap, start the fade-in early so the preset is fully
+            // visible by the time the block's content begins
+            const fadeDurIn = hasGapBefore ? entry.blendTime : 0;
+            const fadeInDelay = Math.max(0, (st - fadeDurIn - fromTime) * 1000);
+
+            // Schedule fade-in (cover → transparent)
+            if (hasGapBefore && fadeDurIn > 0) {
+                timers.push(setTimeout(() => {
+                    if (!this._playing) return;
+                    this._fadeZoneCover(zoneId, 0, fadeDurIn);  // fade in from black
+                }, fadeInDelay));
+            }
+
+            // Schedule preset load at exact start time
             const delay = (st - fromTime) * 1000;
+            // If fading in from gap, load preset when fade starts (so there's something to show)
+            const loadDelay = hasGapBefore && fadeDurIn > 0 ? fadeInDelay : delay;
             timers.push(setTimeout(() => {
                 if (!this._playing) return;
-                const cover = this._zoneCovers.get(zoneId);
-                if (cover) cover.style.display = 'none';
+                if (!hasGapBefore || fadeDurIn <= 0) {
+                    // Consecutive entry — no cover fade needed, butterchurn crossfade handles it
+                    this._fadeZoneCover(zoneId, 0, 0);
+                }
                 zd.engine.loadPreset(entry.presetName, entry.blendTime).catch(() => {});
-            }, delay));
+            }, loadDelay));
+
+            // Schedule fade-out at end of this entry if there's a gap after it
+            const entryEnd = st + entry.duration;
+            const next = entries[i + 1];
+            const nextStart = next ? (next.startTime ?? 0) : Infinity;
+            if (shouldBlackout && entryEnd < nextStart) {
+                const fadeDurOut = Math.min(entry.blendTime, entry.duration);
+                const fadeStart  = entryEnd - fadeDurOut;
+                const fadeDelay  = Math.max(0, (fadeStart - fromTime) * 1000);
+                timers.push(setTimeout(() => {
+                    if (!this._playing) return;
+                    this._fadeZoneCover(zoneId, 1, fadeDurOut);  // fade to black
+                }, fadeDelay));
+            }
         }
 
         this._zoneTimers.set(zoneId, timers);
@@ -1323,15 +1418,17 @@ export class TimelineEditor {
 
         // Stop all zone engines and re-cover all zones
         for (const [, zd] of this._zoneMap) zd.engine.stopRenderLoop();
-        for (const [, cover] of this._zoneCovers) cover.style.display = '';
+        for (const [zId] of this._zoneCovers) this._fadeZoneCover(zId, 1, 0);  // instant cover all
 
         this._btnPlayStop.classList.remove('is-playing');
         this._psPlayIcon.style.display = '';
         this._psStopIcon.style.display = 'none';
         this._psLabel.textContent = 'Play';
 
-        this._playheadEl.style.display = 'none';
-        this._updateTimeDisplay(0);
+        // Keep playhead visible at its current position (don't reset)
+        this._playheadEl.style.left    = `${this._currentTime * this._pxPerSec}px`;
+        this._playheadEl.style.display = '';
+        this._updateTimeDisplay(this._currentTime);
         if (!this._isFullscreen) this._showOverlays();
     }
 
@@ -1348,6 +1445,7 @@ export class TimelineEditor {
     _tickPlayhead() {
         if (!this._playing) return;
         const tNow = (performance.now() - this._playStartWall) / 1000;
+        this._currentTime = tNow;  // persist position every frame
 
         const x = tNow * this._pxPerSec;
         this._playheadEl.style.left    = `${x}px`;
@@ -1366,6 +1464,7 @@ export class TimelineEditor {
     }
 
     _scrubTo(t) {
+        this._currentTime = t;  // always persist the parked position
         this._playheadEl.style.left    = `${t * this._pxPerSec}px`;
         this._playheadEl.style.display = '';
         this._updateTimeDisplay(t);
@@ -1374,7 +1473,7 @@ export class TimelineEditor {
 
         // Restart playback from position t using wall-clock offset
         clearTimeout(this._masterTimer);
-        for (const timers of this._zoneTimers.values()) for (const t of timers) clearTimeout(t);
+        for (const timers of this._zoneTimers.values()) for (const h of timers) clearTimeout(h);
         this._zoneTimers.clear();
         cancelAnimationFrame(this._rafId);
 
@@ -1389,7 +1488,16 @@ export class TimelineEditor {
 
         this._masterTimer = setTimeout(() => {
             if (!this._playing) return;
-            this._looping ? (this.stop(), requestAnimationFrame(() => this.play())) : this.stop();
+            if (this._looping) {
+                this._currentTime = 0;
+                this.stop();
+                requestAnimationFrame(() => this.play());
+            } else {
+                this.stop();
+                this._currentTime = 0;
+                this._playheadEl.style.left = '0px';
+                this._updateTimeDisplay(0);
+            }
         }, remaining * 1000);
 
         this._rafId = requestAnimationFrame(() => this._tickPlayhead());

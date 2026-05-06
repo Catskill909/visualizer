@@ -1,8 +1,198 @@
 # Timeline Editor — Design & Planning Doc
 
-**Status:** Phases 1–3 complete. Phase 4 (Waveform + BPM) is next.  
-**Last updated:** 2026-04-30  
+**Status:** Phases 1–3.5 complete ✅ — Phase 4 next.  
+**Last updated:** 2026-05-05  
 **Architecture:** Standalone page (`/timeline.html`) — self-contained MPA entry in Vite.
+
+## Phased Rollout
+
+### Phase 1 — Single-zone editor ✅ COMPLETE
+
+- `timeline.html`, `src/timeline/main.js`, `src/timelineStorage.js` — full CRUD, export/import
+- Full-screen single canvas (VisualizerEngine on Full zone)
+- Timeline strip: DOM blocks, drag-to-reorder, resize right edge
+- Preset picker modal with search + All/Favorites/My Presets tabs
+- Quick-edit popover (Duration, Blend, Label)
+- Right-click context menu (Duplicate, Delete)
+- Transport: Play/Stop toggle, Loop, time display, Zoom, Snap
+- Playhead advancing during playback
+- Save / Load / Delete timelines; timeline switcher dropdown
+- JSON Copy / Paste export-import; block auto-color from preset name hash
+- `vite.config.js` third entry; `L` key in `src/controls.js`
+- Custom presets via `engine.refreshCustomPresets()` on boot
+- `?preset=<name>` query param pre-adds to new timeline
+
+**Post-ship bug fixes:**
+- Delete modal on boot — CSS `display:flex` beat `[hidden]` — fixed with global `[hidden] { display:none !important }`
+- Play/Stop confusion — replaced with single `#tl-btn-playstop` toggle (`is-playing` class)
+- Ruler `+` cursor confusion — changed to `cursor: pointer`
+- Quick-edit overflow — widened to 260px, `min-width:0` on flex inputs
+
+### Phase 2 — Multi-zone compositor ✅ COMPLETE
+
+- `initSlave(canvas, primaryEngine)` added to `src/visualizer.js` — shared audio graph, `_isSlaveEngine` guards render loop
+- 6 predefined zone layouts with SVG previews (`ZONE_LAYOUTS` constant)
+- Zone Manager modal (`#tl-zone-mgr` / `#tl-zone-layouts`) opened by **⊞ Zones** button
+- `_syncZoneCanvases()` — diffed canvas/engine lifecycle tied to `_tl.zones`
+- Multi-row strip — `_renderZoneRows()` builds one `.tl-zone-row` per zone
+- Each zone label row has a `+` button (`tl-zone-add-btn`) to add directly to that zone
+- Preset picker tracks `_pickerZoneId` — adds to the correct zone row
+- `_updateStripHeight()` — `--strip-h` CSS var + transport `bottom` updated dynamically
+- `resizeAllZones()` — public, called on window resize from `main.js`
+- Playback: `_playZone(zoneId, fromTime)` schedules per-zone, all zones start in `play()`
+- Ruler seek: `_scrubTo(t)` calls `_playZone(id, t)` for all zones
+
+### Phase 3 — UX polish ✅ COMPLETE
+
+- **Position-based dragging** — blocks drag freely to any time position. `entry.startTime` is now stored (not computed). Dragging the block body updates `entry.startTime` directly on drop. `_migrateEntryStartTimes()` auto-converts old sequential timelines on load.
+- **Inline block actions** — hover a block to reveal Edit / Duplicate / Delete icon buttons. Clicking them does not trigger drag. Right-click context menu preserved as secondary path.
+- **Controls always visible** — auto-hide timer removed. Controls are permanently visible unless fullscreen is active.
+- **`#tl-fullscreen-btn`** — always-visible fullscreen icon in top-right corner (replaced the old `≡` pin toggle). Click or press `F` to enter fullscreen and hide all controls. Click again, press `F`, or press `Escape` to exit fullscreen and restore controls. Web uses native browser fullscreen API; macOS app uses Tauri `appWindow.setFullscreen()`.
+
+### Phase 3.5 — Active Playhead 🔧 IN PROGRESS
+
+A classic NLE playhead: click-to-seek, persistent position, play-from-here. This is the foundation for all future transport features (loop ranges, markers, live queue override).
+
+#### Current State Audit
+
+What exists today:
+- **`_scrubTo(t)`** — moves the playhead visually and, *if playing*, cancels all zone timers, recalculates `_playStartWall`, and re-schedules all zones from time `t`. If *not* playing, it only moves the red line and updates the time display — then immediately returns (`if (!this._playing) return;`).
+- **`play()`** — always starts from `t = 0`. Sets `_playStartWall = performance.now()` and calls `_playZone(zone.id)` with `fromTime = 0` (default).
+- **`stop()`** — kills everything *and resets to zero*: hides the playhead (`display: none`), resets time display to `0:00`, stops all engines, shows all covers.
+- **`_tickPlayhead()`** — rAF loop that derives position from wall-clock: `tNow = (performance.now() - _playStartWall) / 1000`. No state is persisted — when playback stops, the current time is lost.
+- **No `_currentTime` property exists.** The playhead position is ephemeral — it only exists inside the rAF loop and disappears on stop.
+
+#### Gap Analysis — What's Missing
+
+| Behavior | Status | Gap |
+|----------|--------|-----|
+| Click ruler while **playing** → jump to that time | ✅ Works | `_scrubTo` handles this correctly |
+| Click ruler while **stopped** → park playhead there | ⚠️ Partial | Visually parks, but `play()` ignores it — always starts from 0 |
+| Play from parked playhead position | ❌ Missing | `play()` hardcodes `fromTime = 0`, no `_currentTime` state |
+| Stop → playhead stays at last position | ❌ Missing | `stop()` hides playhead and resets display to `0:00` |
+| Playback reaches end → rewind to 0 | ❌ Missing | `stop()` always resets, but there's no distinction between "user pressed stop" vs "reached the end" |
+
+#### Proposed Behavior
+
+**Core rule:** The playhead always has a position (`_currentTime`), whether playing or stopped.
+
+| Action | If Playing | If Stopped |
+|--------|-----------|-----------|
+| **Click ruler** | Jump playhead + all zone engines to that time, continue playing | Park playhead at that time, update time display |
+| **Press Play** | — (already playing) | Start playback from `_currentTime` |
+| **Press Stop** | Pause at current position, playhead stays visible | — (already stopped) |
+| **Playback reaches end** | If looping → restart from 0. If not looping → stop and rewind to 0 | — |
+| **Add/delete blocks** | — | Playhead stays where it is (don't reset on edits) |
+
+#### Implementation Spec
+
+**New state:**
+```js
+this._currentTime = 0;   // seconds — the playhead's persistent position
+```
+
+**Modified methods:**
+
+| Method | Change |
+|--------|--------|
+| `play()` | Use `_currentTime` instead of 0: `_playStartWall = performance.now() - this._currentTime * 1000`. Pass `_currentTime` to `_playZone()`. Master timer uses `remaining = total - _currentTime`. |
+| `stop()` | **Don't reset.** Keep playhead visible at `_currentTime`. Don't hide it. Don't reset time display. Keep engines stopped but don't re-cover zones (debatable — see discussion below). |
+| `_tickPlayhead()` | Write `this._currentTime = tNow` every frame so it's always current. |
+| `_scrubTo(t)` | Always set `this._currentTime = t`. The rest of the existing logic (timer cancel + restart) only runs if `_playing`, which is already correct. |
+| Master timer (end of timeline) | Distinguish "natural end" from "user stop": on natural end with no loop, call `stop()` then reset `_currentTime = 0`. |
+
+#### Design Decisions — Resolved
+
+| Decision | Choice | Notes |
+|----------|--------|-------|
+| **Stop vs Pause** | **(A)** Single Play/Pause toggle | Playhead keeps position on stop. Click ruler at `0:00` to rewind. Rewind button can be added later. |
+| **Zone covers on stop** | **(A)** Show black covers | Clean black canvas when idle. "Hold frame" is a future nice-to-have. |
+| **Playhead appearance** | **(A)** Same red line always | No visual distinction between parked/playing. Revisit if confusing. |
+
+#### Bug Fix → Transition System: Gap Blackout + Animated Fades
+
+**Original bug:** When a block's duration expired during playback, the zone engine kept rendering the last loaded preset indefinitely. The zone cover (black overlay) was only re-shown on `stop()` — never during playback when a gap occurs.
+
+**Root cause:** `_playZone()` scheduled when to *start* each entry (load preset) but never scheduled when an entry *ends*. No "off" timer existed.
+
+**Fix (evolved into a full transition system):**
+
+1. **Switched cover from `display` toggle to `opacity` transitions** — all cover manipulation now goes through `_fadeZoneCover(zoneId, opacity, durationSec, style)`.
+2. **Fade-out to black:** When a block ends and there's a gap after it, the cover fades from transparent to black over `blendTime` seconds. The fade *starts* at `endTime - blendTime` so it finishes exactly when the block ends.
+3. **Fade-in from black:** When a scheduled block starts and there's a gap before it, the preset loads early (at `startTime - blendTime`) and the cover fades from black to transparent over `blendTime` seconds.
+4. **Consecutive entries:** No cover fade — butterchurn's internal crossfade handles the visual transition.
+5. **Instant reveal on seek/scrub:** When the user clicks the ruler, the cover snaps instantly (no animation) to the correct state.
+
+**Transition behavior matrix:**
+
+| Scenario | Cover action | Duration |
+|----------|-------------|----------|
+| Block starts after gap | Fade cover 1→0 | `entry.blendTime` |
+| Block starts after previous block (consecutive) | No cover change | butterchurn crossfade |
+| Block ends before gap | Fade cover 0→1 | `entry.blendTime` |
+| Block ends before next block (consecutive) | No cover change | butterchurn crossfade |
+| Scrub/seek into a block | Instant snap cover→0 | 0 |
+| Scrub/seek into a gap | Instant snap cover→1 | 0 |
+| Play pressed / Stop pressed | Instant snap | 0 |
+
+**New helper method — `_fadeZoneCover(zoneId, opacity, durationSec, style)`:**
+```js
+// style: 'fade-black' (default), 'cut' (instant)
+// Future: 'fade-white', 'flash', 'dip-to-black', etc.
+```
+
+The `style` parameter is an extensibility hook. To add a new transition type (e.g. white flash):
+1. Add the case to the `switch` in `_fadeZoneCover()`
+2. Add `transitionStyle` field to `TimelineEntry` data model
+3. Pass `entry.transitionStyle` from `_playZone()` scheduling
+4. Add UI in the quick-edit popover to choose transition type
+
+**What changed in the data model:** Nothing — `blendTime` already existed on entries and is reused as the fade duration. The future `transitionStyle` field (already in Phase 4 plans) will control the fade type.
+
+---
+
+### Playhead Feature Brainstorm — Future Ideas
+
+These are **not** part of Phase 3.5. Documenting them here so we have a backlog to pull from.
+
+#### Transport / Seeking
+- **Rewind-to-zero button** — `⏮` button in transport bar, one-click reset
+- **Skip forward / backward** — jump to the next or previous block boundary in the active zone
+- **Keyboard nudge** — arrow keys move playhead ±1 second (±5 with Shift)
+- **Drag-scrub on ruler** — click *and drag* on the ruler for continuous scrubbing (currently click-only). Live preview as you drag.
+
+#### Loop & Regions
+- **Loop region (in/out points)** — drag a range on the ruler to set loop bounds. Playback bounces between in and out points. Visual: translucent overlay on ruler.
+- **Loop single block** — right-click block → "Loop This" — sets loop range to that block's start/end
+
+#### Markers & Cues
+- **Named markers / cue points** — double-click ruler to drop a colored/labeled marker (e.g. "Build", "Drop"). Click marker to seek. Stored in timeline data model.
+- **Jump-to-marker keyboard shortcuts** — `1`–`9` keys jump to markers by index
+
+#### Live Performance
+- **Live queue override** — during playback, click a future block to force it to play *next*, overriding the timeline's strict chronological order. Visual: block gets a "queued" indicator.
+- **Hold/freeze preset** — while playing, press `H` to freeze the current preset indefinitely, ignoring upcoming block transitions. Press again to release.
+- **Speed control** — 0.5×, 1×, 2× playback speed. Affects wall-clock calculation.
+
+#### Audio Sync
+- **Timeline ↔ Audio lock** — when using "Load Track" mode, sync the timeline playhead with the audio file's `currentTime`. Scrubbing one scrubs both. Playback of one drives both.
+- **BPM grid on ruler** — enter a BPM; ruler shows beat markers. Blocks snap to beat boundaries on drag/resize. Playhead shows current beat count.
+- **Beat-triggered transitions** — instead of hard time-based transitions, trigger the next preset on the next beat boundary after the block's duration expires.
+
+---
+
+### Phase 4 — Advanced show features
+
+- Named markers — double-click ruler to drop a labeled flag
+- Per-entry crossfade style (Cut / White Flash / Black Dip) — stored as `transitionStyle` on entry
+- Loop section range on ruler
+- Live queue override during playback (click a future block to queue it next)
+- Entry label canvas overlay during playback (label field already in data model and quick-edit)
+- Auto-fill from Favorites button in transport
+- Multi-select (Shift-click) + bulk duration stamping
+- Setlist text export (plain-text or HTML table)
+- **Timeline Library modal** — replace the topbar `<select>` dropdown with a "Library" button that opens a card-grid modal (mirrors `src/editor/presetLibrary.js` patterns). Each card: name, last-edited relative time, entry count, zone-layout chip, per-card Load + Delete actions. Search box, sort by recent/name, multi-select for bulk delete. Save button gains a "Save As…" dialog for new/clone flows. Discard-confirm guard when switching timelines with unsaved changes (currently missing on the dropdown change handler).
+- **Auto-save behavior** — currently new timelines are in-memory only until the user clicks Save (`createTimeline()` returns a record without persisting; `_loadAll()` calls `pruneEmptyUntitled()` once on boot to clean up legacy auto-saved junk where `name === 'Untitled Timeline' && entries.length === 0`). If we want true auto-save later, gate it behind a debounced "draft" slot rather than spawning a new entry per page load.
 
 ---
 
@@ -15,6 +205,14 @@ Same design language as the rest of the app: full-screen canvas, glassmorphic ov
 **No changes to the main app or Preset Studio are required** beyond two one-liners (navigation links, already shipped — see Modified Files).
 
 ---
+
+## Open Bugs / Known Gaps
+
+- **No overlap prevention**: blocks can be dragged to overlap each other within a zone. The data model spec says `startTime + duration <= next.startTime` but this is not enforced. Future: push colliding blocks on drop (same as a real NLE).
+- ~~**Gap behavior not visualized**~~: ✅ Fixed in Phase 3.5 — `_playZone()` now schedules blackout timers when entries end. `gapBehavior: 'black'` re-shows the zone cover; `'hold'` lets the last frame persist. Visual crosshatch/ghost-block strip rendering still not built (cosmetic only).
+- **Zone settings popover not built**: clicking the zone label chip does nothing yet. It should open a popover for name, opacity, blend mode, gap behavior.
+- **Entry label overlay not rendered**: `entry.label` is stored and editable in quick-edit but not rendered on the canvas during playback.
+- **`presetLibrary.js` "Send to Timeline →"** one-liner not yet added.
 
 ## Current State — What's Built and Shipped
 
@@ -294,64 +492,6 @@ Defined in `src/timeline/style.css` `:root`:
 
 ## Phased Rollout
 
-### Phase 1 — Single-zone editor ✅ COMPLETE
-
-- `timeline.html`, `src/timeline/main.js`, `src/timelineStorage.js` — full CRUD, export/import
-- Full-screen single canvas (VisualizerEngine on Full zone)
-- Timeline strip: DOM blocks, drag-to-reorder, resize right edge
-- Preset picker modal with search + All/Favorites/My Presets tabs
-- Quick-edit popover (Duration, Blend, Label)
-- Right-click context menu (Duplicate, Delete)
-- Transport: Play/Stop toggle, Loop, time display, Zoom, Snap
-- Playhead advancing during playback
-- Save / Load / Delete timelines; timeline switcher dropdown
-- JSON Copy / Paste export-import; block auto-color from preset name hash
-- `vite.config.js` third entry; `L` key in `src/controls.js`
-- Custom presets via `engine.refreshCustomPresets()` on boot
-- `?preset=<name>` query param pre-adds to new timeline
-
-**Post-ship bug fixes:**
-- Delete modal on boot — CSS `display:flex` beat `[hidden]` — fixed with global `[hidden] { display:none !important }`
-- Play/Stop confusion — replaced with single `#tl-btn-playstop` toggle (`is-playing` class)
-- Ruler `+` cursor confusion — changed to `cursor: pointer`
-- Quick-edit overflow — widened to 260px, `min-width:0` on flex inputs
-
-### Phase 2 — Multi-zone compositor ✅ COMPLETE
-
-- `initSlave(canvas, primaryEngine)` added to `src/visualizer.js` — shared audio graph, `_isSlaveEngine` guards render loop
-- 6 predefined zone layouts with SVG previews (`ZONE_LAYOUTS` constant)
-- Zone Manager modal (`#tl-zone-mgr` / `#tl-zone-layouts`) opened by **⊞ Zones** button
-- `_syncZoneCanvases()` — diffed canvas/engine lifecycle tied to `_tl.zones`
-- Multi-row strip — `_renderZoneRows()` builds one `.tl-zone-row` per zone
-- Each zone label row has a `+` button (`tl-zone-add-btn`) to add directly to that zone
-- Preset picker tracks `_pickerZoneId` — adds to the correct zone row
-- `_updateStripHeight()` — `--strip-h` CSS var + transport `bottom` updated dynamically
-- `resizeAllZones()` — public, called on window resize from `main.js`
-- Playback: `_playZone(zoneId, fromTime)` schedules per-zone, all zones start in `play()`
-- Ruler seek: `_scrubTo(t)` calls `_playZone(id, t)` for all zones
-
-### Phase 3 — UX polish ✅ COMPLETE
-
-- **Position-based dragging** — blocks drag freely to any time position. `entry.startTime` is now stored (not computed). Dragging the block body updates `entry.startTime` directly on drop. `_migrateEntryStartTimes()` auto-converts old sequential timelines on load.
-- **Inline block actions** — hover a block to reveal Edit / Duplicate / Delete icon buttons. Clicking them does not trigger drag. Right-click context menu preserved as secondary path.
-- **Controls always visible** — auto-hide timer removed. Controls are permanently visible unless fullscreen is active.
-- **`#tl-fullscreen-btn`** — always-visible fullscreen icon in top-right corner (replaced the old `≡` pin toggle). Click or press `F` to enter fullscreen and hide all controls. Click again, press `F`, or press `Escape` to exit fullscreen and restore controls. Web uses native browser fullscreen API; macOS app uses Tauri `appWindow.setFullscreen()`.
-
-### Phase 4 — Advanced show features
-
-- Named markers — double-click ruler to drop a labeled flag
-- Per-entry crossfade style (Cut / White Flash / Black Dip) — stored as `transitionStyle` on entry
-- Loop section range on ruler
-- Live queue override during playback (click a future block to queue it next)
-- Entry label canvas overlay during playback (label field already in data model and quick-edit)
-- Auto-fill from Favorites button in transport
-- Multi-select (Shift-click) + bulk duration stamping
-- Setlist text export (plain-text or HTML table)
-- **Timeline Library modal** — replace the topbar `<select>` dropdown with a "Library" button that opens a card-grid modal (mirrors `src/editor/presetLibrary.js` patterns). Each card: name, last-edited relative time, entry count, zone-layout chip, per-card Load + Delete actions. Search box, sort by recent/name, multi-select for bulk delete. Save button gains a "Save As…" dialog for new/clone flows. Discard-confirm guard when switching timelines with unsaved changes (currently missing on the dropdown change handler).
-- **Auto-save behavior** — currently new timelines are in-memory only until the user clicks Save (`createTimeline()` returns a record without persisting; `_loadAll()` calls `pruneEmptyUntitled()` once on boot to clean up legacy auto-saved junk where `name === 'Untitled Timeline' && entries.length === 0`). If we want true auto-save later, gate it behind a debounced "draft" slot rather than spawning a new entry per page load.
-
----
-
 ## Save & Naming UX Design
 
 ### The Problem
@@ -409,10 +549,3 @@ When switching timelines via the `<select>` while `_dirty`, a `confirm()` prompt
 
 ---
 
-## Open Bugs / Known Gaps
-
-- **No overlap prevention**: blocks can be dragged to overlap each other within a zone. The data model spec says `startTime + duration <= next.startTime` but this is not enforced. Future: push colliding blocks on drop (same as a real NLE).
-- **Gap behavior not visualized**: `gapBehavior: 'black' | 'hold'` is in the data model and documentation but no visual crosshatch or ghost-block rendering exists yet.
-- **Zone settings popover not built**: clicking the zone label chip does nothing yet. It should open a popover for name, opacity, blend mode, gap behavior.
-- **Entry label overlay not rendered**: `entry.label` is stored and editable in quick-edit but not rendered on the canvas during playback.
-- **`presetLibrary.js` "Send to Timeline →"** one-liner not yet added.
