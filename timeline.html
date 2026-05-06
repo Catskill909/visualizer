@@ -222,6 +222,37 @@
         </div>
     </div>
 
+    <!-- ─── MARKER EDIT POPOVER ─── -->
+    <div id="tl-marker-edit" hidden role="dialog" aria-label="Edit marker">
+        <div class="qe-title" id="me-title">Edit Marker</div>
+        <div class="qe-row">
+            <span class="qe-label">Label</span>
+            <input id="me-label" class="qe-input" type="text" placeholder="Marker name…" maxlength="40" />
+        </div>
+        <div class="qe-row">
+            <span class="qe-label">Color</span>
+            <input id="me-color" type="color" value="#ffffff" />
+        </div>
+        <div class="qe-row">
+            <span class="qe-label">Action</span>
+            <select id="me-action" class="qe-input">
+                <option value="none">None (Cue)</option>
+                <option value="stop">Auto-Stop</option>
+                <option value="loop">Auto-Loop</option>
+            </select>
+        </div>
+        <div class="qe-actions">
+            <button id="me-apply" class="tl-btn tl-btn--primary" type="button">Apply</button>
+            <button id="me-cancel" class="tl-btn" type="button">Cancel</button>
+            <button id="me-delete" class="tl-btn tl-btn--danger" type="button" title="Delete Marker">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                    <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
     <!-- ─── CONTEXT MENU ─── -->
     <div id="tl-ctx-menu" hidden role="menu">
         <div class="tl-ctx-item" data-action="duplicate" role="menuitem">Duplicate</div>

@@ -1,6 +1,6 @@
 # Timeline Editor — Design & Planning Doc
 
-**Status:** Phases 1–3.5 complete ✅ — Phase 4 next.  
+**Status:** Phases 1–4.1 complete ✅ — Phase 4.2 next.  
 **Last updated:** 2026-05-05  
 **Architecture:** Standalone page (`/timeline.html`) — self-contained MPA entry in Vite.
 
@@ -49,105 +49,15 @@
 - **Controls always visible** — auto-hide timer removed. Controls are permanently visible unless fullscreen is active.
 - **`#tl-fullscreen-btn`** — always-visible fullscreen icon in top-right corner (replaced the old `≡` pin toggle). Click or press `F` to enter fullscreen and hide all controls. Click again, press `F`, or press `Escape` to exit fullscreen and restore controls. Web uses native browser fullscreen API; macOS app uses Tauri `appWindow.setFullscreen()`.
 
-### Phase 3.5 — Active Playhead 🔧 IN PROGRESS
+### Phase 3.5 — Active Playhead ✅ COMPLETE
 
 A classic NLE playhead: click-to-seek, persistent position, play-from-here. This is the foundation for all future transport features (loop ranges, markers, live queue override).
 
-#### Current State Audit
-
-What exists today:
-- **`_scrubTo(t)`** — moves the playhead visually and, *if playing*, cancels all zone timers, recalculates `_playStartWall`, and re-schedules all zones from time `t`. If *not* playing, it only moves the red line and updates the time display — then immediately returns (`if (!this._playing) return;`).
-- **`play()`** — always starts from `t = 0`. Sets `_playStartWall = performance.now()` and calls `_playZone(zone.id)` with `fromTime = 0` (default).
-- **`stop()`** — kills everything *and resets to zero*: hides the playhead (`display: none`), resets time display to `0:00`, stops all engines, shows all covers.
-- **`_tickPlayhead()`** — rAF loop that derives position from wall-clock: `tNow = (performance.now() - _playStartWall) / 1000`. No state is persisted — when playback stops, the current time is lost.
-- **No `_currentTime` property exists.** The playhead position is ephemeral — it only exists inside the rAF loop and disappears on stop.
-
-#### Gap Analysis — What's Missing
-
-| Behavior | Status | Gap |
-|----------|--------|-----|
-| Click ruler while **playing** → jump to that time | ✅ Works | `_scrubTo` handles this correctly |
-| Click ruler while **stopped** → park playhead there | ⚠️ Partial | Visually parks, but `play()` ignores it — always starts from 0 |
-| Play from parked playhead position | ❌ Missing | `play()` hardcodes `fromTime = 0`, no `_currentTime` state |
-| Stop → playhead stays at last position | ❌ Missing | `stop()` hides playhead and resets display to `0:00` |
-| Playback reaches end → rewind to 0 | ❌ Missing | `stop()` always resets, but there's no distinction between "user pressed stop" vs "reached the end" |
-
-#### Proposed Behavior
-
-**Core rule:** The playhead always has a position (`_currentTime`), whether playing or stopped.
-
-| Action | If Playing | If Stopped |
-|--------|-----------|-----------|
-| **Click ruler** | Jump playhead + all zone engines to that time, continue playing | Park playhead at that time, update time display |
-| **Press Play** | — (already playing) | Start playback from `_currentTime` |
-| **Press Stop** | Pause at current position, playhead stays visible | — (already stopped) |
-| **Playback reaches end** | If looping → restart from 0. If not looping → stop and rewind to 0 | — |
-| **Add/delete blocks** | — | Playhead stays where it is (don't reset on edits) |
-
-#### Implementation Spec
-
-**New state:**
-```js
-this._currentTime = 0;   // seconds — the playhead's persistent position
-```
-
-**Modified methods:**
-
-| Method | Change |
-|--------|--------|
-| `play()` | Use `_currentTime` instead of 0: `_playStartWall = performance.now() - this._currentTime * 1000`. Pass `_currentTime` to `_playZone()`. Master timer uses `remaining = total - _currentTime`. |
-| `stop()` | **Don't reset.** Keep playhead visible at `_currentTime`. Don't hide it. Don't reset time display. Keep engines stopped but don't re-cover zones (debatable — see discussion below). |
-| `_tickPlayhead()` | Write `this._currentTime = tNow` every frame so it's always current. |
-| `_scrubTo(t)` | Always set `this._currentTime = t`. The rest of the existing logic (timer cancel + restart) only runs if `_playing`, which is already correct. |
-| Master timer (end of timeline) | Distinguish "natural end" from "user stop": on natural end with no loop, call `stop()` then reset `_currentTime = 0`. |
-
-#### Design Decisions — Resolved
-
-| Decision | Choice | Notes |
-|----------|--------|-------|
-| **Stop vs Pause** | **(A)** Single Play/Pause toggle | Playhead keeps position on stop. Click ruler at `0:00` to rewind. Rewind button can be added later. |
-| **Zone covers on stop** | **(A)** Show black covers | Clean black canvas when idle. "Hold frame" is a future nice-to-have. |
-| **Playhead appearance** | **(A)** Same red line always | No visual distinction between parked/playing. Revisit if confusing. |
-
-#### Bug Fix → Transition System: Gap Blackout + Animated Fades
-
-**Original bug:** When a block's duration expired during playback, the zone engine kept rendering the last loaded preset indefinitely. The zone cover (black overlay) was only re-shown on `stop()` — never during playback when a gap occurs.
-
-**Root cause:** `_playZone()` scheduled when to *start* each entry (load preset) but never scheduled when an entry *ends*. No "off" timer existed.
-
-**Fix (evolved into a full transition system):**
-
-1. **Switched cover from `display` toggle to `opacity` transitions** — all cover manipulation now goes through `_fadeZoneCover(zoneId, opacity, durationSec, style)`.
-2. **Fade-out to black:** When a block ends and there's a gap after it, the cover fades from transparent to black over `blendTime` seconds. The fade *starts* at `endTime - blendTime` so it finishes exactly when the block ends.
-3. **Fade-in from black:** When a scheduled block starts and there's a gap before it, the preset loads early (at `startTime - blendTime`) and the cover fades from black to transparent over `blendTime` seconds.
-4. **Consecutive entries:** No cover fade — butterchurn's internal crossfade handles the visual transition.
-5. **Instant reveal on seek/scrub:** When the user clicks the ruler, the cover snaps instantly (no animation) to the correct state.
-
-**Transition behavior matrix:**
-
-| Scenario | Cover action | Duration |
-|----------|-------------|----------|
-| Block starts after gap | Fade cover 1→0 | `entry.blendTime` |
-| Block starts after previous block (consecutive) | No cover change | butterchurn crossfade |
-| Block ends before gap | Fade cover 0→1 | `entry.blendTime` |
-| Block ends before next block (consecutive) | No cover change | butterchurn crossfade |
-| Scrub/seek into a block | Instant snap cover→0 | 0 |
-| Scrub/seek into a gap | Instant snap cover→1 | 0 |
-| Play pressed / Stop pressed | Instant snap | 0 |
-
-**New helper method — `_fadeZoneCover(zoneId, opacity, durationSec, style)`:**
-```js
-// style: 'fade-black' (default), 'cut' (instant)
-// Future: 'fade-white', 'flash', 'dip-to-black', etc.
-```
-
-The `style` parameter is an extensibility hook. To add a new transition type (e.g. white flash):
-1. Add the case to the `switch` in `_fadeZoneCover()`
-2. Add `transitionStyle` field to `TimelineEntry` data model
-3. Pass `entry.transitionStyle` from `_playZone()` scheduling
-4. Add UI in the quick-edit popover to choose transition type
-
-**What changed in the data model:** Nothing — `blendTime` already existed on entries and is reused as the fade duration. The future `transitionStyle` field (already in Phase 4 plans) will control the fade type.
+- **Active Playhead State**: Introduced `_currentTime` to `TimelineEditor` to persist timeline position, allowing "play-from-here" functionality and persistent parking when stopped.
+- **Play/Pause Toggle Semantics**: Stop button now merely pauses the playhead. Clicking ruler at 0:00 rewinds. Reaching the end of the timeline auto-rewinds to 0:00 naturally.
+- **Visuals on Stop**: Stopped timelines show a clean black canvas (covers shown), with the playhead remaining persistently visible to indicate position.
+- **Transition / Fade System**: Replaced `display: none/block` cover toggling with an extensible opacity-based `_fadeZoneCover` helper.
+- **Automated Crossfades**: Zones automatically fade in from black after gaps, and fade out to black before gaps (based on `blendTime`). Scrubbing instantly snaps without visual lag.
 
 ---
 
@@ -181,10 +91,21 @@ These are **not** part of Phase 3.5. Documenting them here so we have a backlog 
 
 ---
 
-### Phase 4 — Advanced show features
+### Phase 4 — Advanced show features 🔧 IN PROGRESS
 
-- Named markers — double-click ruler to drop a labeled flag
+**Phase 4.1 — VJ Marker System** ✅ COMPLETE
+- **Data Model**: `Timeline` object now stores an array of `markers` (`time`, `label`, `color`, `action`).
+- **Interactive Ruler**: Double-click ruler to drop a marker. Click and drag to reposition with snapping support.
+- **Edit Popover**: Click a marker to open an editor to change its Label, Color, and Action. Smart positioning prevents it from dropping off-screen.
+- **Playback Execution**: Playhead engine scans for markers. 
+  - `stop` action: halts playback and parks exactly on the marker.
+  - `loop` action: halts playback, wraps back to `0:00`, and resumes seamlessly.
+- **Live Scrubbing**: Clicking the ruler while stopped immediately loads the corresponding presets into the visualizer engines and lifts covers for a live preview.
+
+**Upcoming Phase 4.x Tasks**:
 - Per-entry crossfade style (Cut / White Flash / Black Dip) — stored as `transitionStyle` on entry
+- Advanced Loop logic (jump to previous loop start rather than `0:00`)
+- Keyboard shortcuts for markers (`1`-`9`, next/prev)
 - Loop section range on ruler
 - Live queue override during playback (click a future block to queue it next)
 - Entry label canvas overlay during playback (label field already in data model and quick-edit)

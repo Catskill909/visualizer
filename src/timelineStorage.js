@@ -76,6 +76,7 @@ export function createTimeline(name = 'Untitled Timeline') {
         schemaVersion: 2,
         zones: [defaultZone()],
         entries: [],
+        markers: [],
         loop: false,
         totalDuration: 0,
         defaultDuration: 30,
@@ -117,6 +118,19 @@ export function createEntry({ presetName, duration, blendTime = 2, zoneId = 'ful
         blendTime,
         label,
         color: null,    // auto-assigned by editor
+    };
+}
+
+/**
+ * Create a marker object.
+ */
+export function createMarker({ time, label = 'Marker', color = '#ffffff', action = 'none' }) {
+    return {
+        id: generateId(),
+        time,
+        label,
+        color,
+        action, // 'none', 'stop', 'loop'
     };
 }
 
@@ -249,6 +263,7 @@ export function importTimeline(jsonStr) {
         id: generateId(),
         name,
         zones: data.zones?.length ? data.zones : [defaultZone()],
+        markers: data.markers || [],
         schemaVersion: 2,
         createdAt: Date.now(),
         updatedAt: Date.now(),

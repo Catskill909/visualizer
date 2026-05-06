@@ -13,6 +13,7 @@ import {
     deleteTimeline,
     pruneEmptyUntitled,
     createEntry,
+    createMarker,
     exportTimelineBundle,
     importTimelineBundle,
     generateId,
@@ -214,6 +215,15 @@ export class TimelineEditor {
         this._qeApply       = document.getElementById('qe-apply');
         this._qeCancel      = document.getElementById('qe-cancel');
 
+        this._markerEditEl  = document.getElementById('tl-marker-edit');
+        this._meTitle       = document.getElementById('me-title');
+        this._meLabel       = document.getElementById('me-label');
+        this._meColor       = document.getElementById('me-color');
+        this._meAction      = document.getElementById('me-action');
+        this._meApply       = document.getElementById('me-apply');
+        this._meCancel      = document.getElementById('me-cancel');
+        this._meDelete      = document.getElementById('me-delete');
+
         this._ctxMenu       = document.getElementById('tl-ctx-menu');
         this._saveModal     = document.getElementById('tl-save-modal');
         this._saveNameInput = document.getElementById('tl-save-name');
@@ -320,6 +330,17 @@ export class TimelineEditor {
         // Quick edit
         this._qeApply.addEventListener('click',  () => this._applyQuickEdit());
         this._qeCancel.addEventListener('click', () => this._closeQuickEdit());
+
+        this._meApply.addEventListener('click', () => this._applyMarkerEdit());
+        this._meCancel.addEventListener('click', () => this._closeMarkerEdit());
+        this._meDelete.addEventListener('click', () => {
+            if (this._meMarkerId) {
+                this._tl.markers = this._tl.markers.filter(m => m.id !== this._meMarkerId);
+                this._setDirty();
+                this._renderStrip();
+            }
+            this._closeMarkerEdit();
+        });
         this._quickEditEl.addEventListener('keydown', e => {
             if (e.key === 'Enter') this._applyQuickEdit();
             if (e.key === 'Escape') this._closeQuickEdit();
@@ -350,9 +371,18 @@ export class TimelineEditor {
 
         // Ruler click → seek
         this._rulerEl.addEventListener('pointerdown', e => {
+            if (e.target.closest('.tl-marker-flag')) return;
             const rect = this._rulerEl.getBoundingClientRect();
             const t = Math.max(0, (e.clientX - rect.left - 120) / this._pxPerSec);
             this._scrubTo(t);
+        });
+
+        // Ruler double-click → add marker
+        this._rulerEl.addEventListener('dblclick', e => {
+            if (e.target.closest('.tl-marker-flag')) return;
+            const rect = this._rulerEl.getBoundingClientRect();
+            const t = Math.max(0, (e.clientX - rect.left - 120) / this._pxPerSec);
+            this._addMarkerAt(t);
         });
 
         // Global pointer — close menus
@@ -361,6 +391,8 @@ export class TimelineEditor {
                 this._closeContextMenu();
             if (!this._quickEditEl.hidden && !this._quickEditEl.contains(e.target))
                 this._closeQuickEdit();
+            if (!this._markerEditEl.hidden && !this._markerEditEl.contains(e.target))
+                this._closeMarkerEdit();
         }, { capture: true });
 
         // Fullscreen button — enter only; exit is via click-on-canvas or Esc
@@ -862,6 +894,7 @@ export class TimelineEditor {
 
         this._innerEl.style.minWidth = `${innerW}px`;
         this._renderRuler(total);
+        this._renderMarkers(total);
         this._renderZoneRows(zones, entries);
         this._updateTimeDisplay(0);
     }
@@ -885,6 +918,148 @@ export class TimelineEditor {
             tick.appendChild(label);
             this._rulerEl.appendChild(tick);
         }
+    }
+
+    _renderMarkers(totalSec) {
+        this._innerEl.querySelectorAll('.tl-marker-line').forEach(el => el.remove());
+        
+        const markers = this._tl?.markers || [];
+        for (const m of markers) {
+            const leftPx = 120 + m.time * this._pxPerSec;
+
+            // Ruler flag
+            const markerEl = document.createElement('div');
+            markerEl.className = 'tl-marker tl-marker-flag';
+            markerEl.dataset.id = m.id;
+            markerEl.style.left = `${leftPx}px`;
+            markerEl.textContent = m.label || 'Marker';
+            markerEl.style.setProperty('--marker-color', m.color || '#ffffff');
+            
+            this._rulerEl.appendChild(markerEl);
+            
+            // Drop line (spans all tracks)
+            const line = document.createElement('div');
+            line.className = 'tl-marker-line';
+            line.dataset.id = m.id;
+            line.style.left = `${leftPx}px`;
+            line.style.setProperty('--marker-color', m.color || '#ffffff');
+            line.style.height = `var(--strip-h)`; // spans from ruler down
+            this._innerEl.appendChild(line);
+
+            // Events: combine drag and click into pointerdown to handle correctly
+            markerEl.addEventListener('pointerdown', e => {
+                e.stopPropagation();
+                this._startMarkerDrag(e, m);
+            });
+        }
+    }
+
+    _addMarkerAt(t) {
+        if (!this._tl) return;
+        this._tl.markers = this._tl.markers || [];
+        // Round to snap if active
+        if (this._snapSec > 0) t = Math.round(t / this._snapSec) * this._snapSec;
+        const m = createMarker({ time: t, label: 'Marker' });
+        this._tl.markers.push(m);
+        this._setDirty();
+        this._renderStrip();
+        
+        // Open edit popover immediately
+        const markerEl = this._rulerEl.querySelector(`.tl-marker-flag[data-id="${m.id}"]`);
+        if (markerEl) this._openMarkerEdit(m.id, markerEl);
+    }
+
+    _startMarkerDrag(e, m) {
+        if (e.button !== 0) return;
+        
+        const flagEl = this._rulerEl.querySelector(`.tl-marker-flag[data-id="${m.id}"]`);
+        const lineEl = this._innerEl.querySelector(`.tl-marker-line[data-id="${m.id}"]`);
+        if (!flagEl || !lineEl) return;
+        
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const origTime = m.time;
+        let newTime = origTime;
+        let isDrag = false;
+        
+        const onMove = ev => {
+            if (!isDrag && (Math.abs(ev.clientX - startX) > 3 || Math.abs(ev.clientY - startY) > 3)) {
+                isDrag = true;
+            }
+            if (!isDrag) return;
+
+            const dx = ev.clientX - startX;
+            newTime = Math.max(0, origTime + dx / this._pxPerSec);
+            if (this._snapSec > 0) newTime = Math.round(newTime / this._snapSec) * this._snapSec;
+            const leftPx = `${120 + newTime * this._pxPerSec}px`;
+            flagEl.style.left = leftPx;
+            lineEl.style.left = leftPx;
+        };
+        
+        const onUp = () => {
+            document.removeEventListener('pointermove', onMove);
+            document.removeEventListener('pointerup',   onUp);
+            if (!isDrag) {
+                // Treat as click
+                this._openMarkerEdit(m.id, flagEl);
+                return;
+            }
+            m.time = newTime;
+            this._setDirty();
+            // Re-sort markers by time just to keep data clean
+            this._tl.markers.sort((a, b) => a.time - b.time);
+            this._renderStrip();
+        };
+        
+        document.addEventListener('pointermove', onMove);
+        document.addEventListener('pointerup',   onUp);
+        e.preventDefault();
+    }
+
+    // ─── Marker Edit Popover ───
+
+    _openMarkerEdit(id, anchorEl) {
+        const m = this._tl?.markers?.find(x => x.id === id);
+        if (!m) return;
+
+        this._meMarkerId = id;
+        this._meLabel.value  = m.label || '';
+        this._meColor.value  = m.color || '#ffffff';
+        this._meAction.value = m.action || 'none';
+
+        const rect = anchorEl.getBoundingClientRect();
+        const popW = 260, popH = 220;
+        let left = rect.left;
+        let top  = rect.bottom + 8; // Drop below the ruler
+        if (top + popH > window.innerHeight - 10) {
+            top = rect.top - popH - 8; // Drop above ruler if clipped
+        }
+        if (left + popW > window.innerWidth - 10) left = window.innerWidth - popW - 10;
+
+        this._markerEditEl.style.left = `${left}px`;
+        this._markerEditEl.style.top  = `${top}px`;
+        this._markerEditEl.hidden = false;
+        this._meLabel.focus();
+        this._meLabel.select();
+    }
+
+    _applyMarkerEdit() {
+        if (!this._meMarkerId) return;
+        const m = this._tl?.markers?.find(x => x.id === this._meMarkerId);
+        if (m) {
+            m.label  = this._meLabel.value.trim() || '';
+            m.color  = this._meColor.value;
+            m.action = this._meAction.value;
+            this._setDirty();
+            this._tl.markers.sort((a, b) => a.time - b.time);
+            this._renderStrip();
+        }
+        this._closeMarkerEdit();
+    }
+
+    _closeMarkerEdit() {
+        this._markerEditEl.hidden = true;
+        this._meMarkerId = null;
     }
 
     _renderZoneRows(zones, entries) {
@@ -1262,6 +1437,7 @@ export class TimelineEditor {
         // Start from the parked playhead position
         const from = this._currentTime;
         this._playStartWall = performance.now() - from * 1000;
+        this._lastTickTime  = from;
 
         // Re-cover all zones; _playZone() lifts each cover when its first entry fires
         for (const [zId] of this._zoneCovers) this._fadeZoneCover(zId, 1, 0);  // instant cover all
@@ -1445,6 +1621,28 @@ export class TimelineEditor {
     _tickPlayhead() {
         if (!this._playing) return;
         const tNow = (performance.now() - this._playStartWall) / 1000;
+
+        // Check for markers between last tick and now
+        if (this._tl?.markers && this._lastTickTime !== undefined) {
+            // Sort by time just in case, though they usually are
+            const sorted = [...this._tl.markers].sort((a, b) => a.time - b.time);
+            for (const m of sorted) {
+                if (m.action !== 'none' && m.time > this._lastTickTime && m.time <= tNow) {
+                    if (m.action === 'stop') {
+                        this.stop();
+                        this._scrubTo(m.time); // park playhead exactly on marker
+                        return;
+                    } else if (m.action === 'loop') {
+                        this.stop();
+                        this._scrubTo(0); // for now loop jumps back to start
+                        this.play();
+                        return;
+                    }
+                }
+            }
+        }
+
+        this._lastTickTime = tNow;
         this._currentTime = tNow;  // persist position every frame
 
         const x = tNow * this._pxPerSec;
@@ -1464,12 +1662,47 @@ export class TimelineEditor {
     }
 
     _scrubTo(t) {
-        this._currentTime = t;  // always persist the parked position
+        this._currentTime  = t;  // always persist the parked position
+        this._lastTickTime = t;
         this._playheadEl.style.left    = `${t * this._pxPerSec}px`;
         this._playheadEl.style.display = '';
         this._updateTimeDisplay(t);
 
-        if (!this._playing) return;
+        if (!this._playing) {
+            // Load presets corresponding to time t into the view
+            if (this._tl?.zones && this._tl?.entries) {
+                for (const zone of this._tl.zones) {
+                    const entries = this._tl.entries.filter(e => e.zoneId === zone.id)
+                                                    .sort((a, b) => (a.startTime || 0) - (b.startTime || 0));
+                    
+                    let activeEntry = null;
+                    for (const e of entries) {
+                        const start = e.startTime || 0;
+                        if (t >= start && t < start + e.duration) {
+                            activeEntry = e;
+                            break;
+                        }
+                    }
+
+                    if (activeEntry) {
+                        const zd = this._zoneMap.get(zone.id);
+                        if (zd && zd.engine) {
+                            zd.engine.loadPreset(activeEntry.presetName, 0).catch(() => {});
+                            // Ensure the black cover is hidden so we can see the preset
+                            this._fadeZoneCover(zone.id, 0, 0); 
+                            // Try to render a single frame if the engine allows it when stopped
+                            if (typeof zd.engine.renderFrame === 'function' && !zd.engine.isRunning) {
+                                zd.engine.renderFrame();
+                            }
+                        }
+                    } else {
+                        // Playhead is in an empty gap, blackout this zone
+                        this._fadeZoneCover(zone.id, 1, 0);
+                    }
+                }
+            }
+            return;
+        }
 
         // Restart playback from position t using wall-clock offset
         clearTimeout(this._masterTimer);
