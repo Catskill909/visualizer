@@ -266,15 +266,31 @@ async function boot(connectAudioFn) {
             const num = parseInt(e.key, 10);
             editor.jumpToMarker(num - 1);
         }
-        // Home — pause timeline at start (animation continues)
+        // Home — reset to start and stop
         if (e.key === 'Home' && !inInput) {
             e.preventDefault();
-            editor._pauseTimelineAt(0);
+            editor.stop();
+            editor._scrubTo(0);
         }
-        // Right Arrow — skip to next block
-        if (e.key === 'ArrowRight' && !inInput && !ctrl) {
+        // Up/Down — nudge playhead (±1s, ±5s with Shift)
+        if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !inInput && !ctrl) {
             e.preventDefault();
-            editor._skipToNextBlock();
+            const nudgeSec = e.shiftKey ? 5 : 1;
+            const dir = e.key === 'ArrowUp' ? 1 : -1; // Up = forward, Down = backward
+            const newTime = Math.max(0, editor._currentTime + (dir * nudgeSec));
+            editor._scrubTo(newTime);
+        }
+        // Left/Right — jump to prev/next block boundary
+        if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !inInput && !ctrl) {
+            e.preventDefault();
+            if (e.key === 'ArrowRight') editor._skipToNextBlock();
+            else editor._skipToPrevBlock();
+        }
+        // 1-9 — jump to marker by index
+        if (!ctrl && !inInput && e.key >= '1' && e.key <= '9') {
+            e.preventDefault();
+            const num = parseInt(e.key, 10);
+            editor.jumpToMarker(num - 1);
         }
     });
 

@@ -1,6 +1,6 @@
 # Timeline Editor — Design & Planning Doc
 
-**Status:** Phases 1–4.1 complete ✅ — Phase 4.2 next.  
+**Status:** Phases 1–4.3 complete ✅ — Phase 4.4 next.  
 **Last updated:** 2026-05-05  
 **Architecture:** Standalone page (`/timeline.html`) — self-contained MPA entry in Vite.
 
@@ -72,28 +72,33 @@ A classic NLE playhead: click-to-seek, persistent position, play-from-here. This
   - `loop` action: halts playback, wraps back to `0:00`, and resumes seamlessly.
 - **Live Scrubbing**: Clicking the ruler while stopped immediately loads the corresponding presets into the visualizer engines and lifts covers for a live preview.
 
-**Phase 4.2 — Transport & Seeking** ✅ COMPLETE
+**Phase 4.2 — Transport & Seeking (VJ Mode)** ✅ COMPLETE
 
-- **Go-to-start button** — `⏮` in transport bar jumps playhead to 0:00
+- **Go-to-start button** — `⏮` in transport bar jumps playhead to 0:00 (pauses timeline, keeps visuals)
 - **Skip-to-next-block button** — `⏵` jumps to next block start (wraps to 0:00 at end)
-- **Keyboard shortcuts** — `Home` for start, `→` arrow to skip next block
+- **Play/Stop button** — Stop pauses timeline progression but **keeps preset animations running** (no black screen)
+- **Keyboard shortcuts** — `Home` for start
 - **Ruler hint** — hover ruler shows "Double-click to add marker" cue
+
+*VJ Mode Philosophy:* The show never stops. Timeline controls (playhead, scheduling) pause, but visuals continue playing. Press Play to resume timeline progression.
+
+**Phase 4.3 — Quick Wins** ✅ COMPLETE
+
+- **Keyboard nudge** — `↑`/`↓` nudge playhead ±1s, `Shift+↑`/`Shift+↓` nudge ±5s
+- **Drag-scrub on ruler** — click-hold-drag on ruler for smooth playhead control
+- **Keyboard shortcuts for markers** — `1`-`9` jump to markers 1-9 by index
+- **Block navigation** — `←`/`→` jump to prev/next preset block start
+
+*Rationale:* Horizontal arrows for timeline navigation (block-to-block), vertical arrows for fine-tuning (time nudge). More intuitive for VJ workflow.
 
 *Rationale:* Standard DAW/NLE transport uses 3 buttons: Go-to-Start, Play/Stop, Skip-Next. Skip-Prev is rarely used and was confusing when both left buttons went to 0:00. Simplified to match industry standard.
 
 **Upcoming Phase 4.x Tasks**:
 
-*Transport & Seeking*
-- **Keyboard nudge** — arrow keys (with modifiers) for ±1s/±5s time nudge
-- **Drag-scrub on ruler** — click *and drag* on the ruler for continuous scrubbing (currently click-only). Live preview as you drag.
-
 *Loop & Regions*
 - **Loop section range on ruler** — drag a range on the ruler to set loop bounds. Playback bounces between in and out points.
 - **Advanced Loop logic** — marker action `loop` jumps to previous loop start rather than `0:00`.
 - **Loop single block** — right-click block → "Loop This" — sets loop range to that block's start/end
-
-*Markers & Cues*
-- **Keyboard shortcuts for markers** — `1`-`9` jump to markers by index, next/prev navigation.
 
 *Live Performance*
 - **Per-entry crossfade style** — Cut / White Flash / Black Dip — stored as `transitionStyle` on entry.

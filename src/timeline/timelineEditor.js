@@ -409,6 +409,29 @@ export class TimelineEditor {
             this._addMarkerAt(t);
         });
 
+        // Ruler drag-scrub → continuous scrubbing
+        let isScrubbing = false;
+        this._rulerEl.addEventListener('pointerdown', e => {
+            if (e.target.closest('.tl-marker-flag')) return; // Let marker drag handle it
+            isScrubbing = true;
+            this._rulerEl.setPointerCapture(e.pointerId);
+            const rect = this._rulerEl.getBoundingClientRect();
+            const t = Math.max(0, (e.clientX - rect.left - 120) / this._pxPerSec);
+            this._scrubTo(t);
+        });
+        this._rulerEl.addEventListener('pointermove', e => {
+            if (!isScrubbing) return;
+            const rect = this._rulerEl.getBoundingClientRect();
+            const t = Math.max(0, (e.clientX - rect.left - 120) / this._pxPerSec);
+            this._scrubTo(t);
+        });
+        this._rulerEl.addEventListener('pointerup', e => {
+            if (isScrubbing) {
+                isScrubbing = false;
+                this._rulerEl.releasePointerCapture(e.pointerId);
+            }
+        });
+
         // Global pointer — close menus
         document.addEventListener('pointerdown', e => {
             if (!this._ctxMenu.hidden && !this._ctxMenu.contains(e.target))
@@ -676,10 +699,10 @@ export class TimelineEditor {
             }
             const cover = this._zoneCovers.get(zone.id);
             const r = zone.region;
+            // Only update position/size - DO NOT reset opacity to black
             Object.assign(cover.style, {
                 left: `${r.x * 100}%`, top: `${r.y * 100}%`,
                 width: `${r.width * 100}%`, height: `${r.height * 100}%`,
-                opacity: '1',
             });
         }
 
@@ -1484,7 +1507,7 @@ export class TimelineEditor {
         // Master stop timer — remaining duration from current position
         const total     = this._totalDuration();
         const remaining = total - from;
-        if (remaining <= 0) { this.stop(); return; }
+        if (remaining <= 0) { this._pauseAtEnd(); return; }
 
         this._masterTimer = setTimeout(() => {
             if (!this._playing) return;
@@ -1493,8 +1516,8 @@ export class TimelineEditor {
                 this.stop();
                 requestAnimationFrame(() => this.play());
             } else {
-                // Natural end — stop and rewind
-                this.stop();
+                // Natural end — VJ mode: pause timeline but keep visuals running
+                this._pauseAtEnd();
                 this._currentTime = 0;
                 this._playheadEl.style.left = '0px';
                 this._updateTimeDisplay(0);
@@ -1529,19 +1552,6 @@ export class TimelineEditor {
                 this._fadeZoneCover(zoneId, 0, 0);  // instant reveal (scrub/seek)
                 zd.engine.loadPreset(entry.presetName, 0).catch(() => {});
 
-                // Schedule fade-out at end of this entry if there's a gap after it
-                const entryEnd = st + entry.duration;
-                const next = entries[i + 1];
-                const nextStart = next ? (next.startTime ?? 0) : Infinity;
-                if (shouldBlackout && entryEnd < nextStart) {
-                    const fadeDur  = Math.min(entry.blendTime, entry.duration);
-                    const fadeStart = entryEnd - fadeDur;
-                    const fadeDelay = Math.max(0, (fadeStart - fromTime) * 1000);
-                    timers.push(setTimeout(() => {
-                        if (!this._playing) return;
-                        this._fadeZoneCover(zoneId, 1, fadeDur);  // fade to black
-                    }, fadeDelay));
-                }
                 break;
             }
         }
@@ -1556,48 +1566,33 @@ export class TimelineEditor {
             // Only schedule entries that haven't started yet
             if (st < fromTime) continue;
 
-            // Determine if there's a gap before this entry (fade in from black)
+            // Determine if there's a gap before this entry
             const prev = entries[i - 1];
             const prevEnd = prev ? ((prev.startTime ?? 0) + prev.duration) : -Infinity;
             const hasGapBefore = st > prevEnd;
-            // If there's a gap, start the fade-in early so the preset is fully
-            // visible by the time the block's content begins
-            const fadeDurIn = hasGapBefore ? entry.blendTime : 0;
-            const fadeInDelay = Math.max(0, (st - fadeDurIn - fromTime) * 1000);
 
-            // Schedule fade-in (cover → transparent)
-            if (hasGapBefore && fadeDurIn > 0) {
+            // VJ MODE: No fade-to-black at entry end. 
+            // If gap before entry, fade in from black so preset is visible when block starts.
+            if (hasGapBefore) {
+                const fadeDurIn = entry.blendTime;
+                const fadeInDelay = Math.max(0, (st - fadeDurIn - fromTime) * 1000);
                 timers.push(setTimeout(() => {
                     if (!this._playing) return;
                     this._fadeZoneCover(zoneId, 0, fadeDurIn);  // fade in from black
                 }, fadeInDelay));
-            }
 
-            // Schedule preset load at exact start time
-            const delay = (st - fromTime) * 1000;
-            // If fading in from gap, load preset when fade starts (so there's something to show)
-            const loadDelay = hasGapBefore && fadeDurIn > 0 ? fadeInDelay : delay;
-            timers.push(setTimeout(() => {
-                if (!this._playing) return;
-                if (!hasGapBefore || fadeDurIn <= 0) {
-                    // Consecutive entry — no cover fade needed, butterchurn crossfade handles it
-                    this._fadeZoneCover(zoneId, 0, 0);
-                }
-                zd.engine.loadPreset(entry.presetName, entry.blendTime).catch(() => {});
-            }, loadDelay));
-
-            // Schedule fade-out at end of this entry if there's a gap after it
-            const entryEnd = st + entry.duration;
-            const next = entries[i + 1];
-            const nextStart = next ? (next.startTime ?? 0) : Infinity;
-            if (shouldBlackout && entryEnd < nextStart) {
-                const fadeDurOut = Math.min(entry.blendTime, entry.duration);
-                const fadeStart  = entryEnd - fadeDurOut;
-                const fadeDelay  = Math.max(0, (fadeStart - fromTime) * 1000);
+                // Load preset when fade starts so there's something to show
                 timers.push(setTimeout(() => {
                     if (!this._playing) return;
-                    this._fadeZoneCover(zoneId, 1, fadeDurOut);  // fade to black
-                }, fadeDelay));
+                    zd.engine.loadPreset(entry.presetName, entry.blendTime).catch(() => {});
+                }, fadeInDelay));
+            } else {
+                // Consecutive entry — butterchurn crossfade handles it, no cover fade
+                const delay = (st - fromTime) * 1000;
+                timers.push(setTimeout(() => {
+                    if (!this._playing) return;
+                    zd.engine.loadPreset(entry.presetName, entry.blendTime).catch(() => {});
+                }, delay));
             }
         }
 
@@ -1647,9 +1642,10 @@ export class TimelineEditor {
         cancelAnimationFrame(this._rafId);
         this._rafId = null;
 
-        // Stop all zone engines and re-cover all zones
-        for (const [, zd] of this._zoneMap) zd.engine.stopRenderLoop();
-        for (const [zId] of this._zoneCovers) this._fadeZoneCover(zId, 1, 0);  // instant cover all
+        // VJ MODE: DO NOT stop engines - keep animations running!
+        // DO NOT fade zone covers - show keeps displaying visuals
+        // for (const [, zd] of this._zoneMap) zd.engine.stopRenderLoop();
+        // for (const [zId] of this._zoneCovers) this._fadeZoneCover(zId, 1, 0);
 
         this._btnPlayStop.classList.remove('is-playing');
         this._psPlayIcon.style.display = '';
@@ -1762,16 +1758,14 @@ export class TimelineEditor {
                         if (zd && zd.engine) {
                             zd.engine.loadPreset(activeEntry.presetName, 0).catch(() => {});
                             // Ensure the black cover is hidden so we can see the preset
-                            this._fadeZoneCover(zone.id, 0, 0); 
+                            this._fadeZoneCover(zone.id, 0, 0);
                             // Try to render a single frame if the engine allows it when stopped
                             if (typeof zd.engine.renderFrame === 'function' && !zd.engine.isRunning) {
                                 zd.engine.renderFrame();
                             }
                         }
-                    } else {
-                        // Playhead is in an empty gap, blackout this zone
-                        this._fadeZoneCover(zone.id, 1, 0);
                     }
+                    // VJ MODE: No blackout in gaps - keep showing last preset
                 }
             }
             return;
@@ -1790,7 +1784,7 @@ export class TimelineEditor {
         }
 
         const remaining = this._totalDuration() - t;
-        if (remaining <= 0) { this.stop(); return; }
+        if (remaining <= 0) { this._pauseAtEnd(); return; }
 
         this._masterTimer = setTimeout(() => {
             if (!this._playing) return;
@@ -1812,6 +1806,46 @@ export class TimelineEditor {
     _updateTimeDisplay(tNow) {
         const total = this._totalDuration();
         this._timeDisp.textContent = `${fmtTime(tNow)} / ${fmtTime(total)}`;
+    }
+
+    // VJ Mode: pause timeline at end without stopping engines (no black screen)
+    _pauseAtEnd() {
+        if (!this._playing) return;
+        this._playing = false;
+        this._markerHoldTime = null;
+
+        clearTimeout(this._masterTimer);
+        this._masterTimer = null;
+        for (const timers of this._zoneTimers.values()) for (const t of timers) clearTimeout(t);
+        this._zoneTimers.clear();
+        cancelAnimationFrame(this._rafId);
+        this._rafId = null;
+
+        // VJ: Keep engines running - reload presets at current time so visuals continue
+        for (const zone of (this._tl?.zones || [])) {
+            this._playZone(zone.id, this._currentTime);
+        }
+
+        // VJ: Update UI to stopped state
+        this._btnPlayStop.classList.remove('is-playing');
+        this._psPlayIcon.style.display = '';
+        this._psStopIcon.style.display = 'none';
+        this._psLabel.textContent = 'Play';
+    }
+
+    _skipToPrevBlock() {
+        if (!this._tl?.entries?.length) return;
+        // Find all block boundaries (start times) across all zones
+        const boundaries = new Set();
+        boundaries.add(0); // Always allow jumping to start
+        for (const e of this._tl.entries) {
+            const st = e.startTime ?? 0;
+            if (st < this._currentTime) boundaries.add(st);
+        }
+        const sorted = Array.from(boundaries).sort((a, b) => a - b);
+        // Find the largest boundary strictly less than current time
+        const target = sorted.reverse().find(t => t < this._currentTime - 0.5);
+        if (target !== undefined) this._scrubTo(target);
     }
 
     _skipToNextBlock() {
