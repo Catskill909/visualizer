@@ -259,11 +259,10 @@ async function boot(connectAudioFn) {
             const num = parseInt(e.key, 10);
             editor.jumpToMarker(num - 1);
         }
-        // Home — reset to start and stop
+        // Home — pause timeline at start (animation continues)
         if (e.key === 'Home' && !inInput) {
             e.preventDefault();
-            editor.stop();
-            editor._scrubTo(0);
+            editor._pauseTimelineAt(0);
         }
         // Right Arrow — skip to next block
         if (e.key === 'ArrowRight' && !inInput && !ctrl) {

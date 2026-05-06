@@ -136,6 +136,7 @@ export class TimelineEditor {
         this._zoneTimers   = new Map();  // zoneId → timer handle[]
         this._masterTimer  = null;
         this._rafId        = null;
+        this._markerHoldTime = null;     // VJ mode: frozen at marker time, animation continues
 
         // UI state
         this._stripVisible  = true;
@@ -302,7 +303,7 @@ export class TimelineEditor {
         });
 
         this._btnPlayStop.addEventListener('click', () => this.togglePlayback());
-        this._btnRewind?.addEventListener('click',  () => { this.stop(); this._scrubTo(0); });
+        this._btnRewind?.addEventListener('click',  () => this._pauseTimelineAt(0));
         this._btnSkipNext?.addEventListener('click', () => this._skipToNextBlock());
         this._btnLoop.addEventListener('click',     () => this._toggleLoop());
         this._btnZones?.addEventListener('click',   () => this._openZoneMgr());
@@ -1456,6 +1457,7 @@ export class TimelineEditor {
         }
         if (this._playing) return;
         this._playing      = true;
+        this._markerHoldTime = null; // Clear any VJ hold mode
 
         // Start from the parked playhead position
         const from = this._currentTime;
@@ -1602,9 +1604,39 @@ export class TimelineEditor {
         this._zoneTimers.set(zoneId, timers);
     }
 
-    stop() {
-        if (!this._playing) return;
+    // Pause timeline scheduling at a specific time, but KEEP animation running
+    _pauseTimelineAt(t) {
         this._playing = false;
+        this._currentTime = t;
+        this._markerHoldTime = null;
+
+        clearTimeout(this._masterTimer);
+        this._masterTimer = null;
+
+        for (const timers of this._zoneTimers.values()) for (const h of timers) clearTimeout(h);
+        this._zoneTimers.clear();
+
+        cancelAnimationFrame(this._rafId);
+        this._rafId = null;
+
+        // Update UI to stopped state
+        this._btnPlayStop.classList.remove('is-playing');
+        this._psPlayIcon.style.display = '';
+        this._psStopIcon.style.display = 'none';
+        this._psLabel.textContent = 'Play';
+
+        // Keep playhead visible at position
+        this._playheadEl.style.left = `${t * this._pxPerSec}px`;
+        this._playheadEl.style.display = '';
+        this._updateTimeDisplay(t);
+
+        // DO NOT stop engines - animation continues!
+    }
+
+    stop() {
+        if (!this._playing && this._markerHoldTime === null) return;
+        this._playing = false;
+        this._markerHoldTime = null; // Clear VJ hold mode on manual stop
 
         clearTimeout(this._masterTimer);
         this._masterTimer = null;
@@ -1643,6 +1675,14 @@ export class TimelineEditor {
 
     _tickPlayhead() {
         if (!this._playing) return;
+
+        // VJ Marker Hold Mode: Frozen at marker time, animation continues
+        if (this._markerHoldTime !== null) {
+            // Keep playhead parked at marker, but keep rAF going for animation
+            this._rafId = requestAnimationFrame(() => this._tickPlayhead());
+            return;
+        }
+
         const tNow = (performance.now() - this._playStartWall) / 1000;
 
         // Check for markers between last tick and now
@@ -1652,8 +1692,18 @@ export class TimelineEditor {
             for (const m of sorted) {
                 if (m.action !== 'none' && m.time > this._lastTickTime && m.time <= tNow) {
                     if (m.action === 'stop') {
-                        this.stop();
-                        this._scrubTo(m.time); // park playhead exactly on marker
+                        // VJ mode: Park playhead at marker, stop timeline advancing,
+                        // but KEEP animation running (show goes on!)
+                        this._markerHoldTime = m.time;  // Freeze timeline at marker
+                        this._currentTime = m.time;
+                        this._lastTickTime = m.time;
+                        // Clear preset scheduling timers only
+                        this._clearAllTimers();
+                        // Update playhead visual
+                        this._playheadEl.style.left = `${m.time * this._pxPerSec}px`;
+                        this._updateTimeDisplay(m.time);
+                        // Keep rAF loop running so animation continues
+                        this._rafId = requestAnimationFrame(() => this._tickPlayhead());
                         return;
                     } else if (m.action === 'loop') {
                         this.stop();
