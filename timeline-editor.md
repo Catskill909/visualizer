@@ -1,6 +1,6 @@
 # Timeline Editor — Design & Planning Doc
 
-**Status:** Phases 1–4.3 complete ✅ — Phase 4.4 next (Loop & Regions).  
+**Status:** Phases 1–4.3 complete ✅ — Phase 4.4 next (Loop & Regions) — Phase 5 in research (Multi-monitor output).  
 **Last updated:** 2026-05-06  
 **Architecture:** Standalone page (`/timeline.html`) — self-contained MPA entry in Vite.
 
@@ -58,6 +58,39 @@ A classic NLE playhead: click-to-seek, persistent position, play-from-here. This
 - **Visuals on Stop**: Stopped timelines show a clean black canvas (covers shown), with the playhead remaining persistently visible to indicate position.
 - **Transition / Fade System**: Replaced `display: none/block` cover toggling with an extensible opacity-based `_fadeZoneCover` helper.
 - **Automated Crossfades**: Zones automatically fade in from black after gaps, and fade out to black before gaps (based on `blendTime`). Scrubbing instantly snaps without visual lag.
+
+---
+
+### Phase 5 — Timeline Output to External Displays 🔬 RESEARCH PHASE
+
+**Status**: Research in progress — see `visualizer-output-dev.md` for detailed findings.
+
+**Goal**: Route each zone to a separate physical display (monitor/projector) for live performance setups.
+
+**Architecture**: This is built on the **Output System** — a modular subsystem shared between the timeline editor and main app player. The core handles display enumeration, window positioning, and streaming; the timeline editor adds per-zone output assignment UI.
+
+**Platform Targets**:
+| Platform | Status | Notes |
+|----------|--------|-------|
+| **Web** | 🔬 Research | `getScreenDetails()` + `window.open()` positioning needs testing |
+| **macOS (Tauri)** | 🔬 Research | `set_position()` → `set_fullscreen()` pattern identified |
+| **Windows (Tauri)** | 🔬 Research | Same pattern + Spout for VJ integration |
+
+**Key Research Findings** (see `visualizer-output-dev.md` for full details):
+- **Web**: `getScreenDetails()` enumerates screens; `window.open(left=2560)` positioning needs validation
+- **Tauri**: `availableMonitors()` JS API exists; fullscreen to specific monitor requires `set_position` → `set_fullscreen` workaround (Issue #6394)
+- **VJ Protocols**: Syphon (macOS), Spout (Windows), NDI (cross-platform) identified for professional integration
+
+**UI Additions (Planned)**:
+- **Output Manager** modal (similar to Zone Manager) — shows available displays as tiles
+- Per-zone **output chip** in timeline rows — click to assign/unassign display
+- Visual indicator when zone is routed externally
+
+**Next Steps**:
+1. Validate web popup positioning on multi-monitor setup
+2. Test Tauri `set_position` → `set_fullscreen` on macOS
+3. Test same on Windows
+4. Architecture decision: IPC vs. Syphon/Spout for native streaming
 
 ---
 
