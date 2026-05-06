@@ -180,6 +180,8 @@ export class TimelineEditor {
         this._psPlayIcon    = document.getElementById('tl-ps-play-icon');
         this._psStopIcon    = document.getElementById('tl-ps-stop-icon');
         this._psLabel       = document.getElementById('tl-ps-label');
+        this._btnRewind     = document.getElementById('tl-btn-rewind');
+        this._btnSkipNext   = document.getElementById('tl-btn-skip-next');
         this._btnLoop       = document.getElementById('tl-btn-loop');
         this._btnZones      = document.getElementById('tl-btn-zones');
         this._timeDisp      = document.getElementById('tl-time-display');
@@ -300,6 +302,8 @@ export class TimelineEditor {
         });
 
         this._btnPlayStop.addEventListener('click', () => this.togglePlayback());
+        this._btnRewind?.addEventListener('click',  () => { this.stop(); this._scrubTo(0); });
+        this._btnSkipNext?.addEventListener('click', () => this._skipToNextBlock());
         this._btnLoop.addEventListener('click',     () => this._toggleLoop());
         this._btnZones?.addEventListener('click',   () => this._openZoneMgr());
 
@@ -1758,6 +1762,28 @@ export class TimelineEditor {
     _updateTimeDisplay(tNow) {
         const total = this._totalDuration();
         this._timeDisp.textContent = `${fmtTime(tNow)} / ${fmtTime(total)}`;
+    }
+
+    _skipToNextBlock() {
+        if (!this._tl?.entries?.length) return;
+        const total = this._totalDuration();
+        // Find all block start times across all zones
+        const boundaries = new Set();
+        for (const e of this._tl.entries) {
+            boundaries.add(e.startTime ?? 0);
+        }
+        const sorted = Array.from(boundaries).sort((a, b) => a - b);
+        // Find the next boundary strictly after current time
+        const next = sorted.find(t => t > this._currentTime + 0.5); // +0.5s to avoid re-triggering same block
+        if (next !== undefined) {
+            this._scrubTo(next);
+        } else if (this._currentTime < total - 1) {
+            // At end of content - jump to end
+            this._scrubTo(total);
+        } else {
+            // At absolute end - wrap to start
+            this._scrubTo(0);
+        }
     }
 
     // ─── Overlay visibility ───────────────────────────────────────────────

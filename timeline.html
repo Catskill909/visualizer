@@ -140,10 +140,20 @@
 
     <!-- ─── TRANSPORT ─── -->
     <div id="tl-transport" class="tl-overlay">
+        <button id="tl-btn-rewind" class="tl-btn tl-btn--icon" type="button" title="Go to start (Home)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M6 6v12h4v-6l8 6V6l-8 6V6H6z"/>
+            </svg>
+        </button>
         <button id="tl-btn-playstop" class="tl-play-btn" type="button">
             <svg id="tl-ps-play-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
             <svg id="tl-ps-stop-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="display:none"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
             <span id="tl-ps-label">Play</span>
+        </button>
+        <button id="tl-btn-skip-next" class="tl-btn tl-btn--icon" type="button" title="Skip to next block (→)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M6 18l8.5-6L6 6v12z"/>
+            </svg>
         </button>
         <button id="tl-btn-loop" type="button" title="Loop">⟳ Loop</button>
 
@@ -275,6 +285,12 @@
                         <h4 style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255,255,255,0.4); margin: 0 0 12px 0; font-weight: 600;">Transport</h4>
                         <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 0.85rem; color: rgba(255,255,255,0.7);">
                             <kbd style="padding: 2px 6px; font-family: monospace; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px;">Space</kbd> <span>Play / Pause</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 0.85rem; color: rgba(255,255,255,0.7);">
+                            <kbd style="padding: 2px 6px; font-family: monospace; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px;">Home</kbd> <span>Go to Start</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 0.85rem; color: rgba(255,255,255,0.7);">
+                            <kbd style="padding: 2px 6px; font-family: monospace; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px;">→</kbd> <span>Skip to Next Block</span>
                         </div>
                         <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 0.85rem; color: rgba(255,255,255,0.7);">
                             <kbd style="padding: 2px 6px; font-family: monospace; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px;">F</kbd> <span>Fullscreen</span>

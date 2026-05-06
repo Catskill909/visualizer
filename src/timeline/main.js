@@ -259,6 +259,17 @@ async function boot(connectAudioFn) {
             const num = parseInt(e.key, 10);
             editor.jumpToMarker(num - 1);
         }
+        // Home — reset to start and stop
+        if (e.key === 'Home' && !inInput) {
+            e.preventDefault();
+            editor.stop();
+            editor._scrubTo(0);
+        }
+        // Right Arrow — skip to next block
+        if (e.key === 'ArrowRight' && !inInput && !ctrl) {
+            e.preventDefault();
+            editor._skipToNextBlock();
+        }
     });
 
     // Help button click delegation

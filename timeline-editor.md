@@ -72,12 +72,19 @@ A classic NLE playhead: click-to-seek, persistent position, play-from-here. This
   - `loop` action: halts playback, wraps back to `0:00`, and resumes seamlessly.
 - **Live Scrubbing**: Clicking the ruler while stopped immediately loads the corresponding presets into the visualizer engines and lifts covers for a live preview.
 
+**Phase 4.2 — Transport & Seeking** ✅ COMPLETE
+
+- **Go-to-start button** — `⏮` in transport bar jumps playhead to 0:00
+- **Skip-to-next-block button** — `⏵` jumps to next block start (wraps to 0:00 at end)
+- **Keyboard shortcuts** — `Home` for start, `→` arrow to skip next block
+- **Ruler hint** — hover ruler shows "Double-click to add marker" cue
+
+*Rationale:* Standard DAW/NLE transport uses 3 buttons: Go-to-Start, Play/Stop, Skip-Next. Skip-Prev is rarely used and was confusing when both left buttons went to 0:00. Simplified to match industry standard.
+
 **Upcoming Phase 4.x Tasks**:
 
 *Transport & Seeking*
-- **Rewind-to-zero button** — `⏮` button in transport bar, one-click reset
-- **Skip forward / backward** — jump to the next or previous block boundary in the active zone
-- **Keyboard nudge** — arrow keys move playhead ±1 second (±5 with Shift)
+- **Keyboard nudge** — arrow keys (with modifiers) for ±1s/±5s time nudge
 - **Drag-scrub on ruler** — click *and drag* on the ruler for continuous scrubbing (currently click-only). Live preview as you drag.
 
 *Loop & Regions*

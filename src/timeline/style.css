@@ -433,6 +433,21 @@ body.tl-fullscreen #tl-canvas-container { cursor: pointer; }
   cursor: pointer;
   user-select: none;
 }
+#tl-ruler::after {
+  content: 'Double-click to add marker';
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: var(--text-4);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+#tl-ruler:hover::after {
+  opacity: 1;
+}
 .tl-tick {
   position: absolute;
   top: 0; bottom: 0;
