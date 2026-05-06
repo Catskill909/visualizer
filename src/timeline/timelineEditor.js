@@ -241,6 +241,13 @@ export class TimelineEditor {
         this._pendingDeleteId    = null;
         this._toastEl       = document.getElementById('tl-toast');
 
+        this._guideModal    = document.getElementById('tl-keyboard-guide');
+        this._btnHelp       = document.getElementById('tl-btn-help');
+        
+        // Simple listener binding. The button is forced into existence by main.js if missing.
+        this._btnHelp?.addEventListener('click', () => this.toggleKeyboardGuide());
+        this._guideClose    = document.getElementById('tl-guide-close');
+
         // Overlays for auto-hide (mini-player included via .filter(Boolean))
         this._overlays = [
             document.getElementById('tl-topbar'),
@@ -369,9 +376,21 @@ export class TimelineEditor {
             this._entryDeleteModal.hidden = true;
         });
 
+        // Keyboard guide
+        this._btnHelp?.addEventListener('click', () => this.toggleKeyboardGuide());
+        this._guideClose?.addEventListener('click', () => { if (this._guideModal) this._guideModal.hidden = true; });
+        this._guideModal?.addEventListener('click', e => {
+            if (e.target === this._guideModal) this._guideModal.hidden = true;
+        });
+
+        // ─── DOM Events (Canvas / Ruler / Keys) ───
         // Ruler click → seek
         this._rulerEl.addEventListener('pointerdown', e => {
-            if (e.target.closest('.tl-marker-flag')) return;
+            if (e.target.closest('.tl-marker-flag')) {
+                const markerId = e.target.closest('.tl-marker-flag').dataset.id;
+                this.jumpToMarker(markerId);
+                return;
+            }
             const rect = this._rulerEl.getBoundingClientRect();
             const t = Math.max(0, (e.clientX - rect.left - 120) / this._pxPerSec);
             this._scrubTo(t);
@@ -1835,6 +1854,7 @@ export class TimelineEditor {
     // ─── Escape handler ───────────────────────────────────────────────────────
 
     handleEscape() {
+        if (this._guideModal && !this._guideModal.hidden) { this._guideModal.hidden = true; return; }
         if (!this._zoneMgrEl?.hidden)  { this._closeZoneMgr();     return; }
         if (!this._pickerEl.hidden)    { this._closePicker();       return; }
         if (!this._quickEditEl.hidden) { this._closeQuickEdit();    return; }
@@ -1843,6 +1863,29 @@ export class TimelineEditor {
         if (!this._deleteModal.hidden) { this._deleteModal.hidden = true; return; }
         if (this._isFullscreen)        { this._exitFullscreen();    return; }
         if (this._playing)             { this.stop();               return; }
+    }
+
+    toggleKeyboardGuide() {
+        if (!this._guideModal) return;
+        this._guideModal.hidden = !this._guideModal.hidden;
+    }
+
+    jumpToMarker(indexOrId) {
+        if (!this._tl || !this._tl.markers || this._tl.markers.length === 0) return;
+        
+        let m = null;
+        if (typeof indexOrId === 'string') {
+            m = this._tl.markers.find(x => x.id === indexOrId);
+        } else if (typeof indexOrId === 'number') {
+            const sortedMarkers = [...this._tl.markers].sort((a, b) => a.time - b.time);
+            if (indexOrId >= 0 && indexOrId < sortedMarkers.length) {
+                m = sortedMarkers[indexOrId];
+            }
+        }
+        
+        if (m) {
+            this._scrubTo(m.time);
+        }
     }
 
     // ─── JSON Export / Import ─────────────────────────────────────────────────

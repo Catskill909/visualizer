@@ -249,6 +249,23 @@ async function boot(connectAudioFn) {
             e.preventDefault();
             editor.togglePlayback();
         }
+        // ? or / — toggle keyboard guide
+        if (!ctrl && !inInput && (e.key === '?' || e.key === '/')) {
+            e.preventDefault();
+            editor.toggleKeyboardGuide();
+        }
+        // 1-9 — jump to marker
+        if (!ctrl && !inInput && e.key >= '1' && e.key <= '9') {
+            const num = parseInt(e.key, 10);
+            editor.jumpToMarker(num - 1);
+        }
+    });
+
+    // Help button click delegation
+    document.addEventListener('click', e => {
+        if (e.target.closest('#tl-btn-help')) {
+            editor?.toggleKeyboardGuide();
+        }
     });
 
     console.log(

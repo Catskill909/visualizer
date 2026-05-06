@@ -61,36 +61,6 @@ A classic NLE playhead: click-to-seek, persistent position, play-from-here. This
 
 ---
 
-### Playhead Feature Brainstorm — Future Ideas
-
-These are **not** part of Phase 3.5. Documenting them here so we have a backlog to pull from.
-
-#### Transport / Seeking
-- **Rewind-to-zero button** — `⏮` button in transport bar, one-click reset
-- **Skip forward / backward** — jump to the next or previous block boundary in the active zone
-- **Keyboard nudge** — arrow keys move playhead ±1 second (±5 with Shift)
-- **Drag-scrub on ruler** — click *and drag* on the ruler for continuous scrubbing (currently click-only). Live preview as you drag.
-
-#### Loop & Regions
-- **Loop region (in/out points)** — drag a range on the ruler to set loop bounds. Playback bounces between in and out points. Visual: translucent overlay on ruler.
-- **Loop single block** — right-click block → "Loop This" — sets loop range to that block's start/end
-
-#### Markers & Cues
-- **Named markers / cue points** — double-click ruler to drop a colored/labeled marker (e.g. "Build", "Drop"). Click marker to seek. Stored in timeline data model.
-- **Jump-to-marker keyboard shortcuts** — `1`–`9` keys jump to markers by index
-
-#### Live Performance
-- **Live queue override** — during playback, click a future block to force it to play *next*, overriding the timeline's strict chronological order. Visual: block gets a "queued" indicator.
-- **Hold/freeze preset** — while playing, press `H` to freeze the current preset indefinitely, ignoring upcoming block transitions. Press again to release.
-- **Speed control** — 0.5×, 1×, 2× playback speed. Affects wall-clock calculation.
-
-#### Audio Sync
-- **Timeline ↔ Audio lock** — when using "Load Track" mode, sync the timeline playhead with the audio file's `currentTime`. Scrubbing one scrubs both. Playback of one drives both.
-- **BPM grid on ruler** — enter a BPM; ruler shows beat markers. Blocks snap to beat boundaries on drag/resize. Playhead shows current beat count.
-- **Beat-triggered transitions** — instead of hard time-based transitions, trigger the next preset on the next beat boundary after the block's duration expires.
-
----
-
 ### Phase 4 — Advanced show features 🔧 IN PROGRESS
 
 **Phase 4.1 — VJ Marker System** ✅ COMPLETE
@@ -103,17 +73,39 @@ These are **not** part of Phase 3.5. Documenting them here so we have a backlog 
 - **Live Scrubbing**: Clicking the ruler while stopped immediately loads the corresponding presets into the visualizer engines and lifts covers for a live preview.
 
 **Upcoming Phase 4.x Tasks**:
-- Per-entry crossfade style (Cut / White Flash / Black Dip) — stored as `transitionStyle` on entry
-- Advanced Loop logic (jump to previous loop start rather than `0:00`)
-- Keyboard shortcuts for markers (`1`-`9`, next/prev)
-- Loop section range on ruler
-- Live queue override during playback (click a future block to queue it next)
-- Entry label canvas overlay during playback (label field already in data model and quick-edit)
-- Auto-fill from Favorites button in transport
-- Multi-select (Shift-click) + bulk duration stamping
-- Setlist text export (plain-text or HTML table)
-- **Timeline Library modal** — replace the topbar `<select>` dropdown with a "Library" button that opens a card-grid modal (mirrors `src/editor/presetLibrary.js` patterns). Each card: name, last-edited relative time, entry count, zone-layout chip, per-card Load + Delete actions. Search box, sort by recent/name, multi-select for bulk delete. Save button gains a "Save As…" dialog for new/clone flows. Discard-confirm guard when switching timelines with unsaved changes (currently missing on the dropdown change handler).
-- **Auto-save behavior** — currently new timelines are in-memory only until the user clicks Save (`createTimeline()` returns a record without persisting; `_loadAll()` calls `pruneEmptyUntitled()` once on boot to clean up legacy auto-saved junk where `name === 'Untitled Timeline' && entries.length === 0`). If we want true auto-save later, gate it behind a debounced "draft" slot rather than spawning a new entry per page load.
+
+*Transport & Seeking*
+- **Rewind-to-zero button** — `⏮` button in transport bar, one-click reset
+- **Skip forward / backward** — jump to the next or previous block boundary in the active zone
+- **Keyboard nudge** — arrow keys move playhead ±1 second (±5 with Shift)
+- **Drag-scrub on ruler** — click *and drag* on the ruler for continuous scrubbing (currently click-only). Live preview as you drag.
+
+*Loop & Regions*
+- **Loop section range on ruler** — drag a range on the ruler to set loop bounds. Playback bounces between in and out points.
+- **Advanced Loop logic** — marker action `loop` jumps to previous loop start rather than `0:00`.
+- **Loop single block** — right-click block → "Loop This" — sets loop range to that block's start/end
+
+*Markers & Cues*
+- **Keyboard shortcuts for markers** — `1`-`9` jump to markers by index, next/prev navigation.
+
+*Live Performance*
+- **Per-entry crossfade style** — Cut / White Flash / Black Dip — stored as `transitionStyle` on entry.
+- **Live queue override** — during playback, click a future block to force it to play *next*, overriding the timeline's strict chronological order.
+- **Hold/freeze preset** — while playing, press `H` to freeze the current preset indefinitely, ignoring upcoming block transitions. Press again to release.
+- **Speed control** — 0.5×, 1×, 2× playback speed. Affects wall-clock calculation.
+- **Entry label canvas overlay** — text overlay during playback (label field already in data model and quick-edit).
+
+*Audio Sync*
+- **Timeline ↔ Audio lock** — when using "Load Track" mode, sync the timeline playhead with the audio file's `currentTime`. Scrubbing one scrubs both. Playback of one drives both.
+- **BPM grid on ruler** — enter a BPM; ruler shows beat markers. Blocks snap to beat boundaries on drag/resize. Playhead shows current beat count.
+- **Beat-triggered transitions** — instead of hard time-based transitions, trigger the next preset on the next beat boundary after the block's duration expires.
+
+*Workflow & UX*
+- **Auto-fill from Favorites** — button in transport to quickly fill a zone.
+- **Multi-select (Shift-click)** — bulk duration stamping and movement.
+- **Setlist text export** — plain-text or HTML table.
+- **Timeline Library modal** — replace the topbar `<select>` dropdown with a "Library" button that opens a card-grid modal (mirrors `presetLibrary.js` patterns). Each card: name, last-edited relative time, entry count, zone-layout chip, per-card Load + Delete actions. Search box, sort by recent/name, multi-select for bulk delete. Save button gains a "Save As…" dialog for new/clone flows. Discard-confirm guard when switching timelines with unsaved changes.
+- **Auto-save behavior** — debounced "draft" slot rather than spawning a new entry per page load.
 
 ---
 
