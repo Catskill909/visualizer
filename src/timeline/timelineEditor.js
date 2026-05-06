@@ -1552,8 +1552,32 @@ export class TimelineEditor {
                 this._fadeZoneCover(zoneId, 0, 0);  // instant reveal (scrub/seek)
                 zd.engine.loadPreset(entry.presetName, 0).catch(() => {});
 
+                // Schedule fade-out at end of this entry if there's a gap after it
+                const entryEnd  = st + entry.duration;
+                const next      = entries[i + 1];
+                const nextStart = next ? (next.startTime ?? 0) : Infinity;
+                if (shouldBlackout && entryEnd < nextStart) {
+                    const fadeDur  = Math.min(entry.blendTime, entry.duration);
+                    const fadeStart = entryEnd - fadeDur;
+                    const fadeDelay = Math.max(0, (fadeStart - fromTime) * 1000);
+                    timers.push(setTimeout(() => {
+                        if (!this._playing) return;
+                        this._fadeZoneCover(zoneId, 1, fadeDur);  // fade to black
+                    }, fadeDelay));
+                }
                 break;
             }
+        }
+
+        // Track true end of last processed entry — entries[i-1] is wrong after skips
+        let lastEnd = -Infinity;
+        for (const e of entries) {
+            const s = e.startTime ?? 0;
+            if (s + e.duration <= fromTime) lastEnd = Math.max(lastEnd, s + e.duration);
+        }
+        if (immediateEntryId) {
+            const imm = entries.find(e => e.id === immediateEntryId);
+            if (imm) lastEnd = Math.max(lastEnd, (imm.startTime ?? 0) + imm.duration);
         }
 
         for (let i = 0; i < entries.length; i++) {
@@ -1567,33 +1591,44 @@ export class TimelineEditor {
             if (st < fromTime) continue;
 
             // Determine if there's a gap before this entry
-            const prev = entries[i - 1];
-            const prevEnd = prev ? ((prev.startTime ?? 0) + prev.duration) : -Infinity;
-            const hasGapBefore = st > prevEnd;
+            const hasGapBefore = st > lastEnd + 0.01;
+            const fadeDurIn    = hasGapBefore ? entry.blendTime : 0;
+            const fadeInDelay  = Math.max(0, (st - fadeDurIn - fromTime) * 1000);
 
-            // VJ MODE: No fade-to-black at entry end. 
-            // If gap before entry, fade in from black so preset is visible when block starts.
-            if (hasGapBefore) {
-                const fadeDurIn = entry.blendTime;
-                const fadeInDelay = Math.max(0, (st - fadeDurIn - fromTime) * 1000);
+            // Schedule fade-in (cover → transparent)
+            if (hasGapBefore && fadeDurIn > 0) {
                 timers.push(setTimeout(() => {
                     if (!this._playing) return;
                     this._fadeZoneCover(zoneId, 0, fadeDurIn);  // fade in from black
                 }, fadeInDelay));
-
-                // Load preset when fade starts so there's something to show
-                timers.push(setTimeout(() => {
-                    if (!this._playing) return;
-                    zd.engine.loadPreset(entry.presetName, entry.blendTime).catch(() => {});
-                }, fadeInDelay));
-            } else {
-                // Consecutive entry — butterchurn crossfade handles it, no cover fade
-                const delay = (st - fromTime) * 1000;
-                timers.push(setTimeout(() => {
-                    if (!this._playing) return;
-                    zd.engine.loadPreset(entry.presetName, entry.blendTime).catch(() => {});
-                }, delay));
             }
+
+            // Schedule preset load
+            const delay     = (st - fromTime) * 1000;
+            const loadDelay = hasGapBefore && fadeDurIn > 0 ? fadeInDelay : delay;
+            timers.push(setTimeout(() => {
+                if (!this._playing) return;
+                if (!hasGapBefore || fadeDurIn <= 0) {
+                    this._fadeZoneCover(zoneId, 0, 0);
+                }
+                zd.engine.loadPreset(entry.presetName, entry.blendTime).catch(() => {});
+            }, loadDelay));
+
+            // Schedule fade-out at end of this entry if there's a gap after it
+            const entryEnd  = st + entry.duration;
+            const next      = entries[i + 1];
+            const nextStart = next ? (next.startTime ?? 0) : Infinity;
+            if (shouldBlackout && entryEnd < nextStart) {
+                const fadeDurOut = Math.min(entry.blendTime, entry.duration);
+                const fadeStart  = entryEnd - fadeDurOut;
+                const fadeDelay  = Math.max(0, (fadeStart - fromTime) * 1000);
+                timers.push(setTimeout(() => {
+                    if (!this._playing) return;
+                    this._fadeZoneCover(zoneId, 1, fadeDurOut);  // fade to black
+                }, fadeDelay));
+            }
+
+            lastEnd = Math.max(lastEnd, st + entry.duration);
         }
 
         this._zoneTimers.set(zoneId, timers);
@@ -1764,8 +1799,10 @@ export class TimelineEditor {
                                 zd.engine.renderFrame();
                             }
                         }
+                    } else {
+                        // Playhead is in an empty gap — cover this zone
+                        this._fadeZoneCover(zone.id, 1, 0);
                     }
-                    // VJ MODE: No blackout in gaps - keep showing last preset
                 }
             }
             return;

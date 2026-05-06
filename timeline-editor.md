@@ -192,6 +192,101 @@ Each block shows **Edit / Duplicate / Delete** icon buttons on hover — no hidd
 
 ---
 
+## ⚠️ CRITICAL: Playback & Cover System — Do Not Break
+
+> This section exists because of a catastrophic regression on 2026-05-06. Multiple incremental patches made things progressively worse. Read this before touching ANY playback, fade, or scrub code.
+
+### How the Cover System Works
+
+Each zone has a black `<div>` cover (`_zoneCovers` map) that sits on top of its canvas. Opacity `1` = black (hidden). Opacity `0` = transparent (visible). `_fadeZoneCover(zoneId, opacity, durationSec)` transitions it.
+
+**The cover is the ONLY mechanism for showing/hiding zone content.** WebGL canvases do NOT go black when you stop rendering — the last frame stays in the framebuffer permanently. `stopRenderLoop()` alone will never produce a black canvas. The cover is the correct, intentional solution.
+
+### The Correct State Machine (per zone, during playback)
+
+```
+Timeline start / gap at fromTime
+  → cover = 1 (black)
+
+Active entry found at fromTime (immediate load)
+  → cover fades to 0 instantly
+  → preset loads with blend 0
+  → schedule: cover fades to 1 at (entryEnd - blendTime) IF gap follows
+
+Future entry with gap before it
+  → cover starts fading to 0 at (st - blendTime) — fade-in begins before block start
+  → preset loads when fade-in starts
+  → schedule: cover fades to 1 at (entryEnd - blendTime) IF gap follows
+
+Future entry consecutive (no gap before it)
+  → cover stays at 0 — no manipulation
+  → preset loads at exact st — Butterchurn crossfade handles visual transition
+  → NO cover fade-out scheduled (next block is consecutive)
+
+Gap between blocks
+  → cover = 1 (black) from previous block's fade-out timer
+  → cover stays black until next block's fade-in timer fires
+```
+
+### `shouldBlackout` flag
+
+`const shouldBlackout = !zone || zone.gapBehavior !== 'hold'`
+
+- `gapBehavior: 'black'` (default) → `shouldBlackout = true` → fade-out timers ARE scheduled
+- `gapBehavior: 'hold'` → `shouldBlackout = false` → no fade-out, last frame persists in gaps
+
+All fade-out timer scheduling in `_playZone` is gated by `shouldBlackout`.
+
+### The `entries[i-1]` Index Bug — FIXED, Do Not Reintroduce
+
+The original code (commit `707be41`) used `entries[i-1]` to find the previous entry for gap detection:
+```js
+const prev = entries[i - 1];  // WRONG — index is corrupt after continue statements
+const prevEnd = prev ? ((prev.startTime ?? 0) + prev.duration) : -Infinity;
+const hasGapBefore = st > prevEnd;
+```
+**This is wrong.** The loop skips entries via `continue` (for `immediateEntryId` and `st < fromTime`). After a skip, `entries[i-1]` points to a different entry than the one actually processed before. Result: every future entry appeared to have a gap before it → every block got a pre-fade even when consecutive.
+
+**The fix** (currently in code): track `lastEnd` manually, seeded from past entries and the immediate entry, updated at the bottom of each loop iteration:
+```js
+let lastEnd = -Infinity;
+// seed from past entries and immediate entry...
+for (...) {
+    const hasGapBefore = st > lastEnd + 0.01;
+    // ...
+    lastEnd = Math.max(lastEnd, st + entry.duration);
+}
+```
+
+### `_scrubTo` — Gap Blackout Is Required
+
+When scrubbing while stopped, if a zone has no active entry at time `t`, its cover **must** be raised to black. The original "VJ MODE: No blackout in gaps" comment was wrong for this context. The correct behavior:
+```js
+if (activeEntry) {
+    zd.engine.loadPreset(...);
+    this._fadeZoneCover(zone.id, 0, 0);  // reveal
+} else {
+    this._fadeZoneCover(zone.id, 1, 0);  // blackout gap
+}
+```
+
+### The Working Reference Commit
+
+Commit `900f164` ("implement timeline marker system") has the last fully working `_playZone` and `_scrubTo` before the VJ mode rewrite. If everything breaks, `git show 900f164:src/timeline/timelineEditor.js` is the reference.
+
+The VJ mode rewrite in `707be41` removed gap blackouts ("VJ MODE: No fade-to-black at entry end") which broke the fundamental timeline contract.
+
+### Rules For Future Changes
+
+1. **Never use `entries[i-1]`** in `_playZone`. Use `lastEnd` tracker.
+2. **Never remove the cover fade-out** at block end unless `gapBehavior === 'hold'`.
+3. **Never remove the `else` blackout** in `_scrubTo` — gaps must show black when scrubbing.
+4. **`stopRenderLoop()` alone never shows black** — always pair it with `_fadeZoneCover(zoneId, 1, 0)` if you use it.
+5. **Test with: gap after first block, gap before last block, consecutive blocks, start-from-gap position** before committing any playback change.
+6. **Do not mix cover AND engine-stop** approaches — pick one. Current approach is **cover only** (engine keeps running in gaps). This is correct and intentional.
+
+---
+
 ## Critical Architectural Facts
 
 > These are the non-obvious facts a developer needs before touching this code.
