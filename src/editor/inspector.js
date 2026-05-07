@@ -686,6 +686,8 @@ export class EditorInspector {
         [bv.wave_r, bv.wave_g, bv.wave_b] = p.wave;
         [bv.ob_r, bv.ob_g, bv.ob_b] = p.glow;
         [bv.ib_r, bv.ib_g, bv.ib_b] = p.accent;
+        // Shift Color B = Glow for cohesive two-color blends
+        this.currentState.solidColorB = p.glow.slice();
         bv.ob_a = 0.75;
         bv.ob_size = 0.02;
         if (!bv.ib_a) bv.ib_a = 0.5;
@@ -696,6 +698,7 @@ export class EditorInspector {
         this._applyToEngine();
         this._syncColorSwatches();
         this._syncPaletteSliders();
+        this._syncSolidFx(); // Update shift color swatch
         // Highlight active chip
         document.querySelectorAll('.palette-chip').forEach((el, idx) => {
             el.classList.toggle('active', idx === i);
