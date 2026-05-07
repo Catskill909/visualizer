@@ -347,8 +347,8 @@ export class ControlPanel {
     // --- Fullscreen ---
     els.btnFullscreen.addEventListener('click', () => this.toggleFullscreen());
 
-    // --- Guide Modal ---
-    els.btnHelp.addEventListener('click', () => this.toggleGuide());
+    // --- Guide Modal (User Guide button on start screen) ---
+    els.btnHelp?.addEventListener('click', () => this.toggleGuide());
     els.btnCloseGuide.addEventListener('click', () => this.closeGuide());
 
     // --- Welcome / Feature Guide Modal (start screen) ---

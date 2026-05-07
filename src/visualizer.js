@@ -83,6 +83,8 @@ export class VisualizerEngine {
 
     // GIF animation state: texName → { frames, delays, uploadCanvas, uploadCtx, frameIndex, nextFrameAt, width, height }
     this._gifAnimations = new Map();
+    // Video animation state: texName → { videoElement, uploadCanvas, uploadCtx, width, height }
+    this._videoAnimations = new Map();
     this._audioConfirmed = false;
 
     // Output: resolution lock + virtual camera
@@ -533,6 +535,7 @@ export class VisualizerEngine {
       }
 
       this._tickGifAnimations();
+      this._tickVideoAnimations();
       this.visualizer.render();
 
       // Capture hook: resolve immediately after render() while buffer is live
@@ -751,7 +754,12 @@ export class VisualizerEngine {
       this._loadGifTexture(name, texObj.data, texObj.gifSpeed || 1.0, optimizedData);
       return;
     }
+    if (texObj.isVideo && texObj.videoElement) {
+      this._loadVideoTexture(name, texObj.videoElement, texObj.width, texObj.height);
+      return;
+    }
     this._gifAnimations.delete(name);
+    this._videoAnimations.delete(name);
     try {
       if (typeof this.visualizer.loadExtraImages === 'function') {
         this.visualizer.loadExtraImages({ [name]: texObj });
@@ -764,6 +772,16 @@ export class VisualizerEngine {
   /** Called by inspector when a GIF layer is deleted. */
   removeGifAnimation(name) {
     this._gifAnimations.delete(name);
+  }
+
+  /** Called by inspector when a video layer is deleted. */
+  removeVideoAnimation(name) {
+    const anim = this._videoAnimations.get(name);
+    if (anim && anim.videoElement) {
+      anim.videoElement.pause();
+      anim.videoElement.src = '';
+    }
+    this._videoAnimations.delete(name);
   }
 
   /**
@@ -945,6 +963,67 @@ export class VisualizerEngine {
   }
 
   /**
+   * Load a video file as a WebGL texture for continuous frame upload.
+   * Creates a canvas for frame extraction and starts the video playing.
+   */
+  _loadVideoTexture(name, videoElement, width, height) {
+    try {
+      const imgTextures = this.visualizer?.renderer?.image;
+      if (!imgTextures?.gl) {
+        console.warn('[DiscoCast Visualizer] No GL context for video texture');
+        return;
+      }
+      const gl = imgTextures.gl;
+
+      // Remove any existing video animation for this name
+      this._videoAnimations.delete(name);
+
+      // Create upload canvas for frame extraction
+      const uploadCanvas = document.createElement('canvas');
+      uploadCanvas.width = width;
+      uploadCanvas.height = height;
+      const uploadCtx = uploadCanvas.getContext('2d', { willReadFrequently: true });
+
+      // Create texture
+      const texture = gl.createTexture();
+      imgTextures.samplers[name] = texture;
+
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+      // Initial black frame
+      const initialData = new Uint8Array(width * height * 4);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, initialData);
+
+      // Start video playback
+      videoElement.loop = true;
+      videoElement.play().catch(err => {
+        console.warn('[DiscoCast Visualizer] Video play failed:', err.message);
+      });
+
+      // Register animation
+      this._videoAnimations.set(name, {
+        videoElement,
+        gl,
+        texture,
+        width,
+        height,
+        uploadCanvas,
+        uploadCtx
+      });
+
+      console.log('[DiscoCast Visualizer] Video loaded:', name, `${width}×${height}`);
+    } catch (e) {
+      console.warn('[DiscoCast Visualizer] _loadVideoTexture failed for', name, e.message);
+    }
+  }
+
+  /**
    * Called once per render tick. Advances any GIF whose deadline has passed and
    * uploads the new frame pixels directly via gl.texImage2D (raw Uint8ClampedArray —
    * no canvas, no colour-space conversion, no premultiplied-alpha).
@@ -980,6 +1059,39 @@ export class VisualizerEngine {
       gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE);
       // texSubImage2D writes into the existing GPU allocation — no realloc, much faster than texImage2D
       gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, anim.frames[anim.frameIndex]);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, prevFlip);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, prevPremul);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, prevAlign);
+      gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, prevColorspace);
+    }
+  }
+
+  /**
+   * Called once per render tick for video layers.
+   * Draws the current video frame to a canvas and uploads via texSubImage2D.
+   */
+  _tickVideoAnimations() {
+    if (this._videoAnimations.size === 0) return;
+    for (const [, anim] of this._videoAnimations) {
+      const { videoElement, gl, texture, width, height, uploadCanvas, uploadCtx } = anim;
+      // Only upload if video is playing and frame has changed
+      if (videoElement.paused || videoElement.ended) continue;
+      // Draw video frame to canvas
+      uploadCtx.drawImage(videoElement, 0, 0, width, height);
+      // Get pixel data
+      const frameData = uploadCtx.getImageData(0, 0, width, height).data;
+      // Save pixel-store state
+      const prevFlip = gl.getParameter(gl.UNPACK_FLIP_Y_WEBGL);
+      const prevPremul = gl.getParameter(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL);
+      const prevAlign = gl.getParameter(gl.UNPACK_ALIGNMENT);
+      const prevColorspace = gl.getParameter(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL);
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+      gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE);
+      // Upload frame
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, frameData);
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, prevFlip);
       gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, prevPremul);
       gl.pixelStorei(gl.UNPACK_ALIGNMENT, prevAlign);

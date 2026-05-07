@@ -28,6 +28,16 @@ const STD_MAX_DIM = 1024;   // Standard upload max dimension (longest side)
 const HD_MAX_DIM = 2048;    // "HD" toggle max dimension
 
 /**
+ * Format seconds as MM:SS for video time display.
+ */
+function formatTime(seconds) {
+    if (!isFinite(seconds) || seconds < 0) return '0:00';
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+/**
  * Downscale an image file to at most `maxDim` on its longest side.
  * Destructive — the original blob is not retained anywhere.
  * Returns a new Blob (original format preserved when possible) plus dimensions
@@ -1459,8 +1469,13 @@ export class EditorInspector {
             zone.classList.remove('drag-over');
             const file = e.dataTransfer?.files?.[0];
             if (!file) return;
-            if (!file.type.startsWith('image/')) {
-                showToast('Drop an image file here (JPG, PNG, GIF, WebP…)', true);
+            if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+                showToast('Drop an image or video file here (JPG, PNG, GIF, WebP, MP4, WebM…)', true);
+                return;
+            }
+            // Handle video files
+            if (file.type.startsWith('video/')) {
+                this._addVideoLayer(file);
                 return;
             }
             // Intercept GIFs for optimization check
@@ -1473,8 +1488,14 @@ export class EditorInspector {
         fileInput.addEventListener('change', async () => {
             const file = fileInput.files?.[0];
             if (!file) return;
-            if (!file.type.startsWith('image/')) {
-                showToast('Please choose an image file (JPG, PNG, GIF, WebP…)', true);
+            if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+                showToast('Please choose an image or video file (JPG, PNG, GIF, WebP, MP4, WebM…)', true);
+                fileInput.value = '';
+                return;
+            }
+            // Handle video files
+            if (file.type.startsWith('video/')) {
+                this._addVideoLayer(file);
                 fileInput.value = '';
                 return;
             }
@@ -1903,6 +1924,7 @@ export class EditorInspector {
         if (idx !== -1) this.currentState.images.splice(idx, 1);
         delete this._imageTextures[texName];
         this.engine.removeGifAnimation(texName);
+        this.engine.removeVideoAnimation(texName);
         this._buildCompShader();
         this._applyToEngine();
         card.remove();
@@ -2213,6 +2235,154 @@ export class EditorInspector {
         if (this.currentState.images.length === 1) showHint();
     }
 
+    // ─── Add a video layer ─────────────────────────────────────────────────────
+    // Videos are single-instance (no tiling), with playback controls and color grading.
+    // Hard 720p limit for MVP — reject oversized videos.
+
+    async _addVideoLayer(file) {
+        if (!this.currentState.images) this.currentState.images = [];
+        if (this.currentState.images.length >= MAX_LAYERS) {
+            showToast(`Max ${MAX_LAYERS} layers (images + videos)`, true);
+            return;
+        }
+
+        // ── 720p upload guard ─────────────────────────────────────────────────
+        const MAX_VIDEO_WIDTH = 1280;
+        const MAX_VIDEO_HEIGHT = 720;
+
+        // Create video element to check dimensions
+        const video = document.createElement('video');
+        video.preload = 'metadata';
+        const videoUrl = URL.createObjectURL(file);
+
+        try {
+            await new Promise((resolve, reject) => {
+                video.onloadedmetadata = resolve;
+                video.onerror = () => reject(new Error('Could not load video'));
+                video.src = videoUrl;
+            });
+
+            if (video.videoWidth > MAX_VIDEO_WIDTH || video.videoHeight > MAX_VIDEO_HEIGHT) {
+                URL.revokeObjectURL(videoUrl);
+                showToast(`Video must be 720p or lower (${MAX_VIDEO_WIDTH}×${MAX_VIDEO_HEIGHT}). Current: ${video.videoWidth}×${video.videoHeight}. Please downscale externally.`, true);
+                return;
+            }
+        } catch (err) {
+            URL.revokeObjectURL(videoUrl);
+            showToast('Could not load video', true);
+            return;
+        }
+
+        // Smart accordion: collapse every existing card before we add the new one.
+        this.currentState.images.forEach(e => { e.collapsed = true; });
+        document.querySelectorAll('#image-layers .image-layer-card').forEach(c => {
+            c.classList.add('collapsed');
+        });
+
+        const texName = `uservid${Date.now().toString(36)}`;
+        const videoId = generateId();
+
+        // Store the video file blob
+        storeImage(videoId, file).catch(err => {
+            console.warn('[Editor] storeVideo failed:', err.message);
+        });
+
+        // Video defaults — single instance, no tiling, different blend/scale defaults
+        const entry = {
+            type: 'video',         // Distinguishes from image layers
+            texName,
+            videoId,
+            fileName: file.name,
+            // Playback
+            isPlaying: true,
+            loop: true,
+            speed: 1.0,
+            currentTime: 0,
+            duration: video.duration || 0,
+            // Transform (simplified — no tiling)
+            scale: 0.6,            // Coverage % instead of tile density
+            opacity: 1.0,          // Full opacity - video appears as-is
+            blendMode: 'overlay',  // Natural overlay - preserves video colors
+            spinSpeed: 0.00,
+            orbitRadius: 0.00,
+            cx: 0.50,
+            cy: 0.50,
+            bounceAmp: 0.00,
+            swayAmt: 0.00,
+            swaySpeed: 1.00,
+            wanderAmt: 0.00,
+            wanderSpeed: 0.50,
+            mirror: 'none',        // Duplication via mirror only
+            mirrorScope: 'field',    // Always whole-image for videos
+            // Tile-related properties (disabled for videos, but needed for template)
+            tile: false,
+            spacing: 0,
+            tileScaleX: 1.0,
+            tileScaleY: 1.0,
+            groupSpin: false,
+            radius: 0,
+            isGif: false,
+            alphaMode: 'fade',
+            // Color grading (new for video)
+            brightness: 1.0,
+            contrast: 1.0,
+            gamma: 1.0,
+            // Effects (reused)
+            tintR: 1.00, tintG: 1.00, tintB: 1.00,
+            hueSpinSpeed: 0.00,
+            imageSaturation: 1.00,
+            imageHue: 0,
+            chromaticAberration: 0.00,
+            chromaticSpeed: 1.00,
+            posterize: 0,
+            shakeAmp: 0.00,
+            angle: 0.00,
+            skewX: 0.00, skewY: 0.00,
+            perspX: 0.00, perspY: 0.00,
+            tunnelSpeed: 0.00,
+            strobeAmp: 0.00, strobeThr: 0.40,
+            edgeSobel: false,
+            // Audio reactivity (reused)
+            opacityPulse: 0.00,
+            audioPulse: 0.00,
+            pulseInvert: false,
+            reactSource: 'bass',
+            reactCurve: 'linear',
+            // Animation
+            orbitMode: 'circle',
+            lissFreqX: 0.50, lissFreqY: 0.75, lissPhase: 0.25,
+            panMode: 'off', panSpeedX: 0.00, panSpeedY: 0.00, panRange: 0.20,
+            depthOffset: 0.00,
+            // UI state
+            collapsed: false,
+            solo: false,
+            muted: false,
+            name: file.name.replace(/\.[^.]+$/, '') || 'Video Layer',
+            // Metadata
+            texW: video.videoWidth,
+            texH: video.videoHeight,
+            isHd: false,  // Videos don't use HD toggle
+        };
+
+        this.currentState.images.push(entry);
+
+        // Create video texture object
+        const texObj = {
+            data: videoUrl,        // Object URL for video element
+            width: video.videoWidth,
+            height: video.videoHeight,
+            isVideo: true,         // Flag for visualizer
+            videoElement: video,   // Reference for texture upload loop
+            videoId,
+        };
+
+        this._mountLayerCard(entry, texObj);
+        showToast(`Video layer added (${video.videoWidth}×${video.videoHeight})`);
+        if (this.currentState.images.length === 1) showHint();
+
+        URL.revokeObjectURL(videoUrl); // Clean up, we have the blob stored
+    }
+
     // ─── Mount a layer card from an entry + texObj ─────────────────────────────
     // Used by both _addImageLayer (new upload) and loadPresetData (library load).
 
@@ -2291,6 +2461,30 @@ export class EditorInspector {
             </div>
             <div class="layer-section-divider"></div>
             ` : ''}
+            ${entry.type === 'video' ? `
+            <p class="layer-section-label">Playback</p>
+            <div class="layer-row-inline">
+              <button class="layer-video-play-btn" type="button">${entry.isPlaying ? '⏸ Pause' : '▶ Play'}</button>
+              <span class="layer-ctrl-label" style="margin-left:12px">Loop</span>
+              <label class="toggle-switch toggle-switch--sm">
+                <input type="checkbox" class="layer-video-loop" ${entry.loop ? 'checked' : ''} />
+                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+              </label>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label">Speed</span>
+              <input type="range" class="slider layer-video-speed-sl" min="0.25" max="4" step="0.25"
+                value="${entry.speed}" style="--pct:${pct(entry.speed, 0.25, 4)}">
+              <span class="lsv layer-video-speed-val">${entry.speed.toFixed(2)}×</span>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label">Scrub</span>
+              <input type="range" class="slider layer-video-scrub-sl" min="0" max="1" step="0.001"
+                value="${entry.currentTime / Math.max(entry.duration, 1)}" style="--pct:${((entry.currentTime / Math.max(entry.duration, 1)) * 100).toFixed(1)}%">
+              <span class="lsv layer-video-time-val">${formatTime(entry.currentTime)} / ${formatTime(entry.duration)}</span>
+            </div>
+            <div class="layer-section-divider"></div>
+            ` : ''}
             <div class="layer-row-inline">
               <span class="layer-ctrl-label">Blend</span>
               <select class="layer-blend">
@@ -2299,11 +2493,11 @@ export class EditorInspector {
                 <option value="additive">Additive</option>
                 <option value="multiply">Multiply</option>
               </select>
-              <span class="layer-ctrl-label" style="margin-left:8px">Tile</span>
+              ${entry.type !== 'video' ? `<span class="layer-ctrl-label" style="margin-left:8px">Tile</span>
               <label class="toggle-switch toggle-switch--sm">
                 <input type="checkbox" class="layer-tile" checked />
                 <span class="toggle-track"><span class="toggle-thumb"></span></span>
-              </label>
+              </label>` : ''}
             </div>
             <div class="layer-slider-row">
               <span class="layer-ctrl-label">Opacity</span>
@@ -2312,10 +2506,10 @@ export class EditorInspector {
               <span class="lsv">${entry.opacity.toFixed(2)}</span>
             </div>
             <div class="layer-slider-row">
-              <span class="layer-ctrl-label">Size</span>
+              <span class="layer-ctrl-label">${entry.type === 'video' ? 'Scale' : 'Size'}</span>
               <input type="range" class="slider layer-size-sl" min="0" max="1" step="0.01"
-                value="${Math.sqrt((entry.size - 0.05) / 1.45).toFixed(3)}" style="--pct:${(Math.sqrt((entry.size - 0.05) / 1.45) * 100).toFixed(1)}%">
-              <span class="lsv layer-size-val">${entry.size.toFixed(2)}</span>
+                value="${entry.type === 'video' ? Math.sqrt((entry.scale - 0.1) / 1.9).toFixed(3) : Math.sqrt((entry.size - 0.05) / 1.45).toFixed(3)}" style="--pct:${entry.type === 'video' ? (Math.sqrt((entry.scale - 0.1) / 1.9) * 100).toFixed(1) : (Math.sqrt((entry.size - 0.05) / 1.45) * 100).toFixed(1)}%">
+              <span class="lsv layer-size-val">${entry.type === 'video' ? entry.scale.toFixed(2) : entry.size.toFixed(2)}</span>
             </div>
             <div class="layer-slider-row">
               <span class="layer-ctrl-label" data-tooltip="0 = square · 0.5 = circle">Radius</span>
@@ -2323,19 +2517,19 @@ export class EditorInspector {
                 value="${(entry.radius || 0).toFixed(2)}" style="--pct:${pct(entry.radius || 0, 0, 0.5)}">
               <span class="lsv layer-radius-val">${(entry.radius || 0).toFixed(2)}</span>
             </div>
-            <div class="layer-slider-row layer-spacing-row"${entry.tile ? '' : ' style="display:none"'}>
+            <div class="layer-slider-row layer-spacing-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
               <span class="layer-ctrl-label">Spacing</span>
               <input type="range" class="slider layer-spacing-sl" min="0" max="0.8" step="0.01"
                 value="${entry.spacing}" style="--pct:${pct(entry.spacing, 0, 0.8)}">
               <span class="lsv layer-spacing-val">${entry.spacing.toFixed(2)}</span>
             </div>
-            <div class="layer-slider-row layer-tile-scale-row"${entry.tile ? '' : ' style="display:none"'}>
+            <div class="layer-slider-row layer-tile-scale-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
               <span class="layer-ctrl-label">Width</span>
               <input type="range" class="slider layer-tile-sx-sl" min="0" max="1" step="0.01"
                 value="${Math.sqrt((entry.tileScaleX - 0.25) / 3.75).toFixed(3)}" style="--pct:${(Math.sqrt((entry.tileScaleX - 0.25) / 3.75) * 100).toFixed(1)}%">
               <span class="lsv layer-tile-sx-val">${entry.tileScaleX.toFixed(2)}</span>
             </div>
-            <div class="layer-slider-row layer-tile-scale-row"${entry.tile ? '' : ' style="display:none"'}>
+            <div class="layer-slider-row layer-tile-scale-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
               <span class="layer-ctrl-label">Height</span>
               <input type="range" class="slider layer-tile-sy-sl" min="0" max="1" step="0.01"
                 value="${Math.sqrt((entry.tileScaleY - 0.25) / 3.75).toFixed(3)}" style="--pct:${(Math.sqrt((entry.tileScaleY - 0.25) / 3.75) * 100).toFixed(1)}%">
@@ -2346,7 +2540,7 @@ export class EditorInspector {
               <input type="range" class="slider layer-slider-inline layer-spin-sl" min="-3" max="3" step="0.05"
                 value="${entry.spinSpeed}" style="--pct:${pct(entry.spinSpeed, -3, 3)}">
               <span class="lsv layer-spin-val">${entry.spinSpeed.toFixed(2)}</span>
-              <span class="layer-group-spin-wrap"${entry.tile ? '' : ' style="display:none"'}>
+              <span class="layer-group-spin-wrap"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
                 <span class="layer-ctrl-label" style="margin-left:8px;width:auto" data-tooltip="Rotate the whole tile grid instead of each tile">Group</span>
                 <label class="toggle-switch toggle-switch--sm">
                   <input type="checkbox" class="layer-group-spin" />
@@ -2415,13 +2609,13 @@ export class EditorInspector {
                 value="${entry.lissPhase}" style="--pct:${pct(entry.lissPhase, 0, 1)}">
               <span class="lsv layer-liss-ph-val">${entry.lissPhase.toFixed(2)}</span>
             </div>
-            <div class="layer-slider-row layer-tunnel-row"${entry.tile ? '' : ' style="display:none"'}>
+            <div class="layer-slider-row layer-tunnel-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
               <span class="layer-ctrl-label">Tunnel</span>
               <input type="range" class="slider layer-tunnel-sl" min="-2" max="2" step="0.05"
                 value="${entry.tunnelSpeed}" style="--pct:${pct(entry.tunnelSpeed, -2, 2)}">
               <span class="lsv layer-tunnel-val">${entry.tunnelSpeed.toFixed(2)}</span>
             </div>
-            <div class="layer-slider-row layer-tunnel-row"${entry.tile ? '' : ' style="display:none"'}>
+            <div class="layer-slider-row layer-tunnel-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
               <span class="layer-ctrl-label" data-tooltip="Shift this layer's zoom phase — offset two layers to get genuine parallax depth">Depth</span>
               <input type="range" class="slider layer-depth-sl" min="0" max="1" step="0.01"
                 value="${(entry.depthOffset || 0).toFixed(2)}" style="--pct:${pct(entry.depthOffset || 0, 0, 1)}">
@@ -2492,7 +2686,7 @@ export class EditorInspector {
               <button class="lseg" data-mirror="quad">⊞ Quad</button>
               <button class="lseg" data-mirror="kaleido">✦ Kaleido</button>
             </div>
-            <div class="layer-mirror-scope" role="group" aria-label="Mirror scope" hidden${entry.tile ? '' : ' style="display:none"'}>
+            <div class="layer-mirror-scope" role="group" aria-label="Mirror scope" hidden${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
               <button class="lseg lseg-scope active" data-scope="tile" data-tooltip="Fold inside each tile">Per Tile</button>
               <button class="lseg lseg-scope" data-scope="field" data-tooltip="Fold the whole tiled group">Whole Image</button>
             </div>
@@ -2642,13 +2836,13 @@ export class EditorInspector {
 
         const groupSpinCb = card.querySelector('.layer-group-spin');
 
-        blendSel.addEventListener('change', () => { entry.blendMode = blendSel.value; refresh(); });
+        if (blendSel) blendSel.addEventListener('change', () => { entry.blendMode = blendSel.value; refresh(); });
         const tunnelRow = card.querySelector('.layer-tunnel-row');
         const spacingRow = card.querySelector('.layer-spacing-row');
         const groupSpinWrap = card.querySelector('.layer-group-spin-wrap');
         const mirrorScopeRow = card.querySelector('.layer-mirror-scope');
         const tileScaleRows = card.querySelectorAll('.layer-tile-scale-row');
-        tileCb.addEventListener('change', () => {
+        if (tileCb) tileCb.addEventListener('change', () => {
             entry.tile = tileCb.checked;
             if (tunnelRow) tunnelRow.style.display = entry.tile ? '' : 'none';
             if (spacingRow) spacingRow.style.display = entry.tile ? '' : 'none';
@@ -2657,8 +2851,8 @@ export class EditorInspector {
             tileScaleRows.forEach(r => { r.style.display = entry.tile ? '' : 'none'; });
             refresh();
         });
-        pulseInvCb.addEventListener('change', () => { entry.pulseInvert = pulseInvCb.checked; refresh(); });
-        groupSpinCb.addEventListener('change', () => { entry.groupSpin = groupSpinCb.checked; refresh(); });
+        if (pulseInvCb) pulseInvCb.addEventListener('change', () => { entry.pulseInvert = pulseInvCb.checked; refresh(); });
+        if (groupSpinCb) groupSpinCb.addEventListener('change', () => { entry.groupSpin = groupSpinCb.checked; refresh(); });
 
         // Spin inline slider
         const spinSlider = card.querySelector('.layer-spin-sl');
@@ -2705,7 +2899,7 @@ export class EditorInspector {
         // Pulse inline slider — cubic curve: fine control in low end, extreme at top quarter
         const pulseSlider = card.querySelector('.layer-pulse-sl');
         const pulseVal = card.querySelector('.layer-pulse-val');
-        pulseSlider.addEventListener('input', () => {
+        if (pulseSlider && pulseVal) pulseSlider.addEventListener('input', () => {
             const pos = parseFloat(pulseSlider.value);
             const stored = pos * pos * pos * 2;
             entry.audioPulse = stored;
@@ -2738,13 +2932,18 @@ export class EditorInspector {
             refresh();
         });
 
-        // Size slider — squared curve so value 1.0 lands near ~82% of travel
+        // Size/Scale slider — squared curve so value 1.0 lands near ~82% of travel
+        // Videos use 'scale' (0.1-2.0), images use 'size' (0.05-1.5)
         const sizeSlider = card.querySelector('.layer-size-sl');
         const sizeVal = card.querySelector('.layer-size-val');
-        sizeSlider.addEventListener('input', () => {
+        if (sizeSlider && sizeVal) sizeSlider.addEventListener('input', () => {
             const pos = parseFloat(sizeSlider.value);
-            const stored = 0.05 + 1.45 * pos * pos;
-            entry.size = stored;
+            const isVideo = entry.type === 'video';
+            // Video: pos² maps [0,1] → [0.1, 2.0] (0.1 + 1.9*pos²)
+            // Image: pos² maps [0,1] → [0.05, 1.5] (0.05 + 1.45*pos²)
+            const stored = isVideo ? 0.1 + 1.9 * pos * pos : 0.05 + 1.45 * pos * pos;
+            if (isVideo) entry.scale = stored;
+            else entry.size = stored;
             sizeVal.textContent = stored.toFixed(2);
             sizeSlider.style.setProperty('--pct', `${(pos * 100).toFixed(1)}%`);
             refresh();
@@ -2753,7 +2952,7 @@ export class EditorInspector {
         // Tile scale X/Y sliders — squared curve: pos² maps [0,1] → [0.25,4.0]
         const tileSxSl = card.querySelector('.layer-tile-sx-sl');
         const tileSxVal = card.querySelector('.layer-tile-sx-val');
-        tileSxSl.addEventListener('input', () => {
+        if (tileSxSl && tileSxVal) tileSxSl.addEventListener('input', () => {
             const pos = parseFloat(tileSxSl.value);
             const stored = 0.25 + 3.75 * pos * pos;
             entry.tileScaleX = stored;
@@ -2763,7 +2962,7 @@ export class EditorInspector {
         });
         const tileSySl = card.querySelector('.layer-tile-sy-sl');
         const tileSyVal = card.querySelector('.layer-tile-sy-val');
-        tileSySl.addEventListener('input', () => {
+        if (tileSySl && tileSyVal) tileSySl.addEventListener('input', () => {
             const pos = parseFloat(tileSySl.value);
             const stored = 0.25 + 3.75 * pos * pos;
             entry.tileScaleY = stored;
@@ -2780,7 +2979,7 @@ export class EditorInspector {
         const sliderMins = [0, 0, 0, -2, 0, 0, 0, 0, 0, 0];
         const sliderMaxes = [1, 0.8, 0.45, 2, 1, 0.4, 4, 0.4, 2, 2];
 
-        card.querySelectorAll('.layer-slider-row input[type=range]:not(.layer-bounce-sl):not(.layer-size-sl):not(.layer-liss-sl):not(.layer-strobe-thr-sl):not(.layer-pan-x-sl):not(.layer-pan-y-sl):not(.layer-pan-range-sl):not(.layer-beat-fade-sl):not(.layer-tile-sx-sl):not(.layer-tile-sy-sl):not(.layer-shake-sl):not(.layer-persp-x-sl):not(.layer-persp-y-sl):not(.layer-radius-sl):not(.layer-gif-speed-sl):not(.layer-gif-stability-sl)').forEach((sl, i) => {
+        card.querySelectorAll('.layer-slider-row input[type=range]:not(.layer-bounce-sl):not(.layer-size-sl):not(.layer-liss-sl):not(.layer-strobe-thr-sl):not(.layer-pan-x-sl):not(.layer-pan-y-sl):not(.layer-pan-range-sl):not(.layer-beat-fade-sl):not(.layer-tile-sx-sl):not(.layer-tile-sy-sl):not(.layer-shake-sl):not(.layer-persp-x-sl):not(.layer-persp-y-sl):not(.layer-radius-sl):not(.layer-gif-speed-sl):not(.layer-gif-stability-sl):not(.layer-video-speed-sl):not(.layer-video-scrub-sl)').forEach((sl, i) => {
             const valEl = sl.nextElementSibling;
             sl.addEventListener('input', () => {
                 const v = parseFloat(sl.value);
@@ -2858,6 +3057,62 @@ export class EditorInspector {
                     gifStabilityVal.textContent = v.toFixed(2);
                     gifStabilitySl.style.setProperty('--pct', `${(v * 100).toFixed(1)}%`);
                     this.engine.setGifAnimationStability(entry.texName, v);
+                });
+            }
+        }
+
+        // Video playback controls (only present for video layers)
+        if (entry.type === 'video') {
+            const videoPlayBtn = card.querySelector('.layer-video-play-btn');
+            const videoLoopCb = card.querySelector('.layer-video-loop');
+            const videoSpeedSl = card.querySelector('.layer-video-speed-sl');
+            const videoSpeedVal = card.querySelector('.layer-video-speed-val');
+            const videoScrubSl = card.querySelector('.layer-video-scrub-sl');
+            const videoTimeVal = card.querySelector('.layer-video-time-val');
+
+            if (videoPlayBtn) {
+                videoPlayBtn.addEventListener('click', () => {
+                    entry.isPlaying = !entry.isPlaying;
+                    videoPlayBtn.textContent = entry.isPlaying ? '⏸ Pause' : '▶ Play';
+                    // Notify engine to play/pause video
+                    const anim = this.engine._videoAnimations?.get(entry.texName);
+                    if (anim?.videoElement) {
+                        if (entry.isPlaying) anim.videoElement.play();
+                        else anim.videoElement.pause();
+                    }
+                });
+            }
+
+            if (videoLoopCb) {
+                videoLoopCb.addEventListener('change', () => {
+                    entry.loop = videoLoopCb.checked;
+                    const anim = this.engine._videoAnimations?.get(entry.texName);
+                    if (anim?.videoElement) anim.videoElement.loop = entry.loop;
+                });
+            }
+
+            if (videoSpeedSl && videoSpeedVal) {
+                videoSpeedSl.addEventListener('input', () => {
+                    const v = parseFloat(videoSpeedSl.value);
+                    entry.speed = v;
+                    videoSpeedVal.textContent = v.toFixed(2) + '×';
+                    videoSpeedSl.style.setProperty('--pct', `${((v - 0.25) / 3.75 * 100).toFixed(1)}%`);
+                    const anim = this.engine._videoAnimations?.get(entry.texName);
+                    if (anim?.videoElement) anim.videoElement.playbackRate = v;
+                });
+            }
+
+            if (videoScrubSl && videoTimeVal) {
+                videoScrubSl.addEventListener('input', () => {
+                    const pos = parseFloat(videoScrubSl.value);
+                    const anim = this.engine._videoAnimations?.get(entry.texName);
+                    if (anim?.videoElement) {
+                        const t = pos * anim.videoElement.duration;
+                        anim.videoElement.currentTime = t;
+                        entry.currentTime = t;
+                    }
+                    videoTimeVal.textContent = formatTime(entry.currentTime) + ' / ' + formatTime(entry.duration);
+                    videoScrubSl.style.setProperty('--pct', `${(pos * 100).toFixed(1)}%`);
                 });
             }
         }
@@ -3035,7 +3290,7 @@ export class EditorInspector {
         });
         const lissFxSl = card.querySelector('.layer-liss-fx-sl');
         const lissFxVal = card.querySelector('.layer-liss-fx-val');
-        lissFxSl.addEventListener('input', () => {
+        if (lissFxSl && lissFxVal) lissFxSl.addEventListener('input', () => {
             entry.lissFreqX = parseFloat(lissFxSl.value);
             lissFxVal.textContent = entry.lissFreqX.toFixed(2);
             lissFxSl.style.setProperty('--pct', `${pct(entry.lissFreqX, 0.25, 4)}`);
@@ -3043,7 +3298,7 @@ export class EditorInspector {
         });
         const lissFySl = card.querySelector('.layer-liss-fy-sl');
         const lissFyVal = card.querySelector('.layer-liss-fy-val');
-        lissFySl.addEventListener('input', () => {
+        if (lissFySl && lissFyVal) lissFySl.addEventListener('input', () => {
             entry.lissFreqY = parseFloat(lissFySl.value);
             lissFyVal.textContent = entry.lissFreqY.toFixed(2);
             lissFySl.style.setProperty('--pct', `${pct(entry.lissFreqY, 0.25, 4)}`);
@@ -3051,7 +3306,7 @@ export class EditorInspector {
         });
         const lissPhSl = card.querySelector('.layer-liss-ph-sl');
         const lissPhVal = card.querySelector('.layer-liss-ph-val');
-        lissPhSl.addEventListener('input', () => {
+        if (lissPhSl && lissPhVal) lissPhSl.addEventListener('input', () => {
             entry.lissPhase = parseFloat(lissPhSl.value);
             lissPhVal.textContent = entry.lissPhase.toFixed(2);
             lissPhSl.style.setProperty('--pct', `${pct(entry.lissPhase, 0, 1)}`);
@@ -3707,7 +3962,9 @@ export class EditorInspector {
      * Bounce:       bass pushes the image upward on every beat.
      */
     _buildImageBlock(img) {
-        const sz = img.size.toFixed(4);
+        const isVideo = img.type === 'video';
+        // Videos use 'scale' (0.1-2.0 coverage), images use 'size' (tile density)
+        const sz = isVideo ? (img.scale || 0.6).toFixed(4) : img.size.toFixed(4);
         const sp = img.spinSpeed.toFixed(4);
         const op = img.opacity.toFixed(4);
         const pu = img.audioPulse.toFixed(4);
@@ -3715,7 +3972,7 @@ export class EditorInspector {
         const orb = (img.orbitRadius || 0).toFixed(4);
         const bnc = (img.bounceAmp || 0).toFixed(4);
         const ts = Math.abs(img.tunnelSpeed || 0).toFixed(4);
-        const spc = (img.spacing || 0).toFixed(4);
+        const spc = isVideo ? '0.0' : (img.spacing || 0).toFixed(4);  // Videos have no spacing
         const cx = (img.cx !== undefined ? img.cx : 0.5).toFixed(4);
         const cy = (img.cy !== undefined ? img.cy : 0.5).toFixed(4);
         const swayAmt = (img.swayAmt || 0).toFixed(4);
@@ -3727,7 +3984,8 @@ export class EditorInspector {
         const panSy = (img.panSpeedY || 0).toFixed(4);
         const panRng = (img.panRange !== undefined ? img.panRange : 0.2).toFixed(4);
         const mirror = img.mirror || 'none';
-        const mirrorScope = img.mirrorScope || 'tile';
+        // Videos always use 'field' mirror scope (single instance), images use stored scope
+        const mirrorScope = isVideo ? 'field' : (img.mirrorScope || 'tile');
         const tintR = (img.tintR !== undefined ? img.tintR : 1.0).toFixed(4);
         const tintG = (img.tintG !== undefined ? img.tintG : 1.0).toFixed(4);
         const tintB = (img.tintB !== undefined ? img.tintB : 1.0).toFixed(4);
@@ -3742,8 +4000,9 @@ export class EditorInspector {
         const chromAmt = (img.chromaticAberration || 0).toFixed(4);
         const chromSpd = (img.chromaticSpeed !== undefined ? img.chromaticSpeed : 1.0).toFixed(4);
         const hasChromatic = parseFloat(chromAmt) > 0.001;
-        const tileScaleX = (img.tileScaleX !== undefined ? img.tileScaleX : 1.0).toFixed(4);
-        const tileScaleY = (img.tileScaleY !== undefined ? img.tileScaleY : 1.0).toFixed(4);
+        // Videos don't have independent tile scaling
+        const tileScaleX = isVideo ? '1.0' : (img.tileScaleX !== undefined ? img.tileScaleX : 1.0).toFixed(4);
+        const tileScaleY = isVideo ? '1.0' : (img.tileScaleY !== undefined ? img.tileScaleY : 1.0).toFixed(4);
         const angleDeg = (img.angle || 0);
         const angleRad = (angleDeg * Math.PI / 180).toFixed(6);
         const hasAngle = Math.abs(angleDeg) > 0.01;
@@ -3792,7 +4051,8 @@ export class EditorInspector {
         const hasOrbit = parseFloat(orb) !== 0;
         const hasLissajous = hasOrbit && orbitMode === 'lissajous';
         const hasBounce = parseFloat(bnc) !== 0;
-        const hasTunnel = parseFloat(ts) !== 0 && img.tile;
+        // Videos never have tunnel (no tiles), images respect tile setting
+        const hasTunnel = !isVideo && parseFloat(ts) !== 0 && img.tile;
         const hasSway = parseFloat(swayAmt) !== 0;
         const hasWander = parseFloat(wanderAmt) !== 0;
         const hasPanDrift = panMode === 'drift' && (parseFloat(panSx) !== 0 || parseFloat(panSy) !== 0);
@@ -3801,8 +4061,9 @@ export class EditorInspector {
         const fieldMirror = hasMirror && mirrorScope === 'field';
         const tileMirror = hasMirror && mirrorScope === 'tile';
         const hasTint = parseFloat(hueSpin) !== 0 || parseFloat(tintR) !== 1 || parseFloat(tintG) !== 1 || parseFloat(tintB) !== 1;
-        const groupSpin = img.tile && hasSpin && !!img.groupSpin;
-        const perTileSpin = img.tile && hasSpin && !img.groupSpin && (parseFloat(sp) !== 0 || hasAngle);
+        // Videos are never tiled, so no group spin vs per-tile spin distinction
+        const groupSpin = !isVideo && img.tile && hasSpin && !!img.groupSpin;
+        const perTileSpin = !isVideo && img.tile && hasSpin && !img.groupSpin && (parseFloat(sp) !== 0 || hasAngle);
         const fwd = (img.tunnelSpeed || 0) >= 0;
 
         let blendLine;
@@ -4053,8 +4314,9 @@ export class EditorInspector {
                 `    vec4 _tB = textureGrad(${tex}, _uB, _dxB, _dyB);\n` +
                 `    vec4 _t = mix(_tA, _tB, _tf);\n` +
                 `    float _gapMask = mix(_gapMaskA, _gapMaskB, _tf);\n`;
-        } else if (img.tile) {
+        } else if (!isVideo && img.tile) {
             // Plain tiled — group spin rotates field first, then tile (with optional per-tile spin)
+            // Videos skip this path entirely (always single instance)
             pipeline = groupSpinLines +
                 applySkew('_u') +
                 applyPersp('_u') +
@@ -4202,6 +4464,24 @@ export class EditorInspector {
                 return satLine + hueLine;
             })() +
             (hasPosterize ? `    { float _pn = ${posterize}.0; _src = floor(_src * _pn + 0.5) / _pn; }\n` : '') +
+            // Color grading for videos (brightness, contrast, gamma)
+            (isVideo ? (() => {
+                const br = (img.brightness || 1.0).toFixed(4);
+                const ct = (img.contrast || 1.0).toFixed(4);
+                const gm = (img.gamma || 1.0).toFixed(4);
+                const hasBr = parseFloat(br) !== 1.0;
+                const hasCt = parseFloat(ct) !== 1.0;
+                const hasGm = parseFloat(gm) !== 1.0;
+                if (!hasBr && !hasCt && !hasGm) return '';
+                let s = '';
+                // Brightness: multiply
+                if (hasBr) s += `    _src *= ${br};\n`;
+                // Contrast: (value - 0.5) * contrast + 0.5
+                if (hasCt) s += `    _src = (_src - 0.5) * ${ct} + 0.5;\n`;
+                // Gamma: pow(value, gamma)
+                if (hasGm) s += `    _src = pow(max(_src, 0.0), vec3(${gm}));\n`;
+                return s;
+            })() : '') +
             (img.alphaMode === 'preserve'
                 ? `    float _alphaMask = step(0.1, _t.w);\n    float _op = _alphaMask * _gapMask * clamp(${op} + _r * ${opa}, 0.0, 1.0);\n`
                 : `    float _op = _t.w * _gapMask * clamp(${op} + _r * ${opa}, 0.0, 1.0);\n`) +
