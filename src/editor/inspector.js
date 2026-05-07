@@ -4483,12 +4483,6 @@ export function showOnboarding() {
         ?.addEventListener('click', () => close(false), { once: true });
     document.getElementById('onboarding-never-btn')
         ?.addEventListener('click', () => close(true), { once: true });
-    document.getElementById('onboarding-help-btn')
-        ?.addEventListener('click', () => {
-            close(false);
-            const modal = document.getElementById('help-modal');
-            if (modal) modal.hidden = false;
-        }, { once: true });
 }
 
 const HINT_KEY = 'discocast_hint_slider_reset_seen';
