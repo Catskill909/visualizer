@@ -699,32 +699,288 @@ Virtual Outputs
 
 ---
 
-## Implementation Phases
+## Phased Development Plan with Audits (Main Player First)
 
-### Phase 1 — Core Research (Current)
-- ✅ Web: `getScreenDetails()` + `window.open()` positioning
-- ✅ Tauri: `availableMonitors()` + `set_position()` + `set_fullscreen()`
-- ✅ VJ protocols: Syphon, Spout, NDI identified
-- ⏳ Test: Does `window.open(left=2560)` work on multi-monitor Chrome?
-- ⏳ Test: Does Tauri `set_position` → `set_fullscreen` work reliably?
+### Phase 0 — Architecture & Interface Design (Planning)
 
-### Phase 2 — Web MVP
-- `OutputManagerWeb` implementation
-- `canvas.captureStream()` → `RTCPeerConnection` → popup
-- Output manager UI (monitor tiles)
-- Per-zone output assignment
+**Goal**: Define the complete interface and data model before touching code.
 
-### Phase 3 — Tauri macOS / Windows (Unified)
-- `OutputManagerTauri` implementation (shared core)
-- Window creation + positioning + fullscreen on both platforms
-- **NDI SDK integration** — primary VJ output method
-- Rust NDI crate research + Tauri plugin architecture
+**Deliverables**:
+- [ ] Finalize `OutputTarget` TypeScript definitions
+- [ ] Design `OutputManager` class interface (platform-agnostic core)
+- [ ] Design tile grid UI mockups (all states: Available, Assigned, Conflict, Offline)
+- [ ] Define output settings persistence (save/load with presets)
 
-### Phase 4 — Advanced Native Outputs
+**Audit Checkpoint 0**:
+```
+□ Interface review: Can OutputManager be used by both main player AND timeline?
+□ Platform abstraction: Are platform-specific types (syphon/spout) cleanly separated?
+□ UI consistency: Does tile grid match Zone Manager patterns exactly?
+□ Data model: Can output assignments persist across app restarts?
+```
+
+**Exit Criteria**: All interfaces documented, no code written yet.
+
+---
+
+### Phase 1 — Main Player Single Output (Foundation)
+
+**Goal**: Build output system foundation in stable context (main player).
+
+**Week 1: UI/UX Foundation — Output Manager Modal**
+- Extend existing `#btn-output` / `#output-panel` popover → full modal
+- Display enumeration (platform detection)
+- Tile grid UI (available displays as tiles)
+- Single output assignment (main canvas → one display)
+
+**Audit Checkpoint 1a (UI)**:
+```
+□ Button placement: Output button (O) easily discoverable next to existing controls?
+□ Modal flow: Click Output button → tile grid → select display → assign feels natural?
+□ Visual feedback: Status dot on button shows active output state?
+□ Consistency: Tile grid matches Zone Manager visual language?
+```
+
+**Week 2: Output Implementation — Native Window**
+- Platform detection: Web vs. Tauri (macOS/Windows)
+- Window creation: `set_position()` → `set_fullscreen()` pattern
+- Canvas capture: Read pixels from WebGL → stream to output window
+- Output lifecycle: Assign → stream → disconnect
+
+**Audit Checkpoint 1b (Technical)**:
+```
+□ macOS: Window positions correctly on Display 2 and goes fullscreen
+□ Windows: Same (watch for Issue #7139 cross-monitor positioning)
+□ Canvas capture: 60fps streaming without main UI stutter?
+□ Cleanup: Disconnect removes window cleanly, no orphaned processes?
+□ Recovery: App restart clears stale outputs gracefully?
+```
+
+**Week 3: NDI Prototype (Single Stream)**
+- NDI SDK + Rust bindings evaluation
+- Single NDI sender: "WinampViz/Main" appears in OBS
+- Compare: Native window vs. NDI latency and quality
+
+**Audit Checkpoint 1c (NDI)**:
+```
+□ Build: NDI SDK compiles with Rust bindings successfully?
+□ Discovery: OBS NDI Source list shows "WinampViz/Main" immediately?
+□ Stream: Video appears in OBS, smooth playback?
+□ Latency: End-to-end <50ms (1-2 frames @ 60fps)?
+□ Quality: 1080p60 no artifacts, color accurate?
+```
+
+**Phase 1 Exit Criteria**: Main player can output single stream via native window OR NDI with <50ms latency.
+
+---
+
+### Phase 2 — Major Gate (Foundation Validation)
+
+**Goal**: Validate Phase 1 before scaling to timeline.
+
+**Audit Checkpoint 2 (Major Gate)**:
+```
+□ UI: Output Manager modal feels production-ready?
+□ Performance: Single stream has acceptable latency and no frame drops?
+□ Stability: 30+ minutes continuous streaming without crash or leak?
+□ NDI vs Native: Which is primary output method? (NDI recommended)
+□ Decision: GO to timeline scaling OR fix issues first?
+```
+
+**Possible Outcomes**:
+- **GO**: Foundation solid, proceed to Phase 3 (timeline integration)
+- **FIX**: Address issues before scaling (better than debugging N× later)
+- **PIVOT**: If NDI bindings fail, fallback to native window-only output
+
+---
+
+### Phase 3 — Timeline Integration (2 Zones)
+
+**Goal**: Extend single-output foundation to per-zone assignment.
+
+**Week 4: Data Model Extension**
+- Per-zone output targets in timeline data model
+- Zone row output badges (🖥️2, 📡, etc.)
+- Quick-assign: Click badge → inline output selector
+
+**Audit Checkpoint 3a (Data)**:
+```
+□ Schema: Output target embeds cleanly in zone object?
+□ Persistence: Timeline JSON saves/loads output assignments?
+□ Migration: Old timelines without outputs load gracefully?
+```
+
+**Week 5: Multi-Zone Output (2 Zones)**
+- Zone A → Display 2 (or NDI "ZoneA")
+- Zone B → Display 3 (or NDI "ZoneB")
+- Resource management: 2 streams, memory, synchronization
+
+**Audit Checkpoint 3b (Multi)**:
+```
+□ Assignment: Can assign different zones to different displays?
+□ Isolation: Zone A output doesn't affect Zone B output?
+□ Performance: 2× 1080p60 streams, no dropped frames on main UI?
+□ Conflict: Warning if trying to assign Zone B to Display already showing Zone A?
+□ Cleanup: Disconnecting one zone doesn't break the other?
+```
+
+**Week 6: Output Manager Timeline Integration**
+- Full modal accessible from timeline (same as main player)
+- Pre-filtered: Click Zone A badge → Output Manager filtered to Zone A
+- Global view: See all assignments at once
+
+**Audit Checkpoint 3c (Integration)**:
+```
+□ Flow: Timeline badge click → modal → assign → badge updates correctly?
+□ Consistency: Same Output Manager component works in both contexts?
+□ State sync: Changing output in modal updates timeline badge live?
+```
+
+**Phase 3 Exit Criteria**: Timeline supports 2 zones with independent outputs, assignments persist, UI consistent.
+
+---
+
+### Phase 4 — Scale & Advanced Features
+
+**Goal**: 4+ zones, platform optimizations, edge cases.
+
+**Week 7-8: Scale (4+ Zones)**
+- Stress test: 4 zones → 4 displays/NDI sources
+- Performance monitoring: FPS, memory, CPU
+- Error handling: Display unplugged mid-stream
+
+**Audit Checkpoint 4a (Scale)**:
+```
+□ Performance: 4× 1080p60 NDI streams, main UI still 60fps?
+□ Memory: No leaks over 1 hour continuous operation?
+□ Unplug: Display removed → zone shows "Offline" → reconnects when available?
+□ Resolution change: Changing output resolution recreates stream cleanly?
+```
+
+**Week 9-10: Platform-Specific Outputs**
 - **macOS**: Syphon for zero-latency local workflows
 - **Windows**: Spout for zero-latency local workflows
-- Fallback IPC streaming for edge cases
-- Edge blending shaders (if needed for projector overlap)
+- UI: Hide/show Syphon/Spout tiles based on platform
+
+**Audit Checkpoint 4b (Platform)**:
+```
+□ macOS: Syphon sender works in Resolume (alternative to NDI)?
+□ Windows: Spout sender works in Resolume?
+□ UI: Only relevant output types shown per platform?
+□ Latency: Syphon/Spout near-zero as expected?
+```
+
+**Week 11-12: Edge Cases & Polish**
+- Same zone to multiple outputs (mirroring)
+- Composed output (all zones to one display)
+- Advanced settings: Resolution override, FPS limit, color space
+
+**Audit Checkpoint 4c (Edge Cases)**:
+```
+□ Mirror: Can assign Zone A to both Display 2 AND Display 3?
+□ Composed: "All Zones" option outputs full canvas with layout?
+□ Settings: Per-output resolution/FPS overrides work correctly?
+```
+
+**Phase 4 Exit Criteria**: Production-ready with 4+ zones, error handling, platform optimizations.
+
+---
+
+### Phase 5 — Final Audit & Release
+
+**Goal**: Verify complete system before release.
+
+**Final Audit Checkpoint 5**:
+```
+□ Main Player: Single output stable, UI polished
+□ Timeline: 2-4 zone output works, assignments persist
+□ NDI: Primary method works cross-platform (macOS + Windows)
+□ Syphon/Spout: Secondary method available on respective platforms
+□ UI: Consistent between main player and timeline contexts
+□ Performance: 4× 1080p60 NDI, no dropped frames, <50ms latency
+□ Documentation: User docs explain OBS/Resolume setup
+□ Error handling: All failure modes have clear user messaging
+```
+
+**Release Criteria**: All audit checkpoints passed, production-ready.
+
+---
+
+## UI/UX Placement in Main Player (index.html)
+
+### Current State
+The main player already has an **Output Settings** button (`#btn-output`) with popover (`#output-panel`) at lines 280-346:
+- Location: Transport bar, after Preset Drawer, before Preset Studio
+- Current controls: Resolution, Aspect Ratio, Fill Mode, Virtual Camera toggle
+- Status dot (`#output-status-dot`) shows active state
+
+### Recommended Evolution
+
+**Phase 1 (Immediate)**: Extend existing popover → **Output Manager modal**
+
+```
+Current:                            Proposed Phase 1:
+┌─ Output Settings ─────────┐       ┌─ Output Manager ────────────────────┐
+│ Resolution               │       │ Detected Displays               [↻]  │
+│ Aspect Ratio             │       │ ┌─────────┐ ┌─────────┐              │
+│ Fill Mode                │   →    │ │ 🖥️      │ │ 🖥️      │              │
+│ Virtual Camera [toggle]  │       │ │Display 1│ │Display 2│              │
+│                          │       │ │[Assign] │ │[Assign] │              │
+└──────────────────────────┘       │ └─────────┘ └─────────┘              │
+                                    │                                      │
+                                    │ Active Output:                       │
+                                    │ 🖥️ Display 2 → Main  [⚙️] [✕]       │
+                                    └──────────────────────────────────────┘
+```
+
+**Phase 3+ (Timeline)**: Same modal, but with **source selector** (which zone/main player)
+
+### Button Placement Options
+
+| Option | Location | Pros | Cons |
+|--------|----------|------|------|
+| **A: Current** (keep) | Transport bar after Presets | Already exists, users know it | Small, might be overlooked |
+| **B: New dedicated** | Separate "Outputs" button with ⊘ icon | Very discoverable | Adds button to already busy bar |
+| **C: Dropdown merge** | Merge with existing Output Settings | Minimal UI change | Harder to discover multi-output |
+
+**Recommendation: Option A (Current) with visual upgrade**
+- Keep `#btn-output` location (muscle memory for existing users)
+- Upgrade popover → full modal
+- Add animated status dot for active outputs
+- Tooltip changes: "Output Settings (O)" → "Output Manager (O)" when modal opens
+
+### Status Indicators
+
+**Button Status Dot (`#output-status-dot`)**:
+- **Gray/off**: No active outputs
+- **Green pulsing**: 1+ outputs active
+- **Orange**: Output error (display disconnected, stream failed)
+
+**Transport Bar Mini-Indicator** (optional):
+```
+[🎵 Audio] [🎨 Shift] [🖥️ 2] [⊞ Zones] [⚙ Output] [✎ Studio]
+          ↑              ↑
+     Current preset   "2 outputs active" badge
+```
+
+---
+
+## Audit Summary Table (Main Player First)
+
+| Phase | Checkpoint | Gate Type | Context | Focus |
+|-------|-----------|-----------|---------|-------|
+| 0 | Interface Design | Review | Planning | Core architecture |
+| 1a | UI Foundation | UX | Main Player | Modal, tile grid, button placement |
+| 1b | Single Output | Technical | Main Player | Native window, canvas capture |
+| 1c | NDI Prototype | Technical | Main Player | NDI SDK, single stream |
+| 2 | Major Gate | Decision | Main Player | Foundation validation before scaling |
+| 3a | Data Model | Technical | Timeline | Per-zone output persistence |
+| 3b | Multi-Zone (2) | Technical | Timeline | 2 streams, isolation, conflicts |
+| 3c | Timeline UI | UX | Timeline | Badge integration, modal filtering |
+| 4a | Scale (4+) | Technical | Timeline | Performance, memory, unplug handling |
+| 4b | Platform Outputs | Technical | Both | Syphon/Spout integration |
+| 4c | Edge Cases | UX | Both | Mirroring, composed, advanced settings |
+| 5 | Final Release | Review | Both | Production readiness |
 
 ---
 
