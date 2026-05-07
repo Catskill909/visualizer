@@ -19,35 +19,34 @@
   <div class="promo-modal-backdrop" id="beta-modal" role="dialog" aria-modal="true" aria-labelledby="beta-modal-title"
     aria-describedby="beta-modal-copy">
     <div class="promo-modal-card">
-      <div class="promo-modal-eyebrow">Early Beta Preview</div>
-      <h2 id="beta-modal-title">Thanks for helping test The DiscoCast Visualizer.</h2>
-      <p id="beta-modal-copy">
-      <p>This is an early beta build — the core visualizer, preset browser, and studio are solid, but the Timeline
-        Editor (still actively being built) is a work in progress.
+      <div class="promo-modal-header">
+        <div class="promo-modal-eyebrow">Early Beta Preview</div>
+        <h2 id="beta-modal-title">Thanks for helping test The DiscoCast Visualizer.</h2>
+      </div>
+      
+      <div id="beta-modal-copy" class="promo-modal-scroll-area">
+        <p>This is an early beta build — the core visualizer, preset browser, and studio are solid, but the <strong>Timeline Editor</strong> (still actively being built) is a work in progress.</p>
+        
+        <p><strong>Quick tip:</strong> When you are in the Preset Editor remixing a preset, not all sliders work if the setting is not in the preset or the setting is very subtle. Different presets have different reactions to different sliders. Image layers have their own separate settings in the Image tab.</p>
 
-      </p>
-      <p>Quick tip: When you are in the Preset Editor remixing a preset not all sliders work if the setting is not in
-        the preset or the setting is very subtle. Different presets have different reactions to different sliders. Image
-        layers have their own separate settings in the Image tab of the Preset Editor</p>
-      </p>
-      <p id="beta-modal-copy">
-        <strong>Timeline Editor (Beta)</strong> — Full-screen sequencer with multi-zone compositor, transport controls (play/stop/seek), drag-scrub on ruler, keyboard nudge (↑/↓ ±1s), block navigation (←/→), marker system (1-9 shortcuts), and VJ mode (visuals never stop)<br>
-        Motion Audio Reactivity for MilkDrop presets (Pulse, Bounce, Shake, Beat Fade, Strobe)<br>
-        Animated GIF layers with speed control, Alpha Mode, and timing smoothing<br>
-        Per-layer Saturation and Hue Rotate<br>
-        Radius — rounded corners on image tiles<br>
-        Windows build<br>
-        Bug fixes<br>
-      <p>Send feedback to
-        <a href="mailto:paul@rarefunk.com">paul@rarefunk.com</a>.
-      </p>
-      </p>
-      <p>Current release is <span id="app-version">Beta May 06, 2026</span>. Send me your email if you want notice of
-        app updates.</p>
-      <p class="promo-modal-note">
-        Your feedback helps shape the public release.
-      </p>
-      <button type="button" class="btn btn-primary promo-modal-button" id="beta-modal-dismiss">OK</button>
+        <p class="promo-modal-subtitle">What's new:</p>
+        <ul class="promo-modal-list">
+          <li><strong>Timeline Editor (Beta)</strong> — Full-screen sequencer with multi-zone compositor, transport controls (play/stop/seek), drag-scrub on ruler, keyboard nudge (↑/↓ ±1s), block navigation (←/→), marker system (1-9 shortcuts), and VJ mode (visuals never stop).</li>
+          <li><strong>Motion Audio Reactivity</strong> for MilkDrop presets (Pulse, Bounce, Shake, Beat Fade, Strobe).</li>
+          <li><strong>Animated GIF layers</strong> with speed control, Alpha Mode, and timing smoothing.</li>
+          <li>Per-layer Saturation and Hue Rotate.</li>
+          <li>Radius — rounded corners on image tiles.</li>
+          <li>Windows build support &amp; bug fixes.</li>
+        </ul>
+
+        <p>Send feedback to <a href="mailto:paul@rarefunk.com">paul@rarefunk.com</a>.</p>
+        <p>Current release is <span id="app-version">Beta May 06, 2026</span>. Send me your email if you want notice of app updates.</p>
+        <p class="promo-modal-note">Your feedback helps shape the public release.</p>
+      </div>
+
+      <div class="promo-modal-footer">
+        <button type="button" class="btn btn-primary promo-modal-button" id="beta-modal-dismiss">OK</button>
+      </div>
     </div>
   </div>
 

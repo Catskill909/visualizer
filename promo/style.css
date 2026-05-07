@@ -85,8 +85,11 @@ a { color: inherit; text-decoration: none; }
 }
 
 .promo-modal-card {
-  width: min(100%, 560px);
-  padding: 32px;
+  width: min(100%, 720px);
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
   border-radius: 28px;
   border: 1px solid rgba(255 255 255 / 0.1);
   background:
@@ -95,6 +98,42 @@ a { color: inherit; text-decoration: none; }
   box-shadow:
     0 30px 80px rgba(0 0 0 / 0.5),
     inset 0 1px 0 rgba(255 255 255 / 0.06);
+  overflow: hidden;
+}
+
+.promo-modal-header {
+  padding: 40px 40px 24px 40px;
+  flex-shrink: 0;
+}
+
+.promo-modal-scroll-area {
+  padding: 0 40px;
+  overflow-y: auto;
+  flex-grow: 1;
+  min-height: 0;
+}
+
+.promo-modal-scroll-area::-webkit-scrollbar {
+  width: 6px;
+}
+.promo-modal-scroll-area::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
+}
+.promo-modal-scroll-area::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+.promo-modal-scroll-area::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.promo-modal-footer {
+  padding: 24px 40px 40px 40px;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+  position: relative;
 }
 
 .promo-modal-eyebrow {
@@ -118,6 +157,35 @@ a { color: inherit; text-decoration: none; }
   font-size: 1rem;
   line-height: 1.7;
   color: var(--text-secondary);
+  margin-bottom: 16px;
+}
+
+.promo-modal-card p:last-of-type {
+  margin-bottom: 0;
+}
+
+.promo-modal-subtitle {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-top: 24px;
+  margin-bottom: 12px !important;
+}
+
+.promo-modal-list {
+  list-style-type: disc;
+  padding-left: 24px;
+  margin-bottom: 24px;
+  color: var(--text-secondary);
+}
+
+.promo-modal-list li {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+
+.promo-modal-list li strong {
+  color: var(--text-primary);
 }
 
 .promo-modal-card a {
@@ -132,7 +200,7 @@ a { color: inherit; text-decoration: none; }
 }
 
 .promo-modal-button {
-  margin-top: 28px;
+  margin-top: 0;
   width: fit-content;
   min-width: 0;
   padding: 12px 24px;
