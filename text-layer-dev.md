@@ -2,7 +2,7 @@
 
 > **Status:** 📋 Brainstorming / Planning Phase  
 > **Date:** May 7, 2026  
-> **Goal:** Design text layer system with WYSIWYG editing, Google Fonts, and reusable effects
+> **Goal:** Design text layer system with WYSIWYG editing, 20 bundled fonts, transparent background, and reusable effects
 
 ---
 
@@ -11,6 +11,8 @@
 Text layers extend the visualizer's layer system (images, GIFs, videos) to support dynamic typography. Unlike traditional "overlay text" approaches, text layers are first-class citizens in the compositing stack — they receive the same transforms, effects, and audio reactivity as image layers.
 
 **Key insight:** Text = Images with a special content pipeline. The same GLSL compositing, transforms, and effects apply. The innovation is in the **content generation** (Canvas 2D text rendering with WYSIWYG editing) not the **rendering** (already solved).
+
+**Critical requirement:** Text layers must have **transparent background** — the canvas renders text with `clearRect()` or transparent fill, so text appears as a floating object that composites cleanly with layers behind it.
 
 ---
 
@@ -23,7 +25,7 @@ Text layers extend the visualizer's layer system (images, GIFs, videos) to suppo
 2. See a textarea with live preview
 3. Type text, hit Enter for new lines, use spaces freely
 4. Text appears in the visualizer immediately
-5. Select Google Font from dropdown
+5. Select font from 20 curated bundled fonts
 6. Apply same transforms/effects as image layers
 
 **What makes it powerful:**
@@ -194,6 +196,15 @@ const textLayerDefaults = {
         color: '#000000',
         width: 2
     },
+    
+    // Background box (optional — off by default for transparent text)
+    backgroundBox: {
+        enabled: false,     // Default: transparent background
+        color: '#000000',
+        padding: 10,
+        cornerRadius: 4,
+        opacity: 0.5
+    },
     // Future: gradientFill, textMask, etc.
     
     // Canvas dimensions (auto-calculated)
@@ -232,21 +243,24 @@ _renderTextTexture(textLayer) {
     canvas.width = Math.max(64, Math.pow(2, Math.ceil(Math.log2(maxWidth + 20))));
     canvas.height = Math.max(64, Math.pow(2, Math.ceil(Math.log2(totalHeight + 20))));
     
-    // 3. Apply background if enabled
-    if (textLayer.background.enabled) {
-        ctx.fillStyle = textLayer.background.color;
-        roundRect(ctx, 0, 0, canvas.width, canvas.height, textLayer.background.cornerRadius);
+    // 3. Clear with transparent background (critical for compositing)
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // 4. Apply optional background box if enabled (user toggle)
+    if (textLayer.backgroundBox?.enabled) {
+        ctx.fillStyle = textLayer.backgroundBox.color;
+        roundRect(ctx, 0, 0, canvas.width, canvas.height, textLayer.backgroundBox.cornerRadius);
         ctx.fill();
     }
     
-    // 4. Configure text rendering
+    // 5. Configure text rendering
     ctx.font = `${textLayer.fontWeight} ${textLayer.fontSize}px ${textLayer.fontFamily}`;
     ctx.fillStyle = textLayer.color;
     ctx.textAlign = textLayer.textAlign;
     ctx.textBaseline = 'middle';
     ctx.letterSpacing = `${textLayer.letterSpacing}px`;
     
-    // 5. Apply shadow
+    // 6. Apply shadow
     if (textLayer.textShadow.enabled) {
         ctx.shadowColor = textLayer.textShadow.color;
         ctx.shadowBlur = textLayer.textShadow.blur;
@@ -254,7 +268,7 @@ _renderTextTexture(textLayer) {
         ctx.shadowOffsetY = textLayer.textShadow.offsetY;
     }
     
-    // 6. Draw text lines
+    // 7. Draw text lines
     const lineHeightPx = textLayer.fontSize * textLayer.lineHeight;
     const startY = (canvas.height - (lines.length - 1) * lineHeightPx) / 2;
     
@@ -490,29 +504,154 @@ textInput.addEventListener('input', debounce(() => {
 
 ---
 
-## 9. Phased Implementation
+## 9. Code-Audited Implementation Plan
+
+Based on audit of `inspector.js` and `visualizer.js`, here's the exact implementation strategy:
+
+### Existing Infrastructure (Reused)
+| Component | Location | How Text Layer Uses It |
+|-----------|----------|------------------------|
+| Layer card system | `inspector.js:2426` `_mountLayerCard()` | Add text UI section, reuse all transform controls |
+| Texture pipeline | `visualizer.js:749` `setUserTexture()` | Add `isText` branch like existing `isGif`/`isVideo` |
+| Entry data model | `inspector.js:2184` | Add `type: 'text'` + text-specific properties |
+| Collapsible sections | `inspector.js:2480` | Text content section collapsible like others |
+| Transform controls | `inspector.js:2542-2854` | All reused unchanged (scale, spin, orbit, mirror, etc.) |
+| Audio reactivity | `inspector.js:2793-2854` | All reused unchanged (pulse, bounce, shake, beat fade) |
+| Preset serialization | `customPresets.js` | Add text layer type to serialization |
+
+### Phase 1: Core Text (MVP) — ~2 dev sessions
+
+#### Step 1: Font Assets (~30 min)
+```
+src/assets/fonts/
+├── inter.woff2, roboto.woff2, oswald.woff2 (3 fonts for MVP)
+└── fonts.css (@font-face declarations)
+```
+
+#### Step 2: Data Model Extension (`inspector.js:2184`)
+Add to entry creation in `_addTextLayer()`:
+```javascript
+const entry = {
+    type: 'text',
+    texName,
+    text: 'Hello\nWorld',
+    fontFamily: 'Inter',
+    fontSize: 48,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    textShadow: { enabled: true, color: '#000000', blur: 4, offsetX: 2, offsetY: 2 },
+    backgroundBox: { enabled: false, color: '#000000', padding: 10 },
+    // ... inherit ALL transform defaults from image layers
+    scale: 0.6, opacity: 1.0, spinSpeed: 0.00, etc.
+};
+```
+
+#### Step 3: Text Layer Creation (`inspector.js` new method)
+```javascript
+_addTextLayer() {
+    // Similar to _addImageLayer() but:
+    // - No file picker
+    // - Create entry with type: 'text'
+    // - Generate texName
+    // - Call _renderTextTexture() to create initial canvas
+    // - Mount card with _mountLayerCard()
+}
+```
+
+#### Step 4: Layer Card UI (`inspector.js:2481` in `_mountLayerCard`)
+Add text content section (before transforms):
+```javascript
+${entry.type === 'text' ? `
+<p class="layer-section-label">Content</p>
+<textarea class="layer-text-input">${entry.text}</textarea>
+<p class="layer-section-label">Typography</p>
+<div class="layer-row-inline">
+  <span class="layer-ctrl-label">Font</span>
+  <select class="layer-font-family">${FONT_OPTIONS}</select>
+</div>
+<div class="layer-slider-row">
+  <span class="layer-ctrl-label">Size</span>
+  <input type="range" class="slider layer-font-size-sl" min="12" max="128" value="${entry.fontSize}">
+</div>
+... (color picker, weight, align, shadow toggle)
+<div class="layer-section-divider"></div>
+` : ''}
+```
+
+#### Step 5: Text Rendering Engine (`visualizer.js`)
+```javascript
+_renderTextTexture(name, textLayer) {
+    // 1. Create canvas
+    // 2. Measure text, size canvas
+    // 3. ctx.clearRect() for transparent background
+    // 4. Apply shadow if enabled
+    // 5. ctx.fillText() for each line
+    // 6. Return canvas.toDataURL() as texture data
+}
+```
+
+#### Step 6: Texture Integration (`visualizer.js:749`)
+Add to `setUserTexture()`:
+```javascript
+if (texObj.isText && texObj.textLayer) {
+    const canvas = this._renderTextTexture(name, texObj.textLayer);
+    // Upload canvas to WebGL texture
+    return;
+}
+```
+
+#### Step 7: Add Layer Dropdown (`inspector.js`)
+Change "+ Add Layer" dropdown:
+```
+[+ Add Layer ▼]
+  ├─ 📷 Image from File
+  ├─ 🎬 Video from File
+  └─ ✏️ Create Text  ← NEW
+```
+
+#### Step 8: Serialization (`customPresets.js`)
+Add text layer type to save/load — text content is just a string.
+
+### Phase 2: Typography Polish — ~1 dev session
+- Letter spacing, line height sliders
+- Text outline (stroke) toggle
+- Text glow toggle  
+- Background box with padding
+- Recently used fonts (localStorage)
+- All 20 bundled fonts (expand from 3 in MVP)
+
+### Phase 3: Text Animations — Future
+- Typing effect (character reveal)
+- Scrolling/marquee
+- Google Fonts CDN integration with offline fallback
+
+---
+
+## 9. Phased Implementation (Summary)
 
 ### Phase 1: Core Text (MVP)
-- [ ] Basic textarea with preserved whitespace
-- [ ] Canvas 2D text rendering
-- [ ] WebGL texture pipeline
-- [ ] 20 bundled fonts (woff2 files in src/assets/fonts/)
-- [ ] Basic styling: size, color, weight, align
-- [ ] Text shadow
-- [ ] Full transform/effects parity with images
+- [ ] Download 3 bundled fonts (Inter, Roboto, Oswald)
+- [ ] Create `_addTextLayer()` method
+- [ ] Add text entry to data model with `type: 'text'`
+- [ ] Add text UI section to `_mountLayerCard()`
+- [ ] Implement `_renderTextTexture()` in visualizer.js
+- [ ] Add `isText` branch to `setUserTexture()`
+- [ ] Update "+ Add Layer" dropdown
+- [ ] Add text layer serialization
 
 ### Phase 2: Typography Polish
+- [ ] All 20 bundled fonts
 - [ ] Letter spacing, line height
 - [ ] Text outline (stroke)
 - [ ] Text glow
 - [ ] Background box with padding
 - [ ] Recently used fonts
-- [ ] Google Fonts CDN integration (with fallback to bundled)
 
 ### Phase 3: Text Animations
 - [ ] Typing effect (character reveal)
 - [ ] Scrolling/marquee
-- [ ] Text fade in/out per line
+- [ ] Google Fonts CDN with fallback
 
 ---
 

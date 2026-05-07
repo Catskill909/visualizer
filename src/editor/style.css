@@ -1073,11 +1073,13 @@ html, body {
 }
 .layer-tint-swatch {
   display: inline-block;
-  width: 24px; height: 24px;
+  width: 32px; height: 32px;
   border-radius: 4px;
   border: 1px solid var(--border);
   cursor: pointer;
   transition: border-color 0.12s;
+  position: relative;
+  flex-shrink: 0;
 }
 .layer-tint-swatch:hover { border-color: var(--border-hi); }
 .layer-tint-picker {
