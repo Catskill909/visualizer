@@ -81,10 +81,28 @@ async fn pick_audio_file() -> Option<AudioFileResult> {
     Some(AudioFileResult { name, data })
 }
 
+#[tauri::command]
+async fn pick_image_file() -> Option<AudioFileResult> {
+    let (tx, mut rx) = channel::<Option<std::path::PathBuf>>(1);
+    FileDialogBuilder::new()
+        .set_title("Open Image or Video")
+        .add_filter("Images & Videos", &["jpg", "jpeg", "png", "gif", "webp", "svg", "avif", "mp4", "webm", "mov"])
+        .add_filter("Images", &["jpg", "jpeg", "png", "gif", "webp", "svg", "avif"])
+        .add_filter("Videos", &["mp4", "webm", "mov"])
+        .pick_file(move |path| {
+            let _ = tx.blocking_send(path);
+        });
+    let path = rx.recv().await.unwrap_or(None)?;
+    let name = path.file_name()?.to_string_lossy().into_owned();
+    let bytes = std::fs::read(&path).ok()?;
+    let data = general_purpose::STANDARD.encode(&bytes);
+    Some(AudioFileResult { name, data })
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(CaffeinateState(Mutex::new(None)))
-        .invoke_handler(tauri::generate_handler![caffeinate_start, caffeinate_stop, toggle_fullscreen, get_fullscreen, pick_audio_file, save_file])
+        .invoke_handler(tauri::generate_handler![caffeinate_start, caffeinate_stop, toggle_fullscreen, get_fullscreen, pick_audio_file, pick_image_file, save_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

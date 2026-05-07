@@ -164,8 +164,8 @@
                     <nav class="tab-bar" role="tablist" aria-label="Editor sections">
                         <button class="tab active" data-tab="palette" role="tab" aria-selected="true"
                             aria-controls="tab-palette">Palette</button>
-                        <button class="tab" data-tab="image" role="tab" aria-selected="false"
-                            aria-controls="tab-image">Image</button>
+                        <button class="tab" data-tab="layers" role="tab" aria-selected="false"
+                            aria-controls="tab-layers">Layers</button>
                         <button class="tab" data-tab="motion" role="tab" aria-selected="false"
                             aria-controls="tab-motion">Motion</button>
                         <button class="tab" data-tab="wave" role="tab" aria-selected="false"
@@ -362,7 +362,7 @@
                                 </div>
                             </div>
                             <div id="motion-react-sliders"></div>
-                            <p class="section-note" style="margin-top:10px">Audio FX controls mirror Image tab behavior
+                            <p class="section-note" style="margin-top:10px">Audio FX controls mirror Layers tab behavior
                                 but apply to MilkDrop preset motion only.</p>
                             <div class="layer-row-inline" style="gap:8px;margin-top:8px;margin-bottom:8px">
                                 <span class="layer-ctrl-label"
@@ -427,8 +427,8 @@
                     </div>
 
 
-                    <!-- ─── IMAGE TAB ─── -->
-                    <div id="tab-image" class="tab-panel" role="tabpanel" hidden>
+                    <!-- ─── LAYERS TAB ─── -->
+                    <div id="tab-layers" class="tab-panel" role="tabpanel" hidden>
                         <div class="tab-scroll">
 
                             <p class="section-label">Canvas Mirror</p>
@@ -443,17 +443,17 @@
                             </div>
 
                             <div class="images-header" style="margin-top:16px">
-                                <p class="section-label" style="margin:0">Image Layers</p>
+                                <p class="section-label" style="margin:0">Layers</p>
                                 <label class="images-only-row"
-                                    data-tooltip="Hide the base visualizer — show only uploaded images over black">
-                                    <span class="images-only-label">Images Only</span>
+                                    data-tooltip="Hide the MilkDrop visualizer and show only your layers (images/videos) over black">
+                                    <span class="images-only-label">Show layers only</span>
                                     <label class="toggle-switch toggle-switch--sm">
                                         <input type="checkbox" id="toggle-images-only" />
                                         <span class="toggle-track"><span class="toggle-thumb"></span></span>
                                     </label>
                                 </label>
                             </div>
-                            <p class="section-note">Add up to 5 images. Choose how they react to the music.</p>
+                            <p class="section-note">Add up to 5 layers (images, GIFs, or videos). Each has independent animation and audio reactivity.</p>
                             <div class="layers-bar">
                                 <span class="layers-count" id="layers-count">Layers: 0 / 5</span>
                                 <label class="hd-upload-row"
@@ -475,7 +475,7 @@
                                     <circle cx="8.5" cy="8.5" r="1.5" />
                                     <polyline points="21 15 16 10 5 21" />
                                 </svg>
-                                <span>Drop image/video here or click to browse</span>
+                                <span id="dropzone-text">Drop image/video here or click to browse</span>
                                 <input type="file" id="image-file-input"
                                     accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml,image/avif,video/mp4,video/webm,video/quicktime,.jpg,.jpeg,.png,.gif,.webp,.svg,.avif,.mp4,.webm,.mov"
                                     hidden />

@@ -1453,10 +1453,35 @@ export class EditorInspector {
     _bindImageDropzone() {
         const zone = document.getElementById('image-dropzone');
         const fileInput = document.getElementById('image-file-input');
+        const dropzoneText = document.getElementById('dropzone-text');
         if (!zone || !fileInput) return;
 
-        zone.addEventListener('click', (e) => {
+        // macOS Tauri: change text since drag-drop doesn't work in WKWebView
+        if (window.__TAURI__ && navigator.userAgent.includes('Mac') && dropzoneText) {
+            dropzoneText.textContent = 'Click to browse';
+            zone.setAttribute('aria-label', 'Click to browse for image or video');
+        }
+
+        zone.addEventListener('click', async (e) => {
             if (e.target === fileInput) return;
+            // Tauri macOS only: native file picker (drag-drop doesn't work in WKWebView)
+            // Windows Tauri uses standard HTML file input (drag-drop works in WebView2)
+            if (window.__TAURI__ && navigator.userAgent.includes('Mac')) {
+                const result = await window.__TAURI__.invoke('pick_image_file');
+                if (!result) return;
+                const bytes = Uint8Array.from(atob(result.data), c => c.charCodeAt(0));
+                const file = new File([bytes], result.name);
+                // Handle based on file extension
+                const ext = result.name.split('.').pop()?.toLowerCase();
+                if (ext === 'mp4' || ext === 'webm' || ext === 'mov') {
+                    this._addVideoLayer(file);
+                } else if (ext === 'gif') {
+                    await this._handleGifUpload(file);
+                } else {
+                    this._addImageLayer(file);
+                }
+                return;
+            }
             fileInput.click();
         });
         zone.addEventListener('keydown', (e) => {
@@ -2380,7 +2405,13 @@ export class EditorInspector {
         showToast(`Video layer added (${video.videoWidth}×${video.videoHeight})`);
         if (this.currentState.images.length === 1) showHint();
 
-        URL.revokeObjectURL(videoUrl); // Clean up, we have the blob stored
+        // Start video playback - critical for texture upload loop
+        video.play().catch(err => {
+            console.warn('[Editor] Video autoplay failed:', err.message);
+        });
+
+        // Delay URL cleanup until video has buffered enough
+        setTimeout(() => URL.revokeObjectURL(videoUrl), 5000);
     }
 
     // ─── Mount a layer card from an entry + texObj ─────────────────────────────
