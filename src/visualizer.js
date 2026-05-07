@@ -975,7 +975,18 @@ export class VisualizerEngine {
       }
       const gl = imgTextures.gl;
 
+      // Check if already registered with same video element
+      const existing = this._videoAnimations.get(name);
+      if (existing && existing.videoElement === videoElement) {
+        // Already registered, don't re-register (prevents playback interruption)
+        return;
+      }
+
       // Remove any existing video animation for this name
+      if (existing) {
+        existing.videoElement.pause();
+        existing.videoElement.src = '';
+      }
       this._videoAnimations.delete(name);
 
       // Create upload canvas for frame extraction
@@ -1004,6 +1015,17 @@ export class VisualizerEngine {
       videoElement.loop = true;
       videoElement.play().catch(err => {
         console.warn('[DiscoCast Visualizer] Video play failed:', err.message);
+      });
+
+      // macOS WKWebView workaround: loop attribute doesn't always work reliably
+      // Manually restart video when it ends if looping is enabled
+      videoElement.addEventListener('ended', () => {
+        if (videoElement.loop) {
+          videoElement.currentTime = 0;
+          videoElement.play().catch(err => {
+            console.warn('[DiscoCast Visualizer] Video loop restart failed:', err.message);
+          });
+        }
       });
 
       // Register animation

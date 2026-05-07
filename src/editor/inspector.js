@@ -1947,6 +1947,11 @@ export class EditorInspector {
     _performDeleteLayer(entry, card, texName) {
         const idx = this.currentState.images.indexOf(entry);
         if (idx !== -1) this.currentState.images.splice(idx, 1);
+        // Clean up video blob URL if present
+        const texObj = this._imageTextures[texName];
+        if (texObj?._videoUrl) {
+            URL.revokeObjectURL(texObj._videoUrl);
+        }
         delete this._imageTextures[texName];
         this.engine.removeGifAnimation(texName);
         this.engine.removeVideoAnimation(texName);
@@ -2278,6 +2283,8 @@ export class EditorInspector {
         // Create video element to check dimensions
         const video = document.createElement('video');
         video.preload = 'metadata';
+        video.playsInline = true;  // Critical for WKWebView inline playback
+        video.muted = true;        // WKWebView autoplay requires muted initially
         const videoUrl = URL.createObjectURL(file);
 
         try {
@@ -2399,6 +2406,7 @@ export class EditorInspector {
             isVideo: true,         // Flag for visualizer
             videoElement: video,   // Reference for texture upload loop
             videoId,
+            _videoUrl: videoUrl,   // Keep reference for cleanup
         };
 
         this._mountLayerCard(entry, texObj);
@@ -2410,8 +2418,9 @@ export class EditorInspector {
             console.warn('[Editor] Video autoplay failed:', err.message);
         });
 
-        // Delay URL cleanup until video has buffered enough
-        setTimeout(() => URL.revokeObjectURL(videoUrl), 5000);
+        // NOTE: We do NOT revoke the blob URL here - WKWebView needs it to stay
+        // valid for the entire playback. It will be cleaned up when the layer
+        // is deleted via the delete button.
     }
 
     // ─── Mount a layer card from an entry + texObj ─────────────────────────────

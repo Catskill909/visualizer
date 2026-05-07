@@ -1,8 +1,8 @@
 # Video Layer Feature — Brainstorm & Audit Document
 
-> **Status:** 📋 Brainstorming / Planning Phase  
+> **Status:** ✅ **SHIPPED** — Phase 1 Complete  
 > **Date:** May 7, 2026  
-> **Goal:** Audit existing image layer architecture and define video layer feature scope
+> **Goal:** Video layer playback with macOS WKWebView support
 
 ---
 
@@ -443,6 +443,85 @@ Same JSON bundle format as presets, but video BLOBs make files large. May need:
 - Faster implementation (reuse existing `_buildImageBlock()` with minor modifications)
 - Audio reactivity "just works" — no special per-frame logic needed
 - No heavy dependencies for MVP (FFmpeg.wasm = ~25MB, added only in Phase 2)
+
+---
+
+## 14. macOS WKWebView Implementation Notes
+
+**Critical:** The macOS Tauri app uses WKWebView, which has stricter video playback requirements than standard browsers. These fixes were applied May 7, 2026.
+
+### 14.1 Required Video Element Attributes
+
+WKWebView requires explicit attributes for inline playback:
+
+```javascript
+const video = document.createElement('video');
+video.playsInline = true;   // REQUIRED — prevents full-screen takeover
+video.muted = true;         // REQUIRED — WKWebView blocks unmuted autoplay
+video.preload = 'metadata'; // Standard, but critical for WKWebView
+```
+
+**Location:** `@/src/editor/inspector.js` in `_addVideoLayer()`
+
+### 14.2 Blob URL Lifecycle Management
+
+**Problem:** The 5-second `setTimeout(() => URL.revokeObjectURL(), 5000)` pattern that works in browsers breaks WKWebView — the video stops playing when the blob URL is revoked, even if the video element already has the data buffered.
+
+**Fix:** Keep the blob URL valid for the entire video lifecycle. Only revoke when the layer is deleted:
+
+```javascript
+// Create texture object with persistent URL reference
+const texObj = {
+    data: videoUrl,
+    _videoUrl: videoUrl,   // Keep reference for cleanup
+    // ... other props
+};
+
+// Cleanup on delete only
+_performDeleteLayer(entry, card, texName) {
+    if (texObj?._videoUrl) {
+        URL.revokeObjectURL(texObj._videoUrl);
+    }
+}
+```
+
+**Location:** `@/src/editor/inspector.js` in `_addVideoLayer()` and `_performDeleteLayer()`
+
+### 14.3 Loop Workaround
+
+The `video.loop = true` property doesn't always work in WKWebView. Manual loop handling is required:
+
+```javascript
+videoElement.addEventListener('ended', () => {
+    if (videoElement.loop) {
+        videoElement.currentTime = 0;
+        videoElement.play().catch(...);
+    }
+});
+```
+
+**Location:** `@/src/visualizer.js` in `_loadVideoTexture()`
+
+### 14.4 Platform Differences Summary
+
+| Aspect | Web (Chrome/Safari/Firefox) | macOS Tauri (WKWebView) |
+|--------|------------------------------|-------------------------|
+| `playsInline` | Recommended | **Required** |
+| `muted` for autoplay | Often required | **Always required** |
+| Blob URL revocation | Can revoke after load | **Must keep valid** |
+| `loop` property | Works reliably | Needs manual restart |
+
+### 14.5 Testing Checklist for macOS
+
+Before shipping macOS builds with video support:
+
+- [ ] Video imports without error
+- [ ] Video plays immediately (no black frame)
+- [ ] Video loops continuously without stopping
+- [ ] Scale/opacity/transform sliders work without freezing
+- [ ] Pulse/bounce audio reactivity works
+- [ ] Play/pause button toggles correctly
+- [ ] Video stops when layer deleted (no memory leak)
 
 ---
 
