@@ -365,21 +365,49 @@ This explains why **Trail** works on some presets but not others.
 - Works on 100% of presets automatically
 - Creative effect, not just "fix it" tool
 
+### UI Mock (Palette Tab)
+
+```
+┌─ Vignette ─────────────────────────┐
+│                                     │
+│  [Toggle]  Enable                   │
+│                                     │
+│  Target    [Center ○● Edges]        │
+│                                     │
+│  Center           [Reset ↺]         │
+│  ┌─────────┐                        │
+│  │    ●    │   ← XY pad            │
+│  │         │     (drag to move)    │
+│  └─────────┘                        │
+│                                     │
+│  Radius      [──●────]  0.50       │
+│  Strength    [──●────]  0.50       │
+│  Fade        [─●─────]  0.30        │
+│                                     │
+│  Color  [███] #3a0050   [ picker ]  │
+│         ↑ tint for venue blending   │
+└─────────────────────────────────────┘
+```
+
+**Color picker** — simple color selector for vignette tint.
+
 ### Proposed Controls
 
 | Control | Type | Range | Default | Description |
 |---------|------|-------|---------|-------------|
 | Vignette | Toggle | on/off | off | Master enable |
 | Target | Select | Center/Edges | Center | Where to darken |
+| Center X/Y | XY Pad | 0-1 | 0.5, 0.5 | Vignette center point (reuses Image tab pattern) |
 | Radius | Slider | 0-1 | 0.5 | Size of affected area |
 | Strength | Slider | 0-1 | 0.5 | How dark it gets |
 | Fade | Slider | 0-1 | 0.3 | Edge softness (0=hard, 1=feathered) |
+| Color | Color Swatch | #000000 | Black | Vignette tint color (for blending with venue lights) |
 
 ### Technical Approach
 
 **Use existing `darken_center` butterchurn uniform as base**, but:
 1. Extend from boolean (on/off) to float (strength 0-1)
-2. Add `vignette_radius`, `vignette_fade`, `vignette_target` baseVals
+2. Add `vignette_radius`, `vignette_fade`, `vignette_target`, `vignette_cx`, `vignette_cy`, `vignette_color` baseVals
 3. Modify shader injection to bake values as literals
 4. Keep it simple: no runtime uniform updates, just rebuild on change
 
@@ -390,10 +418,11 @@ This explains why **Trail** works on some presets but not others.
 
 ### GLSL Sketch
 ```glsl
-// Vignette: darken based on distance from center (or edges)
-float dist = distance(uv, vec2(0.5));  // center-based
-float mask = smoothstep(radius, radius * (1.0 - fade), dist);
-ret.rgb *= (1.0 - mask * strength);  // darker at edges
+// Vignette: darken/tint based on distance from center (or edges)
+float dist = distance(uv, vec2(vignette_cx, vignette_cy));  // configurable center
+float mask = smoothstep(vignette_radius, vignette_radius * (1.0 - vignette_fade), dist);
+vec3 vignetteTint = vignette_color * (1.0 - mask * vignette_strength);
+ret.rgb = mix(ret.rgb, vignetteTint, mask * vignette_strength);
 ```
 
 **Status:** Ready to implement when user gives go-ahead.
