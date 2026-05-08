@@ -290,8 +290,8 @@ See `macos-app-generate.md` for full packaging details and `app-output-dev.md` �
 A standalone Windows app built via GitHub Actions on demand — produces a single NSIS `.exe` installer.
 
 ### Install
-1. Download `DiscoCast-Visualizer-Windows-Setup` from the [GitHub Actions artifacts](#build-from-github-actions)
-2. Unzip → double-click the `.exe` to install
+1. Download `DiscoCast-Visualizer-Windows-Setup.exe` from the [promo page](promo/index.html)
+2. Double-click the `.exe` to install
 3. Launch **DiscoCast Visualizer** from the Start menu
 4. First time using mic/USB: Windows will prompt for microphone permission — click **Allow**
 
