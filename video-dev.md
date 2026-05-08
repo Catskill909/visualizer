@@ -525,4 +525,300 @@ Before shipping macOS builds with video support:
 
 ---
 
-*Document created for brainstorming session. Simplified spec reflects May 7, 2026 discussion — no tiling, single-quad video layers with mirror-based duplication.*
+## 15. Future VJ Effects — Brainstorm & Difficulty Ratings
+
+> **Date:** May 8, 2026 brainstorm session  
+> **Goal:** Catalog all potential video processing effects, rate difficulty, identify easy wins
+
+### 15.0 Existing Per-Layer Audio Reactivity (Already Shipped)
+
+These controls **already work** on image, video, and text layers in the Preset Studio Layers tab. Any brainstorm idea that duplicates these is marked ✅ DONE.
+
+#### Audio Source & Curve (per-layer)
+| Control | Values | What it does |
+|---------|--------|--------------|
+| **React Source** | `bass` / `mid` / `treb` / `vol` | Which frequency band drives all audio-reactive controls on this layer |
+| **React Curve** | `linear` / `squared` / `cubed` / `gate` | Response shape — gate = hard on/off threshold |
+
+#### Beat-Driven Effects (per-layer)
+| Control | Range | What it does | Status |
+|---------|-------|--------------|--------|
+| **Pulse** | 0–2 (cubic curve) | Bass drives scale — image grows on beat | ✅ DONE |
+| **Shrink** | Toggle | Invert pulse direction — shrink on beat instead of grow | ✅ DONE |
+| **Bounce** | 0–0.4 (cubic curve) | Bass pushes image upward on each beat | ✅ DONE |
+| **Shake** | 0–0.15 (cubic curve) | Random 2D UV jolt on beat — omnidirectional impulse | ✅ DONE |
+| **Beat Fade** | 0–1 (cubic curve) | Opacity pulses in on every beat, fades out between | ✅ DONE |
+| **Strobe** | 0–1 (cubic curve) + Threshold slider | Hard opacity cut when audio crosses threshold — instant flash | ✅ DONE |
+
+#### Motion / Position (per-layer, always active — not beat-triggered)
+| Control | Range | What it does | Status |
+|---------|-------|--------------|--------|
+| **Spin** | −3 to +3 | Continuous rotation speed | ✅ DONE |
+| **Orbit** | 0–0.45 | Circle path radius around center point | ✅ DONE |
+| **Orbit Mode** | `circle` / `lissajous` | Path shape — Lissajous = figure-8 / clover patterns | ✅ DONE |
+| **Lissajous Freq X/Y** | 0.25–4 Hz | Independent axis frequencies for Lissajous figures | ✅ DONE |
+| **Lissajous Phase** | 0–1 | X-axis phase offset — rotates the figure | ✅ DONE |
+| **Sway Amount/Speed** | 0–0.4 / 0–4 Hz | Sinusoidal horizontal oscillation | ✅ DONE |
+| **Wander Amount/Speed** | 0–0.4 / 0–2 | Organic random drift (Perlin-like) | ✅ DONE |
+| **Pan Mode** | `off` / `drift` / `bounce` | Whole-layer translation with speed X/Y | ✅ DONE |
+| **Tunnel** | −2 to +2 | Infinite zoom through tiled layer | ✅ DONE |
+
+#### Visual Effects (per-layer, always active)
+| Control | Range | What it does | Status |
+|---------|-------|--------------|--------|
+| **Chromatic Aberration** | 0–1 + Speed | RGB channel split | ✅ DONE |
+| **Posterize** | 0 / 2–16 | Color banding / reduced color count | ✅ DONE |
+| **Edge (Sobel)** | Off / On | Neon wireframe / line art mode | ✅ DONE |
+| **Mirror** | None / H / V / Quad / Kaleido | UV fold for duplication | ✅ DONE |
+| **Hue Spin** | 0–2 | Continuous hue rotation speed | ✅ DONE |
+| **Saturation** | 0–2 | Per-layer vibrancy | ✅ DONE |
+| **Tint (RGB)** | 3 color channels | Per-layer color tinting | ✅ DONE |
+| **Angle** | −180° to +180° | Static rotation offset | ✅ DONE |
+| **Skew X/Y** | −1 to +1 | Horizontal/vertical shear | ✅ DONE |
+| **Perspective X/Y** | −1 to +1 | Projective tilt distortion | ✅ DONE |
+
+---
+
+**Key takeaway for brainstorm:** The app already has a rich per-layer audio reactivity system with source selection, curve shaping, and 6 beat-driven effects. New VJ effects should **plug into this existing system** (same `reactSource`/`reactCurve` routing) rather than inventing new audio hooks. The brainstorm items below are rated with this in mind — anything that's already done is excluded or noted.
+
+---
+
+### Difficulty Key
+
+| Rating | Meaning | Typical effort |
+|--------|---------|----------------|
+| 🟢 **Easy** | Single GLSL pass or simple JS, reuses existing infrastructure | 1–3 hours |
+| 🟡 **Medium** | New shader pass or moderate JS logic, may need new uniforms/UI | 4–12 hours |
+| 🔴 **Hard** | Multi-pass rendering, new texture pipelines, or significant architecture changes | 1–3 days |
+
+---
+
+### 15.1 Time Manipulation
+
+| Effect | Description | Difficulty | Notes |
+|--------|-------------|------------|-------|
+| **Freeze Frame** | Hold current frame on beat, release to resume | 🟢 Easy | Just stop calling `texSubImage2D` on trigger |
+| **Stutter / Glitch Repeat** | Lock to 2–8 frame micro-loop on beat | 🟡 Medium | Needs small frame ring-buffer (~8 frames) |
+| **Reverse Burst** | Momentary backward playback on trigger | 🟡 Medium | Requires frame buffer or `video.playbackRate = -1` (limited support) |
+| **Frame Buffer / Echo** ⭐ | Blend N previous frames with decay — ghostly motion trails | 🟡 Medium | Ping-pong FBO, blend with previous frame texture. **TOP 5** |
+| **Time Displacement Map (Slit-Scan)** | Different image regions play at different time offsets | 🔴 Hard | Needs N-frame history buffer + per-pixel time lookup |
+
+### 15.2 Feedback & Recursion
+
+| Effect | Description | Difficulty | Notes |
+|--------|-------------|------------|-------|
+| **Feedback Loop** ⭐ | Re-inject previous output frame with scale/rotation offset | 🟡 Medium | Render-to-texture + feedback FBO. Defines analog VJ look. **TOP 5** |
+| **Pixel Persistence / Phosphor Decay** | Pixels fade slowly instead of being replaced | 🟢 Easy | `mix(prevFrame, currentFrame, decayRate)` — subset of feedback |
+| **Accumulation Buffer** | Add frames together, no decay — long exposure look | 🟢 Easy | Additive blend with previous FBO, clamp to 1.0 |
+
+### 15.3 Distortion & Displacement
+
+| Effect | Description | Difficulty | Notes |
+|--------|-------------|------------|-------|
+| **Wave Distort** | Sinusoidal UV warp, audio-reactive amplitude | 🟢 Easy | `uv.x += sin(uv.y * freq + time) * amp` — one line of GLSL |
+| **Pixelate / Mosaic** | Controllable block size, audio-reactive | 🟢 Easy | `floor(uv * blocks) / blocks` — one line |
+| **Barrel / Fisheye** | Lens distortion | 🟢 Easy | Standard radial distortion formula, ~5 lines GLSL |
+| **Displacement Map** | Use one layer/waveform to warp another layer's UVs | 🟡 Medium | Cross-layer texture read, needs uniform hookup |
+| **Glitch Blocks** ⭐ | Random rect chunks offset, beat-synced | 🟡 Medium | Random block offsets seeded by beat count. **TOP 5** |
+| **RGB Channel Shift (independent)** | Per-channel X/Y UV offsets at different speeds | 🟢 Easy | Extension of existing chromatic aberration — add direction vectors |
+| **Edge Warp / Melt** | Displace pixels outward from edge-detected boundaries | 🟡 Medium | Edge detect pass → displacement pass (2-pass) |
+| **Slice & Reassemble** | Cut frame into strips, offset each differently | 🟢 Easy | Modular UV offset per strip row/column |
+| **Polar Coordinates** | Cartesian ↔ polar conversion | 🟢 Easy | `vec2(atan(uv.y,uv.x), length(uv))` — standard transform |
+| **Recursive Zoom (Droste)** | Image contains itself shrinking toward a point | 🔴 Hard | Log-polar mapping + feedback, complex math |
+
+### 15.4 Color Processing
+
+| Effect | Description | Difficulty | Notes |
+|--------|-------------|------------|-------|
+| **Invert** | Full or partial color inversion (0–1 mix) | 🟢 Easy | `mix(color, 1.0 - color, amount)` — one line |
+| **Threshold / Binary** | Hard B&W cutoff, audio-reactive level | 🟢 Easy | `step(threshold, luminance)` — one line |
+| **Color Channel Swap** | R↔G, G↔B, R↔B with crossfade | 🟢 Easy | Swizzle: `color.grb`, `color.bgr`, etc. |
+| **Duotone / Tritone** | Map luminance to 2–3 user-chosen colors | 🟢 Easy | `mix(colorA, colorB, luminance)` — simple remap |
+| **Thermal / Heat Map** | Luminance → thermal palette (blue→red→white) | 🟢 Easy | 1D gradient LUT texture or step function |
+| **Halftone** | CMYK dot pattern, dot size = luminance | 🟡 Medium | Needs distance-from-grid-center math per channel |
+| **Color Palette Quantize** | Reduce to N specific colors | 🟡 Medium | Nearest-color search in GLSL, user picks palette |
+| **LUT (Look-Up Table)** | Load .cube/.png LUT for cinematic grades | 🟡 Medium | 3D texture lookup, needs LUT file loader |
+
+### 15.5 Edge & Outline Effects
+
+| Effect | Description | Difficulty | Notes |
+|--------|-------------|------------|-------|
+| **Edge Detection (Sobel)** | Show only edges — neon wireframe look | ✅ DONE | Already shipped as per-layer "Edge" toggle |
+| **Edge Glow / Bloom on Edges** | Detect edges, apply bloom only to them | 🟡 Medium | Edge detect + blur pass (2-pass minimum) |
+| **Emboss** | Raised/stamped 3D texture feel | 🟢 Easy | Convolution kernel, similar to Sobel |
+| **Outline + Fill (Cel Shade)** | Edge detect + quantized fill colors | 🟡 Medium | Edge pass + posterize combination |
+
+### 15.6 Blend & Compositing
+
+| Effect | Description | Difficulty | Notes |
+|--------|-------------|------------|-------|
+| **Luma Key** ⭐ | Cut out darks or lights, composite over other layers | 🟢 Easy | `alpha = smoothstep(lo, hi, luminance)` — trivial. **TOP 5** |
+| **Chroma Key** | Cut specific color range (greenscreen) | 🟡 Medium | Color-distance in YCbCr space, feathering |
+| **Difference Blend** | Show only motion (current vs previous frame) | 🟢 Easy | `abs(current - previous)` — needs prev frame texture |
+| **Auto-Mask (Luminance Cutout)** | Keep only bright parts as overlay | 🟢 Easy | Variant of luma key with high threshold |
+
+### 15.7 Pattern Generation & Overlay
+
+| Effect | Description | Difficulty | Notes |
+|--------|-------------|------------|-------|
+| **Scan Lines** | CRT scanline overlay, controllable density | 🟢 Easy | `mod(gl_FragCoord.y, lineSpacing)` |
+| **Film Grain / Noise** | Animated noise overlay, opacity-controlled | 🟢 Easy | Hash-based noise, already common pattern |
+| **Grid Overlay** | Configurable grid lines, beat-pulsing | 🟢 Easy | Step function on UV coordinates |
+| **Strobe** | White flash / hard-cut to black, beat-synced | ✅ DONE | Already shipped as per-layer Strobe + Threshold |
+
+### 15.8 Spatial Transforms (beyond current)
+
+| Effect | Description | Difficulty | Notes |
+|--------|-------------|------------|-------|
+| **Zoom Pulse** | Punchy zoom-in-and-snap-back on beat (not continuous) | 🟢 Easy | Note: existing **Pulse** control is similar but continuous. This would be a sharper one-shot envelope |
+| **Tile with Offset (Brick)** | Repeat N×M with alternating row offset | 🟡 Medium | Re-introduces simplified tiling — deliberate opt-in |
+| **Polar Coordinates** | Cartesian ↔ polar — turns any video into radial tunnel | 🟢 Easy | Standard transform, listed above in distortion too |
+
+### 15.9 Audio-Reactive Mapping (extending existing)
+
+| Effect | Description | Difficulty | Notes |
+|--------|-------------|------------|-------|
+| **Audio Spectrum → UV Displacement** | Frequency spectrum displaces pixel rows | 🟡 Medium | Needs spectrum texture uniform |
+| **Beat Counter → Parameter Cycle** | Cycle effect values every N beats | 🟢 Easy | Modular counter, already have beat detection. Extends existing `reactSource`/`reactCurve` system |
+| **Envelope Follower** | Smooth amplitude with attack/release, map to any param | 🟡 Medium | JS-side smoothing filter. Note: existing `reactCurve` (squared/cubed) partially covers this |
+| **Frequency Band → Layer Select** | Different bands trigger different layers | 🟡 Medium | Routing logic in JS, per-layer alpha modulation |
+
+### 15.10 Pro VJ Quality-of-Life
+
+| Feature | Description | Difficulty | Notes |
+|---------|-------------|------------|-------|
+| **Effect Dry/Wet** | 0–1 mix knob on every effect | 🟢 Easy | `mix(original, effected, dryWet)` per effect |
+| **Tap Tempo / BPM Sync** | All time-based effects lock to global BPM | 🟡 Medium | BPM detector or manual tap, sync all oscillators |
+| **Effect Chains / FX Bus** | Stack + reorder multiple effects per layer | 🔴 Hard | Multi-pass render pipeline, drag-drop UI |
+| **Effect Presets** | Save/recall effect chain configs | 🟡 Medium | Serialization of effect state to IndexedDB |
+| **Crossfader (A/B Deck)** | Crossfade between two layer groups | 🔴 Hard | Layer grouping system + global mix control |
+
+---
+
+## 16. Easy Wins Summary — Ship First
+
+These can each be added with minimal GLSL and a single slider in the layer controls:
+
+| # | Effect | GLSL Complexity | UI Needed |
+|---|--------|-----------------|-----------|
+| 1 | **Invert** | 1 line | Toggle or slider |
+| 2 | **Threshold / Binary** | 1 line | Slider (0–1) |
+| 3 | **Wave Distort** | 2 lines | Freq + Amp sliders |
+| 4 | **Pixelate / Mosaic** | 1 line | Slider (block size) |
+| 5 | **Scan Lines** | 2 lines | Density + Opacity sliders |
+| 6 | **Film Grain** | 3 lines | Amount slider |
+| 7 | **Color Channel Swap** | 1 line | Dropdown (RGB/GBR/BRG/etc.) |
+| 8 | **Duotone** | 2 lines | 2 color pickers |
+| 9 | **Slice & Reassemble** | 3 lines | Slices + Offset sliders |
+| 10 | **Barrel / Fisheye** | 5 lines | Strength slider |
+| 11 | **Polar Coordinates** | 2 lines | Toggle + blend slider |
+| 12 | **Zoom Pulse** | 3 lines (JS envelope) | Existing Pulse is similar — this is sharper one-shot |
+| 13 | **Edge Detection (Sobel)** | ✅ DONE | Already shipped as per-layer Edge toggle |
+| 14 | **Luma Key** | 2 lines | Lo/Hi threshold sliders |
+| 15 | **Freeze Frame** | 0 GLSL (JS only) | Toggle/beat-trigger |
+
+---
+
+## 17. Top 5 Priority Effects — Phased Plan
+
+> These five effects maximize visual impact vs. implementation cost and would bridge the gap between "visualizer with video" and "actual VJ tool."
+
+### Phase A: Immediate (reuse existing pipeline)
+
+#### A1. Luma Key 🟢
+- **Why:** Unlocks layered composition — makes every other effect more powerful
+- **GLSL:** `alpha *= smoothstep(loThresh, hiThresh, luminance)` — 2 lines
+- **UI:** Lo Threshold slider + Hi Threshold slider (or single slider with feather)
+- **Audio-reactive:** Threshold shift on beat = pulsing reveal
+- **Estimate:** 1–2 hours
+
+#### A2. Wave Distort 🟢
+- **Why:** Instant crowd-pleaser. Sinusoidal UV warp creates liquid/underwater/heat-haze look.
+- **GLSL:** `uv.x += sin(uv.y * freq + time) * amp;` — literally 1–2 lines
+- **UI:** Frequency slider (1–20) + Amplitude slider (0–0.1) + optional: Axis toggle (H/V/Both)
+- **Audio-reactive:** Amplitude driven by existing `reactSource` — bass = big waves, treble = fine ripples
+- **Estimate:** 1–2 hours
+
+#### A3. Invert + Threshold (2-for-1) 🟢
+- **Why:** Two essential VJ color tools, both one-liners, share a "Color FX" subsection in UI
+- **GLSL:** Invert: `mix(color, 1.0-color, amount)` / Threshold: `step(thresh, luminance)`
+- **UI:** Invert slider (0–1 mix) + Threshold slider (0–1 cutoff)
+- **Audio-reactive:** Threshold driven by `reactSource` = pulsing silhouettes
+- **Estimate:** 1–2 hours
+
+### Phase B: Frame Buffer Required (new FBO infrastructure)
+
+> Phases B1 and B2 share the same prerequisite: a **previous-frame FBO** (framebuffer object). Build this once, both effects use it.
+
+#### B1. Frame Buffer / Echo (Motion Trails) 🟡
+- **Why:** Ghostly trails, the analog feedback aesthetic. Massive visual payoff.
+- **Architecture:**
+  1. Create a ping-pong FBO pair (two render textures)
+  2. Each frame: blend current video texture with previous FBO at decay rate
+  3. Write result to other FBO, swap
+- **UI:** Trail Length / Decay slider (0 = no trails, 1 = infinite persistence)
+- **Audio-reactive:** Decay rate driven by energy (loud = short trails, quiet = long smears)
+- **Prereq:** FBO ping-pong infrastructure (reusable for B2)
+- **Estimate:** 6–8 hours (including FBO setup)
+
+#### B2. Feedback Loop 🟡
+- **Why:** #1 effect in analog VJ rigs. Creates infinite tunnels, fractal smears.
+- **Architecture:** Same FBO as B1, but re-inject with **scale + rotation offset**
+  1. Read previous FBO
+  2. Sample with `uv * feedbackScale` and `rotate(uv, feedbackAngle)`
+  3. Blend with current frame
+  4. Write to FBO
+- **UI:** Feedback Amount (0–0.99), Zoom (0.9–1.1), Rotation (0–10°)
+- **Audio-reactive:** Zoom amount on bass, rotation speed on mids
+- **Prereq:** Same FBO infrastructure as B1 — marginal cost if B1 is done
+- **Estimate:** 3–4 hours (after B1 FBO exists)
+
+### Phase C: Beat-Synced Logic
+
+#### C1. Glitch Blocks 🟡
+- **Why:** Pure VJ energy. Random rectangular chunks displaced, beat-synced.
+- **Architecture:**
+  1. Divide frame into grid (e.g., 8×6)
+  2. On beat trigger, randomly select N blocks
+  3. Offset their UV coordinates by random amount
+  4. Hold for N frames, then release
+- **UI:** Block Size slider, Intensity (how many blocks), Hold Duration
+- **Audio-reactive:** Trigger on kick, intensity scales with energy
+- **Prereq:** Beat detection (already exists), random seed per beat
+- **Estimate:** 4–6 hours
+
+### Implementation Order
+
+```
+Phase A (no new infra needed):
+  A1. Luma Key ──────────── 1-2 hrs ──┐
+  A2. Wave Distort ─────── 1-2 hrs ──┤── Ship together
+  A3. Invert + Threshold ── 1-2 hrs ─┘
+                                      
+Phase B (FBO infrastructure):         
+  B0. Build FBO ping-pong ── 3 hrs ──┐
+  B1. Frame Echo ──────── 3-4 hrs ───┤── Ship together
+  B2. Feedback Loop ───── 3-4 hrs ───┘
+                                      
+Phase C (beat logic):                 
+  C1. Glitch Blocks ──── 4-6 hrs ──── Ship standalone
+```
+
+**Total estimated effort:** ~14–20 hours across all phases
+
+**NOTE:** Edge Detection (Sobel) was originally in the Top 5 but is already shipped as the per-layer "Edge" toggle. Replaced with Wave Distort + Invert/Threshold as easy wins that fill different visual territory.
+
+### Shared FBO Infrastructure (Phases B+C)
+
+The ping-pong FBO built for Phase B is reusable for many future effects:
+- Frame Echo (B1)
+- Feedback Loop (B2)
+- Difference Blend (future)
+- Time Displacement / Slit-Scan (future)
+- Accumulation Buffer (future)
+
+Building it once unlocks an entire category of temporal effects.
+
+---
+
+*Document created for brainstorming session. Simplified spec reflects May 7, 2026 discussion — no tiling, single-quad video layers with mirror-based duplication. VJ effects brainstorm added May 8, 2026.*
