@@ -758,6 +758,12 @@ export class VisualizerEngine {
       this._loadVideoTexture(name, texObj.videoElement, texObj.width, texObj.height);
       return;
     }
+    if (texObj.isText && texObj.textLayer) {
+      this._gifAnimations.delete(name);
+      this._videoAnimations.delete(name);
+      this._loadTextTexture(name, texObj.textLayer);
+      return;
+    }
     this._gifAnimations.delete(name);
     this._videoAnimations.delete(name);
     try {
@@ -766,6 +772,176 @@ export class VisualizerEngine {
       }
     } catch (e) {
       console.warn('[DiscoCast Visualizer] setUserTexture failed:', e.message);
+    }
+  }
+
+  /**
+   * Render a text layer to a Canvas 2D offscreen canvas and return a dataURL.
+   * Called every time text content or typography settings change.
+   * Transparent background — text composites cleanly over layers behind it.
+   */
+  _renderTextTexture(textLayer) {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    const fontSize = textLayer.fontSize || 48;
+    const fontWeight = textLayer.fontWeight || 'bold';
+    const fontFamily = textLayer.fontFamily || 'Inter';
+    const lineHeight = textLayer.lineHeight || 1.2;
+    const letterSpacing = textLayer.letterSpacing || 0;
+    const textAlign = textLayer.textAlign || 'center';
+    const color = textLayer.color || '#ffffff';
+    const lines = (textLayer.text || '').split('\n');
+
+    // Measure to determine canvas size
+    ctx.font = `${fontWeight} ${fontSize}px "${fontFamily}", sans-serif`;
+    if (letterSpacing) ctx.letterSpacing = `${letterSpacing}px`;
+    const lineHeightPx = fontSize * lineHeight;
+    const padding = Math.ceil(fontSize * 0.5);
+
+    let maxWidth = 1;
+    for (const line of lines) {
+      const w = ctx.measureText(line).width + Math.abs(letterSpacing) * Math.max(line.length - 1, 0);
+      if (w > maxWidth) maxWidth = w;
+    }
+    const totalHeight = lines.length * lineHeightPx;
+
+    // Shadow extends canvas — add extra room
+    const shadowBlur = textLayer.textShadow?.enabled ? (textLayer.textShadow.blur || 0) : 0;
+    const shadowPad = shadowBlur + Math.abs(textLayer.textShadow?.offsetX || 0) + Math.abs(textLayer.textShadow?.offsetY || 0);
+
+    // Size the canvas to the text at MAX font size (200px) so canvas never changes
+    // as the font size slider moves. This keeps texW/texH stable so tile spacing
+    // and shader aspect ratio never change — font size only changes glyph size within.
+    const maxFontSize = 200;
+    const maxPadding = Math.ceil(maxFontSize * 0.5);
+    ctx.font = `${fontWeight} ${maxFontSize}px "${fontFamily}", sans-serif`;
+    let maxFontWidth = 1;
+    for (const line of lines) {
+      const w = ctx.measureText(line).width + Math.abs(letterSpacing) * Math.max(line.length - 1, 0);
+      if (w > maxFontWidth) maxFontWidth = w;
+    }
+    const maxFontTotalH = lines.length * (maxFontSize * lineHeight);
+    const canvasW = Math.max(64, Math.ceil(maxFontWidth + maxPadding * 2 + shadowPad * 2));
+    const canvasH = Math.max(64, Math.ceil(maxFontTotalH + maxPadding * 2 + shadowPad * 2));
+    canvas.width = canvasW;
+    canvas.height = canvasH;
+
+    // Transparent background
+    ctx.clearRect(0, 0, canvasW, canvasH);
+
+    // Optional background box
+    if (textLayer.backgroundBox?.enabled) {
+      ctx.fillStyle = textLayer.backgroundBox.color || '#000000';
+      ctx.globalAlpha = textLayer.backgroundBox.opacity ?? 0.5;
+      ctx.fillRect(0, 0, canvasW, canvasH);
+      ctx.globalAlpha = 1;
+    }
+
+    // Typography
+    ctx.font = `${fontWeight} ${fontSize}px "${fontFamily}", sans-serif`;
+    if (letterSpacing) ctx.letterSpacing = `${letterSpacing}px`;
+    ctx.fillStyle = color;
+    ctx.textBaseline = 'alphabetic';
+
+    // Text alignment anchor X
+    let anchorX;
+    if (textAlign === 'center') { ctx.textAlign = 'center'; anchorX = canvasW / 2; }
+    else if (textAlign === 'right') { ctx.textAlign = 'right'; anchorX = canvasW - padding - shadowPad; }
+    else { ctx.textAlign = 'left'; anchorX = padding + shadowPad; }
+
+    // Center text vertically in the stable canvas
+    const startY = Math.floor((canvasH - totalHeight) / 2) + fontSize;
+
+    const applyShadow = () => {
+      if (textLayer.textShadow?.enabled) {
+        ctx.shadowColor = textLayer.textShadow.color || '#000000';
+        ctx.shadowBlur = textLayer.textShadow.blur ?? 8;
+        ctx.shadowOffsetX = textLayer.textShadow.offsetX ?? 3;
+        ctx.shadowOffsetY = textLayer.textShadow.offsetY ?? 3;
+      } else {
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+      }
+    };
+    const clearShadow = () => {
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+    };
+
+    lines.forEach((line, i) => {
+      const y = startY + i * lineHeightPx;
+      // Outline drawn first (behind fill), never with shadow
+      if (textLayer.textOutline?.enabled) {
+        clearShadow();
+        ctx.strokeStyle = textLayer.textOutline.color || '#000000';
+        ctx.lineWidth = (textLayer.textOutline.width || 3) * 2;
+        ctx.lineJoin = 'round';
+        ctx.strokeText(line, anchorX, y);
+      }
+      // Fill with shadow
+      applyShadow();
+      ctx.fillStyle = color;
+      ctx.fillText(line, anchorX, y);
+    });
+
+    return { dataURL: canvas.toDataURL(), width: canvasW, height: canvasH, canvas };
+  }
+
+  /**
+   * Upload a text layer canvas directly to a GL texture (bypasses loadExtraImages
+   * which skips re-upload when a sampler with the same name already exists).
+   * Safe to call repeatedly — reuses the existing GL texture object.
+   */
+  async _loadTextTexture(name, textLayer) {
+    try {
+      const imgTextures = this.visualizer?.renderer?.image;
+      if (!imgTextures?.gl) {
+        console.warn('[DiscoCast Visualizer] No GL context for text texture');
+        return;
+      }
+      const gl = imgTextures.gl;
+
+      // Ensure the bundled @font-face is loaded before Canvas 2D measures/renders.
+      // check() is synchronous — skip the async load() if font is already ready
+      // to avoid async pile-up when the font size slider is dragged rapidly.
+      const rawWeight = textLayer.fontWeight || 'bold';
+      const fontSize = textLayer.fontSize || 64;
+      const fontFamily = textLayer.fontFamily || 'Inter';
+      // Normalise keyword weights to numbers so fonts.check() matches @font-face declarations
+      const fontWeight = rawWeight === 'bold' ? '700' : rawWeight === 'normal' ? '400' : rawWeight;
+      const fontStr = `${fontWeight} ${fontSize}px "${fontFamily}"`;
+      if (!document.fonts.check(fontStr)) {
+        try { await document.fonts.load(fontStr); } catch (_) { /* use fallback */ }
+      }
+
+      const rendered = this._renderTextTexture(textLayer);
+      const { canvas } = rendered;
+      // Reuse existing texture object if present, create new one otherwise
+      let texture = imgTextures.samplers[name];
+      if (!texture) {
+        texture = gl.createTexture();
+        imgTextures.samplers[name] = texture;
+      }
+
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+      // Canvas is always 1024x1024 (power-of-two) so REPEAT is valid.
+      // Use REPEAT when tiling is enabled so tiles render correctly.
+      const wrapMode = textLayer.tile ? gl.REPEAT : gl.CLAMP_TO_EDGE;
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapMode);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrapMode);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      return { width: canvas.width, height: canvas.height };
+    } catch (e) {
+      console.warn('[DiscoCast Visualizer] _loadTextTexture failed:', e.message);
     }
   }
 

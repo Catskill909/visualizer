@@ -4,6 +4,7 @@
  * the user picks an audio source.
  */
 
+import '../assets/fonts/fonts.css';
 import { VisualizerEngine } from '../visualizer.js';
 import { EditorInspector, showToast } from './inspector.js';
 import { PresetLibrary } from './presetLibrary.js';

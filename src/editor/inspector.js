@@ -458,6 +458,7 @@ export class EditorInspector {
         this._bindImagesOnly();
         this._bindHdUploads();
         this._bindCollapseAll();
+        this._bindAddTextLayer();
         this._initDevHud();
         this._updateLayersBar();
 
@@ -1896,6 +1897,14 @@ export class EditorInspector {
         });
     }
 
+    // ─── Text layer button ──────────────────────────────────────────────────────
+
+    _bindAddTextLayer() {
+        const btn = document.getElementById('btn-add-text-layer');
+        if (!btn) return;
+        btn.addEventListener('click', () => this._addTextLayer());
+    }
+
     // ─── Phase 1: layers count + dropzone-disabled bar state ───────────────────
 
     _updateLayersBar() {
@@ -2426,6 +2435,111 @@ export class EditorInspector {
         // is deleted via the delete button.
     }
 
+    // ─── Add a text layer ──────────────────────────────────────────────────────
+    // No file picker — creates entry with type:'text' and renders initial texture.
+
+    _addTextLayer() {
+        if (!this.currentState.images) this.currentState.images = [];
+        if (this.currentState.images.length >= MAX_LAYERS) {
+            showToast(`Max ${MAX_LAYERS} layers`, true);
+            return;
+        }
+
+        // Smart accordion: collapse existing cards
+        this.currentState.images.forEach(e => { e.collapsed = true; });
+        document.querySelectorAll('#image-layers .image-layer-card').forEach(c => {
+            c.classList.add('collapsed');
+        });
+
+        const texName = `usertxt${Date.now().toString(36)}`;
+
+        const entry = {
+            type: 'text',
+            texName,
+            // Content
+            text: 'Hello\nWorld',
+            // Typography
+            fontFamily: 'Inter',
+            fontSize: 64,
+            fontWeight: 'bold',
+            color: '#ffffff',
+            textAlign: 'center',
+            letterSpacing: 0,
+            lineHeight: 1.2,
+            // Effects
+            textShadow: { enabled: true, color: '#000000', blur: 8, offsetX: 3, offsetY: 3 },
+            textOutline: { enabled: false, color: '#000000', width: 2 },
+            backgroundBox: { enabled: false, color: '#000000', padding: 10, opacity: 0.5 },
+            // Transforms — same defaults as image layers
+            blendMode: 'normal',
+            size: 0.50,
+            opacity: 1.0,
+            opacityPulse: 0.00,
+            spinSpeed: 0.00,
+            orbitRadius: 0.00,
+            orbitMode: 'circle',
+            lissFreqX: 0.50,
+            lissFreqY: 0.75,
+            lissPhase: 0.25,
+            bounceAmp: 0.00,
+            cx: 0.50,
+            cy: 0.50,
+            swayAmt: 0.00,
+            swaySpeed: 1.00,
+            wanderAmt: 0.00,
+            wanderSpeed: 0.50,
+            panMode: 'off',
+            panSpeedX: 0.00,
+            panSpeedY: 0.00,
+            panRange: 0.20,
+            mirror: 'none',
+            mirrorScope: 'tile',
+            tintR: 1.00, tintG: 1.00, tintB: 1.00,
+            hueSpinSpeed: 0.00,
+            imageSaturation: 1.00,
+            imageHue: 0,
+            tile: false,
+            spacing: 0.00,
+            tileScaleX: 1.00,
+            tileScaleY: 1.00,
+            tunnelSpeed: 0.00,
+            depthOffset: 0.00,
+            groupSpin: false,
+            audioPulse: 0.00,
+            pulseInvert: false,
+            angle: 0.00,
+            skewX: 0.00,
+            skewY: 0.00,
+            perspX: 0.00,
+            perspY: 0.00,
+            radius: 0.00,
+            chromaticAberration: 0.00,
+            chromaticSpeed: 1.00,
+            shakeAmp: 0.00,
+            strobeAmp: 0.00,
+            strobeThr: 0.40,
+            posterize: 0,
+            edgeSobel: false,
+            reactSource: 'bass',
+            reactCurve: 'linear',
+            solo: false,
+            muted: false,
+            collapsed: false,
+            isGif: false,
+            isText: true,
+            name: 'Text',
+        };
+        this.currentState.images.push(entry);
+
+        const initRendered = this.engine._renderTextTexture(entry);
+        entry.texW = initRendered.width;
+        entry.texH = initRendered.height;
+        const texObj = { isText: true, textLayer: entry, width: initRendered.width, height: initRendered.height };
+        this._mountLayerCard(entry, texObj);
+        showToast('Text layer added');
+        if (this.currentState.images.length === 1) showHint();
+    }
+
     // ─── Mount a layer card from an entry + texObj ─────────────────────────────
     // Used by both _addImageLayer (new upload) and loadPresetData (library load).
 
@@ -2528,17 +2642,126 @@ export class EditorInspector {
             </div>
             <div class="layer-section-divider"></div>
             ` : ''}
+            ${entry.type === 'text' ? `
+            <p class="layer-section-label">Content</p>
+            <textarea class="layer-text-input" spellcheck="false" rows="3">${entry.text || ''}</textarea>
+            <div class="layer-section-divider"></div>
+            <p class="layer-section-label">Typography</p>
+            <div class="layer-row-inline">
+              <span class="layer-ctrl-label">Font</span>
+              <select class="layer-font-family">
+                <option value="Inter"${entry.fontFamily === 'Inter' ? ' selected' : ''}>Inter</option>
+                <option value="Roboto"${entry.fontFamily === 'Roboto' ? ' selected' : ''}>Roboto</option>
+                <option value="Oswald"${entry.fontFamily === 'Oswald' ? ' selected' : ''}>Oswald</option>
+              </select>
+            </div>
+            <div class="layer-row-inline">
+              <span class="layer-ctrl-label">Weight</span>
+              <select class="layer-font-weight">
+                <option value="normal"${entry.fontWeight === 'normal' ? ' selected' : ''}>Normal</option>
+                <option value="bold"${entry.fontWeight === 'bold' ? ' selected' : ''}>Bold</option>
+              </select>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label">Size</span>
+              <input type="range" class="slider layer-font-size-sl" min="24" max="200" step="1"
+                value="${entry.fontSize || 64}" style="--pct:${pct(entry.fontSize || 64, 24, 200)}">
+              <span class="lsv layer-font-size-val">${entry.fontSize || 64}px</span>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Space between letters (px)">Letter</span>
+              <input type="range" class="slider layer-letter-spacing-sl" min="-10" max="30" step="1"
+                value="${entry.letterSpacing || 0}" style="--pct:${pct(entry.letterSpacing || 0, -10, 30)}">
+              <span class="lsv layer-letter-spacing-val">${entry.letterSpacing || 0}px</span>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Line height multiplier">Line</span>
+              <input type="range" class="slider layer-line-height-sl" min="1.0" max="3.0" step="0.1"
+                value="${(entry.lineHeight || 1.2).toFixed(1)}" style="--pct:${pct(entry.lineHeight || 1.2, 1.0, 3.0)}">
+              <span class="lsv layer-line-height-val">${(entry.lineHeight || 1.2).toFixed(1)}</span>
+            </div>
+            <div class="layer-row-inline">
+              <span class="layer-ctrl-label">Align</span>
+              <div class="layer-text-align-seg" role="group" aria-label="Text alignment">
+                <button class="lseg${(entry.textAlign || 'center') === 'left' ? ' active' : ''}" data-text-align="left">L</button>
+                <button class="lseg${(entry.textAlign || 'center') === 'center' ? ' active' : ''}" data-text-align="center">C</button>
+                <button class="lseg${(entry.textAlign || 'center') === 'right' ? ' active' : ''}" data-text-align="right">R</button>
+              </div>
+            </div>
+            <div class="layer-row-inline">
+              <span class="layer-ctrl-label">Color</span>
+              <div class="layer-text-color-wrap">
+                <span class="layer-text-color-swatch" style="background:${entry.color || '#ffffff'}"></span>
+                <input type="color" class="layer-text-color-picker" value="${entry.color || '#ffffff'}">
+              </div>
+            </div>
+            <div class="layer-section-divider"></div>
+            <p class="layer-section-label">Effects</p>
+            <div class="layer-row-inline">
+              <label class="toggle-switch toggle-switch--sm">
+                <input type="checkbox" class="layer-text-shadow-cb" ${entry.textShadow?.enabled ? 'checked' : ''} />
+                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+              </label>
+              <span class="layer-ctrl-label" style="margin-left:6px">Shadow</span>
+            </div>
+            <div class="layer-text-fx-detail layer-text-shadow-detail" style="${entry.textShadow?.enabled ? '' : 'display:none'}">
+              <div class="layer-slider-row">
+                <span class="layer-ctrl-label">Blur</span>
+                <input type="range" class="slider layer-shadow-blur-sl" min="0" max="40" step="1"
+                  value="${entry.textShadow?.blur ?? 8}" style="--pct:${pct(entry.textShadow?.blur ?? 8, 0, 40)}">
+                <span class="lsv layer-shadow-blur-val">${entry.textShadow?.blur ?? 8}</span>
+              </div>
+              <div class="layer-row-inline">
+                <span class="layer-ctrl-label">X / Y</span>
+                <input type="range" class="slider layer-shadow-x-sl" min="-20" max="20" step="1"
+                  value="${entry.textShadow?.offsetX ?? 3}" style="--pct:${pct(entry.textShadow?.offsetX ?? 3, -20, 20)}">
+                <input type="range" class="slider layer-shadow-y-sl" min="-20" max="20" step="1"
+                  value="${entry.textShadow?.offsetY ?? 3}" style="--pct:${pct(entry.textShadow?.offsetY ?? 3, -20, 20)}">
+              </div>
+              <div class="layer-row-inline">
+                <span class="layer-ctrl-label">Color</span>
+                <div class="layer-shadow-color-wrap">
+                  <span class="layer-shadow-color-swatch" style="background:${entry.textShadow?.color || '#000000'}"></span>
+                  <input type="color" class="layer-shadow-color-picker" value="${entry.textShadow?.color || '#000000'}">
+                </div>
+              </div>
+            </div>
+            <div class="layer-row-inline" style="margin-top:4px">
+              <label class="toggle-switch toggle-switch--sm">
+                <input type="checkbox" class="layer-text-outline-cb" ${entry.textOutline?.enabled ? 'checked' : ''} />
+                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+              </label>
+              <span class="layer-ctrl-label" style="margin-left:6px">Outline</span>
+            </div>
+            <div class="layer-text-fx-detail layer-text-outline-detail" style="${entry.textOutline?.enabled ? '' : 'display:none'}">
+              <div class="layer-slider-row">
+                <span class="layer-ctrl-label">Width</span>
+                <input type="range" class="slider layer-outline-width-sl" min="1" max="16" step="1"
+                  value="${entry.textOutline?.width ?? 3}" style="--pct:${pct(entry.textOutline?.width ?? 3, 1, 16)}">
+                <span class="lsv layer-outline-width-val">${entry.textOutline?.width ?? 3}px</span>
+              </div>
+              <div class="layer-row-inline">
+                <span class="layer-ctrl-label">Color</span>
+                <div class="layer-outline-color-wrap">
+                  <span class="layer-outline-color-swatch" style="background:${entry.textOutline?.color || '#000000'}"></span>
+                  <input type="color" class="layer-outline-color-picker" value="${entry.textOutline?.color || '#000000'}">
+                </div>
+              </div>
+            </div>
+            <div class="layer-section-divider"></div>
+            ` : ''}
             <div class="layer-row-inline">
               <span class="layer-ctrl-label">Blend</span>
               <select class="layer-blend">
-                <option value="screen">Screen</option>
-                <option value="overlay" selected>Overlay</option>
-                <option value="additive">Additive</option>
-                <option value="multiply">Multiply</option>
+                <option value="normal"${(entry.blendMode || 'overlay') === 'normal' ? ' selected' : ''}>Normal</option>
+                <option value="screen"${(entry.blendMode || 'overlay') === 'screen' ? ' selected' : ''}>Screen</option>
+                <option value="overlay"${(entry.blendMode || 'overlay') === 'overlay' ? ' selected' : ''}>Overlay</option>
+                <option value="additive"${(entry.blendMode || 'overlay') === 'additive' ? ' selected' : ''}>Additive</option>
+                <option value="multiply"${(entry.blendMode || 'overlay') === 'multiply' ? ' selected' : ''}>Multiply</option>
               </select>
               ${entry.type !== 'video' ? `<span class="layer-ctrl-label" style="margin-left:8px">Tile</span>
               <label class="toggle-switch toggle-switch--sm">
-                <input type="checkbox" class="layer-tile" checked />
+                <input type="checkbox" class="layer-tile" ${entry.tile ? 'checked' : ''} />
                 <span class="toggle-track"><span class="toggle-thumb"></span></span>
               </label>` : ''}
             </div>
@@ -2729,7 +2952,7 @@ export class EditorInspector {
               <button class="lseg" data-mirror="quad">⊞ Quad</button>
               <button class="lseg" data-mirror="kaleido">✦ Kaleido</button>
             </div>
-            <div class="layer-mirror-scope" role="group" aria-label="Mirror scope" hidden${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
+            <div class="layer-mirror-scope" role="group" aria-label="Mirror scope"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
               <button class="lseg lseg-scope active" data-scope="tile" data-tooltip="Fold inside each tile">Per Tile</button>
               <button class="lseg lseg-scope" data-scope="field" data-tooltip="Fold the whole tiled group">Whole Image</button>
             </div>
@@ -2890,8 +3113,9 @@ export class EditorInspector {
             if (tunnelRow) tunnelRow.style.display = entry.tile ? '' : 'none';
             if (spacingRow) spacingRow.style.display = entry.tile ? '' : 'none';
             if (groupSpinWrap) groupSpinWrap.style.display = entry.tile ? '' : 'none';
-            if (mirrorScopeRow && entry.mirror !== 'none') mirrorScopeRow.style.display = entry.tile ? '' : 'none';
+            if (mirrorScopeRow) mirrorScopeRow.style.display = (entry.mirror !== 'none') ? '' : 'none';
             tileScaleRows.forEach(r => { r.style.display = entry.tile ? '' : 'none'; });
+            if (entry.type === 'text') this.engine._loadTextTexture(entry.texName, entry);
             refresh();
         });
         if (pulseInvCb) pulseInvCb.addEventListener('change', () => { entry.pulseInvert = pulseInvCb.checked; refresh(); });
@@ -3022,7 +3246,7 @@ export class EditorInspector {
         const sliderMins = [0, 0, 0, -2, 0, 0, 0, 0, 0, 0];
         const sliderMaxes = [1, 0.8, 0.45, 2, 1, 0.4, 4, 0.4, 2, 2];
 
-        card.querySelectorAll('.layer-slider-row input[type=range]:not(.layer-bounce-sl):not(.layer-size-sl):not(.layer-liss-sl):not(.layer-strobe-thr-sl):not(.layer-pan-x-sl):not(.layer-pan-y-sl):not(.layer-pan-range-sl):not(.layer-beat-fade-sl):not(.layer-tile-sx-sl):not(.layer-tile-sy-sl):not(.layer-shake-sl):not(.layer-persp-x-sl):not(.layer-persp-y-sl):not(.layer-radius-sl):not(.layer-gif-speed-sl):not(.layer-gif-stability-sl):not(.layer-video-speed-sl):not(.layer-video-scrub-sl)').forEach((sl, i) => {
+        card.querySelectorAll('.layer-slider-row input[type=range]:not(.layer-bounce-sl):not(.layer-size-sl):not(.layer-liss-sl):not(.layer-strobe-thr-sl):not(.layer-pan-x-sl):not(.layer-pan-y-sl):not(.layer-pan-range-sl):not(.layer-beat-fade-sl):not(.layer-tile-sx-sl):not(.layer-tile-sy-sl):not(.layer-shake-sl):not(.layer-persp-x-sl):not(.layer-persp-y-sl):not(.layer-radius-sl):not(.layer-gif-speed-sl):not(.layer-gif-stability-sl):not(.layer-video-speed-sl):not(.layer-video-scrub-sl):not(.layer-font-size-sl):not(.layer-letter-spacing-sl):not(.layer-line-height-sl):not(.layer-shadow-blur-sl):not(.layer-shadow-x-sl):not(.layer-shadow-y-sl):not(.layer-outline-width-sl)').forEach((sl, i) => {
             const valEl = sl.nextElementSibling;
             sl.addEventListener('input', () => {
                 const v = parseFloat(sl.value);
@@ -3045,7 +3269,7 @@ export class EditorInspector {
             const m = mirrorLabels[entry.mirror] || 'Off';
             if (entry.mirror === 'none') mirrorStatus.textContent = 'Off';
             else mirrorStatus.textContent = `${m} · ${scopeLabels[entry.mirrorScope || 'tile']}`;
-            if (scopeRow) scopeRow.hidden = entry.mirror === 'none';
+            if (scopeRow) scopeRow.style.display = entry.mirror === 'none' ? 'none' : '';
         };
         card.querySelectorAll('.layer-mirror-seg .lseg').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -3156,6 +3380,203 @@ export class EditorInspector {
                     }
                     videoTimeVal.textContent = formatTime(entry.currentTime) + ' / ' + formatTime(entry.duration);
                     videoScrubSl.style.setProperty('--pct', `${(pos * 100).toFixed(1)}%`);
+                });
+            }
+        }
+
+        // Text layer controls (only present for type:'text' layers)
+        if (entry.type === 'text') {
+            // Direct GL upload — bypasses loadExtraImages name-collision cache
+            const reRender = () => {
+                this.engine._loadTextTexture(entry.texName, entry);
+                // Update thumbnail
+                const thumbCanvas = card.querySelector('.layer-thumb');
+                if (thumbCanvas) {
+                    const rendered = this.engine._renderTextTexture(entry);
+                    const thumbImg = new Image();
+                    thumbImg.onload = () => {
+                        const ctx = thumbCanvas.getContext('2d');
+                        ctx.clearRect(0, 0, thumbCanvas.width, thumbCanvas.height);
+                        ctx.fillStyle = '#0a0a0a';
+                        ctx.fillRect(0, 0, thumbCanvas.width, thumbCanvas.height);
+                        const srcAR = rendered.canvas.width / rendered.canvas.height;
+                        const dstAR = thumbCanvas.width / thumbCanvas.height;
+                        let dw, dh, dx, dy;
+                        if (srcAR > dstAR) { dw = thumbCanvas.width; dh = dw / srcAR; dx = 0; dy = (thumbCanvas.height - dh) / 2; }
+                        else { dh = thumbCanvas.height; dw = dh * srcAR; dy = 0; dx = (thumbCanvas.width - dw) / 2; }
+                        ctx.drawImage(thumbImg, dx, dy, dw, dh);
+                    };
+                    thumbImg.src = rendered.dataURL;
+                }
+            };
+
+            const textInput = card.querySelector('.layer-text-input');
+            if (textInput) {
+                let _textDebounce;
+                textInput.addEventListener('input', () => {
+                    clearTimeout(_textDebounce);
+                    _textDebounce = setTimeout(() => {
+                        entry.text = textInput.value;
+                        reRender();
+                    }, 150);
+                });
+            }
+
+            const fontFamilySel = card.querySelector('.layer-font-family');
+            if (fontFamilySel) {
+                fontFamilySel.addEventListener('change', () => {
+                    entry.fontFamily = fontFamilySel.value;
+                    reRender();
+                });
+            }
+
+            const fontWeightSel = card.querySelector('.layer-font-weight');
+            if (fontWeightSel) {
+                fontWeightSel.addEventListener('change', () => {
+                    entry.fontWeight = fontWeightSel.value;
+                    reRender();
+                });
+            }
+
+            const fontSizeSl = card.querySelector('.layer-font-size-sl');
+            const fontSizeVal = card.querySelector('.layer-font-size-val');
+            if (fontSizeSl && fontSizeVal) {
+                fontSizeSl.addEventListener('input', () => {
+                    const v = parseInt(fontSizeSl.value, 10);
+                    entry.fontSize = v;
+                    fontSizeVal.textContent = `${v}px`;
+                    fontSizeSl.style.setProperty('--pct', `${pct(v, 24, 200)}`);
+                    reRender();
+                });
+            }
+
+            const letterSl = card.querySelector('.layer-letter-spacing-sl');
+            const letterVal = card.querySelector('.layer-letter-spacing-val');
+            if (letterSl && letterVal) {
+                letterSl.addEventListener('input', () => {
+                    const v = parseInt(letterSl.value, 10);
+                    entry.letterSpacing = v;
+                    letterVal.textContent = `${v}px`;
+                    letterSl.style.setProperty('--pct', `${pct(v, -10, 30)}`);
+                    reRender();
+                });
+            }
+
+            const lineHSl = card.querySelector('.layer-line-height-sl');
+            const lineHVal = card.querySelector('.layer-line-height-val');
+            if (lineHSl && lineHVal) {
+                lineHSl.addEventListener('input', () => {
+                    const v = parseFloat(lineHSl.value);
+                    entry.lineHeight = v;
+                    lineHVal.textContent = v.toFixed(1);
+                    lineHSl.style.setProperty('--pct', `${pct(v, 1.0, 3.0)}`);
+                    reRender();
+                });
+            }
+
+            const alignBtns = card.querySelectorAll('.layer-text-align-seg .lseg');
+            alignBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    alignBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    entry.textAlign = btn.dataset.textAlign;
+                    reRender();
+                });
+            });
+
+            const colorPicker = card.querySelector('.layer-text-color-picker');
+            const colorSwatch = card.querySelector('.layer-text-color-swatch');
+            if (colorPicker) {
+                colorPicker.addEventListener('input', () => {
+                    entry.color = colorPicker.value;
+                    colorSwatch.style.background = colorPicker.value;
+                    reRender();
+                });
+            }
+
+            // Shadow
+            const shadowCb = card.querySelector('.layer-text-shadow-cb');
+            const shadowDetail = card.querySelector('.layer-text-shadow-detail');
+            if (shadowCb) {
+                shadowCb.addEventListener('change', () => {
+                    if (!entry.textShadow) entry.textShadow = { blur: 8, offsetX: 3, offsetY: 3, color: '#000000' };
+                    entry.textShadow.enabled = shadowCb.checked;
+                    if (shadowDetail) shadowDetail.style.display = shadowCb.checked ? '' : 'none';
+                    reRender();
+                });
+            }
+            const shadowBlurSl = card.querySelector('.layer-shadow-blur-sl');
+            const shadowBlurVal = card.querySelector('.layer-shadow-blur-val');
+            if (shadowBlurSl) {
+                shadowBlurSl.addEventListener('input', () => {
+                    const v = parseInt(shadowBlurSl.value, 10);
+                    if (!entry.textShadow) entry.textShadow = { blur: 8, offsetX: 3, offsetY: 3, color: '#000000' };
+                    entry.textShadow.blur = v;
+                    if (shadowBlurVal) shadowBlurVal.textContent = v;
+                    shadowBlurSl.style.setProperty('--pct', `${pct(v, 0, 40)}`);
+                    reRender();
+                });
+            }
+            const shadowXSl = card.querySelector('.layer-shadow-x-sl');
+            if (shadowXSl) {
+                shadowXSl.addEventListener('input', () => {
+                    if (!entry.textShadow) entry.textShadow = { blur: 8, offsetX: 3, offsetY: 3, color: '#000000' };
+                    entry.textShadow.offsetX = parseInt(shadowXSl.value, 10);
+                    shadowXSl.style.setProperty('--pct', `${pct(entry.textShadow.offsetX, -20, 20)}`);
+                    reRender();
+                });
+            }
+            const shadowYSl = card.querySelector('.layer-shadow-y-sl');
+            if (shadowYSl) {
+                shadowYSl.addEventListener('input', () => {
+                    if (!entry.textShadow) entry.textShadow = { blur: 8, offsetX: 3, offsetY: 3, color: '#000000' };
+                    entry.textShadow.offsetY = parseInt(shadowYSl.value, 10);
+                    shadowYSl.style.setProperty('--pct', `${pct(entry.textShadow.offsetY, -20, 20)}`);
+                    reRender();
+                });
+            }
+            const shadowColorSwatch = card.querySelector('.layer-shadow-color-swatch');
+            const shadowColorPicker = card.querySelector('.layer-shadow-color-picker');
+            if (shadowColorPicker) {
+                shadowColorPicker.addEventListener('input', () => {
+                    if (!entry.textShadow) entry.textShadow = { blur: 8, offsetX: 3, offsetY: 3, color: '#000000' };
+                    entry.textShadow.color = shadowColorPicker.value;
+                    shadowColorSwatch.style.background = shadowColorPicker.value;
+                    reRender();
+                });
+            }
+
+            // Outline
+            const outlineCb = card.querySelector('.layer-text-outline-cb');
+            const outlineDetail = card.querySelector('.layer-text-outline-detail');
+            if (outlineCb) {
+                outlineCb.addEventListener('change', () => {
+                    if (!entry.textOutline) entry.textOutline = { color: '#000000', width: 3 };
+                    entry.textOutline.enabled = outlineCb.checked;
+                    if (outlineDetail) outlineDetail.style.display = outlineCb.checked ? '' : 'none';
+                    reRender();
+                });
+            }
+            const outlineWidthSl = card.querySelector('.layer-outline-width-sl');
+            const outlineWidthVal = card.querySelector('.layer-outline-width-val');
+            if (outlineWidthSl) {
+                outlineWidthSl.addEventListener('input', () => {
+                    const v = parseInt(outlineWidthSl.value, 10);
+                    if (!entry.textOutline) entry.textOutline = { color: '#000000', width: 3 };
+                    entry.textOutline.width = v;
+                    if (outlineWidthVal) outlineWidthVal.textContent = `${v}px`;
+                    outlineWidthSl.style.setProperty('--pct', `${pct(v, 1, 16)}`);
+                    reRender();
+                });
+            }
+            const outlineColorSwatch = card.querySelector('.layer-outline-color-swatch');
+            const outlineColorPicker = card.querySelector('.layer-outline-color-picker');
+            if (outlineColorPicker) {
+                outlineColorPicker.addEventListener('input', () => {
+                    if (!entry.textOutline) entry.textOutline = { color: '#000000', width: 3 };
+                    entry.textOutline.color = outlineColorPicker.value;
+                    outlineColorSwatch.style.background = outlineColorPicker.value;
+                    reRender();
                 });
             }
         }
@@ -3649,7 +4070,10 @@ export class EditorInspector {
                 else { dh = H; dw = H * srcAR; dy = 0; dx = (W - dw) / 2; }
                 ctx.drawImage(thumbImg, dx, dy, dw, dh);
             };
-            thumbImg.src = texObj.data;
+            const thumbSrc = texObj.isText
+                ? this.engine._renderTextTexture(texObj.textLayer).dataURL
+                : texObj.data;
+            thumbImg.src = thumbSrc;
             thumbCanvas.setAttribute('data-tooltip', entry.fileName || '');
         }
         if (entry.collapsed) {
@@ -3669,6 +4093,33 @@ export class EditorInspector {
     async _resetImageLayer(entry, card) {
         const texObj = this._imageTextures[entry.texName];
         if (!texObj) return;
+
+        // Text layers have no blob — reset by removing and re-adding a fresh default entry
+        if (entry.type === 'text') {
+            this._preSnap();
+            const origIdx = this.currentState.images.indexOf(entry);
+            if (origIdx !== -1) this.currentState.images.splice(origIdx, 1);
+            delete this._imageTextures[entry.texName];
+            card.remove();
+            this._addTextLayer();
+            const arr = this.currentState.images;
+            const newEntry = arr[arr.length - 1];
+            if (newEntry && origIdx !== -1 && origIdx < arr.length - 1) {
+                arr.pop();
+                arr.splice(origIdx, 0, newEntry);
+                const layers = document.getElementById('image-layers');
+                const byTex = new Map();
+                layers.querySelectorAll('.image-layer-card').forEach(c => byTex.set(c.dataset.texName, c));
+                arr.forEach(e => { const c = byTex.get(e.texName); if (c) layers.appendChild(c); });
+            }
+            this._updateLayerIndices();
+            this._buildCompShader();
+            this._applyToEngine();
+            this._postSnap();
+            showToast('Reset text layer');
+            return;
+        }
+
         this._preSnap();
         const origIdx = this.currentState.images.indexOf(entry);
         const origName = entry.name;
@@ -4111,9 +4562,10 @@ export class EditorInspector {
 
         let blendLine;
         switch (img.blendMode) {
+            case 'normal':   blendLine = `col = mix(col, _src, _t.w * _op);`; break;
             case 'additive': blendLine = `col += _src * _op;`; break;
             case 'multiply': blendLine = `col = mix(col, col * _src, _op);`; break;
-            case 'overlay': blendLine = `col = mix(col, _src, _op);`; break;
+            case 'overlay':  blendLine = `col = mix(col, _src, _op);`; break;
             default: blendLine = `col = mix(col, 1.0 - (1.0 - col) * (1.0 - _src), _op);`;
         }
 
@@ -4731,6 +5183,15 @@ export class EditorInspector {
         const savedImages = stateFields.images || [];
         for (const savedEntry of savedImages) {
             try {
+                // Text layers have no imageId — restore directly from saved properties
+                if (savedEntry.type === 'text') {
+                    const entry = this._normalizeImageEntry(deepClone(savedEntry));
+                    const texObj = { isText: true, textLayer: entry, width: 512, height: 256 };
+                    this.currentState.images.push(entry);
+                    this._mountLayerCard(entry, texObj);
+                    continue;
+                }
+
                 const blob = await getImage(savedEntry.imageId);
                 if (!blob) continue;
 
