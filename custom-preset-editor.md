@@ -116,7 +116,17 @@ Up to **5 image layers** in a collapsible smart-accordion stack. Adding a new la
 | **Skew Y** | −1 to +1 | Vertical shear — slides the right edge up/down relative to the left. Combine with Skew X for diamond / rhombus tile grids. |
 | **Tile Width** | 0.25–4.0 | Tile cell width multiplier. 1.0 = native image aspect (default). Values <1 narrow the cells; >1 widen them. Hidden when Tile is OFF. |
 | **Tile Height** | 0.25–4.0 | Tile cell height multiplier. 1.0 = native image aspect (default). Values <1 shorten the cells; >1 stretch them. Hidden when Tile is OFF. |
-| **Reactivity Source** | Bass / Mid / Treble / Volume | Which audio band drives all reactive controls (Pulse, Bounce, Beat Fade) on this layer. Default: Bass. A subtitle in the UI reads “Drives Pulse · Bounce · Beat Fade” as a reminder. |
+| **Edge / Sobel** | Off / On | Replaces the image with a Sobel edge-detected outline — neon line art mode. Pairs well with Tint + Hue Spin. |
+| **Luma Key Lo** | 0–1 | Pixels darker than this luminance become transparent. Use to cut out dark/black backgrounds. Under "Luma Key" sub-header. |
+| **Luma Key Hi** | 0–1 | Pixels brighter than this luminance become transparent. Use to cut out white/light backgrounds. |
+| **Wave Distort** | 0–1 | Sinusoidal UV warp amplitude. Audio-reactive: bass hits increase wave size. Under "Wave Distort" sub-header. |
+| **Wave Freq** | 1–20 | Number of sine cycles across the image. Low = gentle sway, high = tight ripples. Appears when Wave > 0. |
+| **Invert** | 0–1 | Blend between normal and color-negative image. Under "Color FX" sub-header. |
+| **Threshold** | 0–1 | Binary B&W conversion at this luminance cutoff. Audio-reactive: bass shifts the cutoff for pulsing silhouettes. |
+| **Pixelate** | 0–1 | Reduces resolution into mosaic blocks (4–128 blocks). Under "Texture" sub-header. |
+| **Scan Lines** | 0–1 | CRT-style horizontal dark bands. Retro monitor / VHS aesthetic. |
+| **Film Grain** | 0–1 | Animated hash-based noise overlay. Cinematic analog film texture. |
+| **Reactivity Source** | Bass / Mid / Treble / Volume | Which audio band drives all reactive controls (Pulse, Bounce, Beat Fade) on this layer. Default: Bass. A subtitle in the UI reads "Drives Pulse · Bounce · Beat Fade" as a reminder. |
 | **Reactivity Curve** | Linear / Squared / Cubed / Gate | Transform applied to the raw signal before driving reactive controls. Gate = hard on/off at 30% threshold. Default: Linear. |
 | **Aspect-correct tiling** | Automatic | Portrait, square, and landscape images tile without distortion. The GLSL pre-scales `_u.x` by `imgAsp × aspect.y` before the tile UV pipeline, so tile cells match the image’s native aspect ratio in screen pixels. No cropping, no letterboxing. |
 | Images Only | Toggle (header) | Hides base visualizer — black background + images only |

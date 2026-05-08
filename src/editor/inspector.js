@@ -2258,6 +2258,15 @@ export class EditorInspector {
             posterize: 0,          // color bucket count (0 = off, 2–16 steps)
             depthOffset: 0.00,     // tunnel Z-phase offset (0–1) for parallax depth
             edgeSobel: false,      // Edge / Sobel mode: replaces image with neon line art
+            lumaKeyLo: 0.00,       // luma key low threshold (0–1): pixels darker than this become transparent
+            lumaKeyHi: 0.00,       // luma key high threshold (0–1): pixels brighter than this become transparent
+            waveAmp: 0.00,         // wave distort amplitude (0–1): sinusoidal UV warp strength
+            waveFreq: 4.0,         // wave distort frequency (1–20): number of sine cycles across image
+            invertMix: 0.00,       // color inversion mix (0–1): 0=normal, 1=fully inverted
+            thresholdCutoff: 0.00, // threshold cutoff (0–1): 0=off, >0=binary B&W at that luminance
+            pixelate: 0.00,        // pixelate/mosaic amount (0–1): 0=off, 1=maximum blockiness
+            scanLines: 0.00,       // CRT scan lines intensity (0–1): 0=off, 1=full dark bands
+            filmGrain: 0.00,       // animated noise overlay (0–1): 0=off, 1=heavy grain
             perspX: 0.00,          // perspective tilt X (−1 to +1): horizontal vanishing point
             perspY: 0.00,          // perspective tilt Y (−1 to +1): vertical vanishing point
             isHd: hdMode,          // badge shown in card header
@@ -2386,6 +2395,15 @@ export class EditorInspector {
             tunnelSpeed: 0.00,
             strobeAmp: 0.00, strobeThr: 0.40,
             edgeSobel: false,
+            lumaKeyLo: 0.00,       // luma key low threshold (0–1): pixels darker than this become transparent
+            lumaKeyHi: 0.00,       // luma key high threshold (0–1): pixels brighter than this become transparent
+            waveAmp: 0.00,         // wave distort amplitude (0–1): sinusoidal UV warp strength
+            waveFreq: 4.0,         // wave distort frequency (1–20): number of sine cycles across image
+            invertMix: 0.00,       // color inversion mix (0–1): 0=normal, 1=fully inverted
+            thresholdCutoff: 0.00, // threshold cutoff (0–1): 0=off, >0=binary B&W at that luminance
+            pixelate: 0.00,        // pixelate/mosaic amount (0–1): 0=off, 1=maximum blockiness
+            scanLines: 0.00,       // CRT scan lines intensity (0–1): 0=off, 1=full dark bands
+            filmGrain: 0.00,       // animated noise overlay (0–1): 0=off, 1=heavy grain
             // Audio reactivity (reused)
             opacityPulse: 0.00,
             audioPulse: 0.00,
@@ -2520,6 +2538,15 @@ export class EditorInspector {
             strobeThr: 0.40,
             posterize: 0,
             edgeSobel: false,
+            lumaKeyLo: 0.00,
+            lumaKeyHi: 0.00,
+            waveAmp: 0.00,
+            waveFreq: 4.0,
+            invertMix: 0.00,
+            thresholdCutoff: 0.00,
+            pixelate: 0.00,
+            scanLines: 0.00,
+            filmGrain: 0.00,
             reactSource: 'bass',
             reactCurve: 'linear',
             solo: false,
@@ -3041,6 +3068,64 @@ export class EditorInspector {
                 <button class="lseg${entry.edgeSobel ? '' : ' active'}" data-edge="off">Off</button>
                 <button class="lseg${entry.edgeSobel ? ' active' : ''}" data-edge="on">On</button>
               </div>
+            </div>
+            <p class="layer-section-sub" style="margin-top:6px;margin-bottom:2px">Luma Key</p>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Luma Key Lo — pixels darker than this threshold become transparent. Use to cut out dark backgrounds.">Key Lo</span>
+              <input type="range" class="slider layer-luma-lo-sl" min="0" max="1" step="0.01"
+                value="${(entry.lumaKeyLo || 0).toFixed(2)}" style="--pct:${((entry.lumaKeyLo || 0) * 100).toFixed(1)}%">
+              <span class="lsv layer-luma-lo-val">${(entry.lumaKeyLo || 0).toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Luma Key Hi — pixels brighter than this threshold become transparent. Use to cut out bright/white backgrounds.">Key Hi</span>
+              <input type="range" class="slider layer-luma-hi-sl" min="0" max="1" step="0.01"
+                value="${(entry.lumaKeyHi || 0).toFixed(2)}" style="--pct:${((entry.lumaKeyHi || 0) * 100).toFixed(1)}%">
+              <span class="lsv layer-luma-hi-val">${(entry.lumaKeyHi || 0).toFixed(2)}</span>
+            </div>
+            <p class="layer-section-sub" style="margin-top:6px;margin-bottom:2px">Wave Distort</p>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Wave amplitude — how far pixels are displaced. Audio-reactive: bass hits make waves bigger.">Wave</span>
+              <input type="range" class="slider layer-wave-amp-sl" min="0" max="1" step="0.01"
+                value="${(entry.waveAmp || 0).toFixed(2)}" style="--pct:${((entry.waveAmp || 0) * 100).toFixed(1)}%">
+              <span class="lsv layer-wave-amp-val">${(entry.waveAmp || 0).toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row layer-wave-freq-row"${(entry.waveAmp || 0) <= 0 ? ' style="display:none"' : ''}>
+              <span class="layer-ctrl-label" data-tooltip="Wave frequency — number of sine cycles across the image. Low = gentle sway, high = tight ripples.">Freq</span>
+              <input type="range" class="slider layer-wave-freq-sl" min="0" max="1" step="0.01"
+                value="${(((entry.waveFreq || 4) - 1) / 19).toFixed(3)}" style="--pct:${((((entry.waveFreq || 4) - 1) / 19) * 100).toFixed(1)}%">
+              <span class="lsv layer-wave-freq-val">${(entry.waveFreq || 4).toFixed(1)}</span>
+            </div>
+            <p class="layer-section-sub" style="margin-top:6px;margin-bottom:2px">Color FX</p>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Invert — blend between normal and inverted colors. 0 = normal, 1 = fully negative image.">Invert</span>
+              <input type="range" class="slider layer-invert-sl" min="0" max="1" step="0.01"
+                value="${(entry.invertMix || 0).toFixed(2)}" style="--pct:${((entry.invertMix || 0) * 100).toFixed(1)}%">
+              <span class="lsv layer-invert-val">${(entry.invertMix || 0).toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Threshold — converts image to binary B&W at this luminance cutoff. Audio-reactive: bass shifts the cutoff for pulsing silhouettes.">Thresh</span>
+              <input type="range" class="slider layer-thresh-sl" min="0" max="1" step="0.01"
+                value="${(entry.thresholdCutoff || 0).toFixed(2)}" style="--pct:${((entry.thresholdCutoff || 0) * 100).toFixed(1)}%">
+              <span class="lsv layer-thresh-val">${(entry.thresholdCutoff || 0).toFixed(2)}</span>
+            </div>
+            <p class="layer-section-sub" style="margin-top:6px;margin-bottom:2px">Texture</p>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Pixelate — reduces resolution into chunky blocks. Creates retro mosaic / 8-bit look.">Pixelate</span>
+              <input type="range" class="slider layer-pixelate-sl" min="0" max="1" step="0.01"
+                value="${(entry.pixelate || 0).toFixed(2)}" style="--pct:${((entry.pixelate || 0) * 100).toFixed(1)}%">
+              <span class="lsv layer-pixelate-val">${(entry.pixelate || 0).toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Scan Lines — horizontal CRT-style dark bands. Higher = more visible lines.">Scan</span>
+              <input type="range" class="slider layer-scanlines-sl" min="0" max="1" step="0.01"
+                value="${(entry.scanLines || 0).toFixed(2)}" style="--pct:${((entry.scanLines || 0) * 100).toFixed(1)}%">
+              <span class="lsv layer-scanlines-val">${(entry.scanLines || 0).toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Film Grain — animated noise overlay for a cinematic / analog film texture.">Grain</span>
+              <input type="range" class="slider layer-grain-sl" min="0" max="1" step="0.01"
+                value="${(entry.filmGrain || 0).toFixed(2)}" style="--pct:${((entry.filmGrain || 0) * 100).toFixed(1)}%">
+              <span class="lsv layer-grain-val">${(entry.filmGrain || 0).toFixed(2)}</span>
             </div>
             <div class="layer-section-divider"></div>
             <p class="layer-section-label">Audio Reactivity</p>
@@ -3765,6 +3850,102 @@ export class EditorInspector {
                 entry.edgeSobel = btn.dataset.edge === 'on';
                 refresh();
             });
+        });
+
+        // Luma Key Lo/Hi sliders
+        const lumaLoSl = card.querySelector('.layer-luma-lo-sl');
+        const lumaLoVal = card.querySelector('.layer-luma-lo-val');
+        if (lumaLoSl) lumaLoSl.addEventListener('input', () => {
+            const v = parseFloat(lumaLoSl.value);
+            entry.lumaKeyLo = v;
+            lumaLoVal.textContent = v.toFixed(2);
+            lumaLoSl.style.setProperty('--pct', `${(v * 100).toFixed(1)}%`);
+            refresh();
+        });
+        const lumaHiSl = card.querySelector('.layer-luma-hi-sl');
+        const lumaHiVal = card.querySelector('.layer-luma-hi-val');
+        if (lumaHiSl) lumaHiSl.addEventListener('input', () => {
+            const v = parseFloat(lumaHiSl.value);
+            entry.lumaKeyHi = v;
+            lumaHiVal.textContent = v.toFixed(2);
+            lumaHiSl.style.setProperty('--pct', `${(v * 100).toFixed(1)}%`);
+            refresh();
+        });
+
+        // Wave Distort sliders
+        const waveAmpSl = card.querySelector('.layer-wave-amp-sl');
+        const waveAmpVal = card.querySelector('.layer-wave-amp-val');
+        const waveFreqRow = card.querySelector('.layer-wave-freq-row');
+        const waveFreqSl = card.querySelector('.layer-wave-freq-sl');
+        const waveFreqVal = card.querySelector('.layer-wave-freq-val');
+        if (waveAmpSl) waveAmpSl.addEventListener('input', () => {
+            const v = parseFloat(waveAmpSl.value);
+            entry.waveAmp = v;
+            waveAmpVal.textContent = v.toFixed(2);
+            waveAmpSl.style.setProperty('--pct', `${(v * 100).toFixed(1)}%`);
+            if (waveFreqRow) waveFreqRow.style.display = v > 0 ? '' : 'none';
+            refresh();
+        });
+        if (waveFreqSl) waveFreqSl.addEventListener('input', () => {
+            const norm = parseFloat(waveFreqSl.value);
+            const freq = 1 + norm * 19;  // map 0–1 → 1–20
+            entry.waveFreq = freq;
+            waveFreqVal.textContent = freq.toFixed(1);
+            waveFreqSl.style.setProperty('--pct', `${(norm * 100).toFixed(1)}%`);
+            refresh();
+        });
+
+        // Invert + Threshold sliders
+        const invertSl = card.querySelector('.layer-invert-sl');
+        const invertVal = card.querySelector('.layer-invert-val');
+        if (invertSl) invertSl.addEventListener('input', () => {
+            const v = parseFloat(invertSl.value);
+            entry.invertMix = v;
+            invertVal.textContent = v.toFixed(2);
+            invertSl.style.setProperty('--pct', `${(v * 100).toFixed(1)}%`);
+            refresh();
+        });
+        const threshSl = card.querySelector('.layer-thresh-sl');
+        const threshVal = card.querySelector('.layer-thresh-val');
+        if (threshSl) threshSl.addEventListener('input', () => {
+            const v = parseFloat(threshSl.value);
+            entry.thresholdCutoff = v;
+            threshVal.textContent = v.toFixed(2);
+            threshSl.style.setProperty('--pct', `${(v * 100).toFixed(1)}%`);
+            refresh();
+        });
+
+        // Pixelate slider
+        const pixSl = card.querySelector('.layer-pixelate-sl');
+        const pixVal = card.querySelector('.layer-pixelate-val');
+        if (pixSl) pixSl.addEventListener('input', () => {
+            const v = parseFloat(pixSl.value);
+            entry.pixelate = v;
+            pixVal.textContent = v.toFixed(2);
+            pixSl.style.setProperty('--pct', `${(v * 100).toFixed(1)}%`);
+            refresh();
+        });
+
+        // Scan Lines slider
+        const scanSl = card.querySelector('.layer-scanlines-sl');
+        const scanVal = card.querySelector('.layer-scanlines-val');
+        if (scanSl) scanSl.addEventListener('input', () => {
+            const v = parseFloat(scanSl.value);
+            entry.scanLines = v;
+            scanVal.textContent = v.toFixed(2);
+            scanSl.style.setProperty('--pct', `${(v * 100).toFixed(1)}%`);
+            refresh();
+        });
+
+        // Film Grain slider
+        const grainSl = card.querySelector('.layer-grain-sl');
+        const grainVal = card.querySelector('.layer-grain-val');
+        if (grainSl) grainSl.addEventListener('input', () => {
+            const v = parseFloat(grainSl.value);
+            entry.filmGrain = v;
+            grainVal.textContent = v.toFixed(2);
+            grainSl.style.setProperty('--pct', `${(v * 100).toFixed(1)}%`);
+            refresh();
         });
 
         // Phase 6: Lissajous orbit mode
@@ -4541,6 +4722,22 @@ export class EditorInspector {
         const rad = (img.radius || 0).toFixed(4);
         const hasRadius = parseFloat(rad) > 0.001;
         const hasEdge = !!img.edgeSobel;
+        const lumaKeyLo = (img.lumaKeyLo || 0).toFixed(4);
+        const lumaKeyHi = (img.lumaKeyHi || 0).toFixed(4);
+        const hasLumaKey = parseFloat(lumaKeyLo) > 0.001 || parseFloat(lumaKeyHi) > 0.001;
+        const waveAmp = (img.waveAmp || 0).toFixed(4);
+        const waveFreq = (img.waveFreq || 4.0).toFixed(4);
+        const hasWave = parseFloat(waveAmp) > 0.001;
+        const invertMix = (img.invertMix || 0).toFixed(4);
+        const hasInvert = parseFloat(invertMix) > 0.001;
+        const threshCut = (img.thresholdCutoff || 0).toFixed(4);
+        const hasThreshold = parseFloat(threshCut) > 0.001;
+        const pixelateAmt = (img.pixelate || 0).toFixed(4);
+        const hasPixelate = parseFloat(pixelateAmt) > 0.001;
+        const scanLinesAmt = (img.scanLines || 0).toFixed(4);
+        const hasScanLines = parseFloat(scanLinesAmt) > 0.001;
+        const filmGrainAmt = (img.filmGrain || 0).toFixed(4);
+        const hasFilmGrain = parseFloat(filmGrainAmt) > 0.001;
         // Pixel step for Sobel: 1/texW × 1/texH, falling back to 1/512
         const edgeStepX = img.texW ? (1.0 / img.texW).toFixed(6) : '0.001953';
         const edgeStepY = img.texH ? (1.0 / img.texH).toFixed(6) : '0.001953';
@@ -4910,12 +5107,57 @@ export class EditorInspector {
             })()
             : '';
 
+        // Wave distort: sinusoidal UV warp applied just before texture sample
+        const waveLines = hasWave
+            ? (() => {
+                // Warp both axes with slightly different freq/phase for organic look.
+                // Amplitude is modulated by _r (audio signal) for beat-reactive waves.
+                const ampExpr = `${waveAmp} * 0.1 * (1.0 + _r * 0.5)`;
+                if (hasTunnel) {
+                    // Tunnel: warp each tile layer's UV independently
+                    return (
+                        `    { float _wAmp = ${ampExpr};\n` +
+                        `      _uA.x += sin(_uA.y * ${waveFreq} + time * 2.0) * _wAmp;\n` +
+                        `      _uA.y += sin(_uA.x * ${waveFreq} * 0.7 + time * 1.3) * _wAmp;\n` +
+                        `      _uA = clamp(_uA, 0.0, 1.0);\n` +
+                        `      _uB.x += sin(_uB.y * ${waveFreq} + time * 2.0) * _wAmp;\n` +
+                        `      _uB.y += sin(_uB.x * ${waveFreq} * 0.7 + time * 1.3) * _wAmp;\n` +
+                        `      _uB = clamp(_uB, 0.0, 1.0); }\n`
+                    );
+                }
+                return (
+                    `    { float _wAmp = ${ampExpr};\n` +
+                    `      _u.x += sin(_u.y * ${waveFreq} + time * 2.0) * _wAmp;\n` +
+                    `      _u.y += sin(_u.x * ${waveFreq} * 0.7 + time * 1.3) * _wAmp;\n` +
+                    `      _u = clamp(_u, 0.0, 1.0); }\n`
+                );
+            })()
+            : '';
+
+        // Pixelate: quantize UV into blocks before texture sample
+        const pixelateLines = hasPixelate
+            ? (() => {
+                // Map 0–1 slider to 4–128 blocks (low slider = subtle, high = chunky)
+                const blocks = `mix(128.0, 4.0, ${pixelateAmt})`;
+                if (hasTunnel) {
+                    return (
+                        `    { float _pxB = ${blocks};\n` +
+                        `      _uA = floor(_uA * _pxB) / _pxB;\n` +
+                        `      _uB = floor(_uB * _pxB) / _pxB; }\n`
+                    );
+                }
+                return `    { float _pxB = ${blocks}; _u = floor(_u * _pxB) / _pxB; }\n`;
+            })()
+            : '';
+
         return (
             `  {\n` +
             reactLines +
             angLines +
             centerLines +
             pipeline +
+            waveLines +
+            pixelateLines +
             sampleLine +
             chromaticLines +
             `    vec3 _src = _t.xyz;\n` +
@@ -4986,6 +5228,14 @@ export class EditorInspector {
                 return satLine + hueLine;
             })() +
             (hasPosterize ? `    { float _pn = ${posterize}.0; _src = floor(_src * _pn + 0.5) / _pn; }\n` : '') +
+            // Invert: blend between normal and inverted colors
+            (hasInvert ? `    _src = mix(_src, 1.0 - _src, ${invertMix});\n` : '') +
+            // Threshold: binary B&W at luminance cutoff, audio-reactive shift
+            (hasThreshold ? `    { float _tLum = dot(_src, vec3(0.299, 0.587, 0.114)); _src = vec3(step(${threshCut} - _r * 0.2, _tLum)); }\n` : '') +
+            // Scan Lines: horizontal CRT bands darkening
+            (hasScanLines ? `    _src *= 1.0 - ${scanLinesAmt} * 0.5 * (0.5 + 0.5 * sin(gl_FragCoord.y * 3.14159));\n` : '') +
+            // Film Grain: animated hash-based noise overlay
+            (hasFilmGrain ? `    { float _gn = fract(sin(dot(uv + fract(time * 0.1), vec2(12.9898, 78.233))) * 43758.5453); _src += (_gn - 0.5) * ${filmGrainAmt} * 0.4; }\n` : '') +
             // Color grading for videos (brightness, contrast, gamma)
             (isVideo ? (() => {
                 const br = (img.brightness || 1.0).toFixed(4);
@@ -5003,6 +5253,19 @@ export class EditorInspector {
                 // Gamma: pow(value, gamma)
                 if (hasGm) s += `    _src = pow(max(_src, 0.0), vec3(${gm}));\n`;
                 return s;
+            })() : '') +
+            // Luma Key: darken-below-lo and brighten-above-hi thresholds cut alpha
+            (hasLumaKey ? (() => {
+                let lk = `    { float _luma = dot(_src, vec3(0.299, 0.587, 0.114));\n`;
+                if (parseFloat(lumaKeyLo) > 0.001) {
+                    lk += `      _t.w *= smoothstep(0.0, ${lumaKeyLo}, _luma);\n`;
+                }
+                if (parseFloat(lumaKeyHi) > 0.001) {
+                    const hiThresh = (1.0 - parseFloat(lumaKeyHi)).toFixed(4);
+                    lk += `      _t.w *= 1.0 - smoothstep(${hiThresh}, 1.0, _luma);\n`;
+                }
+                lk += `    }\n`;
+                return lk;
             })() : '') +
             (img.alphaMode === 'preserve'
                 ? `    float _alphaMask = step(0.1, _t.w);\n    float _op = _alphaMask * _gapMask * clamp(${op} + _r * ${opa}, 0.0, 1.0);\n`
@@ -5118,7 +5381,7 @@ export class EditorInspector {
             strobeAmp: 0.00, strobeThr: 0.40,
             chromaticAberration: 0.00, chromaticSpeed: 1.0,
             tileScaleX: 1.00, tileScaleY: 1.00,
-            angle: 0.00, skewX: 0.00, skewY: 0.00, shakeAmp: 0.00, posterize: 0, depthOffset: 0.00, edgeSobel: false, perspX: 0.00, perspY: 0.00,
+            angle: 0.00, skewX: 0.00, skewY: 0.00, shakeAmp: 0.00, posterize: 0, depthOffset: 0.00, edgeSobel: false, lumaKeyLo: 0.00, lumaKeyHi: 0.00, waveAmp: 0.00, waveFreq: 4.0, invertMix: 0.00, thresholdCutoff: 0.00, pixelate: 0.00, scanLines: 0.00, filmGrain: 0.00, perspX: 0.00, perspY: 0.00,
             audioPulse: 0.00, pulseInvert: false,
             blendMode: 'overlay', tile: true, groupSpin: false,
             hueSpinSpeed: 0.00, imageSaturation: 1.00, imageHue: 0, tintR: 1.0, tintG: 1.0, tintB: 1.0,
@@ -5216,6 +5479,40 @@ export class EditorInspector {
                     const texObj = { isText: true, textLayer: entry, width: 512, height: 256 };
                     this.currentState.images.push(entry);
                     this._mountLayerCard(entry, texObj);
+                    continue;
+                }
+
+                // Video layers — stored under videoId, need a <video> element
+                if (savedEntry.type === 'video') {
+                    const blob = await getImage(savedEntry.videoId);
+                    if (!blob) { console.warn('[Studio] Video blob not found:', savedEntry.videoId); continue; }
+                    const videoUrl = URL.createObjectURL(blob);
+                    const video = document.createElement('video');
+                    video.preload = 'metadata';
+                    video.playsInline = true;
+                    video.muted = true;
+                    video.loop = true;
+                    await new Promise((res, rej) => {
+                        video.onloadedmetadata = res;
+                        video.onerror = () => rej(new Error('Video metadata failed'));
+                        video.src = videoUrl;
+                    });
+                    const entry = this._normalizeImageEntry(deepClone(savedEntry));
+                    entry.texW = video.videoWidth;
+                    entry.texH = video.videoHeight;
+                    entry.duration = video.duration || 0;
+                    const texObj = {
+                        data: videoUrl,
+                        width: video.videoWidth,
+                        height: video.videoHeight,
+                        isVideo: true,
+                        videoElement: video,
+                        videoId: savedEntry.videoId,
+                        _videoUrl: videoUrl,
+                    };
+                    this.currentState.images.push(entry);
+                    this._mountLayerCard(entry, texObj);
+                    video.play().catch(() => {});
                     continue;
                 }
 

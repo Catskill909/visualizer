@@ -39,7 +39,7 @@
         </ul>
 
         <p>Send feedback to <a href="mailto:paul@rarefunk.com">paul@rarefunk.com</a>.</p>
-        <p>Current release is <span id="app-version">Beta May 07, 2026</span>. Send me your email if you want notice of app updates.</p>
+        <p>Current release is <span id="app-version">Beta May 08, 2026</span>. Send me your email if you want notice of app updates.</p>
         <p class="promo-modal-note">Your feedback helps shape the public release.</p>
       </div>
 
@@ -282,6 +282,13 @@
               <div class="il-item"><span class="il-dot"></span>Canvas Mirror — folds the entire scene</div>
               <div class="il-item"><span class="il-dot"></span>Posterize — 2 / 4 / 8 / 16 color quantize steps</div>
               <div class="il-item"><span class="il-dot"></span>Edge / Sobel — luminance gradient outline effect</div>
+              <div class="il-item"><span class="il-dot"></span>Luma Key — cut out darks or lights by brightness threshold</div>
+              <div class="il-item"><span class="il-dot"></span>Wave Distort — sinusoidal UV warp, audio-reactive amplitude</div>
+              <div class="il-item"><span class="il-dot"></span>Invert — color negative blend (0 = normal, 1 = fully inverted)</div>
+              <div class="il-item"><span class="il-dot"></span>Threshold — binary B&W with audio-reactive cutoff</div>
+              <div class="il-item"><span class="il-dot"></span>Pixelate — retro mosaic blocks, adjustable resolution</div>
+              <div class="il-item"><span class="il-dot"></span>Scan Lines — CRT-style horizontal dark bands</div>
+              <div class="il-item"><span class="il-dot"></span>Film Grain — animated noise overlay for analog texture</div>
               <div class="il-item"><span class="il-dot"></span>Strobe — hard binary opacity cut on beat threshold</div>
               <div class="il-item"><span class="il-dot"></span>Blend mode — Overlay / Additive / Multiply</div>
             </div>
@@ -319,6 +326,56 @@
               <div class="il-item"><span class="il-dot"></span>GIF Optimizer — frame reduction, resize, and GPU savings preview before adding to preset</div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ── Video Layers ── -->
+  <section class="section" id="video">
+    <div class="container">
+      <div class="section-header fade-in">
+        <div class="section-label">Video Layers</div>
+        <h2 class="section-title">Drop video into any preset</h2>
+        <p class="section-desc">
+          MP4 and WebM files render as real-time GPU textures — every frame composited through
+          the same GLSL pipeline as images. Full playback controls, color grading, and the entire
+          VJ effects suite apply to every video frame at 60 fps.
+        </p>
+      </div>
+
+      <div class="features-grid fade-in">
+        <div class="feature-card">
+          <h3>Full Playback Control</h3>
+          <p>Play/pause, loop toggle, speed slider (0.25×–4×), and a scrub bar for frame-accurate seeking.
+            Videos auto-loop seamlessly — set them and forget them.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Color Grading</h3>
+          <p>Per-video brightness, contrast, and gamma — dial in the look without leaving the preset.
+            Stack with the shared Saturation and Hue Rotate controls for full color authority.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Every Effect Works</h3>
+          <p>Spin, Orbit, Bounce, Chromatic Aberration, Wave Distort, Pixelate, Scan Lines, Film Grain,
+            Luma Key, Invert, Threshold — the entire VJ toolbox applies per-frame to video just like images.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Audio-Reactive Video</h3>
+          <p>Source + Curve shape the audio signal that drives Pulse, Bounce, Beat Fade, Shake, and Strobe
+            on your video layer. The video breathes with the music.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Scale &amp; Mirror</h3>
+          <p>No tiling — videos are single-instance by design. Scale from 10% to 200% coverage, or apply
+            Mirror (H / V / Quad / Kaleidoscope) to create reflected duplicates.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Lightweight &amp; Fast</h3>
+          <p>720p max resolution keeps GPU bandwidth under control. 1–2 video layers run smoothly on any
+            modern machine. The texture uploads directly from the video element — no intermediate canvas.</p>
         </div>
       </div>
     </div>

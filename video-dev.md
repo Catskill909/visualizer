@@ -615,8 +615,8 @@ These controls **already work** on image, video, and text layers in the Preset S
 
 | Effect | Description | Difficulty | Notes |
 |--------|-------------|------------|-------|
-| **Wave Distort** | Sinusoidal UV warp, audio-reactive amplitude | 🟢 Easy | `uv.x += sin(uv.y * freq + time) * amp` — one line of GLSL |
-| **Pixelate / Mosaic** | Controllable block size, audio-reactive | 🟢 Easy | `floor(uv * blocks) / blocks` — one line |
+| **Wave Distort** | Sinusoidal UV warp, audio-reactive amplitude | ✅ DONE | Shipped May 8 — Wave + Freq sliders, audio-reactive amplitude |
+| **Pixelate / Mosaic** | Controllable block size, audio-reactive | ✅ DONE | Shipped May 8 — Pixelate slider under Texture header |
 | **Barrel / Fisheye** | Lens distortion | 🟢 Easy | Standard radial distortion formula, ~5 lines GLSL |
 | **Displacement Map** | Use one layer/waveform to warp another layer's UVs | 🟡 Medium | Cross-layer texture read, needs uniform hookup |
 | **Glitch Blocks** ⭐ | Random rect chunks offset, beat-synced | 🟡 Medium | Random block offsets seeded by beat count. **TOP 5** |
@@ -630,8 +630,8 @@ These controls **already work** on image, video, and text layers in the Preset S
 
 | Effect | Description | Difficulty | Notes |
 |--------|-------------|------------|-------|
-| **Invert** | Full or partial color inversion (0–1 mix) | 🟢 Easy | `mix(color, 1.0 - color, amount)` — one line |
-| **Threshold / Binary** | Hard B&W cutoff, audio-reactive level | 🟢 Easy | `step(threshold, luminance)` — one line |
+| **Invert** | Full or partial color inversion (0–1 mix) | ✅ DONE | Shipped May 8 — Invert slider under Color FX |
+| **Threshold / Binary** | Hard B&W cutoff, audio-reactive level | ✅ DONE | Shipped May 8 — Thresh slider, audio-reactive cutoff shift |
 | **Color Channel Swap** | R↔G, G↔B, R↔B with crossfade | 🟢 Easy | Swizzle: `color.grb`, `color.bgr`, etc. |
 | **Duotone / Tritone** | Map luminance to 2–3 user-chosen colors | 🟢 Easy | `mix(colorA, colorB, luminance)` — simple remap |
 | **Thermal / Heat Map** | Luminance → thermal palette (blue→red→white) | 🟢 Easy | 1D gradient LUT texture or step function |
@@ -652,7 +652,7 @@ These controls **already work** on image, video, and text layers in the Preset S
 
 | Effect | Description | Difficulty | Notes |
 |--------|-------------|------------|-------|
-| **Luma Key** ⭐ | Cut out darks or lights, composite over other layers | 🟢 Easy | `alpha = smoothstep(lo, hi, luminance)` — trivial. **TOP 5** |
+| **Luma Key** ⭐ | Cut out darks or lights, composite over other layers | ✅ DONE | Shipped May 8 — Key Lo + Key Hi sliders in Visual Effects |
 | **Chroma Key** | Cut specific color range (greenscreen) | 🟡 Medium | Color-distance in YCbCr space, feathering |
 | **Difference Blend** | Show only motion (current vs previous frame) | 🟢 Easy | `abs(current - previous)` — needs prev frame texture |
 | **Auto-Mask (Luminance Cutout)** | Keep only bright parts as overlay | 🟢 Easy | Variant of luma key with high threshold |
@@ -661,8 +661,8 @@ These controls **already work** on image, video, and text layers in the Preset S
 
 | Effect | Description | Difficulty | Notes |
 |--------|-------------|------------|-------|
-| **Scan Lines** | CRT scanline overlay, controllable density | 🟢 Easy | `mod(gl_FragCoord.y, lineSpacing)` |
-| **Film Grain / Noise** | Animated noise overlay, opacity-controlled | 🟢 Easy | Hash-based noise, already common pattern |
+| **Scan Lines** | CRT scanline overlay, controllable density | ✅ DONE | Shipped May 8 — Scan slider under Texture header |
+| **Film Grain / Noise** | Animated noise overlay, opacity-controlled | ✅ DONE | Shipped May 8 — Grain slider under Texture header |
 | **Grid Overlay** | Configurable grid lines, beat-pulsing | 🟢 Easy | Step function on UV coordinates |
 | **Strobe** | White flash / hard-cut to black, beat-synced | ✅ DONE | Already shipped as per-layer Strobe + Threshold |
 
@@ -701,12 +701,12 @@ These can each be added with minimal GLSL and a single slider in the layer contr
 
 | # | Effect | GLSL Complexity | UI Needed |
 |---|--------|-----------------|-----------|
-| 1 | **Invert** | 1 line | Toggle or slider |
-| 2 | **Threshold / Binary** | 1 line | Slider (0–1) |
-| 3 | **Wave Distort** | 2 lines | Freq + Amp sliders |
-| 4 | **Pixelate / Mosaic** | 1 line | Slider (block size) |
-| 5 | **Scan Lines** | 2 lines | Density + Opacity sliders |
-| 6 | **Film Grain** | 3 lines | Amount slider |
+| 1 | **Invert** | ✅ DONE | Shipped May 8 |
+| 2 | **Threshold / Binary** | ✅ DONE | Shipped May 8 |
+| 3 | **Wave Distort** | ✅ DONE | Shipped May 8 |
+| 4 | **Pixelate / Mosaic** | ✅ DONE | Shipped May 8 |
+| 5 | **Scan Lines** | ✅ DONE | Shipped May 8 |
+| 6 | **Film Grain** | ✅ DONE | Shipped May 8 |
 | 7 | **Color Channel Swap** | 1 line | Dropdown (RGB/GBR/BRG/etc.) |
 | 8 | **Duotone** | 2 lines | 2 color pickers |
 | 9 | **Slice & Reassemble** | 3 lines | Slices + Offset sliders |
@@ -714,7 +714,7 @@ These can each be added with minimal GLSL and a single slider in the layer contr
 | 11 | **Polar Coordinates** | 2 lines | Toggle + blend slider |
 | 12 | **Zoom Pulse** | 3 lines (JS envelope) | Existing Pulse is similar — this is sharper one-shot |
 | 13 | **Edge Detection (Sobel)** | ✅ DONE | Already shipped as per-layer Edge toggle |
-| 14 | **Luma Key** | 2 lines | Lo/Hi threshold sliders |
+| 14 | **Luma Key** | ✅ DONE | Shipped May 8 |
 | 15 | **Freeze Frame** | 0 GLSL (JS only) | Toggle/beat-trigger |
 
 ---
@@ -725,41 +725,52 @@ These can each be added with minimal GLSL and a single slider in the layer contr
 
 ### Phase A: Immediate (reuse existing pipeline)
 
-#### A1. Luma Key 🟢
+#### A1. Luma Key 🟢 — ✅ SHIPPED (May 8, 2026)
 - **Why:** Unlocks layered composition — makes every other effect more powerful
-- **GLSL:** `alpha *= smoothstep(loThresh, hiThresh, luminance)` — 2 lines
-- **UI:** Lo Threshold slider + Hi Threshold slider (or single slider with feather)
-- **Audio-reactive:** Threshold shift on beat = pulsing reveal
-- **Estimate:** 1–2 hours
+- **GLSL:** `_t.w *= smoothstep(0.0, lumaKeyLo, _luma)` + `_t.w *= 1.0 - smoothstep(hiThresh, 1.0, _luma)`
+- **UI:** "Key Lo" slider (0–1) + "Key Hi" slider (0–1) under "Luma Key" sub-header in Visual Effects section
+- **Works on:** All layer types (image, video, text)
+- **Pipeline position:** After all color processing (tint, saturation, posterize, video grading), before `_op` opacity calc
+- **Audio-reactive:** Uses existing `_r` signal — threshold shift on beat = pulsing reveal (future enhancement)
+- **Implementation:** 4 touch points in `inspector.js`:
+  1. Layer defaults (image L2261, video L2391, text L2527, migration L5175)
+  2. Card HTML template (L3051–3062) — sliders in Visual Effects section
+  3. Control wiring (L3788–3806) — input events → entry prop → refresh()
+  4. GLSL generation in `_buildImageBlock()` (L5048–5060)
 
-#### A2. Wave Distort 🟢
+#### A2. Wave Distort 🟢 — ✅ SHIPPED (May 8, 2026)
 - **Why:** Instant crowd-pleaser. Sinusoidal UV warp creates liquid/underwater/heat-haze look.
-- **GLSL:** `uv.x += sin(uv.y * freq + time) * amp;` — literally 1–2 lines
-- **UI:** Frequency slider (1–20) + Amplitude slider (0–0.1) + optional: Axis toggle (H/V/Both)
-- **Audio-reactive:** Amplitude driven by existing `reactSource` — bass = big waves, treble = fine ripples
-- **Estimate:** 1–2 hours
+- **GLSL:** `_u.x += sin(_u.y * freq + time * 2.0) * amp` + Y-axis with different freq/phase for organic feel
+- **UI:** "Wave" slider (amplitude 0–1) + "Freq" slider (1–20, hidden when amp=0) under "Wave Distort" sub-header
+- **Works on:** All layer types (image, video, text). Tunnel mode warps `_uA`/`_uB` independently.
+- **Pipeline position:** Between `pipeline` (UV transforms) and `sampleLine` (texture fetch) — modifies final UV before sampling
+- **Audio-reactive:** Amplitude auto-modulated by `_r`: `amp * 0.1 * (1.0 + _r * 0.5)` — bass hits make waves bigger
+- **Implementation:** 4 touch points in `inspector.js`:
+  1. Layer defaults (image L2263, video L2395, text L2533, migration L5182)
+  2. Card HTML template (L3070–3082) — sliders in Visual Effects section
+  3. Control wiring (L3828–3849) — input events → entry prop → refresh()
+  4. GLSL generation as `waveLines` variable (L5000–5025), inserted at L5033
 
-#### A3. Invert + Threshold (2-for-1) 🟢
+#### A3. Invert + Threshold (2-for-1) 🟢 — ✅ SHIPPED (May 8, 2026)
 - **Why:** Two essential VJ color tools, both one-liners, share a "Color FX" subsection in UI
-- **GLSL:** Invert: `mix(color, 1.0-color, amount)` / Threshold: `step(thresh, luminance)`
-- **UI:** Invert slider (0–1 mix) + Threshold slider (0–1 cutoff)
-- **Audio-reactive:** Threshold driven by `reactSource` = pulsing silhouettes
-- **Estimate:** 1–2 hours
+- **GLSL:** Invert: `mix(_src, 1.0 - _src, amount)` / Threshold: `step(thresh - _r * 0.2, luminance)`
+- **UI:** "Invert" slider (0–1 mix) + "Thresh" slider (0–1 cutoff) under "Color FX" sub-header
+- **Works on:** All layer types (image, video, text)
+- **Pipeline position:** After posterize, before video color grading — sees fully color-processed pixels
+- **Audio-reactive:** Threshold cutoff auto-modulated by `_r * 0.2` — bass hits shift the black/white boundary for pulsing silhouettes
+- **Implementation:** 4 touch points in `inspector.js`:
+  1. Layer defaults (image L2265–2266, video L2399–2400, text L2539–2540, migration L5255)
+  2. Card HTML template (L3089–3101) — sliders in Visual Effects section
+  3. Control wiring (L3870–3888) — input events → entry prop → refresh()
+  4. GLSL generation in `_buildImageBlock()` (L5147–5150)
 
-### Phase B: Frame Buffer Required (new FBO infrastructure)
+### Phase B: Frame Buffer Required — ⏭️ SKIPPED (May 8, 2026)
 
-> Phases B1 and B2 share the same prerequisite: a **previous-frame FBO** (framebuffer object). Build this once, both effects use it.
+> **Audit finding:** Butterchurn already provides native frame echo/feedback via `echo_alpha`, `echo_zoom`, `echo_orient` (Motion tab) and `decay` (Trail slider in Palette tab). These are MilkDrop 2 built-in parameters exposed in our UI. Custom FBO infrastructure would only add per-layer independent trails — marginal improvement vs. significant complexity/risk.
 
-#### B1. Frame Buffer / Echo (Motion Trails) 🟡
-- **Why:** Ghostly trails, the analog feedback aesthetic. Massive visual payoff.
-- **Architecture:**
-  1. Create a ping-pong FBO pair (two render textures)
-  2. Each frame: blend current video texture with previous FBO at decay rate
-  3. Write result to other FBO, swap
-- **UI:** Trail Length / Decay slider (0 = no trails, 1 = infinite persistence)
-- **Audio-reactive:** Decay rate driven by energy (loud = short trails, quiet = long smears)
-- **Prereq:** FBO ping-pong infrastructure (reusable for B2)
-- **Estimate:** 6–8 hours (including FBO setup)
+#### B1. Frame Buffer / Echo (Motion Trails) 🟡 — ALREADY COVERED
+- **Existing controls:** Trail slider (`ps-decay` 0.85–0.999), Echo Opacity (`ms-ealpha`), Echo Zoom (`ms-ezoom`), Echo Orient
+- **Why skipped:** Building a separate FBO ping-pong outside Butterchurn would be 6–8 hours with fragile WebGL context sharing and no guarantee of compatibility across preset switches
 
 #### B2. Feedback Loop 🟡
 - **Why:** #1 effect in analog VJ rigs. Creates infinite tunnels, fractal smears.

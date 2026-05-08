@@ -873,7 +873,8 @@
                 <li><strong>Solo / Mute</strong> — audition one layer in isolation or hide it without deleting.</li>
                 <li><strong>Animation</strong> — Tile, Spin, <strong>Angle</strong>, <strong>Skew X/Y</strong>, Orbit (Circle or Lissajous path), Tunnel zoom, Bounce
                   (beat-lift), Sway, Wander, <strong>Pan</strong>, <strong>Chromatic Aberration</strong>,
-                  <strong>Tile Width &amp; Height</strong>, and a draggable XY anchor point.</li>
+                  <strong>Tile Width &amp; Height</strong>, and a draggable XY anchor point. <strong>VJ Effects:</strong>
+                  Luma Key, Wave Distort, Invert, Threshold, Pixelate, Scan Lines, Film Grain.</li>
                 <li><strong>Beat Shake</strong> — omnidirectional random UV jolt on every beat. Pairs with Bounce for chaotic, energetic motion.</li>
                 <li><strong>Beat Fade / Pulse / Strobe</strong> — audio drives opacity (smooth fade or hard strobe cut)
                   and size on every beat.</li>
@@ -921,7 +922,8 @@
                   and scrub bar for seeking within the video.</li>
                 <li><strong>No tiling</strong> — Videos are single-instance (no tile mode). Use Scale (0.1–2.0)
                   for coverage %, or apply Mirror (H/V/Quad/Kaleido) to create duplicates.</li>
-                <li><strong>All effects work</strong> — Spin, Orbit, Bounce, Chromatic Aberration, audio reactivity,
+                <li><strong>All effects work</strong> — Spin, Orbit, Bounce, Chromatic Aberration, Luma Key, Wave Distort,
+                  Invert, Threshold, Pixelate, Scan Lines, Film Grain, audio reactivity,
                   and color grading (brightness, contrast, gamma) apply to every video frame.</li>
                 <li><strong>Performance</strong> — 1–2 video layers run smoothly on most devices. Videos use more
                   GPU bandwidth than static images; 4× speed increases decode overhead.</li>
@@ -1109,6 +1111,61 @@
                   still controls the gap between tiles as a fraction of each cell.</li>
                 <li><strong>Saved with the preset</strong> — both values persist in the preset JSON. Presets saved
                   before this control existed default to 1.0 and render identically.</li>
+              </ul>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Luma Key</div>
+              <p>Two sliders under a <strong>Luma Key</strong> sub-header in the Visual Effects section that make pixels
+                transparent based on brightness — great for cutting out backgrounds.</p>
+              <ul class="welcome-list">
+                <li><strong>Key Lo</strong> (0–1) — pixels darker than this luminance become transparent. Use to remove
+                  dark/black backgrounds.</li>
+                <li><strong>Key Hi</strong> (0–1) — pixels brighter than this luminance become transparent. Use to remove
+                  white/light backgrounds.</li>
+                <li><strong>Soft falloff</strong> — uses smooth blend near the threshold for clean edges, not hard cut.</li>
+                <li><strong>Works on all layers</strong> — image, video, and text. Combine both sliders to isolate only
+                  mid-tones.</li>
+              </ul>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Wave Distort</div>
+              <p>Two sliders under a <strong>Wave Distort</strong> sub-header that apply sinusoidal UV warping — makes
+                images ripple and melt.</p>
+              <ul class="welcome-list">
+                <li><strong>Wave</strong> (0–1) — amplitude of the displacement. How far pixels shift.</li>
+                <li><strong>Freq</strong> (1–20) — number of sine cycles. Low = gentle sway, high = tight ripples.
+                  Appears when Wave > 0.</li>
+                <li><strong>Audio-reactive</strong> — amplitude is boosted by the audio signal (bass hits make waves bigger).</li>
+                <li><strong>Works on all layers</strong> — image, video, and text.</li>
+              </ul>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Color FX — Invert &amp; Threshold</div>
+              <p>Two sliders under a <strong>Color FX</strong> sub-header for dramatic color manipulation.</p>
+              <ul class="welcome-list">
+                <li><strong>Invert</strong> (0–1) — blends between normal and color-negative. 0.5 = 50/50 mix for a washed look.</li>
+                <li><strong>Threshold</strong> (0–1) — converts the image to binary black & white at the given luminance
+                  cutoff. Audio-reactive: bass shifts the cutoff for pulsing silhouettes.</li>
+                <li><strong>Stack freely</strong> — Invert + Threshold together creates striking high-contrast pulsing negatives.</li>
+                <li><strong>Works on all layers</strong> — image, video, and text.</li>
+              </ul>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Texture — Pixelate, Scan Lines &amp; Film Grain</div>
+              <p>Three sliders under a <strong>Texture</strong> sub-header for retro and analog looks.</p>
+              <ul class="welcome-list">
+                <li><strong>Pixelate</strong> (0–1) — reduces resolution into chunky mosaic blocks. Low values = subtle,
+                  high = extreme 8-bit look. Affects UV before texture sampling.</li>
+                <li><strong>Scan Lines</strong> (0–1) — CRT-style horizontal dark bands across the image. Great for retro
+                  monitor or VHS aesthetics.</li>
+                <li><strong>Film Grain</strong> (0–1) — animated noise overlay for cinematic/analog film texture. The noise
+                  pattern changes every frame for a living feel.</li>
+                <li><strong>Works on all layers</strong> — image, video, and text. Combine with Posterize or Threshold
+                  for maximum retro impact.</li>
               </ul>
             </div>
 

@@ -67,6 +67,15 @@
 | **Hue** | 0–360° | Rodrigues RGB rotation — shifts image hue independently of the Palette tab. After tint + hue spin + saturation. |
 | **Posterize** | Off / 2 / 4 / 8 / 16 | `floor(_src * n + 0.5) / n` per channel, after tint. |
 | **Edge / Sobel** | Off / On | 3×3 Sobel kernel → luminance gradient magnitude replaces `_src`. Best with Tint + Hue Spin. |
+| **Luma Key Lo** | 0–1 | Pixels darker than this → transparent. Cuts dark backgrounds. Under "Luma Key" header. |
+| **Luma Key Hi** | 0–1 | Pixels brighter than this → transparent. Cuts white backgrounds. |
+| **Wave Distort** | 0–1 | Sinusoidal UV warp. Audio-reactive amplitude boost. Under "Wave Distort" header. |
+| **Wave Freq** | 1–20 | Number of sine cycles. Appears when Wave > 0. |
+| **Invert** | 0–1 | Blend between normal and color-negative. Under "Color FX" header. |
+| **Threshold** | 0–1 | Binary B&W at luminance cutoff. Audio-reactive: bass shifts cutoff. |
+| **Pixelate** | 0–1 | Mosaic blocks (4–128). Under "Texture" header. UV-space effect (before sample). |
+| **Scan Lines** | 0–1 | CRT horizontal dark bands. Post-sample color effect. |
+| **Film Grain** | 0–1 | Animated hash noise overlay. Changes every frame. |
 | **Mirror** | Off / H / V / Quad / Kaleido | Scope: Per Tile or Whole Image. |
 | **Blend** | Overlay / Additive / Multiply | How the layer composites over `col`. |
 | **Opacity** | 0–1 | Base opacity. Opacity Pulse drives audio-reactive fade. |
@@ -96,6 +105,8 @@ aspectPreScale    image aspect correction
 applyTileUV       fract wrap + per-tile spin + gap mask
 applyMirrorUV     per-tile or whole-image fold
 tunnel            pow2 crossfade zoom (fract phase + depthOffset)
+wave distort      sinusoidal UV warp (audio-reactive amplitude)
+pixelate          UV quantize into blocks (before sample)
 textureGrad       sample (or texture for non-tiled)
 chromatic         R/B channel offset resample
 _src              base color
@@ -104,6 +115,11 @@ tint / hue spin   color transform
 saturation        luminance mix (imageSaturation)
 hue rotate        Rodrigues RGB rotation (imageHue)
 posterize         color quantize
+invert            blend normal ↔ 1−color
+threshold         binary B&W at luminance cutoff (audio-reactive)
+scan lines        CRT horizontal dark bands
+film grain        animated hash noise overlay
+luma key          alpha modulation by luminance
 opacity           _op = opacity × opacityPulse × gapMask
 blend             composite into col
 ```

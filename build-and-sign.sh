@@ -64,6 +64,10 @@ if [ ! -d "src-tauri/icons" ]; then
     echo -e "${GREEN}Icons generated!${NC}"
 fi
 
+# Step 0b: Kill any stale Vite dev server that could hold a file lock
+pkill -f "node.*vite" 2>/dev/null || true
+rm -rf node_modules/.vite node_modules/.vite-temp
+
 # Step 1: Build the web app
 echo -e "${YELLOW}Step 1: Building web app with Vite...${NC}"
 npm run build

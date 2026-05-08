@@ -188,12 +188,14 @@ export async function exportPreset(id) {
 
     const exported = { ...preset };
 
-    // Inline image blobs as base64 data URLs
+    // Inline image/video blobs as base64 data URLs
     if (preset.images && preset.images.length > 0) {
         exported.images = await Promise.all(
             preset.images.map(async (img) => {
-                if (!img.imageId) return img;
-                const blob = await getImage(img.imageId);
+                // Video layers store under videoId
+                const blobKey = img.videoId || img.imageId;
+                if (!blobKey) return img;
+                const blob = await getImage(blobKey);
                 if (!blob) return img;
                 const url = await new Promise((res) => {
                     const reader = new FileReader();
@@ -237,7 +239,12 @@ export async function importPreset(json) {
             const newId = generateId();
             await storeImage(newId, blob);
             const { _inlinedDataUrl: _discarded, ...imgClean } = img;
-            images.push({ ...imgClean, imageId: newId });
+            // Video layers use videoId, image layers use imageId
+            if (img.type === 'video') {
+                images.push({ ...imgClean, videoId: newId });
+            } else {
+                images.push({ ...imgClean, imageId: newId });
+            }
         } else {
             images.push(img);
         }
