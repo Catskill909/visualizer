@@ -689,8 +689,8 @@ html, body {
   font-size: 10px; color: var(--text-3); white-space: nowrap;
 }
 .mini-btn {
-  background: transparent; border: 1px solid var(--border);
-  border-radius: var(--r-s); color: var(--text-3);
+  background: transparent; border: 1px solid var(--border-hi);
+  border-radius: var(--r-s); color: var(--text);
   font-size: 13px; line-height: 1; cursor: pointer;
   padding: 3px 7px; transition: all 0.12s;
 }

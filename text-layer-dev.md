@@ -1,7 +1,7 @@
 # Text Layer Feature — Dev Document
 
 > **Status:** ✅ Phase 1 + 2 Complete — tested, 18 bugs found and fixed  
-> **Last Updated:** May 7, 2026  
+> **Last Updated:** May 8, 2026  
 > **Goal:** Text layers as first-class layer type with WYSIWYG editing, bundled fonts, effects, and all image-layer transforms
 
 ---
@@ -11,7 +11,7 @@
 **Working as of May 7, 2026:**
 - ✅ `✏️ Text` button adds a text layer
 - ✅ Textarea updates texture live (150ms debounce)
-- ✅ Font family (Inter / Roboto / Oswald), weight (Normal/Bold), size, letter spacing, line height all update live
+- ✅ Font family (20 fonts across 5 groups), weight (Normal/Bold), size, letter spacing, line height all update live
 - ✅ Font size slider (Typography → Size) works at all sizes 24–200px — no blur, no clipping
 - ✅ Layer scale slider (Blend → Size) works independently for overall layer scaling
 - ✅ Text alignment (L/C/R), color picker positioned correctly near swatch
@@ -31,7 +31,7 @@
 ## Implementation Summary
 
 ### Files changed
-- **`src/assets/fonts/`** — `inter.woff2` (variable), `roboto-400.ttf`, `roboto-700.ttf`, `oswald-400.ttf`, `oswald-700.ttf` (separate weight files)
+- **`src/assets/fonts/`** — `inter.woff2` (variable), `roboto-400.ttf`, `roboto-700.ttf`, `oswald-400.ttf`, `oswald-700.ttf`, `anton-400.ttf`, `bebas-neue-400.ttf`, `righteous-400.ttf`, `exo2-400.ttf`, `exo2-700.ttf`
 - **`src/assets/fonts/fonts.css`** — `@font-face` for Inter (variable woff2), Roboto 400+700, Oswald 400+700 (separate rules per weight)
 - **`src/editor/main.js`** — imports `fonts.css`
 - **`src/visualizer.js`** — `_renderTextTexture()`, `_loadTextTexture()` (direct GL upload, bypasses `loadExtraImages` cache), `isText` branch in `setUserTexture()`
@@ -93,7 +93,12 @@ Every approach below was tried and failed:
 - [x] Font `document.fonts.load()` await before render
 
 ### 🔲 Phase 3 — Future
-- [ ] More bundled fonts (currently 3: Inter, Roboto, Oswald)
+- [x] More bundled fonts — now 20 across 5 groups (May 8, 2026)
+  - Standard: Inter, Roboto, Poppins, Montserrat, Raleway
+  - Display: Oswald, Anton, Bebas Neue, Bangers, Black Ops One, Russo One, Righteous, Cinzel
+  - Tech/Sci-Fi: Orbitron, Exo 2, Chakra Petch
+  - Retro/Pixel: Press Start 2P, VT323
+  - Handwritten: Pacifico, Permanent Marker
 - [x] Background box (color + padding + opacity) — implemented, toggle in UI
 - [ ] Typing / reveal animation
 - [ ] Scrolling / marquee

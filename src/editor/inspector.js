@@ -2650,9 +2650,36 @@ export class EditorInspector {
             <div class="layer-row-inline">
               <span class="layer-ctrl-label">Font</span>
               <select class="layer-font-family">
-                <option value="Inter"${entry.fontFamily === 'Inter' ? ' selected' : ''}>Inter</option>
-                <option value="Roboto"${entry.fontFamily === 'Roboto' ? ' selected' : ''}>Roboto</option>
-                <option value="Oswald"${entry.fontFamily === 'Oswald' ? ' selected' : ''}>Oswald</option>
+                <optgroup label="Standard">
+                  <option value="Inter"${entry.fontFamily === 'Inter' ? ' selected' : ''}>Inter</option>
+                  <option value="Roboto"${entry.fontFamily === 'Roboto' ? ' selected' : ''}>Roboto</option>
+                  <option value="Poppins"${entry.fontFamily === 'Poppins' ? ' selected' : ''}>Poppins</option>
+                  <option value="Montserrat"${entry.fontFamily === 'Montserrat' ? ' selected' : ''}>Montserrat</option>
+                  <option value="Raleway"${entry.fontFamily === 'Raleway' ? ' selected' : ''}>Raleway</option>
+                </optgroup>
+                <optgroup label="Display">
+                  <option value="Oswald"${entry.fontFamily === 'Oswald' ? ' selected' : ''}>Oswald</option>
+                  <option value="Anton"${entry.fontFamily === 'Anton' ? ' selected' : ''}>Anton</option>
+                  <option value="Bebas Neue"${entry.fontFamily === 'Bebas Neue' ? ' selected' : ''}>Bebas Neue</option>
+                  <option value="Bangers"${entry.fontFamily === 'Bangers' ? ' selected' : ''}>Bangers</option>
+                  <option value="Black Ops One"${entry.fontFamily === 'Black Ops One' ? ' selected' : ''}>Black Ops One</option>
+                  <option value="Russo One"${entry.fontFamily === 'Russo One' ? ' selected' : ''}>Russo One</option>
+                  <option value="Righteous"${entry.fontFamily === 'Righteous' ? ' selected' : ''}>Righteous</option>
+                  <option value="Cinzel"${entry.fontFamily === 'Cinzel' ? ' selected' : ''}>Cinzel</option>
+                </optgroup>
+                <optgroup label="Tech / Sci-Fi">
+                  <option value="Orbitron"${entry.fontFamily === 'Orbitron' ? ' selected' : ''}>Orbitron</option>
+                  <option value="Exo 2"${entry.fontFamily === 'Exo 2' ? ' selected' : ''}>Exo 2</option>
+                  <option value="Chakra Petch"${entry.fontFamily === 'Chakra Petch' ? ' selected' : ''}>Chakra Petch</option>
+                </optgroup>
+                <optgroup label="Retro / Pixel">
+                  <option value="Press Start 2P"${entry.fontFamily === 'Press Start 2P' ? ' selected' : ''}>Press Start 2P</option>
+                  <option value="VT323"${entry.fontFamily === 'VT323' ? ' selected' : ''}>VT323</option>
+                </optgroup>
+                <optgroup label="Handwritten">
+                  <option value="Pacifico"${entry.fontFamily === 'Pacifico' ? ' selected' : ''}>Pacifico</option>
+                  <option value="Permanent Marker"${entry.fontFamily === 'Permanent Marker' ? ' selected' : ''}>Permanent Marker</option>
+                </optgroup>
               </select>
             </div>
             <div class="layer-row-inline">
