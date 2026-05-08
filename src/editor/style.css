@@ -1097,6 +1097,8 @@ html, body {
 }
 .layer-font-family:hover,
 .layer-font-weight:hover { border-color: var(--border-hi); }
+.layer-font-family option,
+.layer-font-weight option { background: #1a1a2e; color: #ffffff; }
 .layer-text-align-seg { display: flex; gap: 2px; }
 .layer-text-color-wrap,
 .layer-shadow-color-wrap,
