@@ -19,9 +19,10 @@ initAuthGate();
 const startEl  = document.getElementById('editor-start');
 const shellEl  = document.getElementById('editor-shell');
 const canvasEl = document.getElementById('editor-canvas');
-const btnMic   = document.getElementById('start-mic');
-const btnFile  = document.getElementById('start-file');
-const fileInput = document.getElementById('start-file-input');
+const btnMic     = document.getElementById('start-mic');
+const btnFile    = document.getElementById('start-file');
+const btnNoAudio = document.getElementById('start-no-audio');
+const fileInput  = document.getElementById('start-file-input');
 
 // Mini player refs
 const miniPlayer  = document.getElementById('mini-player');
@@ -212,6 +213,10 @@ function mountMiniPlayer(audio, filename) {
 
     mpFilename.textContent = filename.length > 32 ? filename.slice(0, 30) + '…' : filename;
     miniPlayer.hidden = false;
+    mpPlay.disabled = false;
+    mpSeek.disabled = false;
+    mpPlay.style.opacity = '';
+    mpSeek.style.opacity = '';
 
     const updateUI = () => {
         const cur = audio.currentTime;
@@ -604,6 +609,22 @@ fileInput.addEventListener('change', () => {
         audio.play();
         mountMiniPlayer(audio, file.name);
         showToast('Playing: ' + file.name);
+    });
+});
+
+btnNoAudio?.addEventListener('click', () => {
+    boot(async () => {
+        // No audio connected — show empty mini player so user can load a track later
+        miniPlayer.hidden = false;
+        mpFilename.textContent = 'No audio loaded';
+        mpFilename.dataset.tooltip = 'Click Load button to add audio';
+        mpTime.textContent = '— / —';
+        mpSeek.value = 0;
+        mpSeek.style.setProperty('--pct', '0%');
+        mpPlay.disabled = true;
+        mpSeek.disabled = true;
+        mpPlay.style.opacity = '0.4';
+        mpSeek.style.opacity = '0.4';
     });
 });
 
