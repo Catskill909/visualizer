@@ -181,7 +181,7 @@ const BLANK = {
     comp: BLANK_COMP,  // must be a valid GLSL shader_body string
     init_eqs_str: '', frame_eqs_str: '', pixel_eqs_str: '',
     images: [],
-    sceneMirror: 'none',  // 'none' | 'h' | 'v' | 'both'
+    sceneMirror: 'none',  // 'none' | 'h' | 'v' | 'both' | 'kaleido'
     motionReact: {
         source: 'bass',
         curve: 'linear',
@@ -4672,6 +4672,16 @@ export class EditorInspector {
             uvFold = '  vec2 uv_m = vec2(uv.x, 1.0 - abs(uv.y * 2.0 - 1.0));\n';
         } else if (sm === 'both') {
             uvFold = '  vec2 uv_m = vec2(1.0 - abs(uv.x * 2.0 - 1.0), 1.0 - abs(uv.y * 2.0 - 1.0));\n';
+        } else if (sm === 'kaleido') {
+            uvFold = '  vec2 uv_m;\n' +
+                      '  { vec2 _kp = uv - 0.5;\n' +
+                      '    float _kang = atan(_kp.y, _kp.x);\n' +
+                      '    float _krad = length(_kp);\n' +
+                      '    float _ksect = 6.28318530718 / 6.0;\n' +
+                      '    float _ka = mod(_kang, _ksect);\n' +
+                      '    if (_ka > _ksect * 0.5) _ka = _ksect - _ka;\n' +
+                      '    uv_m = vec2(cos(_ka) * _krad, sin(_ka) * _krad) + 0.5;\n' +
+                      '  }\n';
         } else {
             uvFold = '  vec2 uv_m = uv;\n';
         }

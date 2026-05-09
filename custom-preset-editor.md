@@ -130,7 +130,7 @@ Up to **5 image layers** in a collapsible smart-accordion stack. Adding a new la
 | **Reactivity Curve** | Linear / Squared / Cubed / Gate | Transform applied to the raw signal before driving reactive controls. Gate = hard on/off at 30% threshold. Default: Linear. |
 | **Aspect-correct tiling** | Automatic | Portrait, square, and landscape images tile without distortion. The GLSL pre-scales `_u.x` by `imgAsp × aspect.y` before the tile UV pipeline, so tile cells match the image’s native aspect ratio in screen pixels. No cropping, no letterboxing. |
 | Images Only | Toggle (header) | Hides base visualizer — black background + images only |
-| **Canvas Mirror** | None / ↔ H / ↕ V / ✦ Both | Folds the entire rendered scene (warp buffer + all image layers) along one or both axes |
+| **Canvas Mirror** | None / ↔ H / ↕ V / ⊞ Quad / ✦ Kaleido | Folds the entire rendered scene (warp buffer + all image layers) along one or both axes. Kaleido = 6-slice polar radial fold. |
 
 ### Tunnel implementation
 
@@ -310,7 +310,7 @@ Draw *N* copies of the image arranged in a ring around the center anchor. Contro
 Segmented control: **Off / ↔ H / ↕ V / ✦ Quad / ✶ Kaleido**. Applied as a UV fold *after* tiling (in [0,1] tile space) so it stacks with spin, tunnel, spacing, etc. Mirror H/V: `1 - abs(u × 2 - 1)` per axis (correct formula for [0,1] UV space — NOT `fract(u×0.5)×2−1` which was an earlier bug). Kaleido: 6-slice polar fold — `atan2` → mod into `π/3` sector → mirror → polar back to cartesian.
 
 ### ✅ Canvas Mirror — BUILT
-Scene-level segmented control: **None / ↔ H / ↕ V / ✦ Both** in the Image tab header. Folds the entire comp-shader output — warp buffer AND all image layers move together. Uses `uv_m` local variable technique (see Canvas Mirror section above) to avoid GLSL redeclaration errors.
+Scene-level segmented control: **None / ↔ H / ↕ V / ⊞ Quad / ✦ Kaleido** in the Image tab header. Folds the entire comp-shader output — warp buffer AND all image layers move together. Uses `uv_m` local variable technique (see Canvas Mirror section above) to avoid GLSL redeclaration errors.
 
 ---
 
