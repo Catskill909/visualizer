@@ -50,6 +50,7 @@ export class VisualizerEngine {
     this.presetNames = [];
     this.presets = {};
     this.currentPresetIndex = -1;
+    this.currentPresetName = '';  // Name-based lookup (more reliable than index)
     this.isRunning = false;
     this.audioElement = null;
     this.volumeGainNode = null;
@@ -312,9 +313,10 @@ export class VisualizerEngine {
     const preset = this.presets[name];
     if (!preset) return false;
 
-    // Optimistic index update so getCurrentPresetName() is correct immediately
-    // even while the async image-bind is in flight.
-    this.currentPresetIndex = this.presetNames.indexOf(name);
+    // Store current preset name for reliable lookup (index can become stale after
+    // refreshCustomPresets() rebuilds the presetNames array)
+    this.currentPresetName = name;
+    this.currentPresetIndex = this.presetNames.indexOf(name);  // Keep for backwards compat
 
     // Butterchurn's blendProgress = elapsed / blendDuration produces NaN/Infinity
     // at blendTime=0, keeping it stuck in a permanent-blend state.
@@ -377,8 +379,8 @@ export class VisualizerEngine {
   }
 
   getCurrentPresetName() {
-    if (this.currentPresetIndex < 0) return '';
-    return this.presetNames[this.currentPresetIndex] || '';
+    // Use stored name directly - index can become stale after preset list changes
+    return this.currentPresetName || '';
   }
 
   getPresetNames() { return this.presetNames; }
@@ -446,6 +448,15 @@ export class VisualizerEngine {
         video.muted = true;        // WKWebView autoplay requires muted initially
         video.loop = img.loop !== false;  // Default to looping
         video.preload = 'auto';
+
+        // WKWebView CRITICAL: append to DOM BEFORE setting src
+        video.style.position = 'fixed';
+        video.style.left = '-9999px';
+        video.style.width = '1px';
+        video.style.height = '1px';
+        video.style.opacity = '0';
+        video.style.pointerEvents = 'none';
+        document.body.appendChild(video);
 
         // Wait for metadata to get dimensions
         await new Promise((resolve, reject) => {
@@ -1012,6 +1023,10 @@ export class VisualizerEngine {
     if (anim && anim.videoElement) {
       anim.videoElement.pause();
       anim.videoElement.src = '';
+      // Remove from DOM (WKWebView cleanup)
+      if (anim.videoElement.parentNode) {
+        anim.videoElement.parentNode.removeChild(anim.videoElement);
+      }
     }
     this._videoAnimations.delete(name);
   }
@@ -1200,6 +1215,11 @@ export class VisualizerEngine {
    */
   _loadVideoTexture(name, videoElement, width, height) {
     try {
+      // Validate video element has loaded
+      if (!videoElement || videoElement.videoWidth === 0 || videoElement.videoHeight === 0) {
+        console.warn('[DiscoCast Visualizer] Video not ready for texture upload:', name);
+        return;
+      }
       const imgTextures = this.visualizer?.renderer?.image;
       if (!imgTextures?.gl) {
         console.warn('[DiscoCast Visualizer] No GL context for video texture');
@@ -1242,6 +1262,18 @@ export class VisualizerEngine {
       // Initial black frame
       const initialData = new Uint8Array(width * height * 4);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, initialData);
+
+      // WKWebView fix: video must be in DOM to decode properly
+      // Only append if not already in DOM (prevents double-append from inspector)
+      if (!videoElement.parentNode) {
+        videoElement.style.position = 'fixed';
+        videoElement.style.left = '-9999px';
+        videoElement.style.width = '1px';
+        videoElement.style.height = '1px';
+        videoElement.style.opacity = '0';
+        videoElement.style.pointerEvents = 'none';
+        document.body.appendChild(videoElement);
+      }
 
       // Start video playback
       videoElement.loop = true;
@@ -1328,8 +1360,10 @@ export class VisualizerEngine {
     if (this._videoAnimations.size === 0) return;
     for (const [, anim] of this._videoAnimations) {
       const { videoElement, gl, texture, width, height, uploadCanvas, uploadCtx } = anim;
-      // Only upload if video is playing and frame has changed
+      // Only upload if video is playing and has data ready
       if (videoElement.paused || videoElement.ended) continue;
+      // HAVE_CURRENT_DATA (2) or HAVE_ENOUGH_DATA (4) required for drawImage
+      if (videoElement.readyState < 2) continue;
       // Draw video frame to canvas
       uploadCtx.drawImage(videoElement, 0, 0, width, height);
       // Get pixel data

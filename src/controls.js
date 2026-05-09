@@ -172,9 +172,9 @@ export class ControlPanel {
     });
 
     els.btnNext.addEventListener('click', () => {
-      const name = engine.nextPreset();
+      const name = engine.randomCycleOrder ? engine.randomPreset() : engine.nextPreset();
       this.updatePresetName(name);
-      this.showToast('⏭ ' + this.truncate(name, 50));
+      this.showToast(engine.randomCycleOrder ? '🎲 ' + this.truncate(name, 50) : '⏭ ' + this.truncate(name, 50));
     });
 
     // --- Cycle popover ---
@@ -1508,7 +1508,11 @@ export class ControlPanel {
         break;
       case 'ArrowRight':
         e.preventDefault();
-        this.engine.nextPreset();
+        if (this.engine.randomCycleOrder) {
+          this.engine.randomPreset();
+        } else {
+          this.engine.nextPreset();
+        }
         break;
       case 'ArrowLeft':
         e.preventDefault();

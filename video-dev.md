@@ -1,8 +1,10 @@
 # Video Layer Feature — Brainstorm & Audit Document
 
-> **Status:** ✅ **SHIPPED** — Phase 1 Complete  
-> **Date:** May 7, 2026  
-> **Goal:** Video layer playback with macOS WKWebView support
+> **Status:** ✅ **SHIPPED** — Phase 1 Complete + Auto-Transcoding  
+> **Date:** May 9, 2026  
+> **Goal:** Video layer playback with auto-transcoding (720p), macOS WKWebView support
+
+**Latest:** Auto-transcoding implemented — drag 4K videos, automatically optimized to 720p
 
 ---
 
@@ -173,51 +175,56 @@ const frameIndex = Math.floor(videoTime * fps);
 
 **Accept attribute:** `accept="video/mp4,video/webm,video/quicktime"`
 
-### 5.1 Resolution Enforcement (MVP)
+### 5.1 Resolution Enforcement with Auto-Transcoding ✅ SHIPPED
 
-**Phase 1 (MVP): Hard 720p limit — no conversion library**
+**Status:** Auto-transcoding implemented via FFmpeg.wasm — oversized videos are automatically converted to 720p on upload.
 
+**Behavior:**
 ```javascript
-// Upload guard — reject oversized videos
+// Upload guard — auto-transcode oversized videos
 const MAX_VIDEO_WIDTH = 1280;
 const MAX_VIDEO_HEIGHT = 720;
 
 if (videoWidth > MAX_VIDEO_WIDTH || videoHeight > MAX_VIDEO_HEIGHT) {
-  showToast("Video must be 720p or lower. Please downscale externally.");
-  return; // Reject upload
+  // Auto-transcode instead of rejecting
+  showToast(`Video is ${videoWidth}×${videoHeight}. Optimizing to 720p...`);
+  file = await transcodeTo720p(file, onProgress);
+  showToast(`Optimized: ${originalSize} → ${newSize}`);
 }
 ```
 
-**Rationale:**
-- No heavy dependencies (FFmpeg.wasm = ~25MB)
-- Predictable performance — all uploads are GPU-friendly
-- Matches GIF pattern: simple first, optimizer later
+**User Experience:**
+- Drag 4K video → "Optimizing to 720p... 45%" → "Optimized: 45MB → 8MB"
+- Zero friction — no external tools needed
+- Progress updates during ~30-60s conversion (1min 1080p → 720p)
 
-### 5.2 Conversion / Optimizer (Phase 2)
+### 5.2 FFmpeg.wasm Implementation Details
 
-After MVP validation, add optional FFmpeg.wasm conversion:
+**Dependencies:** `@ffmpeg/ffmpeg` + `@ffmpeg/util` (~25MB lazy-loaded)
+
+**Module:** `@/src/videoTranscoder.js`
 
 ```javascript
-// Phase 2: Detect oversized → offer conversion
-if (videoWidth > 1280 || videoHeight > 720) {
-  showOptimizerModal({
-    source: file,
-    target: { width: 1280, height: 720, fps: 30 },
-    library: '@ffmpeg/ffmpeg' // Lazy-loaded ~25MB
-  });
-}
+// Lazy-load on first use
+const ffmpeg = await getFFmpeg(); // ~25MB fetch once
+
+// Transcode with progress
+const transcodedFile = await transcodeTo720p(file, (progress) => {
+  showToast(`Optimizing... ${Math.round(progress.percent)}%`);
+});
 ```
 
-**FFmpeg.wasm workflow:**
-1. Lazy-load library on first oversized upload
-2. Transcode to 720p H.264 (consistent format)
-3. Store result, discard original
-4. Progress bar during conversion (~30-60s for 1min 1080p)
+**Encoding settings:**
+- Scale: `scale=-2:720:flags=lanczos` (maintains aspect, lanczos quality)
+- Codec: H.264 `libx264`
+- Preset: `fast` (speed/quality balance)
+- CRF: `23` (visually lossless)
+- Audio: stripped (`-an`) — not needed for VJ visuals
 
-**Why delay this:**
-- 25MB dependency is heavy if most users follow guidelines
-- Complex WebAssembly threading setup
-- Only needed if users don't pre-downscale
+**Storage:**
+- Original discarded after transcode
+- Only 720p version stored in IndexedDB
+- Exports include optimized version (smaller bundle size)
 
 ---
 
@@ -487,7 +494,27 @@ _performDeleteLayer(entry, card, texName) {
 
 **Location:** `@/src/editor/inspector.js` in `_addVideoLayer()` and `_performDeleteLayer()`
 
-### 14.3 Loop Workaround
+### 14.3 Critical Bug Fix: Revoked Blob URL in Non-Transcoded Path (May 9, 2026)
+
+**Bug:** Videos under 720p (non-transcoded) didn't display in macOS build despite toast showing success.
+
+**Root Cause:** The non-transcoded path in `_addVideoLayer()` revoked the blob URL while the video element still referenced it:
+
+```javascript
+// BROKEN (inspector.js:2361)
+} else {
+    URL.revokeObjectURL(videoUrl);  // BUG: video.src still points to this!
+}
+// finalVideo = video  ← Uses element with revoked URL
+```
+
+**Fix Applied:**
+- **inspector.js:2310** - Added `video.loop = true` (was missing on original element)
+- **inspector.js:2361-2364** - Removed `URL.revokeObjectURL()` from non-transcoded path
+
+**Lesson:** Never revoke blob URLs while any element still references them. WKWebView strictly enforces this; desktop browsers are more forgiving.
+
+### 14.4 Loop Workaround
 
 The `video.loop = true` property doesn't always work in WKWebView. Manual loop handling is required:
 
@@ -502,7 +529,7 @@ videoElement.addEventListener('ended', () => {
 
 **Location:** `@/src/visualizer.js` in `_loadVideoTexture()`
 
-### 14.4 Platform Differences Summary
+### 14.5 Platform Differences Summary
 
 | Aspect | Web (Chrome/Safari/Firefox) | macOS Tauri (WKWebView) |
 |--------|------------------------------|-------------------------|
@@ -511,7 +538,7 @@ videoElement.addEventListener('ended', () => {
 | Blob URL revocation | Can revoke after load | **Must keep valid** |
 | `loop` property | Works reliably | Needs manual restart |
 
-### 14.5 Testing Checklist for macOS
+### 14.6 Testing Checklist for macOS
 
 Before shipping macOS builds with video support:
 
@@ -522,6 +549,133 @@ Before shipping macOS builds with video support:
 - [ ] Pulse/bounce audio reactivity works
 - [ ] Play/pause button toggles correctly
 - [ ] Video stops when layer deleted (no memory leak)
+
+---
+
+### 14.7 Performance Monitoring & Machine Auditing — Future Dev
+
+> **Status:** Research complete — implementation not started  
+> **Goal:** Real-time performance graphs and video layer impact auditing
+
+**Why this matters:** Video layers are the most resource-intensive feature (720p texture uploads every frame). Users need visibility into performance impact, especially on lower-end hardware.
+
+#### 14.7.1 Available Browser Telemetry APIs
+
+| Metric | API | Reliability | Use Case |
+|--------|-----|-------------|----------|
+| **FPS / Frame Time** | `requestAnimationFrame` delta | ✅ High | Detect jank, dropped frames |
+| **JS Heap Memory** | `performance.memory` | ⚠️ Chrome only | Detect memory leaks from preset switching |
+| **Device Memory Tier** | `navigator.deviceMemory` | ⚠️ Chrome only | Warn on 2GB/4GB devices |
+| **CPU Cores** | `navigator.hardwareConcurrency` | ✅ High | Set conservative defaults on low-core machines |
+| **GPU Info** | `WEBGL_debug_renderer_info` | ⚠️ Extension needed | Detect Intel iGPU vs discrete for tiered defaults |
+| **WebGL Limits** | `gl.getParameter(MAX_TEXTURE_SIZE)` | ✅ High | Validate 2048/4096 support |
+| **Battery / Power** | `navigator.getBattery()` | ⚠️ Limited | Reduce video count on battery power |
+
+**Not available:** GPU utilization %, VRAM usage, thermal state. These require native app instrumentation (Tauri Rust layer) if needed.
+
+#### 14.7.2 Video-Specific Metrics to Track
+
+| Metric | Threshold | Warning Trigger |
+|--------|-----------|-----------------|
+| **Active video layers** | 2 max recommended | ≥2 videos: show amber indicator |
+| **Texture upload time** | ~2-5ms per 720p frame | >5ms: "Video may cause stutter" |
+| **Dropped frames** | 0 at 60fps | >2 drops/sec: reduce video count |
+| **GPU memory estimate** | 4MB per 720p video | >20MB total: "Consider image layers" |
+| **Decode bandwidth** | ~15-30MB/s per 720p | CPU-bound if >2 videos + complex preset |
+
+#### 14.7.3 Implementation Options
+
+**Option A: Minimal HUD Overlay (recommended for MVP)**
+- Canvas 2D overlay in corner (toggle with `Ctrl+Shift+P` or similar)
+- Show: FPS, active video count, GPU tier icon
+- Amber/red indicators when thresholds exceeded
+- Zero overhead when hidden
+
+**Option B: Full Performance Panel**
+- Real-time sparkline graphs (FPS, memory, upload time)
+- Video layer breakdown with per-layer GPU cost
+- Export performance snapshot for bug reports
+- More UI work, but powerful for power users
+
+**Option C: Native Tauri Integration (future)**
+- Rust sidecar to read system GPU/CPU stats
+- OS-level thermal throttling detection
+- Only if browser APIs prove insufficient
+
+#### 14.7.4 Code Sketch — FPS Monitor
+
+```javascript
+class VideoPerformanceMonitor {
+  constructor() {
+    this.frames = [];
+    this.lastTime = performance.now();
+    this.jankCount = 0; // frames > 16.7ms
+    this.videoLayerCount = 0;
+  }
+  
+  tick() {
+    const now = performance.now();
+    const delta = now - this.lastTime;
+    this.lastTime = now;
+    
+    // Track last 60 frames for rolling average
+    this.frames.push(delta);
+    if (this.frames.length > 60) this.frames.shift();
+    
+    const avgDelta = this.frames.reduce((a, b) => a + b, 0) / this.frames.length;
+    const fps = Math.round(1000 / avgDelta);
+    
+    // Detect jank (>16.7ms = missed 60fps deadline)
+    if (delta > 16.7) this.jankCount++;
+    
+    // Video-specific: warn on severe drops
+    if (this.videoLayerCount > 0 && delta > 33) {
+      console.warn('[Perf] Frame drop with active videos:', delta.toFixed(1) + 'ms');
+    }
+    
+    return { fps, jankRate: this.jankCount / this.frames.length };
+  }
+  
+  setVideoCount(n) {
+    this.videoLayerCount = n;
+    // Warn at 2+ videos on Intel iGPU (detected separately)
+  }
+}
+```
+
+#### 14.7.5 GPU Tier Detection
+
+```javascript
+function detectGPUTier(gl) {
+  const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+  const vendor = debugInfo 
+    ? gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL)
+    : gl.getParameter(gl.VENDOR);
+  const renderer = debugInfo
+    ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL)
+    : gl.getParameter(gl.RENDERER);
+  
+  const isIntelIGP = renderer.includes('Intel') && !renderer.includes('Arc');
+  const isDiscrete = renderer.includes('NVIDIA') || renderer.includes('AMD') || renderer.includes('Radeon');
+  
+  // Set conservative defaults for Intel integrated
+  return {
+    tier: isDiscrete ? 'high' : isIntelIGP ? 'low' : 'medium',
+    maxVideos: isDiscrete ? 3 : isIntelIGP ? 1 : 2,
+    renderer,
+    vendor
+  };
+}
+```
+
+#### 14.7.6 Recommended Limits for UI Warnings
+
+| User Hardware | Max Videos | Preset Complexity | UI Guidance |
+|---------------|------------|-------------------|-------------|
+| Intel iGPU (UHD/HD) | 1 | Avoid heavy feedback presets | "One video max for smooth playback" |
+| Apple Silicon M1/M2 | 2 | All presets OK | Standard experience |
+| Discrete GPU (RTX/Radeon) | 3 | All presets OK | "High-end hardware — full performance" |
+| Unknown / Low-end | 1 | Conservative | "Consider GIFs instead of videos" |
 
 ---
 
@@ -832,4 +986,149 @@ Building it once unlocks an entire category of temporal effects.
 
 ---
 
-*Document created for brainstorming session. Simplified spec reflects May 7, 2026 discussion — no tiling, single-quad video layers with mirror-based duplication. VJ effects brainstorm added May 8, 2026.*
+## 16. Future Development — Video Clip Editor / Sampler
+
+> **Status:** 📋 **Brainstorm** — Way down the roadmap, not prioritized  
+> **Idea:** Modal-based video editor for trimming, clip selection, and transcode settings
+
+### 16.1 Vision: Video Sampler Mode
+
+A modal menu that opens when adding videos (or via right-click on existing video layers) that provides:
+
+| Feature | Description | Use Case |
+|---------|-------------|----------|
+| **Clip Trimming** | Set in/out points on a video timeline | Use only the best 10 seconds of a 2-minute clip |
+| **Video Preview** | Scrub-able preview with frame-accurate seeking | See exactly what you're cutting |
+| **Chunk Selection** | Extract multiple segments from one video | Build a "best of" reel from longer footage |
+| **Transcode Settings** | Override default 720p — choose quality/size | 480p for lightweight loops, 1080p for quality |
+| **Format Options** | WebM/VP9 vs MP4/H.264 selection | VP9 for transparency support, H.264 for compatibility |
+| **Audio Strip/Keep** | Option to preserve audio tracks | Rare VJ use case, but possible |
+
+### 16.2 UI Concept
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  🎬 Video Sampler — myclip.mp4                    [×]   │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  ┌─────────────────────────────────────────────┐       │
+│  │                                             │       │
+│  │           VIDEO PREVIEW                     │       │
+│  │           (scrub with waveform)             │       │
+│  │                                             │       │
+│  └─────────────────────────────────────────────┘       │
+│                                                         │
+│  ○━━━━━━●━━━━━━━━━━━━━━━━━━━━━●━━━━━━━━━━━━━━━○        │
+│  0:00   ▲                   ▲                 2:34     │
+│       [IN]               [OUT]                        │
+│                                                         │
+│  Quality: [720p ▼]  Format: [H.264 ▼]  Audio: [✓]    │
+│                                                         │
+│  Estimated: 45MB → 8MB (18s selected)                 │
+│                                                         │
+│  [Cancel]                    [Add to Preset]           │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 16.3 Technical Considerations
+
+| Aspect | Challenge | Solution Path |
+|--------|-----------|---------------|
+| **Seek precision** | Video seeking not frame-accurate in browsers | Use `currentTime` + `seeked` event with throttling |
+| **Waveform display** | Generate audio waveform for visual scrub | Decode audio track with Web Audio API, draw to canvas |
+| **Multiple chunks** | Non-contiguous segments from one source | Transcode each segment separately, concat with FFmpeg |
+| **Live preview** | Seeking on large files is slow | Proxy preview at lower resolution, final transcode at full |
+| **Storage** | Original + multiple clips = bloat | Discard original after sampling, store only selected chunks |
+
+### 16.4 Implementation Phases (Very Rough)
+
+| Phase | Scope | Effort |
+|-------|-------|--------|
+| **Phase 1** | Basic trim (single in/out) + quality selector | 8–12 hrs |
+| **Phase 2** | Visual waveform scrubber | 4–6 hrs |
+| **Phase 3** | Multiple chunk selection | 6–10 hrs |
+| **Phase 4** | Proxy preview for fast scrubbing | 4–8 hrs |
+
+**Dependencies:** All built on top of existing FFmpeg.wasm infrastructure — the hard work (loading, transcoding) is already done.
+
+### 16.5 Streaming Mode — Handle Any Size Without Storage
+
+> **Key insight:** The video sampler can operate in a "streaming mode" where the original file is **never stored** — only the final sample is saved.
+
+**Workflow:**
+```
+1. User drops 4GB ProRes file (or any size/format)
+2. App streams it for preview only — no IndexedDB storage
+3. User marks 15-second sample with in/out points
+4. FFmpeg transcodes just that 15s chunk to 720p
+5. Original 4GB file is discarded, only 15s sample stored (~5MB)
+```
+
+**Benefits:**
+| Aspect | Traditional | Streaming Sampler |
+|--------|-------------|-------------------|
+| **File size limit** | 50-100MB (IndexedDB practical limit) | Unlimited — streams from disk |
+| **Storage** | Original + sample stored | Only sample stored |
+| **Import time** | Upload + full transcode | Immediate preview, sample-only transcode |
+| **Use case** | Small clips, phone videos | Professional footage, long DJ sets, 4K sources |
+
+**Technical approach:**
+- Use `createObjectURL()` for streaming preview — no copy made
+- Only transcode the selected segment with FFmpeg (`-ss start -t duration`)
+- Discard original blob URL after sample extraction
+- Result: 4GB → 15s sample in 30 seconds, no persistent storage of the 4GB
+
+### 16.6 Differentiation
+
+Most VJ tools require pre-edited clips. This would let DJs:
+- Drop a 10-minute music video in
+- Instantly sample the best 30-second loop
+- Trim, transcode, and layer in one flow
+
+**"Video sampler" as a creative tool, not just a technical necessity.**
+
+### 16.7 Clip Editing Features Only
+
+Pure video editing — NO processing/beat detection (already in app). Just clip extraction, stitching, and assembly:
+
+| Feature | Description | Clip Editing Use Case |
+|---------|-------------|----------------------|
+| **Multi-Segment Selection** | Pick 2-5 separate regions from one video | "Take intro (0:05-0:10) + drop (1:30-1:35) + outro (2:45-2:50)" |
+| **Stitch Segments** | Concatenate multiple selected regions into one output clip | Build one seamless clip from scattered highlights |
+| **Filmstrip Thumbnail Grid** | Visual frame grid for precise in/out point selection | Find exact frame for cut |
+| **Trim Fine-Tuning** | Frame-accurate nudge (±1 frame, ±1 second) | Perfect cut points |
+| **Split at Playhead** | One-click split video into two clips at current position | Divide long footage |
+| **Reorder Segments** | Drag to reorder which segment plays first/second | Re-sequence clips before stitch |
+| **Crossfade Between Segments** | Add 0.1-1.0s dissolve between stitched parts | Smooth transitions between distant clips |
+| **Aspect Ratio Crop** | Crop to 9:16, 1:1, 16:9 during extraction | Output correct size directly |
+| **Undo/Redo Stack** | Undo trim, split, reorder, delete actions | Non-destructive editing |
+| **A/B Compare Two Edits** | Side-by-side compare different cut versions | Pick best edit |
+| **Batch Extract** | Same in/out points applied to 5+ videos | Process multiple files identically |
+| **Export Preview** | Low-res preview of final stitched clip before saving | Verify edit before transcode |
+
+**NOT included (already in preset editor):** Beat detection, speed change, reverse, color grading, effects, opacity, blending — all handled after clip is added to video layer.
+
+### 16.8 Workflow Integration Ideas
+
+**"Sampler as Layer Source"**
+- Sampler doesn't just add to preset — it becomes a "clip library"
+- Sampled clips appear in a "My Clips" panel
+- Drag from My Clips → any preset layer slot
+- Clips are reusable across presets
+
+**"Live Sampler Mode"**
+- During timeline playback, hit `S` to sample current 4 bars
+- Auto-extracts, names with timestamp, adds to My Clips
+- Build a clip library from live performance in real-time
+
+**"Smart Sampler AI" (Future)**
+- AI suggests best 15-second segment based on:
+  - Motion intensity peaks
+  - Beat drops in audio
+  - Face/figure visibility
+  - Color palette matching current preset
+- "Extract best drop" one-click button
+
+---
+
+*Document created for brainstorming session.* Simplified spec reflects May 7, 2026 discussion — no tiling, single-quad video layers with mirror-based duplication. VJ effects brainstorm added May 8, 2026. Performance monitoring section added May 9, 2026. Video clip editor brainstorm added May 9, 2026.*

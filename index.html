@@ -912,10 +912,10 @@
             <div class="welcome-feature">
               <div class="welcome-feature-title">Video Layers</div>
               <p>Drop <strong>MP4</strong> or <strong>WebM</strong> video files directly into presets — videos render as
-                real-time GPU textures with full playback controls and effects.</p>
+                real-time GPU textures with full playback controls and effects. <strong>Auto-transcoding:</strong> 1080p and 4K videos are automatically optimized to 720p on upload.</p>
               <ul class="welcome-list">
-                <li><strong>File support</strong> — MP4 (H.264) and WebM (VP9). Maximum 720p resolution (1280×720)
-                  for smooth performance. Larger videos will be rejected with a toast message.</li>
+                <li><strong>File support</strong> — MP4 (H.264) and WebM (VP9). 720p output for smooth performance.
+                  Drop any resolution — 1080p and 4K videos auto-transcode to 720p with progress feedback.</li>
                 <li><strong>Playback controls</strong> — Play/pause button, loop toggle, speed slider (0.25×–4×),
                   and scrub bar for seeking within the video.</li>
                 <li><strong>No tiling</strong> — Videos are single-instance (no tile mode). Use Scale (0.1–2.0)
@@ -923,8 +923,7 @@
                 <li><strong>All effects work</strong> — Spin, Orbit, Bounce, Chromatic Aberration, Luma Key, Wave Distort,
                   Invert, Threshold, Pixelate, Scan Lines, Film Grain, audio reactivity,
                   and color grading (brightness, contrast, gamma) apply to every video frame.</li>
-                <li><strong>Performance</strong> — 1–2 video layers run smoothly on most devices. Videos use more
-                  GPU bandwidth than static images; 4× speed increases decode overhead.</li>
+                <li><strong>Limits</strong> — 2 video layers recommended for best performance. Videos stream from disk so length is flexible; 1–2 minute clips work smoothly, longer videos may show memory pressure on low-end devices.</li>
               </ul>
             </div>
 

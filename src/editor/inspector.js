@@ -19,6 +19,7 @@ import {
     shouldOptimize, getRecommendedSettings, formatBytes,
     estimateGpuMemory
 } from './gifOptimizer.js';
+import { transcodeTo720p, needsTranscode } from '../videoTranscoder.js';
 
 // ─── Phase 1: layer limits + upload resize ───────────────────────────────────
 // Cap surface area for Phase 1. Internals (shader builder, state array) are
@@ -2288,7 +2289,7 @@ export class EditorInspector {
 
     // ─── Add a video layer ─────────────────────────────────────────────────────
     // Videos are single-instance (no tiling), with playback controls and color grading.
-    // Hard 720p limit for MVP — reject oversized videos.
+    // Auto-transcodes oversized videos to 720p using FFmpeg.wasm.
 
     async _addVideoLayer(file) {
         if (!this.currentState.images) this.currentState.images = [];
@@ -2297,7 +2298,7 @@ export class EditorInspector {
             return;
         }
 
-        // ── 720p upload guard ─────────────────────────────────────────────────
+        // ── 720p upload guard with auto-transcoding ────────────────────────────
         const MAX_VIDEO_WIDTH = 1280;
         const MAX_VIDEO_HEIGHT = 720;
 
@@ -2306,7 +2307,12 @@ export class EditorInspector {
         video.preload = 'metadata';
         video.playsInline = true;  // Critical for WKWebView inline playback
         video.muted = true;        // WKWebView autoplay requires muted initially
+        video.loop = true;         // Required for continuous playback
         const videoUrl = URL.createObjectURL(file);
+
+        let videoWidth = 0;
+        let videoHeight = 0;
+        let videoDuration = 0;
 
         try {
             await new Promise((resolve, reject) => {
@@ -2315,15 +2321,102 @@ export class EditorInspector {
                 video.src = videoUrl;
             });
 
-            if (video.videoWidth > MAX_VIDEO_WIDTH || video.videoHeight > MAX_VIDEO_HEIGHT) {
+            videoWidth = video.videoWidth;
+            videoHeight = video.videoHeight;
+            videoDuration = video.duration || 0;
+
+            // Auto-transcode oversized videos instead of rejecting
+            if (videoWidth > MAX_VIDEO_WIDTH || videoHeight > MAX_VIDEO_HEIGHT) {
                 URL.revokeObjectURL(videoUrl);
-                showToast(`Video must be 720p or lower (${MAX_VIDEO_WIDTH}×${MAX_VIDEO_HEIGHT}). Current: ${video.videoWidth}×${video.videoHeight}. Please downscale externally.`, true);
-                return;
+                
+                const originalSize = formatBytes(file.size);
+                showToast(`Video is ${videoWidth}×${videoHeight}. Optimizing to 720p...`, false, 0); // persistent toast
+                
+                try {
+                    // Transcode with progress updates
+                    file = await transcodeTo720p(file, (progress) => {
+                        const percent = Math.round(progress.percent);
+                        showToast(`Optimizing video... ${percent}%`, false, 0);
+                    });
+                    
+                    showToast(`Optimized: ${originalSize} → ${formatBytes(file.size)}`, false, 3000);
+                    
+                    // Re-check dimensions after transcode
+                    const newVideo = document.createElement('video');
+                    newVideo.preload = 'metadata';
+                    const newUrl = URL.createObjectURL(file);
+                    await new Promise((resolve, reject) => {
+                        newVideo.onloadedmetadata = resolve;
+                        newVideo.onerror = reject;
+                        newVideo.src = newUrl;
+                    });
+                    videoWidth = newVideo.videoWidth;
+                    videoHeight = newVideo.videoHeight;
+                    URL.revokeObjectURL(newUrl);
+                } catch (transcodeErr) {
+                    showToast('Video optimization failed. Please use 720p or smaller.', true);
+                    console.error('[Editor] Transcode failed:', transcodeErr);
+                    return;
+                }
+            } else {
+                // Non-transcoded path: keep original blob URL valid
+                // Don't revoke - video element still needs it
+                // finalVideoUrl will be used in texObj for texture system
             }
         } catch (err) {
             URL.revokeObjectURL(videoUrl);
             showToast('Could not load video', true);
             return;
+        }
+
+        // ── Prepare video element (original or transcoded) ────────────────────
+        // If we transcoded, create new video element for the transcoded file
+        let finalVideo = video;
+        let finalVideoUrl = videoUrl;
+        
+        if (videoWidth !== video.videoWidth || videoHeight !== video.videoHeight) {
+            // Dimensions changed — we transcoded. Create new element for transcoded file.
+            URL.revokeObjectURL(videoUrl); // Clean up original
+            
+            finalVideo = document.createElement('video');
+            finalVideo.playsInline = true;
+            finalVideo.muted = true;
+            finalVideo.loop = true;
+            finalVideo.preload = 'auto';  // Changed from 'metadata' for continuous playback
+            finalVideoUrl = URL.createObjectURL(file);
+            
+            // WKWebView: append to DOM BEFORE setting src for proper initialization
+            finalVideo.style.position = 'fixed';
+            finalVideo.style.left = '-9999px';
+            finalVideo.style.width = '1px';
+            finalVideo.style.height = '1px';
+            finalVideo.style.opacity = '0';
+            finalVideo.style.pointerEvents = 'none';
+            document.body.appendChild(finalVideo);
+            
+            // Load metadata to get final dimensions and duration
+            try {
+                await new Promise((resolve, reject) => {
+                    finalVideo.onloadedmetadata = resolve;
+                    finalVideo.onerror = reject;
+                    finalVideo.src = finalVideoUrl;
+                });
+                videoDuration = finalVideo.duration || videoDuration;
+            } catch (e) {
+                console.warn('[Editor] Could not reload transcoded video metadata');
+            }
+        }
+
+        // For non-transcoded videos, append to DOM now (transcoded already appended above)
+        if (!finalVideo.parentNode) {
+            // WKWebView fix: video must be in DOM to decode properly
+            finalVideo.style.position = 'fixed';
+            finalVideo.style.left = '-9999px';
+            finalVideo.style.width = '1px';
+            finalVideo.style.height = '1px';
+            finalVideo.style.opacity = '0';
+            finalVideo.style.pointerEvents = 'none';
+            document.body.appendChild(finalVideo);
         }
 
         // Smart accordion: collapse every existing card before we add the new one.
@@ -2340,7 +2433,7 @@ export class EditorInspector {
             console.warn('[Editor] storeVideo failed:', err.message);
         });
 
-        // Video defaults — single instance, no tiling, different blend/scale defaults
+        // Video defaults — single instance (no tiling), different blend/scale defaults
         const entry = {
             type: 'video',         // Distinguishes from image layers
             texName,
@@ -2351,7 +2444,7 @@ export class EditorInspector {
             loop: true,
             speed: 1.0,
             currentTime: 0,
-            duration: video.duration || 0,
+            duration: videoDuration || 0,
             // Transform (simplified — no tiling)
             scale: 0.6,            // Coverage % instead of tile density
             opacity: 1.0,          // Full opacity - video appears as-is
@@ -2421,8 +2514,8 @@ export class EditorInspector {
             muted: false,
             name: file.name.replace(/\.[^.]+$/, '') || 'Video Layer',
             // Metadata
-            texW: video.videoWidth,
-            texH: video.videoHeight,
+            texW: finalVideo.videoWidth,
+            texH: finalVideo.videoHeight,
             isHd: false,  // Videos don't use HD toggle
         };
 
@@ -2430,21 +2523,21 @@ export class EditorInspector {
 
         // Create video texture object
         const texObj = {
-            data: videoUrl,        // Object URL for video element
-            width: video.videoWidth,
-            height: video.videoHeight,
-            isVideo: true,         // Flag for visualizer
-            videoElement: video,   // Reference for texture upload loop
+            data: finalVideoUrl,        // Object URL for video element
+            width: finalVideo.videoWidth,
+            height: finalVideo.videoHeight,
+            isVideo: true,              // Flag for visualizer
+            videoElement: finalVideo,   // Reference for texture upload loop
             videoId,
-            _videoUrl: videoUrl,   // Keep reference for cleanup
+            _videoUrl: finalVideoUrl,   // Keep reference for cleanup
         };
 
         this._mountLayerCard(entry, texObj);
-        showToast(`Video layer added (${video.videoWidth}×${video.videoHeight})`);
+        showToast(`Video layer added (${finalVideo.videoWidth}×${finalVideo.videoHeight})`);
         if (this.currentState.images.length === 1) showHint();
 
         // Start video playback - critical for texture upload loop
-        video.play().catch(err => {
+        finalVideo.play().catch(err => {
             console.warn('[Editor] Video autoplay failed:', err.message);
         });
 
