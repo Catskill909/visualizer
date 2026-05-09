@@ -1430,6 +1430,7 @@ export class EditorInspector {
         if (layersEl) layersEl.innerHTML = '';
         for (const texName of Object.keys(this._imageTextures)) {
             this.engine.removeGifAnimation?.(texName);
+            this.engine.removeVideoAnimation?.(texName);
         }
         this._imageTextures = {};
 
