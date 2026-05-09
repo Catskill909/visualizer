@@ -392,11 +392,15 @@ export class VisualizerEngine {
     return name;
   }
 
-  /** Async: fetch image blobs from IndexedDB and bind them as user textures. */
+  /** Async: fetch image/video blobs from IndexedDB and bind them as user textures. */
   async _bindCustomPresetImages(presetRecord) {
     const images = presetRecord.images || [];
     if (images.length === 0) return;
+
+    // ── Handle image layers (including GIFs) ─────────────────────────────────
     for (const img of images) {
+      // Skip video layers (handled separately below)
+      if (img.type === 'video' || img.videoId) continue;
       if (!img.imageId || !img.texName) continue;
       try {
         const blob = await getImage(img.imageId);
@@ -422,6 +426,58 @@ export class VisualizerEngine {
         console.log('[DiscoCast Visualizer] Image bound:', img.texName, imgEl.naturalWidth + 'x' + imgEl.naturalHeight);
       } catch (e) {
         console.warn('[DiscoCast Visualizer] Failed to bind image for', img.texName, e.message);
+      }
+    }
+
+    // ── Handle video layers ──────────────────────────────────────────────────
+    for (const img of images) {
+      if (img.type !== 'video' || !img.videoId || !img.texName) continue;
+      try {
+        const blob = await getImage(img.videoId);
+        if (!blob) {
+          console.warn('[DiscoCast Visualizer] Video not found in IndexedDB:', img.videoId, '(texName:', img.texName + ')');
+          continue;
+        }
+
+        // Create blob URL and video element (keep URL valid for entire lifecycle)
+        const videoUrl = URL.createObjectURL(blob);
+        const video = document.createElement('video');
+        video.playsInline = true;  // Required for WKWebView inline playback
+        video.muted = true;        // WKWebView autoplay requires muted initially
+        video.loop = img.loop !== false;  // Default to looping
+        video.preload = 'auto';
+
+        // Wait for metadata to get dimensions
+        await new Promise((resolve, reject) => {
+          video.onloadedmetadata = resolve;
+          video.onerror = () => reject(new Error('Could not load video'));
+          video.src = videoUrl;
+        });
+
+        // Set playback speed if specified
+        if (img.speed && img.speed !== 1.0) {
+          video.playbackRate = img.speed;
+        }
+
+        // Bind to texture system
+        this.setUserTexture(img.texName, {
+          data: videoUrl,
+          width: video.videoWidth,
+          height: video.videoHeight,
+          isVideo: true,
+          videoElement: video,
+          videoId: img.videoId,
+          _videoUrl: videoUrl,  // Keep reference for cleanup
+        });
+
+        // Start playback
+        video.play().catch(err => {
+          console.warn('[DiscoCast Visualizer] Video autoplay failed:', err.message);
+        });
+
+        console.log('[DiscoCast Visualizer] Video bound:', img.texName, video.videoWidth + 'x' + video.videoHeight);
+      } catch (e) {
+        console.warn('[DiscoCast Visualizer] Failed to bind video for', img.texName, e.message);
       }
     }
   }
