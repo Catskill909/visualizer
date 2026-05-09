@@ -113,21 +113,58 @@
       </div>
 
       <div class="features-grid">
+        <!-- Core -->
         <div class="feature-card fade-in">
           <h3>1,144 MilkDrop Presets</h3>
           <p>The full Butterchurn library plus the community-curated Baron pack — all bundled locally, no network calls
             needed.</p>
         </div>
         <div class="feature-card fade-in">
+          <h3>Preset Browser</h3>
+          <p>Searchable drawer across all 1,144 presets. Heart your favorites, hide the ones you don't want, and cycle
+            only through the good stuff.</p>
+        </div>
+        <div class="feature-card fade-in">
           <h3>Live Audio Input</h3>
           <p>Mic, USB DJ controller, external sound card — pick your device from a native dropdown and the visuals
             follow whatever you're playing.</p>
+        </div>
+
+        <!-- Layer types -->
+        <div class="feature-card fade-in">
+          <h3>Image Layers</h3>
+          <p>Up to 5 per preset. Upload photos, textures, or artwork with a full motion, transform, and VJ effects
+            pipeline per layer — all wired to the music independently.</p>
+        </div>
+        <div class="feature-card fade-in">
+          <h3>Video Layers</h3>
+          <p>Drop MP4 or WebM files into any preset. Full playback controls, color grading, and the entire VJ effects
+            suite apply to every frame at 60 fps.</p>
+        </div>
+        <div class="feature-card fade-in">
+          <h3>Animated GIF Layers</h3>
+          <p>Drop any animated GIF into a preset layer. Perceptual speed control (0.25×–8×), Alpha Mode for silhouette
+            cutouts, and a GIF Optimizer for large files.</p>
+        </div>
+
+        <!-- More layers + performance -->
+        <div class="feature-card fade-in">
+          <h3>Text Layers</h3>
+          <p>Add live text to any preset. Choose font, size, weight, shadow, outline, and color — then apply every
+            image layer transform and audio reactivity to it.</p>
         </div>
         <div class="feature-card fade-in">
           <h3>Auto-Gain &amp; Kick-Lock</h3>
           <p>AGC keeps visuals consistently punchy regardless of volume. Kick-Lock isolates the low end so everything
             locks to the kick drum.</p>
         </div>
+        <div class="feature-card fade-in">
+          <h3>Live Performance Keys</h3>
+          <p>One-key strobe, blackout, and color inversion. Hold Shift for a 2× intensity boost. Fast enough for live
+            DJ sets.</p>
+        </div>
+
+        <!-- Output -->
         <div class="feature-card fade-in">
           <h3>Projector Ready</h3>
           <p>Screen Wake Lock, auto-hiding cursor, and Zen Mode (H key) for zero-UI projection. Built for live events
@@ -139,28 +176,9 @@
             one toggle in the app.</p>
         </div>
         <div class="feature-card fade-in">
-          <h3>Preset Browser</h3>
-          <p>Searchable drawer across all 1,144 presets. Heart your favorites, hide the ones you don't want, and cycle
-            only through the good stuff.</p>
-        </div>
-        <div class="feature-card fade-in">
-          <h3>Animated GIF Layers</h3>
-          <p>Drop any animated GIF straight into a preset layer. Perceptual speed control (0.25×–8×), Alpha Mode for silhouette cutouts, and timing smoothing for choppy source files.</p>
-        </div>
-        <div class="feature-card fade-in">
-          <h3>GIF Optimizer</h3>
-          <p>Upload-time tool for large animated GIFs. Shows frame stats, keeps every Nth frame, resizes, and calculates
-            GPU savings — all before adding to your preset.</p>
-        </div>
-        <div class="feature-card fade-in">
           <h3>Output Resolution Control</h3>
           <p>Lock the render canvas to HD / Full HD / QHD / 4K or a custom size. Set aspect ratio and fill mode
             (Letterbox / Stretch / Crop) independently.</p>
-        </div>
-        <div class="feature-card fade-in">
-          <h3>Live Performance Keys</h3>
-          <p>One-key strobe, blackout, and color inversion. Hold Shift for a 2× intensity boost. Fast enough for live DJ
-            sets.</p>
         </div>
       </div>
     </div>
@@ -195,7 +213,7 @@
               <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              4 tabbed sections: Palette, Motion, Wave, Images
+              Up to 5 layers per preset — images, video (MP4/WebM), animated GIFs, or text — each with independent motion, effects, and audio reactivity
             </li>
             <li>
               <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -207,7 +225,7 @@
               <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              Animated GIF layers — perceptual speed (0.25×–8×), Alpha Mode (Fade / Silhouette), timing smoothing
+              Video layers — play/pause, loop, speed (0.25×–4×), scrub bar, per-layer color grading; the entire VJ effects suite applies to every frame
             </li>
             <li>
               <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -219,22 +237,35 @@
               <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              Export presets as portable files — images included, no data lost
+              Export presets as portable files — images and all layer data included, no data lost
             </li>
           </ul>
         </div>
       </div>
 
-      <!-- Image Layers Deep Dive -->
+      <!-- Layer Types Deep Dive -->
       <div class="image-layers fade-in">
-        <h4>Image Layers — up to 5 per preset</h4>
+        <h4>Layer Types — up to 5 per preset</h4>
         <p class="section-desc" style="margin-bottom: 28px; max-width: 100%;">
-          Upload your own photos, textures, or artwork and composite them into the scene in real-time.
-          Each layer has a full independent animation and effects pipeline — motion, transforms, audio reactivity,
-          color, and blending — so you can build complex visuals that move and react exactly how you want.
+          Every layer type — image, video, GIF, or text — runs through the same full effects pipeline.
+          Motion, transforms, audio reactivity, color grading, and blending are independent per layer,
+          so you can stack and mix anything exactly how you want.
         </p>
 
         <div class="il-categories">
+
+          <div class="il-category">
+            <div class="il-category-title">Video</div>
+            <div class="image-layers-grid">
+              <div class="il-item"><span class="il-dot"></span>MP4 &amp; WebM — rendered as real-time GPU textures at up to 720p</div>
+              <div class="il-item"><span class="il-dot"></span>Playback — play/pause, loop toggle, speed (0.25×–4×), scrub bar</div>
+              <div class="il-item"><span class="il-dot"></span>Color grading — per-layer brightness, contrast, and gamma</div>
+              <div class="il-item"><span class="il-dot"></span>Scale 10%–200% coverage · Mirror (H / V / Quad / Kaleidoscope)</div>
+              <div class="il-item"><span class="il-dot"></span>All VJ effects — Spin, Orbit, Wave Distort, Chromatic Aberration, Pixelate, Scan Lines, Film Grain, Luma Key, Invert, Threshold</div>
+              <div class="il-item"><span class="il-dot"></span>Audio-reactive — Bass/Mid/Treble-driven Pulse, Bounce, Beat Fade, Shake, Strobe</div>
+            </div>
+          </div>
+
           <div class="il-category">
             <div class="il-category-title">Motion</div>
             <div class="image-layers-grid">
@@ -324,56 +355,6 @@
               <div class="il-item"><span class="il-dot"></span>GIF Optimizer — frame reduction, resize, and GPU savings preview before adding to preset</div>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <hr class="divider">
-
-  <!-- ── Video Layers ── -->
-  <section class="section" id="video">
-    <div class="container">
-      <div class="section-header fade-in">
-        <div class="section-label">Video Layers</div>
-        <h2 class="section-title">Drop video into any preset</h2>
-        <p class="section-desc">
-          MP4 and WebM files render as real-time GPU textures — every frame composited through
-          the same GLSL pipeline as images. Full playback controls, color grading, and the entire
-          VJ effects suite apply to every video frame at 60 fps.
-        </p>
-      </div>
-
-      <div class="features-grid fade-in">
-        <div class="feature-card">
-          <h3>Full Playback Control</h3>
-          <p>Play/pause, loop toggle, speed slider (0.25×–4×), and a scrub bar for frame-accurate seeking.
-            Videos auto-loop seamlessly — set them and forget them.</p>
-        </div>
-        <div class="feature-card">
-          <h3>Color Grading</h3>
-          <p>Per-video brightness, contrast, and gamma — dial in the look without leaving the preset.
-            Stack with the shared Saturation and Hue Rotate controls for full color authority.</p>
-        </div>
-        <div class="feature-card">
-          <h3>Every Effect Works</h3>
-          <p>Spin, Orbit, Bounce, Chromatic Aberration, Wave Distort, Pixelate, Scan Lines, Film Grain,
-            Luma Key, Invert, Threshold — the entire VJ toolbox applies per-frame to video just like images.</p>
-        </div>
-        <div class="feature-card">
-          <h3>Audio-Reactive Video</h3>
-          <p>Source + Curve shape the audio signal that drives Pulse, Bounce, Beat Fade, Shake, and Strobe
-            on your video layer. The video breathes with the music.</p>
-        </div>
-        <div class="feature-card">
-          <h3>Scale &amp; Mirror</h3>
-          <p>No tiling — videos are single-instance by design. Scale from 10% to 200% coverage, or apply
-            Mirror (H / V / Quad / Kaleidoscope) to create reflected duplicates.</p>
-        </div>
-        <div class="feature-card">
-          <h3>Lightweight &amp; Fast</h3>
-          <p>720p max resolution keeps GPU bandwidth under control. 1–2 video layers run smoothly on any
-            modern machine. The texture uploads directly from the video element — no intermediate canvas.</p>
         </div>
       </div>
     </div>
