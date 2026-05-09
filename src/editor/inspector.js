@@ -182,6 +182,7 @@ const BLANK = {
     init_eqs_str: '', frame_eqs_str: '', pixel_eqs_str: '',
     images: [],
     sceneMirror: 'none',  // 'none' | 'h' | 'v' | 'both' | 'kaleido'
+    sceneMirrorKaleidoSpeed: 0.00,
     motionReact: {
         source: 'bass',
         curve: 'linear',
@@ -1252,6 +1253,13 @@ export class EditorInspector {
 
         // Scene Mirror
         const smSeg = document.getElementById('scene-mirror-seg');
+        const smKaleidoSpeedRow = document.getElementById('scene-kaleido-speed-row');
+        const smKaleidoSpeedSl = document.getElementById('scene-kaleido-speed-sl');
+        const smKaleidoSpeedVal = document.getElementById('scene-kaleido-speed-val');
+        const updateSmKaleidoRow = () => {
+            if (smKaleidoSpeedRow) smKaleidoSpeedRow.style.display =
+                (this.currentState.sceneMirror === 'kaleido') ? '' : 'none';
+        };
         if (smSeg) {
             smSeg.querySelectorAll('.seg').forEach(btn => {
                 btn.addEventListener('click', () => {
@@ -1261,8 +1269,32 @@ export class EditorInspector {
                     this._buildCompShader();
                     this._applyToEngine();
                     smSeg.querySelectorAll('.seg').forEach(b => b.classList.toggle('active', b === btn));
+                    updateSmKaleidoRow();
                 });
             });
+        }
+        if (smKaleidoSpeedSl) {
+            smKaleidoSpeedSl.dataset.defaultPos = smKaleidoSpeedSl.value;
+            smKaleidoSpeedSl.addEventListener('input', () => {
+                const pos = parseFloat(smKaleidoSpeedSl.value);
+                const abs = Math.abs(pos);
+                const v = Math.sign(pos) * abs * abs * abs * 2.0;
+                this.currentState.sceneMirrorKaleidoSpeed = v;
+                smKaleidoSpeedVal.textContent = v.toFixed(2);
+                const pct = (pos + 1) / 2 * 100;
+                smKaleidoSpeedSl.style.setProperty('--pct-lo', `${pos >= 0 ? 50 : pct.toFixed(1)}%`);
+                smKaleidoSpeedSl.style.setProperty('--pct-hi', `${pos >= 0 ? pct.toFixed(1) : 50}%`);
+                this._buildCompShader();
+                this._applyToEngine();
+            });
+            const smKalSpeedLabel = document.querySelector('#scene-kaleido-speed-row .layer-ctrl-label');
+            if (smKalSpeedLabel) {
+                smKalSpeedLabel.classList.add('is-resettable');
+                smKalSpeedLabel.addEventListener('dblclick', () => {
+                    smKaleidoSpeedSl.value = smKaleidoSpeedSl.dataset.defaultPos;
+                    smKaleidoSpeedSl.dispatchEvent(new Event('input', { bubbles: true }));
+                });
+            }
         }
     }
 
@@ -1276,6 +1308,20 @@ export class EditorInspector {
         document.querySelectorAll('#scene-mirror-seg .seg').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.smirror === sm);
         });
+        // Kaleido speed row — show/hide and restore slider position
+        const smKalSpeedRow = document.getElementById('scene-kaleido-speed-row');
+        const smKalSpeedSl = document.getElementById('scene-kaleido-speed-sl');
+        const smKalSpeedVal = document.getElementById('scene-kaleido-speed-val');
+        if (smKalSpeedRow) smKalSpeedRow.style.display = sm === 'kaleido' ? '' : 'none';
+        if (smKalSpeedSl && smKalSpeedVal) {
+            const stored = this.currentState.sceneMirrorKaleidoSpeed || 0;
+            const pos = Math.sign(stored) * Math.cbrt(Math.abs(stored) / 2);
+            smKalSpeedSl.value = pos.toFixed(4);
+            const pct = (pos + 1) / 2 * 100;
+            smKalSpeedSl.style.setProperty('--pct-lo', `${pos >= 0 ? 50 : pct.toFixed(1)}%`);
+            smKalSpeedSl.style.setProperty('--pct-hi', `${pos >= 0 ? pct.toFixed(1) : 50}%`);
+            smKalSpeedVal.textContent = stored.toFixed(2);
+        }
     }
 
     _applySceneMirror() { }
@@ -2219,6 +2265,7 @@ export class EditorInspector {
             panRange: 0.20,     // bounce only: half-amplitude in UV units
             mirror: 'none',     // 'none' | 'h' | 'v' | 'quad' | 'kaleido'
             mirrorScope: 'tile',  // 'tile' = fold inside each tile, 'field' = fold the whole tiled group
+            kaleidoSpeed: 0.00,
             tintR: 1.00,        // tint color red (1=white = no tint)
             tintG: 1.00,
             tintB: 1.00,
@@ -2461,6 +2508,7 @@ export class EditorInspector {
             wanderSpeed: 0.50,
             mirror: 'none',        // Duplication via mirror only
             mirrorScope: 'field',    // Always whole-image for videos
+            kaleidoSpeed: 0.00,
             // Tile-related properties (disabled for videos, but needed for template)
             tile: false,
             spacing: 0,
@@ -2606,6 +2654,7 @@ export class EditorInspector {
             panRange: 0.20,
             mirror: 'none',
             mirrorScope: 'tile',
+            kaleidoSpeed: 0.00,
             tintR: 1.00, tintG: 1.00, tintB: 1.00,
             hueSpinSpeed: 0.00,
             imageSaturation: 1.00,
@@ -3104,6 +3153,13 @@ export class EditorInspector {
               <button class="lseg lseg-scope active" data-scope="tile" data-tooltip="Fold inside each tile">Per Tile</button>
               <button class="lseg lseg-scope" data-scope="field" data-tooltip="Fold the whole tiled group">Whole Image</button>
             </div>
+            <div class="layer-slider-row layer-kaleido-speed-row"${entry.mirror === 'kaleido' ? '' : ' style="display:none"'}>
+              <span class="layer-ctrl-label" data-tooltip="Speed at which the kaleidoscope pattern rotates. Zero = frozen.">Speed</span>
+              <input type="range" class="slider slider--bipolar layer-kaleido-speed-sl" min="-1" max="1" step="0.01"
+                value="${(Math.sign(entry.kaleidoSpeed || 0) * Math.cbrt(Math.abs(entry.kaleidoSpeed || 0) / 2)).toFixed(4)}"
+                style="${(() => { const _p = Math.sign(entry.kaleidoSpeed||0)*Math.cbrt(Math.abs(entry.kaleidoSpeed||0)/2); const _pct=(_p+1)/2*100; return `--pct-lo:${_p>=0?50:_pct.toFixed(1)}%;--pct-hi:${_p>=0?_pct.toFixed(1):50}%`; })()}">
+              <span class="lsv layer-kaleido-speed-val">${(entry.kaleidoSpeed || 0).toFixed(2)}</span>
+            </div>
             <div class="layer-section-divider"></div>
             <p class="layer-section-label">Tint</p>
             <div class="layer-row-inline" style="gap:8px;margin-bottom:6px">
@@ -3452,7 +3508,7 @@ export class EditorInspector {
         const sliderMins = [0, 0, 0, -2, 0, 0, 0, 0, 0, 0];
         const sliderMaxes = [1, 0.8, 0.45, 2, 1, 0.4, 4, 0.4, 2, 2];
 
-        card.querySelectorAll('.layer-slider-row input[type=range]:not(.layer-bounce-sl):not(.layer-size-sl):not(.layer-liss-sl):not(.layer-strobe-thr-sl):not(.layer-pan-x-sl):not(.layer-pan-y-sl):not(.layer-pan-range-sl):not(.layer-beat-fade-sl):not(.layer-tile-sx-sl):not(.layer-tile-sy-sl):not(.layer-shake-sl):not(.layer-persp-x-sl):not(.layer-persp-y-sl):not(.layer-radius-sl):not(.layer-gif-speed-sl):not(.layer-gif-stability-sl):not(.layer-video-speed-sl):not(.layer-video-scrub-sl):not(.layer-font-size-sl):not(.layer-letter-spacing-sl):not(.layer-line-height-sl):not(.layer-shadow-blur-sl):not(.layer-shadow-x-sl):not(.layer-shadow-y-sl):not(.layer-outline-width-sl)').forEach((sl, i) => {
+        card.querySelectorAll('.layer-slider-row input[type=range]:not(.layer-bounce-sl):not(.layer-size-sl):not(.layer-liss-sl):not(.layer-strobe-thr-sl):not(.layer-pan-x-sl):not(.layer-pan-y-sl):not(.layer-pan-range-sl):not(.layer-beat-fade-sl):not(.layer-tile-sx-sl):not(.layer-tile-sy-sl):not(.layer-shake-sl):not(.layer-persp-x-sl):not(.layer-persp-y-sl):not(.layer-radius-sl):not(.layer-gif-speed-sl):not(.layer-gif-stability-sl):not(.layer-video-speed-sl):not(.layer-video-scrub-sl):not(.layer-font-size-sl):not(.layer-letter-spacing-sl):not(.layer-line-height-sl):not(.layer-shadow-blur-sl):not(.layer-shadow-x-sl):not(.layer-shadow-y-sl):not(.layer-outline-width-sl):not(.layer-kaleido-speed-sl)').forEach((sl, i) => {
             const valEl = sl.nextElementSibling;
             sl.addEventListener('input', () => {
                 const v = parseFloat(sl.value);
@@ -3468,6 +3524,7 @@ export class EditorInspector {
         // plus a live label readout and auto show/hide of the scope toggle.
         const mirrorStatus = card.querySelector('.lseg-status');
         const scopeRow = card.querySelector('.layer-mirror-scope');
+        const kaleidoSpeedRow = card.querySelector('.layer-kaleido-speed-row');
         const mirrorLabels = { none: 'Off', h: 'H', v: 'V', quad: 'Quad', kaleido: 'Kaleido' };
         const scopeLabels = { tile: 'Per Tile', field: 'Whole Image' };
         const updateStatus = () => {
@@ -3476,6 +3533,7 @@ export class EditorInspector {
             if (entry.mirror === 'none') mirrorStatus.textContent = 'Off';
             else mirrorStatus.textContent = `${m} · ${scopeLabels[entry.mirrorScope || 'tile']}`;
             if (scopeRow) scopeRow.style.display = entry.mirror === 'none' ? 'none' : '';
+            if (kaleidoSpeedRow) kaleidoSpeedRow.style.display = entry.mirror === 'kaleido' ? '' : 'none';
         };
         card.querySelectorAll('.layer-mirror-seg .lseg').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -3486,6 +3544,23 @@ export class EditorInspector {
                 refresh();
             });
         });
+
+        // Kaleido speed slider (shown only when mirror === 'kaleido')
+        const kaleidoSpeedSl = card.querySelector('.layer-kaleido-speed-sl');
+        const kaleidoSpeedVal = card.querySelector('.layer-kaleido-speed-val');
+        if (kaleidoSpeedSl) {
+            kaleidoSpeedSl.addEventListener('input', () => {
+                const pos = parseFloat(kaleidoSpeedSl.value);
+                const abs = Math.abs(pos);
+                const v = Math.sign(pos) * abs * abs * abs * 2.0;
+                entry.kaleidoSpeed = v;
+                kaleidoSpeedVal.textContent = v.toFixed(2);
+                const pct = (pos + 1) / 2 * 100;
+                kaleidoSpeedSl.style.setProperty('--pct-lo', `${pos >= 0 ? 50 : pct.toFixed(1)}%`);
+                kaleidoSpeedSl.style.setProperty('--pct-hi', `${pos >= 0 ? pct.toFixed(1) : 50}%`);
+                refresh();
+            });
+        }
         card.querySelectorAll('.lseg-scope').forEach(btn => {
             btn.addEventListener('click', () => {
                 card.querySelectorAll('.lseg-scope').forEach(b => b.classList.remove('active'));
@@ -4674,6 +4749,7 @@ export class EditorInspector {
         } else if (sm === 'both') {
             uvFold = '  vec2 uv_m = vec2(1.0 - abs(uv.x * 2.0 - 1.0), 1.0 - abs(uv.y * 2.0 - 1.0));\n';
         } else if (sm === 'kaleido') {
+            const ks = (this.currentState.sceneMirrorKaleidoSpeed || 0).toFixed(4);
             uvFold = '  vec2 uv_m;\n' +
                       '  { vec2 _kp = uv - 0.5;\n' +
                       '    float _kang = atan(_kp.y, _kp.x);\n' +
@@ -4681,6 +4757,7 @@ export class EditorInspector {
                       '    float _ksect = 6.28318530718 / 6.0;\n' +
                       '    float _ka = mod(_kang, _ksect);\n' +
                       '    if (_ka > _ksect * 0.5) _ka = _ksect - _ka;\n' +
+                     `    _ka += time * ${ks} * 6.28318;\n` +
                       '    uv_m = vec2(cos(_ka) * _krad, sin(_ka) * _krad) + 0.5;\n' +
                       '  }\n';
         } else {
@@ -4792,6 +4869,7 @@ export class EditorInspector {
         const mirror = img.mirror || 'none';
         // Videos always use 'field' mirror scope (single instance), images use stored scope
         const mirrorScope = isVideo ? 'field' : (img.mirrorScope || 'tile');
+        const kspd = (img.kaleidoSpeed || 0).toFixed(4);
         const tintR = (img.tintR !== undefined ? img.tintR : 1.0).toFixed(4);
         const tintG = (img.tintG !== undefined ? img.tintG : 1.0).toFixed(4);
         const tintB = (img.tintB !== undefined ? img.tintB : 1.0).toFixed(4);
@@ -4942,6 +5020,7 @@ export class EditorInspector {
                     `      float _kseg = 3.14159265 / 3.0;\n` +
                     `      _kang = mod(_kang, _kseg * 2.0);\n` +
                     `      if (_kang > _kseg) _kang = _kseg * 2.0 - _kang;\n` +
+                    `      _kang += time * ${kspd} * 6.28318;\n` +
                     `      _uvf = vec2(cos(_kang), sin(_kang)) * _krad + 0.5; }\n`;
             }
         }
@@ -5092,6 +5171,7 @@ export class EditorInspector {
                 m += `      float _kseg = 3.14159265 / 3.0;\n`;
                 m += `      _kang = mod(_kang, _kseg * 2.0);\n`;
                 m += `      if (_kang > _kseg) _kang = _kseg * 2.0 - _kang;\n`;
+                m += `      _kang += time * ${kspd} * 6.28318;\n`;
                 m += `      ${varName} = vec2(cos(_kang), sin(_kang)) * _krad + 0.5; }\n`;
             }
             return m;
@@ -5478,7 +5558,7 @@ export class EditorInspector {
             spacing: 0.00, cx: 0.50, cy: 0.50,
             swayAmt: 0.00, swaySpeed: 1.00, wanderAmt: 0.00, wanderSpeed: 0.50,
             panMode: 'off', panSpeedX: 0.00, panSpeedY: 0.00, panRange: 0.20,
-            mirror: 'none', mirrorScope: 'tile',
+            mirror: 'none', mirrorScope: 'tile', kaleidoSpeed: 0.00,
             isGif: false, gifSpeed: 1.0, gifStability: 0.0, alphaMode: 'fade',
             reactSource: 'bass', reactCurve: 'linear',
             orbitMode: 'circle', lissFreqX: 0.50, lissFreqY: 0.75, lissPhase: 0.25,

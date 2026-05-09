@@ -544,6 +544,15 @@ html, body {
   border-radius: 2px; cursor: pointer; outline: none;
   display: block;
 }
+.slider.slider--bipolar {
+  background: linear-gradient(
+    to right,
+    rgba(255,255,255,0.10) var(--pct-lo, 50%),
+    rgba(255,255,255,0.85) var(--pct-lo, 50%),
+    rgba(255,255,255,0.85) var(--pct-hi, 50%),
+    rgba(255,255,255,0.10) var(--pct-hi, 50%)
+  );
+}
 .slider::-webkit-slider-thumb {
   -webkit-appearance: none; appearance: none;
   width: 14px; height: 14px; border-radius: 50%;
