@@ -550,16 +550,37 @@ Before shipping macOS builds with video support:
 - [ ] Play/pause button toggles correctly
 - [ ] Video stops when layer deleted (no memory leak)
 
+### 14.7 Critical Bug Fix: Stale Video Cleanup in _clearForLoad (May 9, 2026)
+
+**Bug:** Adding a video that was previously saved in a preset would inherit old processing settings (blend mode, effects, etc.) instead of getting fresh defaults. Only reproducible in production, not locally.
+
+**Root Cause:** `_clearForLoad()` (called when loading presets via `loadPresetData`, `loadBundledPreset`, or reset) only called `removeGifAnimation()` but NOT `removeVideoAnimation()`:
+
+```javascript
+// BROKEN (inspector.js:1431-1434)
+for (const texName of Object.keys(this._imageTextures)) {
+    this.engine.removeGifAnimation?.(texName);  // Missing removeVideoAnimation!
+}
+this._imageTextures = {};
+```
+
+This left video elements in DOM, blob URLs unrevoked, GL textures active, and `_videoAnimations` map with stale entries. When the same video file was uploaded again, ghost state from the previous instance interfered.
+
+**Fix Applied:**
+- **inspector.js:1433** - Added `this.engine.removeVideoAnimation?.(texName);` to the cleanup loop
+
+**Lesson:** When implementing a new layer type (video), ensure all cleanup paths call the corresponding removal function. The pattern was established for GIFs but video was missed in `_clearForLoad`.
+
 ---
 
-### 14.7 Performance Monitoring & Machine Auditing — Future Dev
+### 14.8 Performance Monitoring & Machine Auditing — Future Dev
 
 > **Status:** Research complete — implementation not started  
 > **Goal:** Real-time performance graphs and video layer impact auditing
 
 **Why this matters:** Video layers are the most resource-intensive feature (720p texture uploads every frame). Users need visibility into performance impact, especially on lower-end hardware.
 
-#### 14.7.1 Available Browser Telemetry APIs
+#### 14.8.1 Available Browser Telemetry APIs
 
 | Metric | API | Reliability | Use Case |
 |--------|-----|-------------|----------|
