@@ -583,6 +583,14 @@
         </nav>
 
         <div class="welcome-content">
+          <!-- ============================================================
+               IN-APP HELP CONTENT — edit sections below to update the
+               User Guide modal (opened via the "User Guide" button).
+               Each <section data-section="X"> matches a nav button above.
+               SECTIONS: welcome · sources · presets · cycling · performance
+                         output · studio · timeline · reactivity · shortcuts · tips
+               ============================================================ -->
+
           <!-- Welcome -->
           <section class="welcome-section active" data-section="welcome" role="tabpanel">
             <h4>Welcome to DiscoCast</h4>
@@ -1124,6 +1132,21 @@
                 <li><strong>Works on all layers</strong> — image, video, and text. Combine both sliders to isolate only
                   mid-tones.</li>
               </ul>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Screen Overlay</div>
+              <p>Each layer has an <strong>Overlay</strong> section (below Film Grain, above Audio Reactivity) that draws a colored shape anywhere on the full screen — perfect for darkening areas, creating spotlight zones, or masking parts of the canvas.</p>
+              <ul class="welcome-list">
+                <li><strong>Enable toggle</strong> — off by default. Turn on to reveal the overlay controls.</li>
+                <li><strong>XY Pad</strong> — drag the dot to position the overlay center anywhere on screen.</li>
+                <li><strong>Width / Height</strong> — size of the shape. At 1.0 both axes cover the full screen.</li>
+                <li><strong>Corner</strong> — morphs between a sharp rectangle (0) and a fully rounded ellipse (1).</li>
+                <li><strong>Strength</strong> — opacity of the overlay. 0 = invisible, 1 = fully solid.</li>
+                <li><strong>Feather</strong> — edge softness. 0 = hard cut, 1 = very soft glow-like fade.</li>
+                <li><strong>Color</strong> — any hex color. Black darkens the area (vignette), white lightens it, any color tints it.</li>
+              </ul>
+              <p class="welcome-hint"><strong>Layer ordering:</strong> the overlay composites immediately after its own layer — so any layer higher in the stack sits <em>on top</em> of it. Use this to frame content: put a dark overlay on Layer 1, then place a logo or video on Layer 2 and it will render cleanly over the darkened area.</p>
             </div>
 
             <div class="welcome-feature">

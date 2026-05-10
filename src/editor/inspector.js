@@ -2318,6 +2318,15 @@ export class EditorInspector {
             filmGrain: 0.00,       // animated noise overlay (0–1): 0=off, 1=heavy grain
             perspX: 0.00,          // perspective tilt X (−1 to +1): horizontal vanishing point
             perspY: 0.00,          // perspective tilt Y (−1 to +1): vertical vanishing point
+            vignette: 0,           // 0 = off, 1 = on
+            vignetteCX: 0.5,       // center X (0-1) — full screen position
+            vignetteCY: 0.5,       // center Y (0-1) — full screen position
+            vignetteW: 0.5,        // width of mask area (0-1)
+            vignetteH: 0.5,        // height of mask area (0-1)
+            vignetteCorner: 0.3,   // corner roundness (0-1): 0=sharp, 1=fully rounded
+            vignetteStrength: 0.5, // how dark/tinted it gets (0-1)
+            vignetteFeather: 0.3,  // edge softness (0-1)
+            vignetteColor: '#000000', // vignette tint color
             isHd: hdMode,          // badge shown in card header
         };
         this.currentState.images.push(entry);
@@ -3278,6 +3287,61 @@ export class EditorInspector {
               <span class="lsv layer-grain-val">${(entry.filmGrain || 0).toFixed(2)}</span>
             </div>
             <div class="layer-section-divider"></div>
+            <p class="layer-section-label">Overlay</p>
+            <div class="layer-row-inline" style="margin-bottom:6px">
+              <label class="toggle-switch toggle-switch--sm">
+                <input type="checkbox" class="layer-vignette-cb" ${entry.vignette ? 'checked' : ''} />
+                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+              </label>
+              <span class="layer-ctrl-label" style="margin-left:6px">Enable</span>
+            </div>
+            <div class="layer-vignette-detail" style="${entry.vignette ? '' : 'display:none'}">
+              <div class="layer-center-row">
+                <span class="layer-ctrl-label" style="margin-bottom:5px">Center</span>
+                <div class="xy-pad-wrap vignette-xy-wrap">
+                  <canvas class="xy-pad vignette-xy-pad" width="96" height="96" data-tooltip="Drag to position overlay on screen"></canvas>
+                  <button class="xy-reset vignette-xy-reset" data-tooltip="Reset to center">↺</button>
+                </div>
+              </div>
+              <div class="layer-slider-row">
+                <span class="layer-ctrl-label" data-tooltip="Width of overlay shape — 0 = narrow, 1 = full screen">Width</span>
+                <input type="range" class="slider layer-vignette-w-sl" min="0" max="1" step="0.01"
+                  value="${(entry.vignetteW ?? 0.5).toFixed(2)}" style="--pct:${((entry.vignetteW ?? 0.5) * 100).toFixed(1)}%">
+                <span class="lsv layer-vignette-w-val">${(entry.vignetteW ?? 0.5).toFixed(2)}</span>
+              </div>
+              <div class="layer-slider-row">
+                <span class="layer-ctrl-label" data-tooltip="Height of overlay shape — 0 = short, 1 = full screen">Height</span>
+                <input type="range" class="slider layer-vignette-h-sl" min="0" max="1" step="0.01"
+                  value="${(entry.vignetteH ?? 0.5).toFixed(2)}" style="--pct:${((entry.vignetteH ?? 0.5) * 100).toFixed(1)}%">
+                <span class="lsv layer-vignette-h-val">${(entry.vignetteH ?? 0.5).toFixed(2)}</span>
+              </div>
+              <div class="layer-slider-row">
+                <span class="layer-ctrl-label" data-tooltip="Corner roundness — 0 = sharp corners, 1 = fully rounded">Corner</span>
+                <input type="range" class="slider layer-vignette-corner-sl" min="0" max="1" step="0.01"
+                  value="${(entry.vignetteCorner ?? 0.3).toFixed(2)}" style="--pct:${((entry.vignetteCorner ?? 0.3) * 100).toFixed(1)}%">
+                <span class="lsv layer-vignette-corner-val">${(entry.vignetteCorner ?? 0.3).toFixed(2)}</span>
+              </div>
+              <div class="layer-slider-row">
+                <span class="layer-ctrl-label" data-tooltip="How opaque the overlay is — 0 = invisible, 1 = fully covers">Strength</span>
+                <input type="range" class="slider layer-vignette-str-sl" min="0" max="1" step="0.01"
+                  value="${(entry.vignetteStrength ?? 0.5).toFixed(2)}" style="--pct:${((entry.vignetteStrength ?? 0.5) * 100).toFixed(1)}%">
+                <span class="lsv layer-vignette-str-val">${(entry.vignetteStrength ?? 0.5).toFixed(2)}</span>
+              </div>
+              <div class="layer-slider-row">
+                <span class="layer-ctrl-label" data-tooltip="Edge softness — 0 = hard edge, 1 = very soft">Feather</span>
+                <input type="range" class="slider layer-vignette-fea-sl" min="0" max="1" step="0.01"
+                  value="${(entry.vignetteFeather ?? 0.3).toFixed(2)}" style="--pct:${((entry.vignetteFeather ?? 0.3) * 100).toFixed(1)}%">
+                <span class="lsv layer-vignette-fea-val">${(entry.vignetteFeather ?? 0.3).toFixed(2)}</span>
+              </div>
+              <div class="layer-row-inline" style="gap:8px;margin-top:4px">
+                <span class="layer-ctrl-label">Color</span>
+                <div class="layer-vignette-color-wrap">
+                  <span class="layer-vignette-swatch" style="background:${entry.vignetteColor || '#000000'}"></span>
+                  <input type="color" class="layer-vignette-picker" value="${entry.vignetteColor || '#000000'}" tabindex="-1" />
+                </div>
+              </div>
+            </div>
+            <div class="layer-section-divider"></div>
             <p class="layer-section-label">Audio Reactivity</p>
             <p class="layer-section-sub">Source &amp; Curve shape the audio signal that powers all sound-driven effects on this layer.</p>
             <div class="layer-row-inline" style="gap:8px;margin-bottom:6px">
@@ -4116,6 +4180,130 @@ export class EditorInspector {
             grainSl.style.setProperty('--pct', `${(v * 100).toFixed(1)}%`);
             refresh();
         });
+
+        // Vignette controls
+        const vignetteCb = card.querySelector('.layer-vignette-cb');
+        const vignetteDetail = card.querySelector('.layer-vignette-detail');
+        if (vignetteCb && vignetteDetail) {
+            vignetteCb.addEventListener('change', () => {
+                entry.vignette = vignetteCb.checked ? 1 : 0;
+                vignetteDetail.style.display = entry.vignette ? '' : 'none';
+                refresh();
+            });
+        }
+
+        // Vignette XY Pad — center point
+        const vXY = card.querySelector('.vignette-xy-pad');
+        const vXYReset = card.querySelector('.vignette-xy-reset');
+        if (vXY) {
+            const vCtx = vXY.getContext('2d');
+            const PAD = 96;
+            const drawVPad = () => {
+                vCtx.clearRect(0, 0, PAD, PAD);
+                vCtx.fillStyle = 'rgba(255,255,255,0.04)';
+                vCtx.beginPath();
+                vCtx.roundRect(0, 0, PAD, PAD, 4);
+                vCtx.fill();
+                vCtx.strokeStyle = 'rgba(255,255,255,0.10)';
+                vCtx.lineWidth = 1;
+                vCtx.beginPath(); vCtx.moveTo(PAD / 2, 0); vCtx.lineTo(PAD / 2, PAD); vCtx.stroke();
+                vCtx.beginPath(); vCtx.moveTo(0, PAD / 2); vCtx.lineTo(PAD, PAD / 2); vCtx.stroke();
+                vCtx.strokeRect(0.5, 0.5, PAD - 1, PAD - 1);
+                const dx = (entry.vignetteCX ?? 0.5) * PAD;
+                const dy = (entry.vignetteCY ?? 0.5) * PAD;
+                vCtx.beginPath();
+                vCtx.arc(dx, dy, 5, 0, Math.PI * 2);
+                vCtx.fillStyle = '#ffffff';
+                vCtx.fill();
+                vCtx.strokeStyle = 'rgba(0,0,0,0.5)';
+                vCtx.lineWidth = 1.5;
+                vCtx.stroke();
+            };
+            drawVPad();
+            const onVMove = (e) => {
+                const rect = vXY.getBoundingClientRect();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                entry.vignetteCX = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+                entry.vignetteCY = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+                drawVPad();
+                refresh();
+            };
+            let vDragging = false;
+            vXY.addEventListener('mousedown', (e) => { vDragging = true; onVMove(e); });
+            vXY.addEventListener('touchstart', (e) => { vDragging = true; onVMove(e); e.preventDefault(); }, { passive: false });
+            window.addEventListener('mousemove', (e) => { if (vDragging) onVMove(e); });
+            window.addEventListener('mouseup', () => { vDragging = false; });
+            window.addEventListener('touchmove', (e) => { if (vDragging) onVMove(e); }, { passive: true });
+            window.addEventListener('touchend', () => { vDragging = false; });
+            if (vXYReset) vXYReset.addEventListener('click', () => {
+                entry.vignetteCX = 0.5;
+                entry.vignetteCY = 0.5;
+                drawVPad();
+                refresh();
+            });
+        }
+
+        const vignetteWSl = card.querySelector('.layer-vignette-w-sl');
+        const vignetteWVal = card.querySelector('.layer-vignette-w-val');
+        if (vignetteWSl) vignetteWSl.addEventListener('input', () => {
+            const v = parseFloat(vignetteWSl.value);
+            entry.vignetteW = v;
+            vignetteWVal.textContent = v.toFixed(2);
+            vignetteWSl.style.setProperty('--pct', `${(v * 100).toFixed(1)}%`);
+            refresh();
+        });
+
+        const vignetteHSl = card.querySelector('.layer-vignette-h-sl');
+        const vignetteHVal = card.querySelector('.layer-vignette-h-val');
+        if (vignetteHSl) vignetteHSl.addEventListener('input', () => {
+            const v = parseFloat(vignetteHSl.value);
+            entry.vignetteH = v;
+            vignetteHVal.textContent = v.toFixed(2);
+            vignetteHSl.style.setProperty('--pct', `${(v * 100).toFixed(1)}%`);
+            refresh();
+        });
+
+        const vignetteCornerSl = card.querySelector('.layer-vignette-corner-sl');
+        const vignetteCornerVal = card.querySelector('.layer-vignette-corner-val');
+        if (vignetteCornerSl) vignetteCornerSl.addEventListener('input', () => {
+            const v = parseFloat(vignetteCornerSl.value);
+            entry.vignetteCorner = v;
+            vignetteCornerVal.textContent = v.toFixed(2);
+            vignetteCornerSl.style.setProperty('--pct', `${(v * 100).toFixed(1)}%`);
+            refresh();
+        });
+
+        const vignetteStrSl = card.querySelector('.layer-vignette-str-sl');
+        const vignetteStrVal = card.querySelector('.layer-vignette-str-val');
+        if (vignetteStrSl) vignetteStrSl.addEventListener('input', () => {
+            const v = parseFloat(vignetteStrSl.value);
+            entry.vignetteStrength = v;
+            vignetteStrVal.textContent = v.toFixed(2);
+            vignetteStrSl.style.setProperty('--pct', `${(v * 100).toFixed(1)}%`);
+            refresh();
+        });
+
+        const vignetteFeaSl = card.querySelector('.layer-vignette-fea-sl');
+        const vignetteFeaVal = card.querySelector('.layer-vignette-fea-val');
+        if (vignetteFeaSl) vignetteFeaSl.addEventListener('input', () => {
+            const v = parseFloat(vignetteFeaSl.value);
+            entry.vignetteFeather = v;
+            vignetteFeaVal.textContent = v.toFixed(2);
+            vignetteFeaSl.style.setProperty('--pct', `${(v * 100).toFixed(1)}%`);
+            refresh();
+        });
+
+        const vignetteSwatch = card.querySelector('.layer-vignette-swatch');
+        const vignettePicker = card.querySelector('.layer-vignette-picker');
+        if (vignetteSwatch && vignettePicker) {
+            vignetteSwatch.addEventListener('click', () => vignettePicker.click());
+            vignettePicker.addEventListener('input', () => {
+                entry.vignetteColor = vignettePicker.value;
+                vignetteSwatch.style.background = vignettePicker.value;
+                refresh();
+            });
+        }
 
         // Phase 6: Lissajous orbit mode
         const orbitModeBtns = card.querySelectorAll('.layer-orbit-mode .lseg');
@@ -5419,7 +5607,8 @@ export class EditorInspector {
             // Scan Lines: horizontal CRT bands darkening
             (hasScanLines ? `    _src *= 1.0 - ${scanLinesAmt} * 0.5 * (0.5 + 0.5 * sin(gl_FragCoord.y * 3.14159));\n` : '') +
             // Film Grain: animated hash-based noise overlay
-            (hasFilmGrain ? `    { float _gn = fract(sin(dot(uv + fract(time * 0.1), vec2(12.9898, 78.233))) * 43758.5453); _src += (_gn - 0.5) * ${filmGrainAmt} * 0.4; }\n` : '') +
+            (hasFilmGrain ? `    { float _gn = fract(sin(dot(uv + fract(time * 0.1), vec2(12.9898, 78.233))) * 43758.5453); _src += (_gn - 0.5) * ${filmGrainAmt} * 0.4; }
+` : '') +
             // Color grading for videos (brightness, contrast, gamma)
             (isVideo ? (() => {
                 const br = (img.brightness || 1.0).toFixed(4);
@@ -5455,6 +5644,22 @@ export class EditorInspector {
                 ? `    float _alphaMask = step(0.1, _t.w);\n    float _op = _alphaMask * _gapMask * clamp(${op} + _r * ${opa}, 0.0, 1.0);\n`
                 : `    float _op = _t.w * _gapMask * clamp(${op} + _r * ${opa}, 0.0, 1.0);\n`) +
             `    ${blendLine}\n` +
+            // Screen overlay: applied immediately after this layer blends in,
+            // so layers stacked above will render on top of it.
+            (!img.vignette ? '' : (() => {
+                const vCX = (img.vignetteCX ?? 0.5).toFixed(4);
+                const vCY = (img.vignetteCY ?? 0.5).toFixed(4);
+                const vW  = (img.vignetteW  ?? 0.5).toFixed(4);
+                const vH  = (img.vignetteH  ?? 0.5).toFixed(4);
+                const vCorner   = (img.vignetteCorner   ?? 0.3).toFixed(4);
+                const vStrength = (img.vignetteStrength ?? 0.5).toFixed(4);
+                const vFeather  = (img.vignetteFeather  ?? 0.3).toFixed(4);
+                const vColor = img.vignetteColor || '#000000';
+                const vR = (parseInt(vColor.slice(1,3),16)/255).toFixed(4);
+                const vG = (parseInt(vColor.slice(3,5),16)/255).toFixed(4);
+                const vB = (parseInt(vColor.slice(5,7),16)/255).toFixed(4);
+                return `    { vec2 _vsuv = uv; float _vsx = ${vCX}; float _vsy = ${vCY}; float _vsw = ${vW} * 0.7; float _vsh = ${vH} * 0.7; float _vsc = ${vCorner} * min(_vsw, _vsh); float _vsf = ${vFeather} * 0.3 + 0.001; vec2 _vsd = abs(vec2(_vsuv.x - _vsx, _vsuv.y - _vsy)); vec2 _vsb = _vsd - vec2(_vsw, _vsh) + _vsc; float _vsdf = length(max(_vsb, 0.0)) + min(max(_vsb.x, _vsb.y), 0.0) - _vsc; float _vsa = smoothstep(-_vsf, _vsf, -_vsdf); col = mix(col, vec3(${vR}, ${vG}, ${vB}), _vsa * ${vStrength}); }\n`;
+            })()) +
             `  }\n`
         );
     }
@@ -5566,6 +5771,7 @@ export class EditorInspector {
             chromaticAberration: 0.00, chromaticSpeed: 1.0,
             tileScaleX: 1.00, tileScaleY: 1.00,
             angle: 0.00, skewX: 0.00, skewY: 0.00, shakeAmp: 0.00, posterize: 0, depthOffset: 0.00, edgeSobel: false, lumaKeyLo: 0.00, lumaKeyHi: 0.00, waveAmp: 0.00, waveFreq: 4.0, invertMix: 0.00, thresholdCutoff: 0.00, pixelate: 0.00, scanLines: 0.00, filmGrain: 0.00, perspX: 0.00, perspY: 0.00,
+            vignette: 0, vignetteCX: 0.5, vignetteCY: 0.5, vignetteW: 0.5, vignetteH: 0.5, vignetteCorner: 0.3, vignetteStrength: 0.5, vignetteFeather: 0.3, vignetteColor: '#000000',
             audioPulse: 0.00, pulseInvert: false,
             blendMode: 'overlay', tile: true, groupSpin: false,
             hueSpinSpeed: 0.00, imageSaturation: 1.00, imageHue: 0, tintR: 1.0, tintG: 1.0, tintB: 1.0,
