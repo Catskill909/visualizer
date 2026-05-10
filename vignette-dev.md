@@ -314,7 +314,7 @@ To start fresh with Shift, navigate to `/editor.html` without any URL parameters
 
 ---
 
-## Status: **PARKED** — White/Desaturation Approach Failed
+## Status: **IN PROGRESS** — Layer-Based Vignette Implementation
 
 ### What We Learned (2026-05-06 Session)
 
@@ -357,6 +357,12 @@ This explains why **Trail** works on some presets but not others.
 
 ## Next Focus: **Vignette / Focused Dark Ring** ✓ ACTIVE
 
+### Implementation Plan (Layer-Based)
+
+**Position in UI:** Bottom of Visual Effects section, just above Audio Reactivity
+
+---
+
 ### Why This Works Better
 
 **Vignette is spatial, not color-based:**
@@ -365,64 +371,101 @@ This explains why **Trail** works on some presets but not others.
 - Works on 100% of presets automatically
 - Creative effect, not just "fix it" tool
 
-### UI Mock (Palette Tab)
+### UI Placement (Layer Controls)
+
+**Location:** Bottom of Visual Effects section, directly above Audio Reactivity divider
 
 ```
-┌─ Vignette ─────────────────────────┐
-│                                     │
-│  [Toggle]  Enable                   │
-│                                     │
-│  Target    [Center ○● Edges]        │
-│                                     │
-│  Center           [Reset ↺]         │
-│  ┌─────────┐                        │
-│  │    ●    │   ← XY pad            │
-│  │         │     (drag to move)    │
-│  └─────────┘                        │
-│                                     │
-│  Radius      [──●────]  0.50       │
-│  Strength    [──●────]  0.50       │
-│  Fade        [─●─────]  0.30        │
-│                                     │
-│  Color  [███] #3a0050   [ picker ]  │
-│         ↑ tint for venue blending   │
+┌─ Layer Card ─────────────────────────┐
+│  ...                               │
+│  Visual Effects                    │
+│  ├── Chromatic  [──●────]         │
+│  ├── Posterize  [Off 2 4 8...]    │
+│  ├── Edge       [Off · On]        │
+│  ├── Luma Key   [sliders...]      │
+│  ├── Wave       [sliders...]      │
+│  ├── Color FX   [sliders...]      │
+│  ├── Texture    [sliders...]      │
+│  │                                │
+│  ├─ **Vignette** ← NEW SECTION    │
+│  │  [Toggle] Enable               │
+│  │                                │
+│  │  Center X    [──●────]  0.50   │
+│  │  Center Y    [──●────]  0.50   │
+│  │  Radius      [──●────]  0.50   │
+│  │  Strength    [──●────]  0.50   │
+│  │  Feather     [─●─────]  0.30   │
+│  │                                │
+├─────── section-divider ────────────┤
+│  Audio Reactivity                  │
+│  ├── Source     [Bass ▼]          │
+│  ...                               │
 └─────────────────────────────────────┘
 ```
 
-**Color picker** — simple color selector for vignette tint.
+### Implementation Audit
 
-### Proposed Controls
+Based on code audit of `/src/editor/inspector.js`:
+
+| Area | Line Range | Purpose |
+|------|------------|---------|
+| Layer defaults (entry) | ~2244 | Add `vignette`, `vignetteCX`, `vignetteCY`, `vignetteRadius`, `vignetteStrength`, `vignetteFeather` |
+| Normalization | ~5554 | Add same keys to `_normalizeImageEntry()` D object |
+| Layer UI HTML | ~3191-3280 | Insert vignette controls after Texture section, before Audio Reactivity divider |
+| Event wiring | ~3350-4000 | Add slider event listeners for vignette controls |
+| GLSL builder | ~4847 | Add vignette calculation in `_buildImageBlock()` after texture sampling |
+
+### Layer Default Values
+
+```javascript
+// In _addImageLayer() ~line 2244 and _normalizeImageEntry() ~line 5554
+vignette: 0,              // 0 = off, 1 = on
+vignetteCX: 0.5,          // center X (0-1)
+vignetteCY: 0.5,          // center Y (0-1)
+vignetteRadius: 0.5,     // radius of darkened area (0-1)
+vignetteStrength: 0.5,    // how dark it gets (0-1)
+vignetteFeather: 0.3,     // edge softness (0-1)
+```
+
+### GLSL Implementation (in _buildImageBlock)
+
+**Location:** After all texture sampling and color effects (~line 5440), before the final `blendLine` execution.
+
+```glsl
+// Vignette: darken based on distance from configurable center
+if (vignetteEnabled) {
+    float _vignetteDist = distance(_suv, vec2(vignetteCX, vignetteCY));
+    float _vignetteEdge = vignetteRadius;
+    float _vignetteMask = smoothstep(_vignetteEdge, _vignetteEdge * (1.0 - vignetteFeather), _vignetteDist);
+    _src.rgb *= (1.0 - _vignetteMask * vignetteStrength);
+}
+```
+
+Where `_suv` is the sampling UV (either `_u` for tiled, `_uA/_uB` for tunnel, or `_uInstanced` for non-tiled).
+
+### Files to Modify
+
+1. **`/src/editor/inspector.js`** — All changes
+   - Line ~2244: Add defaults to `_addImageLayer()` entry object
+   - Line ~5554: Add to `_normalizeImageEntry()` D object
+   - Line ~3191-3280: Add UI HTML in `_mountLayerCard()`
+   - Line ~3350-4000: Wire up event listeners
+   - Line ~4847: Add GLSL generation in `_buildImageBlock()`
+
+### UI Controls Detail
 
 | Control | Type | Range | Default | Description |
 |---------|------|-------|---------|-------------|
 | Vignette | Toggle | on/off | off | Master enable |
-| Target | Select | Center/Edges | Center | Where to darken |
-| Center X/Y | XY Pad | 0-1 | 0.5, 0.5 | Vignette center point (reuses Image tab pattern) |
-| Radius | Slider | 0-1 | 0.5 | Size of affected area |
+| Center X | Slider | 0-1 | 0.5 | Horizontal center point |
+| Center Y | Slider | 0-1 | 0.5 | Vertical center point |
+| Radius | Slider | 0-1 | 0.5 | Size of darkened area |
 | Strength | Slider | 0-1 | 0.5 | How dark it gets |
-| Fade | Slider | 0-1 | 0.3 | Edge softness (0=hard, 1=feathered) |
-| Color | Color Swatch | #000000 | Black | Vignette tint color (for blending with venue lights) |
+| Feather | Slider | 0-1 | 0.3 | Edge softness (0=hard edge, 1=very soft) |
 
-### Technical Approach
+**Note:** Per discussion, simplified from the original plan:
+- Removed "Target: Center/Edges" toggle (can achieve edge vignette by setting Center X/Y to corners)
+- Removed color tint (keep it simple - darken only)
+- Kept the core spatial controls
 
-**Use existing `darken_center` butterchurn uniform as base**, but:
-1. Extend from boolean (on/off) to float (strength 0-1)
-2. Add `vignette_radius`, `vignette_fade`, `vignette_target`, `vignette_cx`, `vignette_cy`, `vignette_color` baseVals
-3. Modify shader injection to bake values as literals
-4. Keep it simple: no runtime uniform updates, just rebuild on change
-
-### Files to Touch
-- `/src/editor/inspector.js` — slider configs, baseVals, sync, shader injection
-- `buildStudioPostFxGlsl()` — vignette GLSL block
-- Possibly remove old `darken_center` toggle entirely, replace with new vignette controls
-
-### GLSL Sketch
-```glsl
-// Vignette: darken/tint based on distance from center (or edges)
-float dist = distance(uv, vec2(vignette_cx, vignette_cy));  // configurable center
-float mask = smoothstep(vignette_radius, vignette_radius * (1.0 - vignette_fade), dist);
-vec3 vignetteTint = vignette_color * (1.0 - mask * vignette_strength);
-ret.rgb = mix(ret.rgb, vignetteTint, mask * vignette_strength);
-```
-
-**Status:** Ready to implement when user gives go-ahead.
+**Status:** Ready for implementation.
