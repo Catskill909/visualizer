@@ -51,7 +51,14 @@ export function saveTimeline(timeline) {
     const { _presetImport: _dropped, ...clean } = timeline; // strip transient side-channel prop
     const record = { ...clean, updatedAt: Date.now() };
     all[record.id] = record;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+    } catch (e) {
+        if (e.name === 'QuotaExceededError') {
+            throw new Error('Storage full — export your timelines to free space, then delete some.');
+        }
+        throw e;
+    }
     // Re-attach the transient summary so the caller can still read it
     if (timeline._presetImport) record._presetImport = timeline._presetImport;
     return record;

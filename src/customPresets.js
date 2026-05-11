@@ -50,7 +50,14 @@ export function saveCustomPreset(preset) {
     const all = loadAllCustomPresets();
     const record = { ...preset, updatedAt: Date.now() };
     all[preset.id] = record;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+    } catch (e) {
+        if (e.name === 'QuotaExceededError') {
+            throw new Error('Storage full — export your presets to free space, then delete some.');
+        }
+        throw e;
+    }
     return record;
 }
 

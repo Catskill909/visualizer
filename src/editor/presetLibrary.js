@@ -310,7 +310,12 @@ export class PresetLibrary {
             if (all[id]) {
                 all[id].name      = next;
                 all[id].updatedAt = Date.now();
-                localStorage.setItem('discocast_custom_presets', JSON.stringify(all));
+                try {
+                    localStorage.setItem('discocast_custom_presets', JSON.stringify(all));
+                } catch (e) {
+                    showToast('Storage full — export your presets to free space.', true);
+                    return;
+                }
             }
             this._renderGrid();
             if (next !== prev) showToast(`Renamed to "${next}"`);

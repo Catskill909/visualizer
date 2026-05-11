@@ -13,6 +13,11 @@
  * @returns {Promise<boolean>} true = saved, false = cancelled.
  */
 export async function downloadFile(filename, content) {
+    const mb = content.length / 1_048_576;
+    if (mb > 50 && !confirm(`This export is ~${mb.toFixed(0)} MB — continue?`)) {
+        return false;
+    }
+
     if (window.__TAURI__) {
         try {
             const result = await window.__TAURI__.invoke('save_file', { filename, content });
