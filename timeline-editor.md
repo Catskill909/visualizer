@@ -1,6 +1,6 @@
 # Timeline Editor — Design & Planning Doc
 
-**Status:** Phases 1–4.3 complete ✅ — Phase 4.4 next (Block Action Modal) — Phase 5 in research (Multi-monitor output).  
+**Status:** Phases 1–4.3 complete ✅ — 4.4 (Block Action Modal) → 4.5 (Double-click Cue & Loop) → 4.6 (Overlap Crossfade) → 4.7 (Undo/Redo) — Phase 5 in research (Multi-monitor output). Performance Panel deferred until video processing controls are built out.  
 **Last updated:** 2026-05-11  
 **Architecture:** Standalone page (`/timeline.html`) — self-contained MPA entry in Vite.
 
@@ -121,7 +121,7 @@ The existing `#tl-quick-edit` popover IS this modal — no new DOM node needed. 
 
 | Phase | What's added | What's removed |
 |-------|-------------|----------------|
-| **A — Consolidate** | Delete + Duplicate move into the modal; clicking block body opens it directly | Hover icon row (small, hard to hit reliably) |
+| **A — Consolidate** | Delete + Duplicate move into the modal; clicking block body opens it directly; `presetLibrary.js` "Send to Timeline →" one-liner | Hover icon row (small, hard to hit reliably); `#tl-ctx-menu` right-click menu (redundant once modal is primary path — one interaction surface per action) |
 | **B — Full Edit** | "Full Edit →" deep-link into Preset Studio for this preset | — |
 | **C — Utilities** | "Loop This" button (sets loop range to block's start/end); block color picker | — |
 | **D — Preset Controls** | Full `controls.js` panel as a new section below the fields, re-targeted to this zone's engine; live during playback | — |
@@ -135,37 +135,71 @@ The existing `#tl-quick-edit` popover IS this modal — no new DOM node needed. 
 
 ---
 
-**⚡ Phase 4.5 — Performance Panel (Layer 2)**
+**⚡ Phase 4.5 — Double-click to Cue and Loop**
 
-A single **⊡ Perform** button in the transport opens a full-width overlay showing every active zone as a flex column. Each column contains that zone's full preset controls panel, re-targeted from the same `controls.js` component. On a large screen or broadcast rig this becomes a complete control surface — every zone, every parameter, all live at once. Columns flex to fill available width; smaller screens scroll horizontally. Closing the panel releases all bindings and returns to the clean strip.
+Double-click any block to immediately load that preset into its zone engine and fade it in using the existing `blendTime` + `_fadeZoneCover` transition — the same code path as a normal block transition, just triggered by gesture instead of the scheduler. The preset loops continuously until the timeline advances or the user triggers another block.
 
-**Design intent:** Built for the live broadcast scenario — a large monitor dedicated to control. The timeline strip plays the show; the Performance Panel is the mixing desk. Both are always optional — the show runs fine with neither open.
+This makes presets **playable**: a VJ brings a preset in live with a smooth fade, the same way a DJ cues a track. The timeline becomes an instrument, not just a scheduler.
+
+**Why here (after 4.4):** Phase 4.4 leaves the block UI clean and well-targeted. Double-click is the natural next gesture — and because it reuses `_fadeZoneCover` and `engine.loadPreset()` already in place, the implementation is minimal.
+
+**Technical path:** `engine.loadPreset(entry.presetName, entry.blendTime)` + `_fadeZoneCover(zoneId, 0, entry.blendTime)` + activate loop range to block bounds. No new infrastructure.
+
+Also available via right-click → "Loop This" as a secondary path.
+
+**⚡ Phase 4.6 — Overlap-driven Crossfade Timing**
+
+Overlap between blocks is already visual and functional. The gap: the crossfade fires on the stored `blendTime` value regardless of how long the overlap actually is. The fix is to use the overlap duration as the fade duration instead.
+
+**Current behavior:** block B starts at its `startTime`, crossfade duration = `entry.blendTime` (fixed).
+
+**Target behavior:** crossfade duration = actual overlap length (`prevEntry.startTime + prevEntry.duration - nextEntry.startTime`). Drag the overlap wider = longer blend. Drag narrower = snappier cut. Out of the box, intuitive — no numeric field needed for most cases. `blendTime` remains as a fine-tune override.
+
+**Technical path:** in `_playZone`, when scheduling a future entry, detect overlap with the previous entry and substitute overlap duration for `blendTime`. One calculation, no new data model fields.
 
 ---
 
-*Loop & Regions*
+**⚡ Phase 4.7 — Undo/Redo**
+
+Accidentally dragging a block, deleting it, or resizing it has no recovery today. Minimum viable scope: a command stack for the three most destructive gestures.
+
+| Action | What's undone |
+|--------|--------------|
+| Drag (position change) | Restores `entry.startTime` to pre-drag value |
+| Delete block | Re-inserts entry at its original position |
+| Resize (duration change) | Restores `entry.duration` to pre-resize value |
+
+**Not in scope (v1):** undo for timeline-level operations (delete whole timeline, change zone layout) — those have confirm dialogs already. Not in scope: multi-level redo. Single-level `Ctrl+Z` / `Cmd+Z` covers the real workflow pain.
+
+**Technical approach:** before each mutation, push a snapshot `{ type, entryId, before }` onto a stack in `TimelineEditor`. `_handleUndo()` pops the top entry and applies the inverse. No external library needed — the data model is simple enough for manual snapshots.
+
+---
+
+*Backlog — Loop & Regions*
 - **Loop section range on ruler** — drag a range on the ruler to set loop bounds. Playback bounces between in and out points.
 - **Advanced Loop logic** — marker action `loop` jumps to previous loop start rather than `0:00`.
-- **Double-click block to loop** — double-click a block to instantly set the loop range to that block's start/end and activate loop mode. Fast path for live VJ looping — one gesture to lock in a loop. Also available via right-click → "Loop This".
 
-*Live Performance*
+*Backlog — Live Performance*
 - **Per-entry crossfade style** — Cut / White Flash / Black Dip — stored as `transitionStyle` on entry.
 - **Live queue override** — during playback, click a future block to force it to play *next*, overriding the timeline's strict chronological order.
 - **Hold/freeze preset** — while playing, press `H` to freeze the current preset indefinitely, ignoring upcoming block transitions. Press again to release.
 - **Speed control** — 0.5×, 1×, 2× playback speed. Affects wall-clock calculation.
 - **Entry label canvas overlay** — text overlay during playback (label field already in data model and quick-edit).
 
-*Audio Sync*
+*Backlog — Audio Sync*
 - **Timeline ↔ Audio lock** — when using "Load Track" mode, sync the timeline playhead with the audio file's `currentTime`. Scrubbing one scrubs both. Playback of one drives both.
 - **BPM grid on ruler** — enter a BPM; ruler shows beat markers. Blocks snap to beat boundaries on drag/resize. Playhead shows current beat count.
 - **Beat-triggered transitions** — instead of hard time-based transitions, trigger the next preset on the next beat boundary after the block's duration expires.
 
-*Workflow & UX*
+*Backlog — Workflow & UX*
 - **Auto-fill from Favorites** — button in transport to quickly fill a zone.
 - **Multi-select (Shift-click)** — bulk duration stamping and movement.
 - **Setlist text export** — plain-text or HTML table.
 - **Timeline Library modal** — replace the topbar `<select>` dropdown with a "Library" button that opens a card-grid modal (mirrors `presetLibrary.js` patterns). Each card: name, last-edited relative time, entry count, zone-layout chip, per-card Load + Delete actions. Search box, sort by recent/name, multi-select for bulk delete. Save button gains a "Save As…" dialog for new/clone flows. Discard-confirm guard when switching timelines with unsaved changes.
 - **Auto-save behavior** — debounced "draft" slot rather than spawning a new entry per page load.
+
+*Deferred — After Video Processing*
+- **Performance Panel** — a full-width overlay showing every active zone as a flex column, each with its full `controls.js` panel re-targeted to that zone's engine. On a large screen or broadcast rig this becomes a complete mixing desk — every zone, every parameter, all live at once. Columns flex to fill available width; smaller screens scroll horizontally. **Blocked on:** video processing controls being built out first — the panel's value comes from having rich controls to surface. Once those are in place, the panel shell is straightforward (see UX Philosophy Layer 2).
 
 ---
 
@@ -214,12 +248,13 @@ Same design language as the rest of the app: full-screen canvas, glassmorphic ov
 
 ## Open Bugs / Known Gaps
 
-- **No overlap prevention**: blocks can be dragged to overlap each other within a zone. The data model spec says `startTime + duration <= next.startTime` but this is not enforced. Future: push colliding blocks on drop (same as a real NLE).
+- **Overlaps are intentional (crossfades)**: blocks can overlap within a zone — this is the crossfade mechanism (Phase 4.6), not a bug. The old spec note `startTime + duration <= next.startTime` is superseded. No overlap prevention should be added.
 - ~~**Gap behavior not visualized**~~: ✅ Fixed in Phase 3.5 — `_playZone()` now schedules blackout timers when entries end. `gapBehavior: 'black'` re-shows the zone cover; `'hold'` lets the last frame persist. Visual crosshatch/ghost-block strip rendering still not built (cosmetic only).
 - **Zone settings popover not built**: clicking the zone label chip does nothing yet. It should open a popover for name, opacity, blend mode, gap behavior.
 - **Entry label overlay not rendered**: `entry.label` is stored and editable in quick-edit but not rendered on the canvas during playback.
-- **`presetLibrary.js` "Send to Timeline →"** one-liner not yet added.
-- **`#tl-quick-edit` styling needs visual polish**: size and padding are correct — controls must stay easy to see and hit. Issues are hierarchy and anchoring: "s" unit labels feel orphaned from their inputs; field labels and values have similar weight so values don't pop; Apply/Cancel styling doesn't match the app's glassmorphic language. Addressed in Phase 4.4 Phase A.
+- **`presetLibrary.js` "Send to Timeline →"** one-liner not yet added — scheduled for Phase 4.4A.
+- **`#tl-quick-edit` styling needs visual polish**: hierarchy and anchoring — "s" unit labels feel orphaned; field labels and values have similar weight so values don't pop; Apply/Cancel doesn't match the glassmorphic language. Addressed in Phase 4.4 styling pass.
+- **Undo/Redo not yet implemented** — scheduled for Phase 4.7. Until then, delete and drag are irreversible.
 
 ---
 
