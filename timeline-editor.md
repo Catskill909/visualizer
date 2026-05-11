@@ -1,8 +1,24 @@
 # Timeline Editor — Design & Planning Doc
 
-**Status:** Phases 1–4.3 complete ✅ — Phase 4.4 next (Loop & Regions) — Phase 5 in research (Multi-monitor output).  
-**Last updated:** 2026-05-06  
+**Status:** Phases 1–4.3 complete ✅ — Phase 4.4 next (Block Action Modal) — Phase 5 in research (Multi-monitor output).  
+**Last updated:** 2026-05-11  
 **Architecture:** Standalone page (`/timeline.html`) — self-contained MPA entry in Vite.
+
+---
+
+## UX Philosophy — The Complexity Ladder
+
+The timeline strip is always the clean base. No new UI appears unless the user deliberately asks for it. Each layer of depth opens on a gesture and closes cleanly back to the layer before. The strip itself never gets busier.
+
+| Layer | What you see | How you get there |
+|-------|-------------|-------------------|
+| 0 | Full-screen canvas + timeline strip | Default |
+| 1 | Block Modal — controls for one preset | Click a block |
+| 2 | Performance Panel — all active presets, all controls | One button in transport |
+
+**Evaluation rule:** Does the idea add to the strip, or does it live behind a deliberate gesture? If it adds to the strip, the answer is no.
+
+---
 
 ## Phased Rollout
 
@@ -46,7 +62,7 @@
 
 - **Position-based dragging** — blocks drag freely to any time position. `entry.startTime` is now stored (not computed). Dragging the block body updates `entry.startTime` directly on drop. `_migrateEntryStartTimes()` auto-converts old sequential timelines on load.
 - **Inline block actions** — hover a block to reveal Edit / Duplicate / Delete icon buttons. Clicking them does not trigger drag. Right-click context menu preserved as secondary path.
-- **Controls always visible** — auto-hide timer removed. Controls are permanently visible unless fullscreen is active.
+- **Controls always visible** — auto-hide timer removed entirely. Controls are permanently visible unless fullscreen is active.
 - **`#tl-fullscreen-btn`** — always-visible fullscreen icon in top-right corner (replaced the old `≡` pin toggle). Click or press `F` to enter fullscreen and hide all controls. Click again, press `F`, or press `Escape` to exit fullscreen and restore controls. Web uses native browser fullscreen API; macOS app uses Tauri `appWindow.setFullscreen()`.
 
 ### Phase 3.5 — Active Playhead ✅ COMPLETE
@@ -58,6 +74,98 @@ A classic NLE playhead: click-to-seek, persistent position, play-from-here. This
 - **Visuals on Stop**: Stopped timelines show a clean black canvas (covers shown), with the playhead remaining persistently visible to indicate position.
 - **Transition / Fade System**: Replaced `display: none/block` cover toggling with an extensible opacity-based `_fadeZoneCover` helper.
 - **Automated Crossfades**: Zones automatically fade in from black after gaps, and fade out to black before gaps (based on `blendTime`). Scrubbing instantly snaps without visual lag.
+
+---
+
+### Phase 4 — Advanced show features 🔧 IN PROGRESS
+
+**Phase 4.1 — VJ Marker System** ✅ COMPLETE
+- **Data Model**: `Timeline` object now stores an array of `markers` (`time`, `label`, `color`, `action`).
+- **Interactive Ruler**: Double-click ruler to drop a marker. Click and drag to reposition with snapping support.
+- **Edit Popover**: Click a marker to open an editor to change its Label, Color, and Action. Smart positioning prevents it from dropping off-screen.
+- **Playback Execution**: Playhead engine scans for markers.
+  - `stop` action: halts playback and parks exactly on the marker.
+  - `loop` action: halts playback, wraps back to `0:00`, and resumes seamlessly.
+- **Live Scrubbing**: Clicking the ruler while stopped immediately loads the corresponding presets into the visualizer engines and lifts covers for a live preview.
+
+**Phase 4.2 — Transport & Seeking (VJ Mode)** ✅ COMPLETE
+
+- **Go-to-start button** — `⏮` in transport bar jumps playhead to 0:00 (pauses timeline, keeps visuals)
+- **Skip-to-next-block button** — `⏵` jumps to next block start (wraps to 0:00 at end)
+- **Play/Stop button** — Stop pauses timeline progression but **keeps preset animations running** (no black screen)
+- **Keyboard shortcuts** — `Home` for start
+- **Ruler hint** — hover ruler shows "Double-click to add marker" cue
+
+*VJ Mode Philosophy:* The show never stops. Timeline controls (playhead, scheduling) pause, but visuals continue playing. Press Play to resume timeline progression.
+
+**Phase 4.3 — Quick Wins** ✅ COMPLETE
+
+- **Keyboard nudge** — `↑`/`↓` nudge playhead ±1s, `Shift+↑`/`Shift+↓` nudge ±5s
+- **Drag-scrub on ruler** — click-hold-drag on ruler for smooth playhead control
+- **Keyboard shortcuts for markers** — `1`-`9` jump to markers 1-9 by index
+- **Block navigation** — `←`/`→` jump to prev/next preset block start
+
+*Rationale:* Horizontal arrows for timeline navigation (block-to-block), vertical arrows for fine-tuning (time nudge). More intuitive for VJ workflow.
+
+*Rationale:* Standard DAW/NLE transport uses 3 buttons: Go-to-Start, Play/Stop, Skip-Next. Skip-Prev is rarely used and was confusing when both left buttons went to 0:00. Simplified to match industry standard.
+
+---
+
+#### Upcoming Phase 4.x
+
+---
+
+**⚡ Phase 4.4 — Block Action Modal**
+
+The existing `#tl-quick-edit` popover IS this modal — no new DOM node needed. Evolve it in place across four phases:
+
+| Phase | What's added | What's removed |
+|-------|-------------|----------------|
+| **A — Consolidate** | Delete + Duplicate move into the modal; clicking block body opens it directly | Hover icon row (small, hard to hit reliably) |
+| **B — Full Edit** | "Full Edit →" deep-link into Preset Studio for this preset | — |
+| **C — Utilities** | "Loop This" button (sets loop range to block's start/end); block color picker | — |
+| **D — Preset Controls** | Full `controls.js` panel as a new section below the fields, re-targeted to this zone's engine; live during playback | — |
+
+**Styling (prerequisite for Phase A):** Size and padding are correct — controls must stay easy to see and hit. Fix is visual hierarchy and anchoring:
+- "s" unit labels feel orphaned — should be anchored to their input (suffix inside the field, or a pill flush alongside it)
+- Field labels and values have similar visual weight — labels should read as secondary so the value is what draws the eye
+- Apply/Cancel button bar stays — clear affordance — but should match the app's glassmorphic language rather than reading as a generic HTML form
+
+**Technical note (for Phase D):** `src/controls.js` currently targets the primary engine. For timeline zones, each zone has its own slave `VisualizerEngine` at `_zoneMap.get(zoneId).engine`. The modal re-targets controls to the correct engine on open, then restores the original target on close. No new slider widgets — just a target-swap.
+
+---
+
+**⚡ Phase 4.5 — Performance Panel (Layer 2)**
+
+A single **⊡ Perform** button in the transport opens a full-width overlay showing every active zone as a flex column. Each column contains that zone's full preset controls panel, re-targeted from the same `controls.js` component. On a large screen or broadcast rig this becomes a complete control surface — every zone, every parameter, all live at once. Columns flex to fill available width; smaller screens scroll horizontally. Closing the panel releases all bindings and returns to the clean strip.
+
+**Design intent:** Built for the live broadcast scenario — a large monitor dedicated to control. The timeline strip plays the show; the Performance Panel is the mixing desk. Both are always optional — the show runs fine with neither open.
+
+---
+
+*Loop & Regions*
+- **Loop section range on ruler** — drag a range on the ruler to set loop bounds. Playback bounces between in and out points.
+- **Advanced Loop logic** — marker action `loop` jumps to previous loop start rather than `0:00`.
+- **Double-click block to loop** — double-click a block to instantly set the loop range to that block's start/end and activate loop mode. Fast path for live VJ looping — one gesture to lock in a loop. Also available via right-click → "Loop This".
+
+*Live Performance*
+- **Per-entry crossfade style** — Cut / White Flash / Black Dip — stored as `transitionStyle` on entry.
+- **Live queue override** — during playback, click a future block to force it to play *next*, overriding the timeline's strict chronological order.
+- **Hold/freeze preset** — while playing, press `H` to freeze the current preset indefinitely, ignoring upcoming block transitions. Press again to release.
+- **Speed control** — 0.5×, 1×, 2× playback speed. Affects wall-clock calculation.
+- **Entry label canvas overlay** — text overlay during playback (label field already in data model and quick-edit).
+
+*Audio Sync*
+- **Timeline ↔ Audio lock** — when using "Load Track" mode, sync the timeline playhead with the audio file's `currentTime`. Scrubbing one scrubs both. Playback of one drives both.
+- **BPM grid on ruler** — enter a BPM; ruler shows beat markers. Blocks snap to beat boundaries on drag/resize. Playhead shows current beat count.
+- **Beat-triggered transitions** — instead of hard time-based transitions, trigger the next preset on the next beat boundary after the block's duration expires.
+
+*Workflow & UX*
+- **Auto-fill from Favorites** — button in transport to quickly fill a zone.
+- **Multi-select (Shift-click)** — bulk duration stamping and movement.
+- **Setlist text export** — plain-text or HTML table.
+- **Timeline Library modal** — replace the topbar `<select>` dropdown with a "Library" button that opens a card-grid modal (mirrors `presetLibrary.js` patterns). Each card: name, last-edited relative time, entry count, zone-layout chip, per-card Load + Delete actions. Search box, sort by recent/name, multi-select for bulk delete. Save button gains a "Save As…" dialog for new/clone flows. Discard-confirm guard when switching timelines with unsaved changes.
+- **Auto-save behavior** — debounced "draft" slot rather than spawning a new entry per page load.
 
 ---
 
@@ -94,71 +202,11 @@ A classic NLE playhead: click-to-seek, persistent position, play-from-here. This
 
 ---
 
-### Phase 4 — Advanced show features 🔧 IN PROGRESS
-
-**Phase 4.1 — VJ Marker System** ✅ COMPLETE
-- **Data Model**: `Timeline` object now stores an array of `markers` (`time`, `label`, `color`, `action`).
-- **Interactive Ruler**: Double-click ruler to drop a marker. Click and drag to reposition with snapping support.
-- **Edit Popover**: Click a marker to open an editor to change its Label, Color, and Action. Smart positioning prevents it from dropping off-screen.
-- **Playback Execution**: Playhead engine scans for markers. 
-  - `stop` action: halts playback and parks exactly on the marker.
-  - `loop` action: halts playback, wraps back to `0:00`, and resumes seamlessly.
-- **Live Scrubbing**: Clicking the ruler while stopped immediately loads the corresponding presets into the visualizer engines and lifts covers for a live preview.
-
-**Phase 4.2 — Transport & Seeking (VJ Mode)** ✅ COMPLETE
-
-- **Go-to-start button** — `⏮` in transport bar jumps playhead to 0:00 (pauses timeline, keeps visuals)
-- **Skip-to-next-block button** — `⏵` jumps to next block start (wraps to 0:00 at end)
-- **Play/Stop button** — Stop pauses timeline progression but **keeps preset animations running** (no black screen)
-- **Keyboard shortcuts** — `Home` for start
-- **Ruler hint** — hover ruler shows "Double-click to add marker" cue
-
-*VJ Mode Philosophy:* The show never stops. Timeline controls (playhead, scheduling) pause, but visuals continue playing. Press Play to resume timeline progression.
-
-**Phase 4.3 — Quick Wins** ✅ COMPLETE
-
-- **Keyboard nudge** — `↑`/`↓` nudge playhead ±1s, `Shift+↑`/`Shift+↓` nudge ±5s
-- **Drag-scrub on ruler** — click-hold-drag on ruler for smooth playhead control
-- **Keyboard shortcuts for markers** — `1`-`9` jump to markers 1-9 by index
-- **Block navigation** — `←`/`→` jump to prev/next preset block start
-
-*Rationale:* Horizontal arrows for timeline navigation (block-to-block), vertical arrows for fine-tuning (time nudge). More intuitive for VJ workflow.
-
-*Rationale:* Standard DAW/NLE transport uses 3 buttons: Go-to-Start, Play/Stop, Skip-Next. Skip-Prev is rarely used and was confusing when both left buttons went to 0:00. Simplified to match industry standard.
-
-**Upcoming Phase 4.x Tasks**:
-
-*Loop & Regions*
-- **Loop section range on ruler** — drag a range on the ruler to set loop bounds. Playback bounces between in and out points.
-- **Advanced Loop logic** — marker action `loop` jumps to previous loop start rather than `0:00`.
-- **Loop single block** — right-click block → "Loop This" — sets loop range to that block's start/end
-
-*Live Performance*
-- **Per-entry crossfade style** — Cut / White Flash / Black Dip — stored as `transitionStyle` on entry.
-- **Live queue override** — during playback, click a future block to force it to play *next*, overriding the timeline's strict chronological order.
-- **Hold/freeze preset** — while playing, press `H` to freeze the current preset indefinitely, ignoring upcoming block transitions. Press again to release.
-- **Speed control** — 0.5×, 1×, 2× playback speed. Affects wall-clock calculation.
-- **Entry label canvas overlay** — text overlay during playback (label field already in data model and quick-edit).
-
-*Audio Sync*
-- **Timeline ↔ Audio lock** — when using "Load Track" mode, sync the timeline playhead with the audio file's `currentTime`. Scrubbing one scrubs both. Playback of one drives both.
-- **BPM grid on ruler** — enter a BPM; ruler shows beat markers. Blocks snap to beat boundaries on drag/resize. Playhead shows current beat count.
-- **Beat-triggered transitions** — instead of hard time-based transitions, trigger the next preset on the next beat boundary after the block's duration expires.
-
-*Workflow & UX*
-- **Auto-fill from Favorites** — button in transport to quickly fill a zone.
-- **Multi-select (Shift-click)** — bulk duration stamping and movement.
-- **Setlist text export** — plain-text or HTML table.
-- **Timeline Library modal** — replace the topbar `<select>` dropdown with a "Library" button that opens a card-grid modal (mirrors `presetLibrary.js` patterns). Each card: name, last-edited relative time, entry count, zone-layout chip, per-card Load + Delete actions. Search box, sort by recent/name, multi-select for bulk delete. Save button gains a "Save As…" dialog for new/clone flows. Discard-confirm guard when switching timelines with unsaved changes.
-- **Auto-save behavior** — debounced "draft" slot rather than spawning a new entry per page load.
-
----
-
 ## What This Is
 
 A **Timeline** is a positional playlist of presets where each entry has a fixed display duration, blend-in transition, and an absolute start time within a zone. Multiple zones (screen regions) run simultaneously — different presets play in different areas of the canvas, composited live via CSS `mix-blend-mode`. The Timeline Editor is where you build and play them.
 
-Same design language as the rest of the app: full-screen canvas, glassmorphic overlays auto-hide after inactivity, controls fade in on mouse movement.
+Same design language as the rest of the app: full-screen canvas, glassmorphic overlays, controls permanently visible unless fullscreen is active.
 
 **No changes to the main app or Preset Studio are required** beyond two one-liners (navigation links, already shipped — see Modified Files).
 
@@ -171,10 +219,13 @@ Same design language as the rest of the app: full-screen canvas, glassmorphic ov
 - **Zone settings popover not built**: clicking the zone label chip does nothing yet. It should open a popover for name, opacity, blend mode, gap behavior.
 - **Entry label overlay not rendered**: `entry.label` is stored and editable in quick-edit but not rendered on the canvas during playback.
 - **`presetLibrary.js` "Send to Timeline →"** one-liner not yet added.
+- **`#tl-quick-edit` styling needs visual polish**: size and padding are correct — controls must stay easy to see and hit. Issues are hierarchy and anchoring: "s" unit labels feel orphaned from their inputs; field labels and values have similar weight so values don't pop; Apply/Cancel styling doesn't match the app's glassmorphic language. Addressed in Phase 4.4 Phase A.
+
+---
 
 ## Current State — What's Built and Shipped
 
-All three phases are fully working. Here's an accurate picture of the running code:
+Phases 1 through 4.3 are fully working. Here's an accurate picture of the running code:
 
 ### Entry point
 `timeline.html` → `src/timeline/main.js` → `TimelineEditor` class in `src/timeline/timelineEditor.js`
@@ -184,9 +235,9 @@ All three phases are fully working. Here's an accurate picture of the running co
 2. `boot()` creates a full-screen canvas + primary `VisualizerEngine`
 3. `engine.refreshCustomPresets()` loads custom presets from localStorage
 4. `new TimelineEditor({ engine, canvasContainer })` initializes the editor
-5. Auto-hide timer starts immediately — controls fade after 3.5s of mouse inactivity
+5. Controls are permanently visible — auto-hide timer was removed in Phase 3
 
-### Zone system (Phase 3, complete)
+### Zone system (Phase 2–3, complete)
 - Every timeline has a `zones` array (default: single 'full' zone)
 - Each zone gets its own `<canvas>` and its own `VisualizerEngine` (slave)
 - Slave engines share the primary engine's `AudioContext` + `GainNode` — all canvases react to the same audio
@@ -209,9 +260,9 @@ All three phases are fully working. Here's an accurate picture of the running co
 - Zone rows stack vertically; height driven by JS setting `--strip-h` CSS var
 
 ### Block inline actions (Phase 3 UX, complete)
-Each block shows **Edit / Duplicate / Delete** icon buttons on hover — no hidden double-click or right-click required. Right-click context menu still works as secondary path.
+Each block shows **Edit / Duplicate / Delete** icon buttons on hover — no hidden double-click or right-click required. Right-click context menu still works as secondary path. These will be consolidated into the Block Action Modal in Phase 4.4.
 
-### Fullscreen button (Phase 3 UX, updated)
+### Fullscreen button (Phase 3 UX, complete)
 - Controls are **always visible** — auto-hide timer removed entirely
 - `#tl-fullscreen-btn` button in top-right corner (replaced the old `#tl-toggle-ui` pin button)
   - Click → hides all overlay controls and enters fullscreen (`_isFullscreen = true`)
@@ -324,7 +375,7 @@ The VJ mode rewrite in `707be41` removed gap blackouts ("VJ MODE: No fade-to-bla
 
 > These are the non-obvious facts a developer needs before touching this code.
 
-### `src/visualizer.js` IS modified (Phase 3 required it)
+### `src/visualizer.js` IS modified (Phase 2 required it)
 `initSlave(canvas, primaryEngine)` was added. It creates a new Butterchurn visualizer on `canvas` sharing the primary engine's audio graph (no new `AudioContext`). Sets `this._isSlaveEngine = true` which guards the render loop from running `updateAGC()`/gain management (primary handles it — slaves must not fight over the shared `GainNode`).
 
 ### `entry.startTime` is the source of truth for position
@@ -517,7 +568,7 @@ timeline.html
           #tl-tracks      — zone rows appended here by JS
           #tl-playhead    — absolute positioned, driven by rAF
     #tl-picker            — preset picker modal (All / Favorites / My Presets tabs)
-    #tl-quick-edit        — block settings popover (Duration, Blend, Label)
+    #tl-quick-edit        — block action modal (Duration, Blend, Label; expanding to Phase 4.4)
     #tl-ctx-menu          — right-click context menu (Duplicate, Delete)
     #tl-zone-mgr          — zone layout picker modal (6 tiles)
     #tl-delete-modal      — confirm delete timeline
@@ -542,8 +593,6 @@ Defined in `src/timeline/style.css` `:root`:
 | `--zone-col-w` | `120px` | Width of zone label column |
 
 ---
-
-## Phased Rollout
 
 ## Save & Naming UX Design
 
@@ -599,6 +648,3 @@ When switching timelines via the `<select>` while `_dirty`, a `confirm()` prompt
 | `_openSaveDialog()` | Pre-fills `#tl-save-name`, shows `#tl-save-modal`, focuses input |
 | `_closeSaveDialog()` | Hides `#tl-save-modal` |
 | `_executeSave()` | Reads name from dialog input, persists, updates `_timelines`, `_setClean()`, refreshes selector |
-
----
-
