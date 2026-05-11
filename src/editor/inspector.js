@@ -2555,6 +2555,10 @@ export class EditorInspector {
             pixelate: 0.00,        // pixelate/mosaic amount (0–1): 0=off, 1=maximum blockiness
             scanLines: 0.00,       // CRT scan lines intensity (0–1): 0=off, 1=full dark bands
             filmGrain: 0.00,       // animated noise overlay (0–1): 0=off, 1=heavy grain
+            // Border (video-only)
+            vidBorderWidth: 0.00,
+            vidBorderColor: '#ffffff',
+            vidBorderFeather: 0.00,
             // Audio reactivity (reused)
             opacityPulse: 0.00,
             audioPulse: 0.00,
@@ -2983,6 +2987,20 @@ export class EditorInspector {
                 value="${entry.type === 'video' ? Math.sqrt((entry.scale - 0.1) / 1.9).toFixed(3) : Math.sqrt((entry.size - 0.05) / 1.45).toFixed(3)}" style="--pct:${entry.type === 'video' ? (Math.sqrt((entry.scale - 0.1) / 1.9) * 100).toFixed(1) : (Math.sqrt((entry.size - 0.05) / 1.45) * 100).toFixed(1)}%">
               <span class="lsv layer-size-val">${entry.type === 'video' ? entry.scale.toFixed(2) : entry.size.toFixed(2)}</span>
             </div>
+            ${entry.type === 'video' ? `
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Horizontal scale multiplier">Width</span>
+              <input type="range" class="slider layer-vid-sx-sl" min="0" max="1" step="0.01"
+                value="${Math.sqrt((entry.tileScaleX - 0.25) / 3.75).toFixed(3)}" style="--pct:${(Math.sqrt((entry.tileScaleX - 0.25) / 3.75) * 100).toFixed(1)}%">
+              <span class="lsv layer-vid-sx-val">${entry.tileScaleX.toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Vertical scale multiplier">Height</span>
+              <input type="range" class="slider layer-vid-sy-sl" min="0" max="1" step="0.01"
+                value="${Math.sqrt((entry.tileScaleY - 0.25) / 3.75).toFixed(3)}" style="--pct:${(Math.sqrt((entry.tileScaleY - 0.25) / 3.75) * 100).toFixed(1)}%">
+              <span class="lsv layer-vid-sy-val">${entry.tileScaleY.toFixed(2)}</span>
+            </div>
+            ` : ''}
             <div class="layer-slider-row">
               <span class="layer-ctrl-label" data-tooltip="0 = square · 0.5 = circle">Radius</span>
               <input type="range" class="slider layer-radius-sl" min="0" max="0.5" step="0.01"
@@ -3197,6 +3215,29 @@ export class EditorInspector {
               <span class="lsv layer-img-hue-val">${(entry.imageHue ?? 0).toFixed(0)}°</span>
             </div>
             <div class="layer-section-divider"></div>
+            ${entry.type === 'video' ? `
+            <p class="layer-section-label">Border</p>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label">Width</span>
+              <input type="range" class="slider layer-vid-border-w-sl" min="0" max="1" step="0.01"
+                value="${Math.sqrt((entry.vidBorderWidth || 0) / 0.12).toFixed(3)}" style="--pct:${(Math.sqrt((entry.vidBorderWidth || 0) / 0.12) * 100).toFixed(1)}%">
+              <span class="lsv layer-vid-border-w-val">${(entry.vidBorderWidth || 0).toFixed(2)}</span>
+            </div>
+            <div class="layer-row-inline" style="gap:8px;margin-bottom:6px">
+              <span class="layer-ctrl-label">Color</span>
+              <div class="layer-vid-border-color-wrap">
+                <span class="layer-vid-border-swatch" style="background:${entry.vidBorderColor || '#ffffff'}"></span>
+                <input type="color" class="layer-vid-border-picker" value="${entry.vidBorderColor || '#ffffff'}" tabindex="-1" />
+              </div>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label">Feather</span>
+              <input type="range" class="slider layer-vid-border-feather-sl" min="0" max="1" step="0.01"
+                value="${(entry.vidBorderFeather || 0).toFixed(2)}" style="--pct:${((entry.vidBorderFeather || 0) * 100).toFixed(1)}%">
+              <span class="lsv layer-vid-border-feather-val">${(entry.vidBorderFeather || 0).toFixed(2)}</span>
+            </div>
+            <div class="layer-section-divider"></div>
+            ` : ''}
             <p class="layer-section-label">Visual Effects</p>
             <p class="layer-section-sub">Fluid color effects independent of audio.</p>
             <div class="layer-row-inline">
@@ -3564,6 +3605,59 @@ export class EditorInspector {
             refresh();
         });
 
+        // Video border — width, color, feather
+        const vidBorderWSl = card.querySelector('.layer-vid-border-w-sl');
+        const vidBorderWVal = card.querySelector('.layer-vid-border-w-val');
+        if (vidBorderWSl && vidBorderWVal) vidBorderWSl.addEventListener('input', () => {
+            const pos = parseFloat(vidBorderWSl.value);
+            const stored = 0.12 * pos * pos;
+            entry.vidBorderWidth = stored;
+            vidBorderWVal.textContent = stored.toFixed(2);
+            vidBorderWSl.style.setProperty('--pct', `${(pos * 100).toFixed(1)}%`);
+            refresh();
+        });
+        const vidBorderSwatch = card.querySelector('.layer-vid-border-swatch');
+        const vidBorderPicker = card.querySelector('.layer-vid-border-picker');
+        if (vidBorderSwatch && vidBorderPicker) {
+            vidBorderSwatch.addEventListener('click', () => vidBorderPicker.click());
+            vidBorderPicker.addEventListener('input', () => {
+                entry.vidBorderColor = vidBorderPicker.value;
+                vidBorderSwatch.style.background = vidBorderPicker.value;
+                refresh();
+            });
+        }
+        const vidBorderFeatherSl = card.querySelector('.layer-vid-border-feather-sl');
+        const vidBorderFeatherVal = card.querySelector('.layer-vid-border-feather-val');
+        if (vidBorderFeatherSl && vidBorderFeatherVal) vidBorderFeatherSl.addEventListener('input', () => {
+            const v = parseFloat(vidBorderFeatherSl.value);
+            entry.vidBorderFeather = v;
+            vidBorderFeatherVal.textContent = v.toFixed(2);
+            vidBorderFeatherSl.style.setProperty('--pct', `${(v * 100).toFixed(1)}%`);
+            refresh();
+        });
+
+        // Video width/height sliders — independent aspect ratio control (same math as tile sliders)
+        const vidSxSl = card.querySelector('.layer-vid-sx-sl');
+        const vidSxVal = card.querySelector('.layer-vid-sx-val');
+        if (vidSxSl && vidSxVal) vidSxSl.addEventListener('input', () => {
+            const pos = parseFloat(vidSxSl.value);
+            const stored = 0.25 + 3.75 * pos * pos;
+            entry.tileScaleX = stored;
+            vidSxVal.textContent = stored.toFixed(2);
+            vidSxSl.style.setProperty('--pct', `${(pos * 100).toFixed(1)}%`);
+            refresh();
+        });
+        const vidSySl = card.querySelector('.layer-vid-sy-sl');
+        const vidSyVal = card.querySelector('.layer-vid-sy-val');
+        if (vidSySl && vidSyVal) vidSySl.addEventListener('input', () => {
+            const pos = parseFloat(vidSySl.value);
+            const stored = 0.25 + 3.75 * pos * pos;
+            entry.tileScaleY = stored;
+            vidSyVal.textContent = stored.toFixed(2);
+            vidSySl.style.setProperty('--pct', `${(pos * 100).toFixed(1)}%`);
+            refresh();
+        });
+
         // Remaining slider rows — DOM order must match sliderKeys exactly:
         // opacity, spacing, orbitRadius, tunnelSpeed,
         // swayAmt, swaySpeed, wanderAmt, wanderSpeed, hueSpinSpeed
@@ -3572,7 +3666,7 @@ export class EditorInspector {
         const sliderMins = [0, 0, 0, -2, 0, 0, 0, 0, 0, 0];
         const sliderMaxes = [1, 0.8, 0.45, 2, 1, 0.4, 4, 0.4, 2, 2];
 
-        card.querySelectorAll('.layer-slider-row input[type=range]:not(.layer-bounce-sl):not(.layer-size-sl):not(.layer-liss-sl):not(.layer-strobe-thr-sl):not(.layer-pan-x-sl):not(.layer-pan-y-sl):not(.layer-pan-range-sl):not(.layer-beat-fade-sl):not(.layer-tile-sx-sl):not(.layer-tile-sy-sl):not(.layer-shake-sl):not(.layer-persp-x-sl):not(.layer-persp-y-sl):not(.layer-radius-sl):not(.layer-gif-speed-sl):not(.layer-gif-stability-sl):not(.layer-video-speed-sl):not(.layer-video-scrub-sl):not(.layer-font-size-sl):not(.layer-letter-spacing-sl):not(.layer-line-height-sl):not(.layer-shadow-blur-sl):not(.layer-shadow-x-sl):not(.layer-shadow-y-sl):not(.layer-outline-width-sl):not(.layer-kaleido-speed-sl)').forEach((sl, i) => {
+        card.querySelectorAll('.layer-slider-row input[type=range]:not(.layer-bounce-sl):not(.layer-size-sl):not(.layer-liss-sl):not(.layer-strobe-thr-sl):not(.layer-pan-x-sl):not(.layer-pan-y-sl):not(.layer-pan-range-sl):not(.layer-beat-fade-sl):not(.layer-tile-sx-sl):not(.layer-tile-sy-sl):not(.layer-vid-sx-sl):not(.layer-vid-sy-sl):not(.layer-vid-border-w-sl):not(.layer-vid-border-feather-sl):not(.layer-shake-sl):not(.layer-persp-x-sl):not(.layer-persp-y-sl):not(.layer-radius-sl):not(.layer-gif-speed-sl):not(.layer-gif-stability-sl):not(.layer-video-speed-sl):not(.layer-video-scrub-sl):not(.layer-font-size-sl):not(.layer-letter-spacing-sl):not(.layer-line-height-sl):not(.layer-shadow-blur-sl):not(.layer-shadow-x-sl):not(.layer-shadow-y-sl):not(.layer-outline-width-sl):not(.layer-kaleido-speed-sl)').forEach((sl, i) => {
             const valEl = sl.nextElementSibling;
             sl.addEventListener('input', () => {
                 const v = parseFloat(sl.value);
@@ -5072,9 +5166,9 @@ export class EditorInspector {
         const chromAmt = (img.chromaticAberration || 0).toFixed(4);
         const chromSpd = (img.chromaticSpeed !== undefined ? img.chromaticSpeed : 1.0).toFixed(4);
         const hasChromatic = parseFloat(chromAmt) > 0.001;
-        // Videos don't have independent tile scaling
-        const tileScaleX = isVideo ? '1.0' : (img.tileScaleX !== undefined ? img.tileScaleX : 1.0).toFixed(4);
-        const tileScaleY = isVideo ? '1.0' : (img.tileScaleY !== undefined ? img.tileScaleY : 1.0).toFixed(4);
+        // All layer types now support independent width/height scaling via tileScaleX/Y
+        const tileScaleX = (img.tileScaleX !== undefined ? img.tileScaleX : 1.0).toFixed(4);
+        const tileScaleY = (img.tileScaleY !== undefined ? img.tileScaleY : 1.0).toFixed(4);
         const angleDeg = (img.angle || 0);
         const angleRad = (angleDeg * Math.PI / 180).toFixed(6);
         const hasAngle = Math.abs(angleDeg) > 0.01;
@@ -5418,24 +5512,26 @@ export class EditorInspector {
                 applyRadius('_u', '_gapMask');
             sampleLine = `    vec4 _t = textureGrad(${tex}, _u, _dx, _dy);\n`;
         } else {
-            // Non-tiled: use same aspectPreScale as tiled, but show single instance (no fract wrapping)
-            // After scaling, check if UV is within [0,1] range of the first image instance
+            // Non-tiled: show single instance (no fract wrapping)
+            // aspectPreScale handles aspect ratio + tileScaleX/Y (width/height for videos)
+            // Center (_u=0) is never affected by any divisor — no drift possible
             const rotLines = hasSpin
                 ? `    float _ca = cos(_spinAng); float _sa = sin(_spinAng);\n` +
                 `    _u = vec2(_ca*_u.x - _sa*_u.y, _sa*_u.x + _ca*_u.y);\n`
                 : '';
             pipeline =
                 `    float _gapMask = 1.0;\n` +
-                aspectPreScale('_u') +  // Same as tiled: _u.x /= imgAsp * aspect.y
+                aspectPreScale('_u') +
                 `    _u /= ${sizeBase};\n` +
                 rotLines +
                 applySkew('_u') +
                 applyPersp('_u') +
-                `    vec2 _uInstanced = _u + 0.5;\n` +  // Center the UV (now range depends on aspect)
+                `    vec2 _uInstanced = _u + 0.5;\n` +
+                `    float _rd = 0.0;\n` +
                 `    { vec2 _rq = abs(_uInstanced - 0.5) - (0.5 - ${rad});\n` +
-                `      float _rd = length(max(_rq, 0.0)) + min(max(_rq.x, _rq.y), 0.0) - ${rad};\n` +
+                `      _rd = length(max(_rq, 0.0)) + min(max(_rq.x, _rq.y), 0.0) - ${rad};\n` +
                 `      _gapMask = 1.0 - smoothstep(-0.004, 0.004, _rd); }\n` +
-                `    _u = clamp(_uInstanced, 0.0, 1.0);\n` +  // Clamp for texture sampling
+                `    _u = clamp(_uInstanced, 0.0, 1.0);\n` +
                 applyMirrorUV('_u');
             sampleLine = `    vec4 _t = texture(${tex}, _u);\n`;
         }
@@ -5644,6 +5740,21 @@ export class EditorInspector {
                 ? `    float _alphaMask = step(0.1, _t.w);\n    float _op = _alphaMask * _gapMask * clamp(${op} + _r * ${opa}, 0.0, 1.0);\n`
                 : `    float _op = _t.w * _gapMask * clamp(${op} + _r * ${opa}, 0.0, 1.0);\n`) +
             `    ${blendLine}\n` +
+            // Video border ring: drawn outside video edge using signed distance _rd
+            (isVideo && (img.vidBorderWidth || 0) > 0.001 ? (() => {
+                const bw = (img.vidBorderWidth || 0).toFixed(4);
+                const bf = `max(${(img.vidBorderFeather || 0).toFixed(4)} * 0.04, 0.002)`;
+                const hex = img.vidBorderColor || '#ffffff';
+                const br = (parseInt(hex.slice(1,3),16)/255).toFixed(4);
+                const bg = (parseInt(hex.slice(3,5),16)/255).toFixed(4);
+                const bb = (parseInt(hex.slice(5,7),16)/255).toFixed(4);
+                return (
+                    `    { float _bf = ${bf};\n` +
+                    `      float _bOuter = 1.0 - smoothstep(${bw} - _bf, ${bw} + _bf, _rd);\n` +
+                    `      float _bMask = _bOuter * (1.0 - _gapMask);\n` +
+                    `      col = mix(col, vec3(${br}, ${bg}, ${bb}), _bMask); }\n`
+                );
+            })() : '') +
             // Screen overlay: applied immediately after this layer blends in,
             // so layers stacked above will render on top of it.
             (!img.vignette ? '' : (() => {

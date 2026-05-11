@@ -1454,3 +1454,60 @@ A tiered AI pipeline for extracting subjects from video (e.g., a bird from sky f
 **Division of labor:** Video Tool isolates and extracts → DiscoCast composites, animates, reacts to audio.
 
 New files when this is built: `src/processing/segmentEngine.js`, `onnxEngine.js`, `yoloSeg.js`, `efficientSam.js`.
+
+---
+
+## 21. Width/Height Sliders — ✅ COMPLETE (May 11, 2026)
+
+Independent Width and Height sliders for video layers. Uses existing `tileScaleX`/`tileScaleY` properties (already in video entry defaults). Shader non-tiled path uses `aspectPreScale()` which bakes both values into UV scaling. Center never drifts — dividing centered `_u` by any scalar leaves `_u=0` at center.
+
+**Key bug fixed:** New slider classes must always be added to the `:not()` exclusion list at `inspector.js` line 3611. See `width-height-video-bug.md`.
+
+---
+
+## 22. Video Border — Width / Color / Feather
+
+> **Status:** 📋 Planned — video only, no tiling involved
+
+A colored border ring drawn just outside the video quad edge. For video layers only.
+
+### Controls (video layer panel, after Width/Height sliders)
+
+| Control | Class | Property | Default | Range |
+|---|---|---|---|---|
+| Border Width | `layer-vid-border-w-sl` | `vidBorderWidth` | `0` | `0–0.1` UV units |
+| Border Color | `layer-vid-border-color` | `vidBorderR/G/B` | `1,1,1` (white) | color picker |
+| Border Feather | `layer-vid-border-feather-sl` | `vidBorderFeather` | `0` | `0–1` |
+
+### Entry Defaults (add to video entry init)
+```javascript
+vidBorderWidth: 0.00,
+vidBorderR: 1.00,
+vidBorderG: 1.00,
+vidBorderB: 1.00,
+vidBorderFeather: 0.00,
+```
+
+### How It Works — Shader
+The non-tiled pipeline already computes `_rd` (signed distance from video edge, negative inside, positive outside) for the `_gapMask` calculation. Promote `_rd` out of its `{}` block so it stays in scope. Then after the blend line:
+
+```glsl
+// Border ring — video-only, drawn after main blend
+{ float _bw = vidBorderWidth;
+  float _bf = max(vidBorderFeather * 0.02, 0.002);
+  float _borderOuter = 1.0 - smoothstep(_bw - _bf, _bw + _bf, _rd);
+  float _borderMask = _borderOuter * (1.0 - _gapMask);   // ring = outside video, within borderWidth
+  col = mix(col, vec3(vidBorderR, vidBorderG, vidBorderB), _borderMask); }
+```
+
+### Implementation Steps
+1. Add 3 controls to video layer HTML (after Height slider)
+2. Add event handlers — Width and Feather: standard `layer-vid-*-sl` pattern; Color: color picker like existing vignette color picker
+3. Add both new slider classes to the `:not()` exclusion list at line 3611
+4. Promote `_rd` to outer scope in the non-tiled shader path (remove wrapping `{}`)
+5. Emit border blend code after `blendLine` for video layers only
+
+### Reference: Similar Existing Features
+- Vignette overlay (`img.vignette`) — color picker + shape, appended after blendLine (~line 5686)
+- Radius slider (`layer-radius-sl`) — also uses `_rd` for corner rounding
+- Generic slider exclusion pattern — always add new video slider classes to `:not()` list at line 3611
