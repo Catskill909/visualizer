@@ -1,6 +1,6 @@
 # Timeline Editor — Design & Planning Doc
 
-**Status:** Phases 1–4.3 complete ✅ — 4.4 (Block Action Modal) → 4.5 (Double-click Cue & Loop) → 4.6 (Overlap Crossfade) → 4.7 (Undo/Redo) — Phase 5 in research (Multi-monitor output). Performance Panel deferred until video processing controls are built out.  
+**Status:** Phases 1–4.3 complete ✅ — 4.4 (Block Action Modal) → 4.5 (Double-click Cue) → 4.6 (Overlap Crossfade) → 4.7 (Undo/Redo) — Phase 5 in research (Multi-monitor output). Loop & Loop Solo transport buttons planned (Phase 3.5 addition). Performance Panel deferred until video processing controls are built out.  
 **Last updated:** 2026-05-11  
 **Architecture:** Standalone page (`/timeline.html`) — self-contained MPA entry in Vite.
 
@@ -75,6 +75,26 @@ A classic NLE playhead: click-to-seek, persistent position, play-from-here. This
 - **Transition / Fade System**: Replaced `display: none/block` cover toggling with an extensible opacity-based `_fadeZoneCover` helper.
 - **Automated Crossfades**: Zones automatically fade in from black after gaps, and fade out to black before gaps (based on `blendTime`). Scrubbing instantly snaps without visual lag.
 
+#### Planned addition — Loop & Loop Solo transport buttons
+
+Two transport buttons that give VJ-style loop control without locking out any other navigation. Neither is a hard lock — any deliberate gesture breaks out cleanly.
+
+- **Loop** — loops the current playhead section across all zones simultaneously. Every track and stream output loops together as one. Any transport action (cue point hit, prev/next block, scrub, play-from-here, another Loop/Loop Solo) overrides and exits the loop.
+- **Loop Solo** — loops only the active preset in its zone; all other zones continue normally. The VJ can use this to hold a single preset on repeat — as a live performance choice, not just a scheduling one — while other zones idle. Moving to another Loop or Loop Solo, hitting a cue point, or any prev/next navigation overrides it. The last Loop or Loop Solo activated always wins.
+
+**Override contract:** both buttons are sticky but not exclusive. The user can move freely between Loop, Loop Solo, and normal playback. A cue point, block navigation, or scrub always wins regardless of loop state.
+
+**⚠️ Critical implementation requirement — cancelable loop handle**
+
+Butterchurn `loadPreset` and the CSS cover system both handle rapid switching safely (each new call displaces the last one cleanly). The risk specific to Loop/Loop Solo is the repeat timer: if the loop cycle uses a recursive `setTimeout` and that handle is not tracked and cleared, rapid clicking can leave orphaned loop callbacks firing after the user has already moved on to a different preset or transport state.
+
+The loop repeat handle must be:
+- Stored in a dedicated slot (e.g. `_loopTimer`, separate from `_zoneTimers` which tracks scheduled block transitions)
+- Cancelled at the top of every override path: another Loop/Loop Solo activation, any block navigation, cue point hit, scrub, or stop
+- Never reused — always assign a fresh handle after clearing the old one
+
+Do not patch this after the fact. Design the cancel path before writing the repeat logic.
+
 ---
 
 ### Phase 4 — Advanced show features 🔧 IN PROGRESS
@@ -135,15 +155,17 @@ The existing `#tl-quick-edit` popover IS this modal — no new DOM node needed. 
 
 ---
 
-**⚡ Phase 4.5 — Double-click to Cue and Loop**
+**⚡ Phase 4.5 — Double-click to Cue**
 
-Double-click any block to immediately load that preset into its zone engine and fade it in using the existing `blendTime` + `_fadeZoneCover` transition — the same code path as a normal block transition, just triggered by gesture instead of the scheduler. The preset loops continuously until the timeline advances or the user triggers another block.
+Double-click any block to immediately load that preset into its zone engine and fade it in using the existing `blendTime` + `_fadeZoneCover` transition — the same code path as a normal block transition, just triggered by gesture instead of the scheduler.
 
 This makes presets **playable**: a VJ brings a preset in live with a smooth fade, the same way a DJ cues a track. The timeline becomes an instrument, not just a scheduler.
 
+Looping after a cue is handled by the **Loop / Loop Solo transport buttons** (Phase 3.5 addition) and the **"Loop This"** action in the Block Action Modal (Phase 4.4-C) — not by this gesture.
+
 **Why here (after 4.4):** Phase 4.4 leaves the block UI clean and well-targeted. Double-click is the natural next gesture — and because it reuses `_fadeZoneCover` and `engine.loadPreset()` already in place, the implementation is minimal.
 
-**Technical path:** `engine.loadPreset(entry.presetName, entry.blendTime)` + `_fadeZoneCover(zoneId, 0, entry.blendTime)` + activate loop range to block bounds. No new infrastructure.
+**Technical path:** `engine.loadPreset(entry.presetName, entry.blendTime)` + `_fadeZoneCover(zoneId, 0, entry.blendTime)`. No loop activation — the user reaches for Loop or Loop Solo in the transport if they want to hold.
 
 
 **⚡ Phase 4.6 — Overlap-driven Crossfade Timing**
