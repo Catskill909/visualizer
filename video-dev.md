@@ -1007,10 +1007,10 @@ Building it once unlocks an entire category of temporal effects.
 
 ---
 
-## 16. Future Development — Video Clip Editor / Sampler
+## 16. Video Clip Editor / Sampler — Background Brainstorm
 
-> **Status:** 📋 **Brainstorm** — Way down the roadmap, not prioritized  
-> **Idea:** Modal-based video editor for trimming, clip selection, and transcode settings
+> **Status:** 📋 **Superseded by §17** — Architectural decisions made May 10, 2026  
+> **See:** §17 (Clipper refined spec), §18 (GIF→WebM), §19 (Export formats), §20 (AI future)
 
 ### 16.1 Vision: Video Sampler Mode
 
@@ -1152,4 +1152,305 @@ Pure video editing — NO processing/beat detection (already in app). Just clip 
 
 ---
 
-*Document created for brainstorming session.* Simplified spec reflects May 7, 2026 discussion — no tiling, single-quad video layers with mirror-based duplication. VJ effects brainstorm added May 8, 2026. Performance monitoring section added May 9, 2026. Video clip editor brainstorm added May 9, 2026.*
+*Document created for brainstorming session.* Simplified spec reflects May 7, 2026 discussion — no tiling, single-quad video layers with mirror-based duplication. VJ effects brainstorm added May 8, 2026. Performance monitoring section added May 9, 2026. Video clip editor brainstorm added May 9, 2026. Clipper refined spec + GIF→WebM added May 10, 2026.*
+
+---
+
+## 17. Clipper — `/clipper.html` — Refined Spec
+
+> **Status:** 📋 **Active Planning**  
+> **Decision:** Integrated directly into the DiscoCast project — not a separate app.
+
+### 17.1 Architectural Decision
+
+The clipper lives inside `winamp-screen/` as a new page. It shares the same Vite build, FFmpeg.wasm instance, COOP/COEP headers, and IndexedDB infrastructure. No new repo, no separate toolchain.
+
+```
+winamp-screen/
+├── clipper.html             ← NEW: the trimmer page
+├── src/
+│   ├── clipper/
+│   │   ├── clipper.js       ← NEW: clipper UI logic
+│   │   └── clipper.css      ← NEW: clipper styles
+│   └── videoTranscoder.js   ← MODIFY: add trimSegment() + GIF→WebM path
+```
+
+**Existing files NOT modified for Phase 1:**
+- `vite.config.js` — COOP/COEP headers already configured ✅
+- `src/customPresets.js` — IndexedDB storage used as-is ✅
+- `src/editor/inspector.js` — only adds one "Import from Clipper" button ✅
+
+### 17.2 How It's Invoked
+
+Two entry points from the Preset Studio:
+
+1. **"✂️ Import from Clipper"** — added to the existing "📎 Add video" button on video layers
+2. **Direct URL** — `/clipper.html` can also be opened standalone
+
+Opened as a new tab (`window.open('/clipper.html?layerId=X')`) — avoids iframe COEP complexity. On completion the clip returns via `postMessage`:
+
+```javascript
+// clipper.html → editor.html
+window.opener?.postMessage({ type: 'clip-ready', layerId, clipBlob }, '*');
+```
+
+Blob URL is revoked only after `postMessage` is confirmed received.
+
+### 17.3 UX Philosophy — Big Buttons, Single Purpose
+
+One job: drop video, mark In/Out, add to layer. Nothing else.
+
+- **Massive drop zone** — full-width on open, collapses once file loads
+- **One big play button** — centered, unmistakable
+- **Two big marker buttons** — `[ SET IN ]` and `[ SET OUT ]` — keyboard + click
+- **One big action button** — `[ ✅ ADD TO PRESET LAYER ]`
+
+### 17.4 UI Layout
+
+```
+╔══════════════════════════════════════════════════════════════╗
+║                    🎬 CLIP IMPORTER                          ║
+╠══════════════════════════════════════════════════════════════╣
+║           ╔══════════════════════════════╗                   ║
+║           ║      VIDEO PREVIEW           ║                   ║
+║           ║      (HTML5 <video>)         ║                   ║
+║           ╚══════════════════════════════╝                   ║
+║                                                              ║
+║   ─────────────────────[▶]─────────────────────────────     ║  ← scrubber
+║   0:00                                              5:23     ║
+║                                                              ║
+║   ╔══════════════╗   0:04 ──────── 0:18   ╔══════════════╗  ║
+║   ║   SET IN  I  ║       14 sec           ║   SET OUT O  ║  ║
+║   ╚══════════════╝                        ╚══════════════╝  ║
+║                                                              ║
+║   ──────[IN]══════════════════════════[OUT]──────────────   ║  ← timeline
+║                                                              ║
+║   ╔══════════════════════════════════════════════════════╗  ║
+║   ║              ✅  ADD TO PRESET LAYER                 ║  ║
+║   ╚══════════════════════════════════════════════════════╝  ║
+╚══════════════════════════════════════════════════════════════╝
+```
+
+### 17.5 Keyboard Shortcuts
+
+| Key | Action |
+|---|---|
+| `Space` | Play / Pause |
+| `J` | Rewind |
+| `L` | Fast forward |
+| `I` | Set In point |
+| `O` | Set Out point |
+| `←` / `→` | Nudge playhead ±1 frame |
+| `Enter` | Add to Preset Layer |
+
+### 17.6 Tech Stack
+
+| Tech | Purpose | Note |
+|---|---|---|
+| HTML5 `<video>` | Playback | `playsInline` + `muted` required — see §14 |
+| Canvas API | Timeline thumbnail strip, scrubber | No audio waveform — visuals only |
+| FFmpeg.wasm | Trim, encode, GIF→WebM | Already in DiscoCast — same lazy-load |
+| MediaInfo.js | Fast metadata on drop | Duration, resolution, codec before FFmpeg loads (~1.5MB WASM) |
+
+> **No WaveSurfer.js.** The clipper is for finding visual cut points, not audio cues. A canvas thumbnail strip is sufficient and consistent with the visual-first use case.
+
+### 17.7 Design Tokens (Matches DiscoCast)
+
+```
+Background:  #0A0A0F   (same as DiscoCast)
+Surface:     #141420
+Accent:      #7C5CFC   (DiscoCast violet — continuity)
+Accent2:     #00E5FF   (cyan — playhead + info)
+In Marker:   #00FF88   (green)
+Out Marker:  #FF4466   (red)
+Text:        #E8E8F0
+Muted:       #5A5A7A
+```
+
+### 17.8 Phase 1 Checklist
+
+- [ ] `clipper.html` in project root
+- [ ] `src/clipper/clipper.js` — video element, play/pause, scrubber
+- [ ] Canvas thumbnail strip on timeline
+- [ ] MediaInfo.js — metadata display on file drop
+- [ ] In/Out marker controls (`I`/`O` keyboard + click buttons)
+- [ ] `videoTranscoder.js` — add `trimSegment(start, duration)` function
+- [ ] GIF → WebM conversion path in `videoTranscoder.js` (see §18)
+- [ ] `postMessage` from clipper → `inspector.js` listener
+- [ ] "✂️ Import from Clipper" button on video layer in Preset Studio
+- [ ] 720p guard on output (reuse existing `transcodeTo720p`)
+- [ ] Progress toast during FFmpeg processing (reuse existing toast system)
+- [ ] Blob URL revoked only after `postMessage` confirmed received
+
+---
+
+## 18. GIF → WebM Conversion
+
+> **Status:** 📋 **Planned for Phase 1** — Add to `videoTranscoder.js`  
+> **Value:** Converts messy internet GIFs into clean, speed-controllable WebM loops for DiscoCast
+
+### 18.1 Why GIF Speed Control Is Hard
+
+The GIF spec stores frame timing as integers in **centiseconds** (1/100th of a second):
+
+| Problem | What Happens |
+|---|---|
+| **Coarse timing** | 10ms increment only — 30fps needs 33.33ms, rounds to 30ms or 40ms → judder |
+| **0ms delay** | Chrome renders 0ms as 10ms, Firefox as 100ms — same GIF, different speeds |
+| **No global FPS** | Every frame has its own delay, or none. Speed control must rebuild the entire frame schedule |
+| **Encoding history** | Internet GIFs are often through Photoshop → Twitter → re-upload. Each pass corrupts timing |
+
+This is why `gifuct-js` does so much work — and why speed control still fights the source material.
+
+### 18.2 Why WebM Is Better for DiscoCast
+
+| Property | GIF | WebM |
+|---|---|---|
+| **Speed control** | Re-parse frame schedule, rebuild timing | `video.playbackRate = 0.5` — one line |
+| **Color depth** | 256 colors (palette) | Full 24-bit |
+| **File size** | Large | Much smaller at same quality |
+| **Alpha channel** | Binary on/off | Full alpha (VP9 `yuva420p`) |
+| **Browser consistency** | Varies widely | Consistent video decode pipeline |
+
+### 18.3 Conversion Workflow
+
+```
+Drag GIF into Clipper
+    │ (FFmpeg.wasm: normalize frame rate, fix timing, preserve alpha)
+    ▼
+Preview + set In/Out
+    │
+    ▼
+Export as WebM VP9 (30fps, proper frame rate)
+    │
+    ▼
+Drag into DiscoCast as video layer
+    │ (playbackRate control, smooth loops, full color, alpha support)
+    ▼
+Reacts to audio — smooth, consistent, predictable
+```
+
+### 18.4 FFmpeg Command
+
+```
+ffmpeg -i input.gif -c:v libvpx-vp9 -b:v 0 -crf 30 -pix_fmt yuva420p -r 30 output.webm
+```
+
+- `-r 30` normalizes frame rate to 30fps regardless of source timing
+- `-pix_fmt yuva420p` preserves GIF transparency as proper WebM alpha
+- `-crf 30` quality-based encoding — no bitrate cap
+
+**Trigger:** On file drop in the clipper, detect GIF and convert immediately. Work with WebM internally. User never sees the intermediate.
+
+### 18.5 Strategy
+
+| Use case | Format |
+|---|---|
+| Import GIF from internet | Convert to WebM on import — use WebM in DiscoCast |
+| Need transparency (silhouette) | WebM VP9 `yuva420p` — Chrome/Windows only (see §19) |
+| Share outside DiscoCast | GIF (universal) |
+| Maximum quality/smoothness in DiscoCast | WebM always |
+
+---
+
+## 19. Export Format Decision (Cross-Platform Safe)
+
+> Cross-platform video quirks (WKWebView `playsInline`, blob URL lifecycle, SharedArrayBuffer) are already solved in DiscoCast — §14 covers the established patterns. The clipper inherits those fixes directly.
+
+| Export Type | Web Chrome | Web Safari | Mac Tauri | Win Tauri | v0.1–0.3 Plan |
+|---|---|---|---|---|---|
+| **MP4 H.264, no alpha** | ✅ | ✅ | ✅ | ✅ | **Default export** |
+| **WebM VP9, no alpha** | ✅ | ✅ | ⚠️ | ✅ | Secondary option |
+| WebM VP9, with alpha | ✅ | 🔴 | 🔴 | ✅ | Defer to v0.5+ |
+| Animated GIF | ✅ | ✅ | ✅ | ✅ | For legacy/sharing |
+
+**v0.1–v0.3 safe strategy:** MP4 H.264 as default. GIF as legacy/share target. WebM alpha deferred — Safari and Mac WKWebView don't support VP9 alpha; HEVC alpha export requires macOS hardware encoder not available in FFmpeg.wasm.
+
+---
+
+## 21. Layer Processing Panel — New Sliders in Preset Studio
+
+> **Status:** 📋 **Planned — Phase 2** (after clipper ships)  
+> **Where:** New collapsible section in `src/editor/inspector.js`, video layer controls only  
+> **Pattern:** Same 4-step pattern as Luma Key, Wave Distort, Shape Overlay — no new architecture
+
+### 21.1 What It Is
+
+A new **"Subject Isolation"** accordion section added directly to the existing video layer controls — not a separate tool. Slots in identically to how Audio Reactivity, Shape Overlay, and Visual Effects already slot in.
+
+### 21.2 The 4-Step Pattern (Existing — Reuse Exactly)
+
+Every new control follows the exact same pattern already proven by Luma Key, Wave Distort, and Shape Overlay:
+
+```javascript
+// 1. Add default to layer state
+entry.isolationMode = 'none';  // 'none' | 'chroma' | 'diff' | 'grabcut' | 'yolo' | 'sam'
+entry.isolationStrength = 1.0;
+
+// 2. Add UI in _buildLayerControls() — reuse existing slider/select builders
+html += this._buildSlider('Strength', 'isolationStrength', 0, 1, entry);
+html += this._buildSelect('Mode', 'isolationMode', ['none','chroma','diff','grabcut','yolo','sam'], entry);
+
+// 3. Wire event → refresh() — same as every other control
+card.querySelector('[data-prop="isolationStrength"]').addEventListener('input', e => {
+  entry.isolationStrength = parseFloat(e.target.value);
+  this._refresh();
+});
+
+// 4. Add GLSL or canvas processing in _buildImageBlock() or a canvas pass
+```
+
+### 21.3 Canvas-First Effects (No AI, Phase 2)
+
+These require no external libraries — just canvas `getImageData()` or GLSL:
+
+| Effect | How | Notes |
+|---|---|---|
+| **Chroma Key** | GLSL hue/sat range cut | Planned in DiscoCast backlog — color greenscreen/bluescreen |
+| **Frame Differencing** | `canvas.getImageData()` diff vs background frame | Motion isolation — moving subject vs static background |
+| **Blur Background** | Canvas convolution outside mask | Simulated bokeh — depth separation |
+| **Desaturate Background** | Canvas color math outside mask | B&W background, vivid subject |
+| **Background Replace** | Solid color/gradient fill outside mask | Match DiscoCast preset palette |
+
+### 21.4 Subject Processing Effects (Once Any Mask Is Established)
+
+These apply *after* any isolation method — canvas tools, YOLO, or SAM:
+
+| Effect | Description | DiscoCast Use |
+|---|---|---|
+| **Spotlight / Vignette** | Darken everything outside the subject | Dramatic focus — pairs with Shape Overlay |
+| **Blur Background** | Simulated bokeh | Depth separation on the layer |
+| **Desaturate Background** | Color only on subject | High contrast — B&W bg, vivid subject |
+| **Crop to Subject** | Re-frame around subject, trim black space | Tight loop for small layer slot |
+| **Subject Extract** | Export subject only with transparency | Layer blending in Preset Studio |
+| **Background Replace** | Swap bg with solid color or gradient | Match DiscoCast preset palette |
+| **Motion Trail** | Ghosting behind fast-moving subject | Psychedelic VJ layer |
+
+### 21.5 Phase 2 Checklist
+
+- [ ] New "Subject Isolation" collapsible section in `inspector.js` video layer controls
+- [ ] Chroma Key — hue/sat range picker, GLSL cut
+- [ ] Frame Differencing — motion mask from `canvas.getImageData()`
+- [ ] Blur Background — canvas convolution outside mask
+- [ ] Desaturate Background — canvas color math outside mask
+- [ ] Export with baked-in effect — FFmpeg assembles processed frames into output clip
+
+---
+
+## 20. Subject Isolation — Future Phase (Brief)
+
+> **Status:** 📋 **Not prioritized** — concept only until Phase 1 clipper is stable
+
+A tiered AI pipeline for extracting subjects from video (e.g., a bird from sky footage). Each tier falls back gracefully:
+
+| Tier | Tech | What it does | Effort |
+|---|---|---|---|
+| **0** | Canvas | Luma Key + Chroma Key + Frame Differencing | Already in DiscoCast |
+| **1** | OpenCV.js WASM (~8MB) | GrabCut (draw rect → mask), optical flow | Medium |
+| **2** | ONNX + YOLOv8-nano-seg (~14MB) | Auto pixel mask for known classes (bird, person...) | Medium |
+| **3** | ONNX + EfficientSAM (~25MB) | Click any point → pixel-perfect mask | Medium-Large |
+| **4** | SAM2 (50–100MB, WebGPU only) | Click once → mask propagated across all frames | Large |
+
+**Division of labor:** Video Tool isolates and extracts → DiscoCast composites, animates, reacts to audio.
+
+New files when this is built: `src/processing/segmentEngine.js`, `onnxEngine.js`, `yoloSeg.js`, `efficientSam.js`.
