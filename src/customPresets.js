@@ -112,7 +112,7 @@ export function registryKey(preset) {
 }
 
 // ---------------------------------------------------------------------------
-// IndexedDB — image blobs
+// IndexedDB — private helpers (web path; also used as lazy-migration fallback)
 // ---------------------------------------------------------------------------
 
 function openImageDB() {
@@ -129,7 +129,7 @@ function openImageDB() {
     });
 }
 
-export async function storeImage(imageId, blob) {
+async function _storeImageIDB(imageId, blob) {
     const db = await openImageDB();
     return new Promise((resolve, reject) => {
         const tx = db.transaction('images', 'readwrite');
@@ -139,7 +139,7 @@ export async function storeImage(imageId, blob) {
     });
 }
 
-export async function getImage(imageId) {
+async function _getImageIDB(imageId) {
     const db = await openImageDB();
     return new Promise((resolve, reject) => {
         const tx = db.transaction('images', 'readonly');
@@ -149,7 +149,7 @@ export async function getImage(imageId) {
     });
 }
 
-export async function deleteImage(imageId) {
+async function _deleteImageIDB(imageId) {
     const db = await openImageDB();
     return new Promise((resolve, reject) => {
         const tx = db.transaction('images', 'readwrite');
@@ -157,6 +157,72 @@ export async function deleteImage(imageId) {
         tx.oncomplete = resolve;
         tx.onerror = (e) => reject(e.target.error);
     });
+}
+
+// ---------------------------------------------------------------------------
+// Tauri native FS — private helpers (macOS + Windows app path)
+// ---------------------------------------------------------------------------
+
+async function _storeImageTauri(imageId, blob) {
+    const arr = await blob.arrayBuffer();
+    const bytes = new Uint8Array(arr);
+    // Chunked encode — btoa(String.fromCharCode(...bigArray)) overflows stack on large files
+    let binary = '';
+    const CHUNK = 65536;
+    for (let i = 0; i < bytes.byteLength; i += CHUNK) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, Math.min(i + CHUNK, bytes.byteLength)));
+    }
+    await window.__TAURI__.invoke('store_blob', { imageId, data: btoa(binary), mime: blob.type || '' });
+}
+
+async function _getImageTauri(imageId) {
+    const result = await window.__TAURI__.invoke('get_blob', { imageId });
+    if (!result) return null;
+    const binary = atob(result.data);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    return new Blob([bytes], { type: result.mime });
+}
+
+async function _deleteImageTauri(imageId) {
+    await window.__TAURI__.invoke('delete_blob', { imageId });
+}
+
+// ---------------------------------------------------------------------------
+// Public API — routes to Tauri FS or IndexedDB based on runtime environment
+// ---------------------------------------------------------------------------
+
+export async function storeImage(imageId, blob) {
+    if (window.__TAURI__) return _storeImageTauri(imageId, blob);
+    return _storeImageIDB(imageId, blob);
+}
+
+export async function getImage(imageId) {
+    if (window.__TAURI__) {
+        const blob = await _getImageTauri(imageId);
+        if (blob) return blob;
+        // Lazy migration: blob not yet in Tauri FS — check IDB (pre-Fix-3B storage).
+        // If found, copy to Tauri FS in the background and return it.
+        const idbBlob = await _getImageIDB(imageId).catch(() => null);
+        if (idbBlob) {
+            _storeImageTauri(imageId, idbBlob).catch(() => {});
+            return idbBlob;
+        }
+        return null;
+    }
+    return _getImageIDB(imageId);
+}
+
+export async function deleteImage(imageId) {
+    if (window.__TAURI__) {
+        // Delete from both locations — handles blobs in either Tauri FS or IDB
+        await _deleteImageTauri(imageId).catch(() => {});
+        await _deleteImageIDB(imageId).catch(() => {});
+        return;
+    }
+    return _deleteImageIDB(imageId);
 }
 
 function dataUrlToBlob(dataUrl) {

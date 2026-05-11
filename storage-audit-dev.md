@@ -1,6 +1,6 @@
 # Storage Audit & Hardening — Dev Doc
 
-**Status:** 🔄 In progress — Fixes 1 & 2 shipped May 11, 2026. Fix 3A (health check) and 3B (Tauri native FS) still pending.
+**Status:** ✅ All fixes shipped May 11, 2026. Requires `./build-and-sign.sh` to deploy Fix 3B to macOS app.
 
 ---
 
@@ -175,46 +175,96 @@ On Preset Studio boot (when `window.__TAURI__`), after library initializes, run 
 
 ---
 
-### Fix 3B — Tauri native FS for blob storage 📋 Pending (requires macOS build)
+### Fix 3B — Tauri native FS for blob storage ✅ Shipped May 11, 2026 (requires `./build-and-sign.sh` to deploy)
 
-**Files:** `src-tauri/src/main.rs`, `src/customPresets.js`
+**Files changed:** `src-tauri/src/main.rs`, `src/customPresets.js`
 
-**Rust commands to add** (raw binary file + `.mime` sidecar per blob):
+**Rust — 3 new commands added to `main.rs`:**
 
-```rust
-store_blob(app, image_id, data: base64 String, mime: String) → Result<(), String>
-get_blob(app, image_id) → Result<Option<{data: base64, mime}>, String>
-delete_blob(app, image_id) → Result<(), String>
-```
+- `store_blob(app, image_id, data, mime)` — decodes base64 `data`, writes raw bytes to `{app_data_dir}/images/{imageId}`, writes mime string to `{app_data_dir}/images/{imageId}.mime`. Creates `images/` dir if needed.
+- `get_blob(app, image_id)` → `Option<BlobResult { data: base64, mime }>` — returns `None` if file doesn't exist; reads raw bytes, base64-encodes, reads mime sidecar.
+- `delete_blob(app, image_id)` — deletes both `{imageId}` and `{imageId}.mime` if they exist; silent success if already gone.
 
-Storage path: `{app_data_dir}/images/{imageId}` (raw bytes) + `{app_data_dir}/images/{imageId}.mime` (mime type string). Files in `app_data_dir()` are under the app's sandboxed container — macOS never evicts them.
+All three registered in `tauri::generate_handler![]`. `BlobResult` struct added with `#[derive(serde::Serialize)]`. No `Cargo.toml` changes — `base64 = "0.21"` and `serde` with derive were already present.
 
-**JS routing in `src/customPresets.js`:** `storeImage`, `getImage`, `deleteImage` branch on `window.__TAURI__`. Web path (IndexedDB) is unchanged.
+**JS — `src/customPresets.js` refactored:**
 
-**Base64 encode/decode must be chunked** — `btoa(String.fromCharCode(...bigArray))` overflows the call stack on 50MB+ video blobs. Use a loop with 64KB chunks.
+The three public functions (`storeImage`, `getImage`, `deleteImage`) are now thin routers. The IDB logic was extracted into private `_storeImageIDB`, `_getImageIDB`, `_deleteImageIDB`. Three Tauri helpers were added: `_storeImageTauri`, `_getImageTauri`, `_deleteImageTauri`.
 
-**Migration required:** Existing Tauri app users have blobs in IndexedDB. Fix 3B must include a one-time migration (`migrateIDBBlobsToTauri()`) that runs on first launch after the update, reads all imageIds from custom preset metadata, fetches each from IndexedDB, and writes to Tauri FS. Sets `discocast_idb_migrated_v1` in localStorage when complete. Without this, existing presets with image layers silently break on upgrade.
+- `storeImage` → Tauri FS if `window.__TAURI__`, else IDB
+- `getImage` → try Tauri FS first; if null, fall back to IDB (lazy migration: if found in IDB, copy to Tauri FS fire-and-forget, return blob). Self-extinguishing — once a blob is in Tauri FS the IDB fallback is never reached again.
+- `deleteImage` → both Tauri FS and IDB (belt-and-suspenders — handles blobs in either location regardless of migration state)
 
-**No `tauri.conf.json` changes needed** — the Rust commands use `std::fs` directly; the JS-side FS allowlist only applies to `@tauri-apps/api/fs` calls, not custom Rust commands.
+**Base64 encoding is chunked** — 64KB chunks prevent call stack overflow on 50MB+ video blobs.
 
-**Applies to both macOS and Windows** — `window.__TAURI__` is true in both apps. Windows doesn't need it but benefits equally. One implementation covers both.
+**No `tauri.conf.json` changes** — Rust `std::fs` bypasses the JS-side FS allowlist entirely.
 
-**Required after implementation:** `./build-and-sign.sh` for macOS. GitHub Actions Windows build.
+**Applies to both macOS and Windows** — `window.__TAURI__` is true in both Tauri apps. Web is unchanged.
+
+**Migration:** Lazy and automatic — no startup block, no migration function. Blobs move from IDB to Tauri FS the first time each preset is loaded after the update.
+
+**To deploy:** Run `./build-and-sign.sh` for macOS. Trigger GitHub Actions for Windows.
 
 ---
 
-## 7. Ship Status
+---
+
+## 8. Pre-existing Blob Cleanup Bugs
+
+Discovered during Fix 3B audit. Both bugs exist before any Fix 3B work and are independent of it. Fix before implementing Fix 3B so the native FS path inherits correct deletion behavior.
+
+### Bug 1 — videoId blobs never deleted on preset delete ✅ FIXED May 11, 2026
+
+**File:** `src/controls.js:642`
+
+Only `img.imageId` was checked. `img.videoId` was never passed to `deleteImage` — every video blob was permanently orphaned when a preset was deleted.
+
+**Fix shipped:** `img.videoId || img.imageId` as the lookup key. A preset image entry has either `imageId` (image/GIF) or `videoId` (video), never both — the `||` handles both types correctly.
+
+---
+
+### Bug 2 — preset delete from Studio Library orphaned all blobs ✅ FIXED May 11, 2026
+
+**File:** `src/editor/presetLibrary.js` — `_startDelete()` countdown handler
+
+The Studio Library countdown delete called `deleteCustomPreset(id)` but never `deleteImage`. All blobs were orphaned. `deleteImage` was not imported.
+
+**Fix shipped:**
+1. Added `deleteImage` to the import from `../customPresets.js`
+2. In the countdown handler, preset record is read *before* `deleteCustomPreset` (once metadata is gone the imageIds are unreachable), then fire-and-forget `deleteImage` for each `videoId`/`imageId`
+3. Timer callback remains synchronous — cleanup is fire-and-forget `.catch(() => {})`
+
+---
+
+### Why blob storage is the right architecture (video)
+
+The question of whether presets should store a file path reference instead of copying the video blob was evaluated. File paths were ruled out:
+
+- **Web app cannot read arbitrary file paths** — browser security model
+- **Paths break on file move/rename** — silent breakage, no recovery
+- **Paths are useless across devices** — export/import and `.dcshow.json` timeline bundles require self-contained data
+- **Blob inlining enables full portability** — export a preset on Mac, import on Windows, all layers work
+
+The only downside to blobs is eviction on macOS (Fix 3B) and export file size (Fix 2, shipped). Both are addressed. Blob storage is the correct choice.
+
+**Transcoding note:** 1080p/4K videos are auto-transcoded to 720p on upload. The stored blob is already 720p; the original file is not preserved. If lossless storage of originals is ever needed, a future "skip transcode" option would be the right mechanism — not a change to the storage architecture.
+
+---
+
+## 9. Fix Ship Status
 
 | Fix | Status | Date | Notes |
 |-----|--------|------|-------|
 | Fix 1 — localStorage quota guard | ✅ Shipped | May 11, 2026 | 3 sites: `saveCustomPreset`, `saveTimeline`, `_startRename` |
 | Fix 2 — Export size warning | ✅ Shipped | May 11, 2026 | Lives in `fileUtils.js:downloadFile()`, 50MB threshold |
-| Fix 3A — Health check banner | 📋 Pending | — | JS only, no build needed |
-| Fix 3B — Tauri native FS | 📋 Pending | — | Requires Rust changes + `build-and-sign.sh` |
+| Bug 1 — videoId never deleted | ✅ Shipped | May 11, 2026 | `controls.js:642` — `img.videoId \|\| img.imageId` |
+| Bug 2 — Studio Library delete orphans blobs | ✅ Shipped | May 11, 2026 | `presetLibrary.js` — added `deleteImage` import + capture record before delete |
+| Fix 3A — Health check banner | ⏭️ Skipped | — | Superseded by Fix 3B; not worth building if 3B ships soon |
+| Fix 3B — Tauri native FS | ✅ Shipped | May 11, 2026 | `main.rs` + `customPresets.js`; lazy IDB migration built-in; run `./build-and-sign.sh` to deploy |
 
 ---
 
-## 8. What's Not a Risk (confirmed safe)
+## 10. What's Not a Risk (confirmed safe)
 
 - **Timeline storage:** no blobs, only preset name strings — localStorage only, small and safe
 - **Favorites / hidden lists:** plain arrays of preset name strings — very small

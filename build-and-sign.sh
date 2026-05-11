@@ -13,6 +13,10 @@
 
 set -e
 
+# Kill any stale vite/tauri processes and clear build cache
+pkill -f vite 2>/dev/null || true
+rm -rf node_modules/.vite node_modules/.vite-temp
+
 # App configuration
 APP_NAME="DiscoCast Visualizer"
 DISPLAY_NAME="DiscoCast Visualizer"

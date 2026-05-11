@@ -7,6 +7,7 @@ import { downloadFile } from '../fileUtils.js';
 import {
     loadAllCustomPresets,
     deleteCustomPreset,
+    deleteImage,
     exportPreset,
     exportAllPresets,
     importFromFile,
@@ -345,7 +346,14 @@ export class PresetLibrary {
             if (secondsLeft <= 0) {
                 clearInterval(timer);
                 this._deleteTimers.delete(id);
+                const record = loadAllCustomPresets()[id];
                 deleteCustomPreset(id);
+                if (record?.images?.length) {
+                    record.images.forEach(img => {
+                        const blobId = img.videoId || img.imageId;
+                        if (blobId) deleteImage(blobId).catch(() => {});
+                    });
+                }
                 this._renderGrid();
                 showToast('Preset deleted');
             } else {

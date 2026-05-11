@@ -48,6 +48,60 @@ struct AudioFileResult {
     data: String,
 }
 
+#[derive(serde::Serialize)]
+struct BlobResult {
+    data: String,  // base64-encoded bytes
+    mime: String,  // mime type string
+}
+
+#[tauri::command]
+async fn store_blob(app: tauri::AppHandle, image_id: String, data: String, mime: String) -> Result<(), String> {
+    let data_dir = app.path_resolver().app_data_dir()
+        .ok_or_else(|| "Could not resolve app data dir".to_string())?;
+    let images_dir = data_dir.join("images");
+    std::fs::create_dir_all(&images_dir).map_err(|e| e.to_string())?;
+    let bytes = general_purpose::STANDARD.decode(&data).map_err(|e| e.to_string())?;
+    std::fs::write(images_dir.join(&image_id), bytes).map_err(|e| e.to_string())?;
+    std::fs::write(images_dir.join(format!("{}.mime", &image_id)), mime.as_bytes()).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_blob(app: tauri::AppHandle, image_id: String) -> Result<Option<BlobResult>, String> {
+    let data_dir = app.path_resolver().app_data_dir()
+        .ok_or_else(|| "Could not resolve app data dir".to_string())?;
+    let images_dir = data_dir.join("images");
+    let blob_path = images_dir.join(&image_id);
+    if !blob_path.exists() {
+        return Ok(None);
+    }
+    let bytes = std::fs::read(&blob_path).map_err(|e| e.to_string())?;
+    let data = general_purpose::STANDARD.encode(&bytes);
+    let mime_path = images_dir.join(format!("{}.mime", &image_id));
+    let mime = if mime_path.exists() {
+        std::fs::read_to_string(&mime_path).unwrap_or_default()
+    } else {
+        String::new()
+    };
+    Ok(Some(BlobResult { data, mime }))
+}
+
+#[tauri::command]
+async fn delete_blob(app: tauri::AppHandle, image_id: String) -> Result<(), String> {
+    let data_dir = app.path_resolver().app_data_dir()
+        .ok_or_else(|| "Could not resolve app data dir".to_string())?;
+    let images_dir = data_dir.join("images");
+    let blob_path = images_dir.join(&image_id);
+    if blob_path.exists() {
+        std::fs::remove_file(&blob_path).map_err(|e| e.to_string())?;
+    }
+    let mime_path = images_dir.join(format!("{}.mime", &image_id));
+    if mime_path.exists() {
+        std::fs::remove_file(&mime_path).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 #[tauri::command]
 async fn save_file(filename: String, content: String) -> Result<Option<String>, String> {
     let (tx, mut rx) = channel::<Option<std::path::PathBuf>>(1);
@@ -102,7 +156,7 @@ async fn pick_image_file() -> Option<AudioFileResult> {
 fn main() {
     tauri::Builder::default()
         .manage(CaffeinateState(Mutex::new(None)))
-        .invoke_handler(tauri::generate_handler![caffeinate_start, caffeinate_stop, toggle_fullscreen, get_fullscreen, pick_audio_file, pick_image_file, save_file])
+        .invoke_handler(tauri::generate_handler![caffeinate_start, caffeinate_stop, toggle_fullscreen, get_fullscreen, pick_audio_file, pick_image_file, save_file, store_blob, get_blob, delete_blob])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

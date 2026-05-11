@@ -477,7 +477,7 @@ These are the entry points. Each one references its focused subdocs in `docs/`.
 | Doc | Status | What it covers |
 |-----|--------|---------------|
 | [`shape-overlay-dev.md`](shape-overlay-dev.md) | ✅ Built May 10, 2026 | Per-layer full-screen colored shape overlay — rectangle/circle/rounded, position, width/height, corner, color, opacity, feather. |
-| [`storage-audit-dev.md`](storage-audit-dev.md) | 🔄 In progress (Fixes 1 & 2 shipped May 11, 2026) | Storage architecture audit — localStorage keys, IndexedDB blob storage, platform limits. QuotaExceededError guard ✅, export size warning ✅, WKWebView eviction health check 📋, Tauri native FS 📋. |
+| [`storage-audit-dev.md`](storage-audit-dev.md) | ✅ All fixes shipped May 11, 2026 | Storage hardening — QuotaExceededError guard, export size warning, blob cleanup bugs fixed, Tauri native FS (eviction-proof blob storage for macOS + Windows). Requires `./build-and-sign.sh` to deploy. |
 | [`noise-gate-dev.md`](noise-gate-dev.md) | ✅ Built | Noise gate for live/mic — silence threshold, AGC interaction, VU meter states. |
 | [`live-input-dev.md`](live-input-dev.md) | ✅ Built | Live audio input dev notes. |
 | [`midi-dev.md`](midi-dev.md) | 📋 Planning | MIDI controller integration — action registry, MIDI learn UX, phased plan. |

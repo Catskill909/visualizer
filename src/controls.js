@@ -638,9 +638,10 @@ export class ControlPanel {
 
     // Remove image blobs first so we don't orphan them if the preset delete throws
     if (record?.images?.length) {
-      await Promise.all(record.images.map(img =>
-        img.imageId ? deleteImage(img.imageId).catch(() => { /* best-effort */ }) : null
-      ));
+      await Promise.all(record.images.map(img => {
+        const blobId = img.videoId || img.imageId;
+        return blobId ? deleteImage(blobId).catch(() => {}) : null;
+      }));
     }
     deleteCustomPreset(id);
 
