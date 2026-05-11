@@ -121,7 +121,7 @@ The existing `#tl-quick-edit` popover IS this modal — no new DOM node needed. 
 
 | Phase | What's added | What's removed |
 |-------|-------------|----------------|
-| **A — Consolidate** | Delete + Duplicate move into the modal; clicking block body opens it directly; `presetLibrary.js` "Send to Timeline →" one-liner | Hover icon row (small, hard to hit reliably); `#tl-ctx-menu` right-click menu (redundant once modal is primary path — one interaction surface per action) |
+| **A — Consolidate** | Delete + Duplicate move into the modal; clicking block body opens it directly | Hover icon row (small, hard to hit reliably); `#tl-ctx-menu` right-click menu (redundant once modal is primary path — one interaction surface per action) |
 | **B — Full Edit** | "Full Edit →" deep-link into Preset Studio for this preset | — |
 | **C — Utilities** | "Loop This" button (sets loop range to block's start/end); block color picker | — |
 | **D — Preset Controls** | Full `controls.js` panel as a new section below the fields, re-targeted to this zone's engine; live during playback | — |
@@ -145,7 +145,6 @@ This makes presets **playable**: a VJ brings a preset in live with a smooth fade
 
 **Technical path:** `engine.loadPreset(entry.presetName, entry.blendTime)` + `_fadeZoneCover(zoneId, 0, entry.blendTime)` + activate loop range to block bounds. No new infrastructure.
 
-Also available via right-click → "Loop This" as a secondary path.
 
 **⚡ Phase 4.6 — Overlap-driven Crossfade Timing**
 
@@ -252,7 +251,6 @@ Same design language as the rest of the app: full-screen canvas, glassmorphic ov
 - ~~**Gap behavior not visualized**~~: ✅ Fixed in Phase 3.5 — `_playZone()` now schedules blackout timers when entries end. `gapBehavior: 'black'` re-shows the zone cover; `'hold'` lets the last frame persist. Visual crosshatch/ghost-block strip rendering still not built (cosmetic only).
 - **Zone settings popover not built**: clicking the zone label chip does nothing yet. It should open a popover for name, opacity, blend mode, gap behavior.
 - **Entry label overlay not rendered**: `entry.label` is stored and editable in quick-edit but not rendered on the canvas during playback.
-- **`presetLibrary.js` "Send to Timeline →"** one-liner not yet added — scheduled for Phase 4.4A.
 - **`#tl-quick-edit` styling needs visual polish**: hierarchy and anchoring — "s" unit labels feel orphaned; field labels and values have similar weight so values don't pop; Apply/Cancel doesn't match the glassmorphic language. Addressed in Phase 4.4 styling pass.
 - **Undo/Redo not yet implemented** — scheduled for Phase 4.7. Until then, delete and drag are irreversible.
 
@@ -415,7 +413,7 @@ The VJ mode rewrite in `707be41` removed gap blackouts ("VJ MODE: No fade-to-bla
 
 ### `entry.startTime` is the source of truth for position
 Old behavior (Phase 1–2): `startTime: 0` on all entries, positions were computed cumulatively from array order.  
-Current behavior (Phase 3+): `startTime` is stored and is the actual seconds-from-zero position. Blocks can have gaps between them, overlap detection is the caller's responsibility (not yet enforced by the editor).
+Current behavior (Phase 3+): `startTime` is stored and is the actual seconds-from-zero position. Blocks can have gaps or overlaps. Overlaps are intentional — they define the crossfade duration (Phase 4.6).
 
 **Backward compatibility**: `_migrateEntryStartTimes(tl)` is called on every timeline load. It detects old timelines (all entries have `startTime === 0`) and assigns cumulative start times so they don't stack at t=0.
 
@@ -525,7 +523,7 @@ Six predefined layouts, each with:
 | `src/controls.js` | Added `L`/`l` case: `window.open('/timeline.html')` |
 | `src/visualizer.js` | Added `initSlave(canvas, primaryEngine)` method + `_isSlaveEngine` guard in render loop |
 
-`src/main.js`, `index.html`, `src/editor/inspector.js`, `src/editor/presetLibrary.js` are **not touched** (the "Send to Timeline →" one-liner in `presetLibrary.js` is still pending — see Phase 4 todo).
+`src/main.js`, `index.html`, `src/editor/inspector.js`, `src/editor/presetLibrary.js` are **not touched**.
 
 ---
 
