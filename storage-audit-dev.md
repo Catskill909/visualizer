@@ -1,6 +1,6 @@
 # Storage Audit & Hardening — Dev Doc
 
-**Status:** ✅ All fixes shipped May 11, 2026. Requires `./build-and-sign.sh` to deploy Fix 3B to macOS app.
+**Status:** ✅ All fixes shipped, built, and verified May 11, 2026. Web production, macOS app, and local all confirmed working. Cross-platform video preset import/export tested (web → macOS → web round-trip). `build-and-sign.sh` patched to kill stale vite processes before every build.
 
 ---
 
@@ -260,7 +260,8 @@ The only downside to blobs is eviction on macOS (Fix 3B) and export file size (F
 | Bug 1 — videoId never deleted | ✅ Shipped | May 11, 2026 | `controls.js:642` — `img.videoId \|\| img.imageId` |
 | Bug 2 — Studio Library delete orphans blobs | ✅ Shipped | May 11, 2026 | `presetLibrary.js` — added `deleteImage` import + capture record before delete |
 | Fix 3A — Health check banner | ⏭️ Skipped | — | Superseded by Fix 3B; not worth building if 3B ships soon |
-| Fix 3B — Tauri native FS | ✅ Shipped | May 11, 2026 | `main.rs` + `customPresets.js`; lazy IDB migration built-in; run `./build-and-sign.sh` to deploy |
+| Fix 3B — Tauri native FS | ✅ Shipped & Deployed | May 11, 2026 | `main.rs` + `customPresets.js`; lazy IDB migration built-in; deployed via `./build-and-sign.sh`; cross-platform video preset import/export verified |
+| `build-and-sign.sh` cleanup patch | ✅ Shipped | May 11, 2026 | Added `pkill -f vite` + `rm -rf node_modules/.vite*` before tauri build — prevents build hangs from stale processes |
 
 ---
 
