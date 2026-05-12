@@ -184,6 +184,13 @@
                     <!-- ─── PALETTE TAB ─── -->
                     <div id="tab-palette" class="tab-panel" role="tabpanel">
                         <div class="tab-scroll">
+                            <div class="slider-row" id="palette-opacity-row">
+                                <div class="slider-header">
+                                    <span class="slider-label">Opacity</span>
+                                    <span class="slider-value" id="ps-opacity-val">1.00</span>
+                                </div>
+                                <input type="range" id="ps-opacity" class="slider" min="0" max="1" step="0.01" value="1" style="--pct:100%" />
+                            </div>
                             <p class="section-label">Start from</p>
                             <div class="base-var-grid" id="base-var-grid"></div>
 

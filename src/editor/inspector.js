@@ -181,6 +181,7 @@ const BLANK = {
     comp: BLANK_COMP,  // must be a valid GLSL shader_body string
     init_eqs_str: '', frame_eqs_str: '', pixel_eqs_str: '',
     images: [],
+    paletteOpacity: 1.0,
     sceneMirror: 'none',  // 'none' | 'h' | 'v' | 'both' | 'kaleido'
     sceneMirrorKaleidoSpeed: 0.00,
     motionReact: {
@@ -441,6 +442,7 @@ export class EditorInspector {
         this._buildBaseVariations();
         this._buildPaletteChips();
         this._buildPaletteSliders();
+        this._bindPaletteOpacity();
         this._buildSolidFxPanel();
         this._buildMotionSliders();
         this._buildMotionReactPanel();
@@ -737,6 +739,33 @@ export class EditorInspector {
             });
             input.addEventListener('pointerup', () => this._postSnap());
         });
+    }
+
+    // ─── Palette opacity ──────────────────────────────────────────────────────
+
+    _bindPaletteOpacity() {
+        const input = document.getElementById('ps-opacity');
+        const valEl = document.getElementById('ps-opacity-val');
+        if (!input) return;
+        input.dataset.defaultPos = '1';
+        const label = input.closest('.slider-row')?.querySelector('.slider-label');
+        if (label) {
+            label.classList.add('is-resettable');
+            label.addEventListener('dblclick', () => {
+                input.value = input.dataset.defaultPos;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            });
+        }
+        input.addEventListener('pointerdown', () => this._preSnap());
+        input.addEventListener('input', () => {
+            const v = parseFloat(input.value);
+            if (valEl) valEl.textContent = v.toFixed(2);
+            input.style.setProperty('--pct', `${v * 100}%`);
+            this.currentState.paletteOpacity = v;
+            this._buildCompShader();
+            this._applyToEngine(true);
+        });
+        input.addEventListener('pointerup', () => this._postSnap());
     }
 
     // ─── Post-FX shader rebuild (saturation / hue rotate) ────────────────────
@@ -4955,7 +4984,8 @@ export class EditorInspector {
         const visibleImages = anySolo
             ? images.filter(img => img.solo)
             : images.filter(img => !img.muted);
-        if (visibleImages.length === 0 && !this._solidColor && sm === 'none') {
+        const _po = this.currentState.paletteOpacity ?? 1.0;
+        if (visibleImages.length === 0 && !this._solidColor && sm === 'none' && _po >= 1.0) {
             this.currentState.comp = BLANK_COMP;
             this._lastBuildMs = performance.now() - _t0;
             return;
@@ -4991,7 +5021,9 @@ export class EditorInspector {
         } else {
             uvFold = '  vec2 uv_m = uv;\n';
         }
-        const mainSample = 'texture(sampler_main, uv_m).xyz * 2.0';
+        const mainSample = _po >= 1.0
+            ? 'texture(sampler_main, uv_m).xyz * 2.0'
+            : `texture(sampler_main, uv_m).xyz * 2.0 * ${_po.toFixed(4)}`;
 
         let base;
         if (this._imagesOnly) {
@@ -5739,6 +5771,7 @@ export class EditorInspector {
     }
 
     _syncPaletteSliders() {
+        this._syncSlider('ps-opacity', this.currentState.paletteOpacity ?? 1.0, 0, 1.0, 2);
         const bv = this.currentState.baseVals;
         this._syncSlider('ps-gamma', bv.gammaadj, 0.5, 4.0, 2);
         this._syncSlider('ps-decay', bv.decay, 0.85, 0.999, 3);

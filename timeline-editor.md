@@ -196,6 +196,60 @@ Accidentally dragging a block, deleting it, or resizing it has no recovery today
 
 ---
 
+**✅ Phase 4.8 — Preset Palette Opacity** *(shipped 2026-05-12)*
+
+Adds an opacity control for the MilkDrop background layer inside a preset. Image, video, and GIF layers are unaffected — they composite on top at their own opacity. This is the prerequisite for the Zone Stack System (4.9).
+
+- `paletteOpacity` (0–1, default 1.0) added to `currentState` BLANK defaults
+- Opacity slider added at the top of the Palette tab in `editor.html` — first control visible on the tab
+- `_buildCompShader` multiplies `sampler_main` by `paletteOpacity` when < 1.0; early-exit to BLANK_COMP is guarded so it rebuilds correctly when opacity is reduced
+- At 0: palette goes black, image/video/gif layers still render on top. At 1: current behavior unchanged.
+- Old presets without `paletteOpacity` fall back to 1.0 via BLANK merge in `loadPresetData` — no migration needed.
+- Beat-reactive controls not added here — Motion tab already covers palette reactivity (Zoom Pulse, Warp Pulse, Echo Opacity, etc.)
+
+**Files touched:** `editor.html`, `src/editor/inspector.js`
+
+---
+
+**The road from here → timeline compositing (Phase 4.9):**
+
+Palette Opacity = 0 makes the MilkDrop background black inside the comp shader. Image/video/gif layers render on top of that black. When this preset plays in a timeline zone with `blendMode: screen`, the black pixels pass through (screen blend of black = passthrough) and the zone below shows through — so image layers appear to float above another zone's active preset. Phase 4.9 builds the zone-level controls (opacity slider, blend mode selector) that complete this workflow.
+
+---
+
+**⚡ Phase 4.9 — Zone Stack System**
+
+Makes the multi-zone compositor a proper layered compositing system. Zones can now be full-screen overlays stacked on top of each other — not just side-by-side screen regions. A preset with `paletteOpacity=0` on a screen-blend zone places its image/video/gif objects floating above whatever zone is beneath it.
+
+**Why this works cross-platform:** CSS `canvas.style.opacity` and `mix-blend-mode` are standard properties that work identically in Chrome, Safari, and WKWebView (Tauri on macOS/Windows). The critical cover system (black divs handling fade-in/out) is completely separate and unaffected. Default `zone.opacity = 1.0` means no visible change unless a user moves the slider.
+
+**The canonical floating-object workflow:**
+
+| Zone | Preset | paletteOpacity | blendMode |
+|---|---|---|---|
+| A (bottom) | Any MilkDrop preset | 1.0 | normal |
+| B (top) | Preset with image/video/gif | 0.0 | screen |
+
+Black palette in B → screen blend → those pixels pass through → Zone A shows. Image pixels in B composite on top.
+
+**Sub-phases:**
+
+**4.9-A — Wire opacity + zone settings popover** *(resolves the known gap: "Zone settings popover not built")*
+- `_positionCanvas` adds: `canvas.style.opacity = zone.opacity ?? 1`
+- Zone label chip click opens a settings popover anchored to the chip: name, opacity slider (0–1), blend mode selector, gap behavior — these fields already exist in the data model, UI was always noted as missing
+
+**4.9-B — Overlay zone layout**
+- New layout tile in the Zone Manager: **"Overlay"** — full-screen Zone A + full-screen Zone B stacked on top (screen blend, zIndex 1)
+- Documents the canonical stack workflow above so it's one click to set up
+
+**4.9-C — Z-index reordering**
+- Drag zones up/down in Zone Manager to control stacking order
+- Updates `zone.zIndex` values and calls `_positionCanvas` for all affected zones
+
+**Files:** `src/timeline/timelineEditor.js` (4.9-A, B, C), `timeline.html` (popover DOM for 4.9-A), `src/timelineStorage.js` (no schema changes — all fields already exist).
+
+---
+
 *Backlog — Loop & Regions*
 - **Loop section range on ruler** — drag a range on the ruler to set loop bounds. Playback bounces between in and out points.
 - **Advanced Loop logic** — marker action `loop` jumps to previous loop start rather than `0:00`.
@@ -271,7 +325,7 @@ Same design language as the rest of the app: full-screen canvas, glassmorphic ov
 
 - **Overlaps are intentional (crossfades)**: blocks can overlap within a zone — this is the crossfade mechanism (Phase 4.6), not a bug. The old spec note `startTime + duration <= next.startTime` is superseded. No overlap prevention should be added.
 - ~~**Gap behavior not visualized**~~: ✅ Fixed in Phase 3.5 — `_playZone()` now schedules blackout timers when entries end. `gapBehavior: 'black'` re-shows the zone cover; `'hold'` lets the last frame persist. Visual crosshatch/ghost-block strip rendering still not built (cosmetic only).
-- **Zone settings popover not built**: clicking the zone label chip does nothing yet. It should open a popover for name, opacity, blend mode, gap behavior.
+- **Zone settings popover not built**: clicking the zone label chip does nothing yet. It should open a popover for name, opacity, blend mode, gap behavior. *(Addressed in Phase 4.9-A)*
 - **Entry label overlay not rendered**: `entry.label` is stored and editable in quick-edit but not rendered on the canvas during playback.
 - **`#tl-quick-edit` styling needs visual polish**: hierarchy and anchoring — "s" unit labels feel orphaned; field labels and values have similar weight so values don't pop; Apply/Cancel doesn't match the glassmorphic language. Addressed in Phase 4.4 styling pass.
 - **Undo/Redo not yet implemented** — scheduled for Phase 4.7. Until then, delete and drag are irreversible.
