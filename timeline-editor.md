@@ -1,7 +1,7 @@
 # Timeline Editor — Design & Planning Doc
 
-**Status:** Phases 1–4.3 complete ✅, Phase 4.8 (Palette Opacity) shipped ✅, Phase 4.4-A + 4.5 shipped ✅, Phase 4.10-A (Real-time Live Editing) shipped ✅, Phase 4.4-B (Menu Icon UX) shipped ✅ — Next: Loop/Loop Solo transport toggles → 4.6 (Overlap Crossfade) → 4.7 (Undo/Redo) → 4.9 (Zone Stack). Phase 5 in research (Multi-monitor output). Performance Panel deferred until video processing controls are built out.  
-**Last updated:** 2026-05-12 — Menu icon UX refined: click-outside-dismiss removed, icon enlarged, active state much brighter  
+**Status:** Phases 1–4.3 complete ✅, Phase 4.8 (Palette Opacity) shipped ✅, Phase 4.4-A + 4.5 shipped ✅, Phase 4.10-A (Real-time Live Editing) shipped ✅, Phase 4.4-B (Menu Icon UX) shipped ✅ — Next: Loop/Loop Solo transport toggles → 4.6 (Overlap Crossfade) → 4.7 (Undo/Redo) → 4.9 (Zone Stack) → 4.11 (Staging Mode) → 4.12 (Timeline Sets Switching). Phase 5 in research (Multi-monitor output). Performance Panel deferred until video processing controls are built out.  
+**Last updated:** 2026-05-12 — Added Timeline Sets concept + UI naming spec; specced Phase 4.11 (Staging Mode), Phase 4.12 (Timeline Sets Switching + My Sets panel), Phase 4.13 (Timeline Set Export/Import with metadata envelope, .dcset.json format, export modal, import preview card)  
 **Architecture:** Standalone page (`/timeline.html`) — self-contained MPA entry in Vite.
 
 ---
@@ -17,6 +17,68 @@ The timeline strip is always the clean base. No new UI appears unless the user d
 | 2 | Performance Panel — all active presets, all controls | One button in transport |
 
 **Evaluation rule:** Does the idea add to the strip, or does it live behind a deliberate gesture? If it adds to the strip, the answer is no.
+
+---
+
+### Timeline Sets — The Core Concept
+
+A **Timeline Set** is a complete, named show arrangement: a full timeline with its zones, blocks, markers, and layout — saved and ready to load. You can have as many as you want. One plays live at any time. Others sit ready to queue.
+
+The name is intentional. "Timeline" grounds it in the editor. "Set" is the DJ/VJ term — a DJ plays sets, switches between them, builds new ones before a show. Every VJ already understands what a set is.
+
+**What a Timeline Set contains:**
+- All zones and their layouts
+- All blocks (entries) with positions, durations, blend times, labels
+- All markers and their actions
+- Zone settings (opacity, blend mode, gap behavior)
+- The Set name
+
+**What a Timeline Set does NOT contain:**
+- The playhead position (always starts from the beginning when loaded)
+- Audio source (that's a session-level concern)
+- Preset definitions (those live in the preset library — Sets reference preset names only)
+
+**UI naming — used consistently everywhere:**
+
+| Concept | Label in UI |
+|---|---|
+| Create a new set | **+ New Set** |
+| Save current state | **Save Set** |
+| The saved name | **[Set Name]** |
+| Open the full list | **My Sets** |
+| Switch to another | **Queue Set →** |
+| Currently queued | **Up next: [name]** |
+| Currently playing | **Now: [name]** |
+
+**Data model (`timelineStorage.js`):**
+```js
+{
+  id: string,           // uuid
+  name: string,         // user-editable, shown everywhere
+  createdAt: number,    // timestamp
+  updatedAt: number,
+  zones: Zone[],        // full zone definitions
+  entries: Entry[],     // all blocks across all zones
+  markers: Marker[]     // ruler markers
+}
+```
+No schema change required — this is exactly what `timelineStorage.js` already stores. The rename from "timeline" → "Timeline Set" is purely UI language and naming. The storage key format and CRUD methods are unchanged.
+
+---
+
+### The Boundary Rule
+
+> **Nothing in the timeline switches mid-block. Every transition — staging apply, set change, loop release, cue — waits for the current block to reach its natural end before taking effect.**
+
+The block boundary is the only transition point. This is the default for all operations. Exceptions require a deliberate override gesture (e.g. double-click to cue, which is intentionally immediate).
+
+**Why:** preset loads, crossfades, and cover fades all require a moment to execute cleanly. Forcing any of these mid-block means interrupting something that is already in motion — the GPU is rendering, the cover is fading, the blend is running. Waiting for the boundary gives the engine time to finish cleanly and start the next thing right.
+
+**In practice:**
+- Staging changes applied → queued, takes effect after current block ends
+- Switch to another set → queued, takes effect after current block ends  
+- Loop release → current loop cycle finishes, then timeline resumes
+- The one deliberate exception: **double-click to cue** overrides immediately because the VJ explicitly chose that moment
 
 ---
 
@@ -491,6 +553,407 @@ Run each scenario WHILE the timeline is playing:
 | Rapid consecutive mutations | Any | No orphan timers; last reschedule wins |
 
 **Cross-platform checklist:** test on web (Chrome), then macOS app (Tauri/WKWebView). The fix is pure JS + `setTimeout` — no platform-specific behavior expected. Confirm `performance.now()` is monotonic in WKWebView (it is, but verify no offset drift over 10+ minutes of playback).
+
+---
+
+---
+
+**⚡ Phase 4.11 — Staging Mode**
+
+A safe editing environment that overlays the live timeline strip. The VJ makes multiple changes — add, remove, reorder blocks — then commits them all at once. The live playback is never interrupted during staging. Changes take effect on the next block boundary after Apply is pressed.
+
+---
+
+#### The Problem it Solves
+
+Real-time editing (Phase 4.10-A) is powerful but exposes a risk: a misclick or accidental drag while playing changes the live show immediately. For a VJ mid-set, a safe scratch space where you can plan the next few blocks without touching what's playing is essential.
+
+---
+
+#### What Staging Is — and Is Not
+
+**It is an overlay on the exact same strip interface.** The live canvas keeps playing behind it. The timeline strip looks identical to the live strip — same blocks, same ruler, same zone rows. The only differences are the amber tint, the STAGING pill, and the passive playhead. The VJ is not taken to a new page or a separate view. They are editing the strip they already know, with the live output visible behind them.
+
+---
+
+#### What Loads into Staging
+
+Two paths — both land in the same overlay:
+
+**Default — copy of the live Set:**  
+Staging opens with an exact copy of the currently-playing Timeline Set. The VJ tweaks what's already scheduled — move a block, add one, remove one — then applies.
+
+**Load a different Timeline Set into Staging:**  
+A **Load Set →** option in the Staging overlay lets the VJ pull any saved Timeline Set into staging instead. They can edit it or push it straight to live as-is. This is the full set-switching workflow: pick a set, optionally edit it, apply on the boundary.
+
+Both paths use the same staging overlay. The difference is just what's in `_stagedTl` when the overlay opens.
+
+---
+
+#### UX Flow
+
+```
+[Stage] button in transport bar
+  → SAME strip, overlay mode activates
+  → amber tint over strip + "STAGING" pill in transport
+  → playhead shown as dashed line — passive, not clickable
+  → live canvas still visible and playing behind the overlay
+  → all block gestures work on the staged copy: add, drag, resize, delete, ☰ menu
+  → [Load Set →] button available to swap in a different Timeline Set
+  → [Apply] and [Cancel] appear in transport
+
+On Apply — carbon copy of live Set (two options presented):
+  → [▶ From Beginning] — staged layout starts from time 0 after current block ends
+  → [▶ Match Cue Point] — staged layout starts from the live playhead position
+      (the dashed playhead in staging shows exactly where this will be)
+  → overlay clears — "Up next ▶ after current block" in transport
+  → current block plays to its natural end
+  → staged layout fades in from the chosen start point
+  → transport returns to normal
+
+On Apply — different Timeline Set loaded into staging:
+  → only one option: always starts from beginning of the new Set
+  → no cue point matching — it's a different set, a fresh start
+  → overlay clears — "Up next: [Set Name] ▶ after current block" in transport
+  → current block plays to its natural end
+  → cover fades out → new Set fades in from block 0
+
+On Cancel:
+  → overlay clears — back to live strip
+  → _stagedTl discarded, nothing changed
+```
+
+**Why the playhead is shown in staging (but passive):**
+The dashed playhead is not just visual context — it is the anchor for "Match Cue Point." The VJ can see exactly where the live set is and make an informed decision: start fresh from 0, or pick up seamlessly from here. Without seeing the live cue position, that choice would be blind.
+
+---
+
+#### What Changes in Staging Mode
+
+| Interaction | Live mode | Staging mode |
+|---|---|---|
+| Click ruler | Scrubs playhead | No-op — playhead is passive |
+| Playhead | Solid line, moving | Dashed line, read-only |
+| Block drag | Immediate, live effect | Writes to staged copy only |
+| Block delete | Immediate, live effect | Writes to staged copy only |
+| + button / preset picker | Adds to live now | Adds to staged copy |
+| Load Set → | — | Replaces staged copy with a saved Set |
+| Apply | — | Queues staged copy; commits on next block boundary |
+| Cancel | — | Discards staged copy; overlay closes |
+
+---
+
+#### Architecture
+
+On entering Staging mode:
+```js
+this._stagedTl = JSON.parse(JSON.stringify(this._tl)); // deep copy
+this._stagingMode = true;
+```
+
+All mutations in Staging mode write to `this._stagedTl`, not `this._tl`. The live playback engine keeps reading from `this._tl` — untouched.
+
+On Apply — two paths:
+
+```js
+// Carbon copy — Match Cue Point
+// _pendingStartTime = current live playhead position
+this._pendingStagedTl = this._stagedTl;
+this._pendingStartTime = (performance.now() - this._playStartWall) / 1000;
+this._stagedTl = null;
+this._stagingMode = false;
+// _onBlockBoundary() → this._tl = this._pendingStagedTl; _playZone from _pendingStartTime
+
+// Carbon copy — From Beginning
+// same but _pendingStartTime = 0
+
+// Different Timeline Set loaded into staging
+// always _pendingStartTime = 0 — new set, fresh start
+this._pendingStagedTl = this._stagedTl;
+this._pendingStartTime = 0;
+this._stagedTl = null;
+this._stagingMode = false;
+```
+
+`_onBlockBoundary()` reads `_pendingStartTime` to know where to begin playback in the incoming Set. If `_pendingStartTime > 0` it calls `_scrubTo(_pendingStartTime)` immediately after the swap; if 0 it starts `_playZone` from the top.
+
+`_onBlockBoundary()` is the same callback already used by the loop system. When the current block's timer fires and the next block is about to be scheduled, check `_pendingStagedTl`: if set, swap it in as `this._tl` and clear the pending slot. The next `_playZone()` call reads the new data naturally — no `_rescheduleIfPlaying()` needed.
+
+On Cancel:
+```js
+this._stagedTl = null;
+this._stagingMode = false;
+// render strip from this._tl — unchanged
+```
+
+---
+
+#### Preset Picker in Staging Mode
+
+The existing preset picker works unchanged. In Staging mode, the confirm action writes to `this._stagedTl` instead of `this._tl`. No new UI needed — the picker is already a deliberate gesture.
+
+Default to the **Favorites tab** when opening the picker from Staging mode. The VJ's curated list is the right starting point for live add decisions. Full All/Search tabs remain available.
+
+---
+
+#### Visual Language
+
+Three signals make Staging unmistakable:
+
+1. **Amber tint** on the strip background (traffic light logic — amber = hold, prepare, not live)
+2. **"STAGING" pill** in the transport bar where the timecode normally appears
+3. **Dashed playhead line** instead of solid — still visible, clearly passive
+
+Getting these three wrong is the worst failure mode. A VJ who thinks they're live when they're in staging (or vice versa) will have a bad night.
+
+---
+
+#### Files
+
+`src/timeline/timelineEditor.js` — staging state, mutation routing, boundary swap  
+`src/timeline/style.css` — amber tint, staging pill, dashed playhead  
+`timeline.html` — Apply / Cancel button additions to transport DOM
+
+---
+
+**⚡ Phase 4.12 — Timeline Sets Switching**
+
+Applies the Boundary Rule to switching between Timeline Sets. The current topbar `<select>` dropdown swaps instantly — this replaces that with a queued switch. The current block plays to its natural end, then the queued Set starts from its beginning with a clean fade.
+
+---
+
+#### UX Flow
+
+```
+My Sets button → opens Sets panel (see 4.12-B)
+  → tap any set → it is queued
+  → transport shows "Up next: [Set Name] ▶"
+  → current block plays to its natural end
+  → crossfade / cover fade → queued Set starts from block 0
+  → "Up next" indicator clears
+  → "Now: [Set Name]" updates in transport
+
+Change your mind before the boundary:
+  → tap a different Set to update the queue
+  → tap the currently-playing Set to cancel the queue
+  → "Up next" clears immediately
+```
+
+---
+
+#### Transition at the Boundary
+
+When the current block's timer fires and the pending Set slot is filled:
+
+```js
+// inside _onBlockBoundary(), called at each block end
+if (this._pendingSetTl) {
+    this._tl = this._pendingSetTl;
+    this._pendingSetTl = null;
+    this._currentZonePreset.clear();
+    // _playZone() fires next and reads from the new _tl — no reschedule needed
+}
+```
+
+The new Set always starts from time 0. The cover system handles the visual: the outgoing preset fades to black (cover up), the first block of the new Set fades in (cover down). Same path as a normal gap-to-block transition — no new fade code.
+
+---
+
+#### 4.12-A — Queue Mechanism (Engine)
+
+- `_pendingSetTl` slot on `TimelineEditor` — holds a full timeline data object
+- Populated when the VJ selects a Set while playing
+- Resolved in `_onBlockBoundary()` — same callback used by Staging (4.11)
+- Cleared if VJ cancels or taps the current Set
+- "Up next: [name]" transport indicator tied to whether `_pendingSetTl` is set
+
+**Files:** `src/timeline/timelineEditor.js`
+
+---
+
+#### 4.12-B — My Sets Panel
+
+Replaces the topbar `<select>` dropdown with a proper Sets panel. The dropdown was fine for planning; it is wrong for live performance — too small a tap target, no visual hierarchy, immediate swap.
+
+**Panel design:**
+- Opens from a **My Sets** button in the transport bar (or top-right corner)
+- Card list: each Set shown as a row — **name**, entry count, zone count, last-edited time
+- Currently-playing Set has a **NOW** chip
+- Queued Set has an **UP NEXT** chip
+- Tap any card → queues that Set (shows "Up next" in transport)
+- Tap the NOW card → no-op (already playing)
+- **+ New Set** at top of list — creates a blank set and enters it (not queued — you're now editing it stopped)
+- **Save Set** button in transport — saves the current state to the current Set (same as existing Save, just renamed)
+- **Rename** on long-press or secondary tap on a card
+- **Delete** with confirm on secondary tap
+
+**Panel does not auto-dismiss** — same rule as block settings menu. The VJ closes it deliberately.
+
+**Files:** `src/timeline/timelineEditor.js`, `timeline.html`, `src/timeline/style.css`
+
+---
+
+#### 4.12-C — Save Set Flow
+
+Current save flow: clicking Save writes the current `_tl` to localStorage under the current timeline's id. This is unchanged. The rename is purely UI:
+
+| Old label | New label |
+|---|---|
+| Save | Save Set |
+| + New | + New Set |
+| (dropdown) | My Sets |
+| [timeline name] | [Set name] |
+
+No storage migration. `timelineStorage.js` key format, CRUD, and schema are unchanged.
+
+---
+
+#### The One Implementation, Two Features Pattern
+
+Staging (4.11) and Timeline Sets switching (4.12) are the same boundary-swap mechanism:
+
+| Operation | What's in the pending slot | When it resolves |
+|---|---|---|
+| Staging apply | Edited copy of current Set | Next block boundary |
+| Set switch | Different saved Set | Next block boundary |
+
+`_onBlockBoundary()` checks both slots in order. If Staging is pending, it resolves first. Set switch resolves after. Only one can be pending at a time in normal use — if a VJ queues a Set while in Staging mode, the Staging changes are discarded (with a one-tap confirm: "Switch sets? Your staged changes will be lost.").
+
+---
+
+#### Files
+
+`src/timeline/timelineEditor.js` — `_pendingSetTl`, `_onBlockBoundary()`, Sets panel logic  
+`timeline.html` — My Sets button, Sets panel DOM, "Up next" indicator  
+`src/timeline/style.css` — panel card styles, NOW/UP NEXT chips, indicator  
+`src/timelineStorage.js` — no changes (schema unchanged)
+
+---
+
+---
+
+**⚡ Phase 4.13 — Timeline Set Export / Import**
+
+Portable Timeline Sets — a `.dcset.json` bundle that contains everything needed to run the set on any machine: the full timeline arrangement, all custom presets referenced by the set, and all embedded images/layers. Hand the file to another VJ and they get an identical show.
+
+Builds directly on the existing `.dcshow.json` export/import architecture. The addition is a metadata envelope and a proper export modal with title, description, and cover image. The import flow reuses the existing `importResultModal.js` pattern.
+
+---
+
+#### The Bundle Format — `.dcset.json`
+
+A metadata wrapper around the existing show bundle:
+
+```json
+{
+  "meta": {
+    "schemaVersion": 1,
+    "title": "string",
+    "description": "string",
+    "coverImage": "data:image/...;base64,...  (optional)",
+    "exportedAt": 1234567890,
+    "appVersion": "string",
+    "setId": "uuid",
+    "setName": "string",
+    "stats": {
+      "blockCount": 12,
+      "zoneCount": 2,
+      "customPresetCount": 4,
+      "markerCount": 3
+    }
+  },
+  "set": {
+    // full Timeline Set data — zones, entries, markers
+  },
+  "presets": {
+    // all custom presets referenced by the set
+    // each with images embedded as base64 — same as existing .dcshow.json
+  }
+}
+```
+
+`.dcset.json` is the new extension — more specific than `.dcshow.json` which already exists. Both formats remain supported on import. Old `.dcshow.json` files import as a Timeline Set with no metadata (title defaults to the filename).
+
+---
+
+#### Export Flow
+
+```
+My Sets panel → ⋯ menu on a Set card → Export Set
+  → Export modal opens (see below)
+  → user fills in metadata
+  → [Export] → downloads [Set Name].dcset.json
+```
+
+Or from the transport bar when a Set is loaded: **Export Set** button.
+
+**Export modal fields:**
+
+| Field | Notes |
+|---|---|
+| **Title** | Pre-filled with the Set name. Editable. |
+| **Description** | Optional. Multi-line. What is this set for, what style, notes for the recipient. |
+| **Cover Image** | Optional. Upload an image or leave blank. Shown in the import preview card and the My Sets panel (future). |
+| **What's included** | Read-only summary: "12 blocks · 2 zones · 4 custom presets · 3 markers" — so the VJ knows what they're bundling before confirming. |
+| **Export** button | Downloads the file. |
+| **Cancel** | Closes modal. |
+
+Cover image is optional in v1 — the field is present but "No image" is a valid state. The infrastructure is there to add auto-screenshot capture later.
+
+---
+
+#### Import Flow
+
+```
+My Sets panel → [Import Set] button
+  → file picker → select .dcset.json (or legacy .dcshow.json)
+  → preview card shown before confirming:
+      - Cover image (if present)
+      - Title + description
+      - "12 blocks · 2 zones · 4 custom presets · 3 markers"
+      - Any name collision warnings ("2 presets already exist — will be kept as-is")
+  → [Import] confirms
+  → Set added to My Sets
+  → All custom presets restored to preset library (same ID remapping as existing import)
+  → Import result modal: lists every imported preset, flags any failures
+  → New Set available immediately in My Sets panel
+```
+
+On name collision for the Set itself (a Set with the same name already exists):  
+→ imported Set gets " (imported)" suffix automatically. No prompt — clean and fast.
+
+---
+
+#### Architecture
+
+**Export:**  
+Reuse `exportPreset(id)` from `customPresets.js` for each custom preset referenced by the set. Collect all results into the `presets` block. Serialize the Set data into `set`. Wrap with `meta`. Use `downloadFile()` from `fileUtils.js` (already handles both web and Tauri native Save As).
+
+**Import:**  
+Parse the outer `meta` + `set` + `presets` structure. Feed `presets` through the existing `importFromFile()` path in `customPresets.js` — ID remapping, IndexedDB image storage, localStorage writes all handled already. Then call `timelineStorage.saveTimeline(set)` with a new ID to register the Set. Show `importResultModal` for preset results.
+
+No new storage primitives needed. The existing preset export/import and timeline save infrastructure covers everything — this phase is plumbing and UI only.
+
+---
+
+#### Future Extensions (out of scope for v1)
+
+- **Cover image auto-capture** — screenshot the canvas at export time, embed as cover
+- **Set preview in My Sets panel** — show cover image on each Set card
+- **Export All Sets** — bulk bundle of every saved Timeline Set
+- **Share link** — upload to a hosted service, share a URL (far future)
+
+---
+
+#### Files
+
+`src/timeline/timelineEditor.js` — export/import trigger, modal wiring  
+`timeline.html` — export modal DOM, import button in My Sets panel  
+`src/timeline/style.css` — export modal, import preview card  
+`src/timelineStorage.js` — no changes  
+`src/customPresets.js` — no changes (reused as-is)  
+`src/fileUtils.js` — no changes (reused as-is)  
+`src/importResultModal.js` — reused as-is
 
 ---
 
