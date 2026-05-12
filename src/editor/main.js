@@ -11,6 +11,7 @@ import { PresetLibrary } from './presetLibrary.js';
 import { getCustomPreset, loadAllCustomPresets, CUSTOM_PREFIX } from '../customPresets.js';
 import { initAuthGate } from '../auth-gate.js';
 import { pickAndConnect } from '../devicePicker.js';
+import { showAudioLoadingModal, hideAudioLoadingModal } from '../fileUtils.js';
 
 initAuthGate();
 
@@ -578,10 +579,17 @@ btnMic.addEventListener('click', () => {
 
 const pickAudioFile = async () => {
     if (window.__TAURI__) {
-        const result = await window.__TAURI__.invoke('pick_audio_file');
-        if (!result) return null;
-        const bytes = Uint8Array.from(atob(result.data), c => c.charCodeAt(0));
-        return new File([bytes], result.name, { type: 'audio/mpeg' });
+        showAudioLoadingModal();
+        try {
+            const result = await window.__TAURI__.invoke('pick_audio_file');
+            if (!result) { hideAudioLoadingModal(); return null; }
+            const bytes = Uint8Array.from(atob(result.data), c => c.charCodeAt(0));
+            hideAudioLoadingModal();
+            return new File([bytes], result.name, { type: 'audio/mpeg' });
+        } catch (err) {
+            hideAudioLoadingModal();
+            throw err;
+        }
     }
     return null;
 };

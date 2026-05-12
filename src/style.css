@@ -584,6 +584,28 @@ kbd {
   box-shadow: 0 2px 0 rgba(255,255,255,0.1); font-weight: 600;
 }
 
+/* AUDIO LOADING MODAL */
+.audio-loading-modal {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 99999;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+.audio-loading-modal.hidden { display: none; }
+.audio-loading-ring {
+  width: 52px; height: 52px; border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.12);
+  border-top-color: rgba(255, 255, 255, 0.88);
+  animation: audioLoadingSpin 0.75s linear infinite;
+}
+@keyframes audioLoadingSpin { to { transform: rotate(360deg); } }
+.audio-loading-text {
+  margin-top: 18px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px; font-weight: 500; letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.82);
+}
+
 /* GENERIC CONFIRM MODAL (reused by unhide-all and future confirms) */
 .modal {
   position: fixed; inset: 0; z-index: 200;

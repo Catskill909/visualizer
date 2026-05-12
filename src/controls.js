@@ -1,7 +1,7 @@
 /**
  * ControlPanel — UI bindings, auto-hide, keyboard shortcuts, preset drawer
  */
-import { downloadFile } from './fileUtils.js';
+import { downloadFile, showAudioLoadingModal, hideAudioLoadingModal } from './fileUtils.js';
 import {
   getCustomPreset,
   deleteCustomPreset,
@@ -148,11 +148,18 @@ export class ControlPanel {
 
     const triggerFilePicker = async () => {
       if (window.__TAURI__) {
-        const result = await window.__TAURI__.invoke('pick_audio_file');
-        if (!result) return;
-        const bytes = Uint8Array.from(atob(result.data), c => c.charCodeAt(0));
-        const file = new File([bytes], result.name, { type: 'audio/mpeg' });
-        this.handleFileSelection(file);
+        showAudioLoadingModal();
+        try {
+          const result = await window.__TAURI__.invoke('pick_audio_file');
+          if (!result) { hideAudioLoadingModal(); return; }
+          const bytes = Uint8Array.from(atob(result.data), c => c.charCodeAt(0));
+          const file = new File([bytes], result.name, { type: 'audio/mpeg' });
+          hideAudioLoadingModal();
+          this.handleFileSelection(file);
+        } catch (err) {
+          hideAudioLoadingModal();
+          throw err;
+        }
       } else {
         els.fileInput.click();
       }

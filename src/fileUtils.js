@@ -12,6 +12,23 @@
  * @param {string} content   File content as a string (JSON, etc.).
  * @returns {Promise<boolean>} true = saved, false = cancelled.
  */
+let _audioLoadingModal = null;
+
+export function showAudioLoadingModal() {
+    if (!_audioLoadingModal) {
+        const el = document.createElement('div');
+        el.className = 'audio-loading-modal';
+        el.innerHTML = '<div class="audio-loading-ring"></div><div class="audio-loading-text">Audio Loading</div>';
+        document.body.appendChild(el);
+        _audioLoadingModal = el;
+    }
+    _audioLoadingModal.classList.remove('hidden');
+}
+
+export function hideAudioLoadingModal() {
+    if (_audioLoadingModal) _audioLoadingModal.classList.add('hidden');
+}
+
 export async function downloadFile(filename, content) {
     const mb = content.length / 1_048_576;
     if (mb > 50 && !confirm(`This export is ~${mb.toFixed(0)} MB — continue?`)) {
