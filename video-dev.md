@@ -8,6 +8,46 @@
 
 ---
 
+## Current Status & Phase Roadmap
+
+> **As of May 12, 2026**
+
+### ✅ Shipped — All Complete
+
+| Feature | Shipped |
+|---|---|
+| Core video playback — MP4/WebM drag-in, 720p limit, play/pause/loop/scrub | May 7 |
+| macOS WKWebView fixes — `playsInline`, blob URL lifecycle, manual loop restart | May 7 |
+| Playback speed control 0.25×–4× | May 9 |
+| Auto-transcoding — drag 4K/1080p → auto-converts to 720p via FFmpeg.wasm | May 9 |
+| Color grading — Brightness, Contrast, Gamma (GLSL, video layers only) | May 9 |
+| VJ Effects — Luma Key, Wave Distort, Invert, Threshold, Pixelate, Scan Lines, Film Grain | May 8 |
+| Width/Height sliders — independent non-uniform scaling 0.25×–4× (video only) | May 11 |
+| Video Border — width, color picker, feather (video only) | May 11 |
+
+### 🔨 Up Next
+
+| Feature | § | Status |
+|---|---|---|
+| **Clipper** (`/clipper.html`) — video trim tool, In/Out markers, FFmpeg trim-encode | §19 | 📋 Active planning |
+| **GIF → WebM** — normalize messy GIFs to proper 30fps WebM in the Clipper | §20 | 📋 Ships with Clipper |
+
+### ⏭️ Skipped / Blocked
+
+| Feature | Reason |
+|---|---|
+| Frame Buffer / Echo (Phase B) | Butterchurn's built-in `echo_alpha` / `decay` / `echo_zoom` already covers this — skip |
+| Seamless Video Loop | Three hard browser walls — do not retry. See §26. |
+
+### 📋 Future (after Clipper is stable)
+
+| Feature | § | Notes |
+|---|---|---|
+| Layer Processing Panel — Chroma Key, Frame Diff, Blur/Desat background | §22 | Canvas-first, no AI needed |
+| Subject Isolation — YOLO/SAM WASM pipeline | §23 | Long-term, not prioritized |
+
+---
+
 ## 1. Executive Summary
 
 Video layers would extend the existing image layer system (5 layers, GLSL compositing) to support video files (MP4, WebM, potentially GIFV). The architecture can reuse ~70% of the image layer controls while adding video-specific playback and color-grading features.
@@ -392,31 +432,20 @@ Same JSON bundle format as presets, but video BLOBs make files large. May need:
 
 ## 11. Phased Implementation Sketch (Simplified Model)
 
-### Phase 1: Core Video Playback (MVP) — No Tiling, Hard 720p
-- **Upload guard:** Reject videos > 720p (1280×720)
-- **Upload flow:** MP4/WebM → detect → create video layer (defaults: scale=0.6, blend=screen, tile=off)
-- **Texture pipeline:** Video element → canvas 2D → `gl.texSubImage2D` each frame
-- **Playback controls:** Play/pause/scrub, Loop on/off
-- **Transform controls:** Scale, Opacity, Spin, Orbit, Mirror (all reuse existing code)
-- **Limit:** 2 video layers max (performance guard)
+### Phase 1: Core Video Playback (MVP) — ✅ COMPLETE (May 7, 2026)
+- Upload guard, MP4/WebM drag-in, play/pause/scrub, loop, scale/opacity/transform controls
 
-### Phase 2: Color Grading
+### Phase 2: Color Grading — ✅ COMPLETE (May 9, 2026)
 - Brightness, Contrast, Gamma in GLSL (applied after texture sample)
 
-### Phase 3: Audio Reactivity
-- Pulse, Beat Fade, Bounce, Shake (already work — no new code needed)
+### Phase 3: Audio Reactivity — ✅ COMPLETE (May 9, 2026)
+- Pulse, Beat Fade, Bounce, Shake — all reuse existing code, worked immediately
 
-### Phase 4: Video Optimizer (Conversion Library)
-- **Library:** FFmpeg.wasm (lazy-loaded, ~25MB)
-- **Trigger:** Detect oversized upload → offer conversion modal
-- **Output:** 720p H.264, 30fps, consistent bitrate
-- **Progress:** Show transcoding progress (~30-60s for 1min 1080p)
-- **Result:** Store optimized video, discard original
+### Phase 4: Video Optimizer (Auto-Transcoding) — ✅ COMPLETE (May 9, 2026)
+- FFmpeg.wasm lazy-loaded ~25MB, auto-converts 4K/1080p to 720p on upload with progress toasts
 
-### Phase 5: Polish
-- Trim in/out
-- Ping-pong loop
-- Speed control (0.25x–4x)
+### Phase 5: Polish — ✅ COMPLETE (May 9–11, 2026)
+- Speed control 0.25×–4×, Width/Height sliders (May 11), Video Border (May 11)
 
 ---
 
@@ -1007,10 +1036,10 @@ Building it once unlocks an entire category of temporal effects.
 
 ---
 
-## 16. Video Clip Editor / Sampler — Background Brainstorm
+## 18. Video Clip Editor / Sampler — Background Brainstorm
 
-> **Status:** 📋 **Superseded by §17** — Architectural decisions made May 10, 2026  
-> **See:** §17 (Clipper refined spec), §18 (GIF→WebM), §19 (Export formats), §20 (AI future)
+> **Status:** 📋 **Superseded by §19** — Architectural decisions made May 10, 2026  
+> **See:** §19 (Clipper refined spec), §20 (GIF→WebM), §21 (Export formats), §23 (AI future)
 
 ### 16.1 Vision: Video Sampler Mode
 
@@ -1152,11 +1181,11 @@ Pure video editing — NO processing/beat detection (already in app). Just clip 
 
 ---
 
-*Document created for brainstorming session.* Simplified spec reflects May 7, 2026 discussion — no tiling, single-quad video layers with mirror-based duplication. VJ effects brainstorm added May 8, 2026. Performance monitoring section added May 9, 2026. Video clip editor brainstorm added May 9, 2026. Clipper refined spec + GIF→WebM added May 10, 2026.*
+*Document created for brainstorming session. Simplified spec reflects May 7, 2026 discussion — no tiling, single-quad video layers with mirror-based duplication. VJ effects brainstorm added May 8, 2026. Performance monitoring section added May 9, 2026. Video clip editor brainstorm added May 9, 2026. Clipper refined spec + GIF→WebM added May 10, 2026. Section renumber + status audit May 12, 2026.*
 
 ---
 
-## 17. Clipper — `/clipper.html` — Refined Spec
+## 19. Clipper — `/clipper.html` — Refined Spec
 
 > **Status:** 📋 **Active Planning**  
 > **Decision:** Integrated directly into the DiscoCast project — not a separate app.
@@ -1284,7 +1313,7 @@ Muted:       #5A5A7A
 
 ---
 
-## 18. GIF → WebM Conversion
+## 20. GIF → WebM Conversion
 
 > **Status:** 📋 **Planned for Phase 1** — Add to `videoTranscoder.js`  
 > **Value:** Converts messy internet GIFs into clean, speed-controllable WebM loops for DiscoCast
@@ -1347,13 +1376,13 @@ ffmpeg -i input.gif -c:v libvpx-vp9 -b:v 0 -crf 30 -pix_fmt yuva420p -r 30 outpu
 | Use case | Format |
 |---|---|
 | Import GIF from internet | Convert to WebM on import — use WebM in DiscoCast |
-| Need transparency (silhouette) | WebM VP9 `yuva420p` — Chrome/Windows only (see §19) |
+| Need transparency (silhouette) | WebM VP9 `yuva420p` — Chrome/Windows only (see §21) |
 | Share outside DiscoCast | GIF (universal) |
 | Maximum quality/smoothness in DiscoCast | WebM always |
 
 ---
 
-## 19. Export Format Decision (Cross-Platform Safe)
+## 21. Export Format Decision (Cross-Platform Safe)
 
 > Cross-platform video quirks (WKWebView `playsInline`, blob URL lifecycle, SharedArrayBuffer) are already solved in DiscoCast — §14 covers the established patterns. The clipper inherits those fixes directly.
 
@@ -1368,7 +1397,7 @@ ffmpeg -i input.gif -c:v libvpx-vp9 -b:v 0 -crf 30 -pix_fmt yuva420p -r 30 outpu
 
 ---
 
-## 21. Layer Processing Panel — New Sliders in Preset Studio
+## 22. Layer Processing Panel — New Sliders in Preset Studio
 
 > **Status:** 📋 **Planned — Phase 2** (after clipper ships)  
 > **Where:** New collapsible section in `src/editor/inspector.js`, video layer controls only  
@@ -1437,7 +1466,7 @@ These apply *after* any isolation method — canvas tools, YOLO, or SAM:
 
 ---
 
-## 20. Subject Isolation — Future Phase (Brief)
+## 23. Subject Isolation — Future Phase (Brief)
 
 > **Status:** 📋 **Not prioritized** — concept only until Phase 1 clipper is stable
 
@@ -1457,7 +1486,7 @@ New files when this is built: `src/processing/segmentEngine.js`, `onnxEngine.js`
 
 ---
 
-## 21. Width/Height Sliders — ✅ COMPLETE (May 11, 2026)
+## 24. Width/Height Sliders — ✅ COMPLETE (May 11, 2026)
 
 Independent Width and Height sliders for video layers. Uses existing `tileScaleX`/`tileScaleY` properties (already in video entry defaults). Shader non-tiled path uses `aspectPreScale()` which bakes both values into UV scaling. Center never drifts — dividing centered `_u` by any scalar leaves `_u=0` at center.
 
@@ -1465,9 +1494,9 @@ Independent Width and Height sliders for video layers. Uses existing `tileScaleX
 
 ---
 
-## 22. Video Border — Width / Color / Feather
+## 25. Video Border — Width / Color / Feather
 
-> **Status:** 📋 Planned — video only, no tiling involved
+> **Status:** ✅ COMPLETE — video only, no tiling involved
 
 A colored border ring drawn just outside the video quad edge. For video layers only.
 
@@ -1514,7 +1543,7 @@ The non-tiled pipeline already computes `_rd` (signed distance from video edge, 
 
 ---
 
-## 23. Seamless Video Loop — ❌ BLOCKED (May 2026)
+## 26. Seamless Video Loop — ❌ BLOCKED (May 2026)
 
 > **Status:** ❌ Attempted and reverted — blocked by three fundamental browser limitations
 > **Decision:** Do not retry the canvas crossfade approach. Document blockers here for future reference.
@@ -1558,7 +1587,7 @@ The technically correct approach is MSE (`MediaSource` + `SourceBuffer`). Append
 
 ### 23.4 Actual Best Practice for VJ Loops
 
-The correct fix is in the **content**, not the player. A video trimmed so frame 0 visually matches the last frame produces an invisible hard cut — no code needed. The Clipper (§17) gives users exactly this tool.
+The correct fix is in the **content**, not the player. A video trimmed so frame 0 visually matches the last frame produces an invisible hard cut — no code needed. The Clipper (§19) gives users exactly this tool.
 
 The existing 1–4 frame hard cut is less distracting to a VJ audience than a 400ms dissolve firing on every loop cycle.
 
