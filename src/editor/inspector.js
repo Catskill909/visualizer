@@ -5060,7 +5060,8 @@ export class EditorInspector {
                 `  float _shiftT = clamp(_sr * ${shift}, 0.0, 1.0);\n` +
                 `  vec3 _colA = vec3(${aR}, ${aG}, ${aB});\n` +
                 `  vec3 _colB = vec3(${bR}, ${bG}, ${bB});\n` +
-                `  vec3 col = mix(_colA, _colB, _shiftT) * _breath * _pulse;\n`;
+                `  vec3 col = mix(_colA, _colB, _shiftT) * _breath * _pulse;\n` +
+                (_po < 1.0 ? `  col *= ${_po.toFixed(4)};\n` : '');
         } else {
             base = uvFold + `  vec3 col = ${mainSample};\n`;
         }
