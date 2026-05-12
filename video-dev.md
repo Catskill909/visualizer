@@ -1514,225 +1514,57 @@ The non-tiled pipeline already computes `_rd` (signed distance from video edge, 
 
 ---
 
-## 23. Seamless Video Loop — Dual-Element Crossfade
+## 23. Seamless Video Loop — ❌ BLOCKED (May 2026)
 
-> **Status:** 📋 Planned — implementation-ready spec  
-> **Goal:** Eliminate the 1–4 frame cut that occurs at every video loop point
+> **Status:** ❌ Attempted and reverted — blocked by three fundamental browser limitations
+> **Decision:** Do not retry the canvas crossfade approach. Document blockers here for future reference.
 
-### 23.1 Why the Cut Exists
+### 23.1 What Was Attempted
 
-The current loop path (`ended` → `currentTime = 0` → `play()`) always has a gap:
+A dual `<video>` element crossfade: a secondary element sits paused at frame 0, starts playing 400ms before the primary ends, and both are blended on the 2D canvas using `globalAlpha` before `texSubImage2D` upload. Implemented, tested, fully reverted.
 
-1. `ended` fires one frame *after* the last frame is displayed
-2. `currentTime = 0` seek takes 1–3 frames to resolve (WKWebView is worse)
-3. `play()` has an additional async startup cost
-4. Result: 1–4 frames of black or a frozen last frame at every splice
+### 23.2 Why It Failed — Three Separate Walls
 
-Even native `video.loop = true` has this — the HTML spec permits a discontinuity at the loop point, and WKWebView exploits it.
+#### Wall 1: Premultiplied Alpha Color Corruption
 
-### 23.2 Approach: Dual Video Element Canvas Crossfade
-
-Two `<video>` elements per layer. The secondary stays paused at `currentTime = 0`. In `_tickVideoAnimations()` — which already draws to a 2D canvas before `texSubImage2D` — detect "near end" and blend both elements on the canvas using `globalAlpha`. The crossfade lives entirely in the existing canvas upload step. No GLSL changes, no new uniforms, no impact on Beat Fade.
+Canvas 2D stores pixels internally in premultiplied format (`R×A, G×A, B×A, A`). When `getImageData()` reads them back it un-multiplies — but using integers, so precision is lost:
 
 ```
-video frame (primary, fading out)  ──┐
-                                      canvas blend  →  texSubImage2D  →  GLSL  →  _op (Beat Fade)
-video frame (secondary, fading in) ──┘
-↑ seamless crossfade lives here                         ↑ Beat Fade unchanged
+Draw: RGB(200, 100, 50) at globalAlpha=0.5
+Canvas stores: RGB(100, 50, 25) at A=128   ← premultiplied integers
+getImageData: RGB(200, 98, 50) at A=128    ← 100/128*255 rounds wrong
 ```
 
-**Why not reuse Beat Fade:** Beat Fade operates in GLSL on `_op` (layer-vs-scene opacity). The loop crossfade operates in 2D canvas on raw pixel data *before* the texture exists in WebGL. They are independent and stack naturally — Beat Fade applies on top of the already-crossfaded texture.
+During the crossfade window, any pixel drawn at `globalAlpha < 1.0` has corrupted RGB values when read back. Worse, partial-alpha pixels uploaded to WebGL let the Butterchurn background bleed through the video texture — which reads visually as the background palette shifting on every loop cycle.
 
-### 23.3 Resource Cost
+**This is not fixable** by reordering draw calls. It is structural: `canvas 2D → getImageData → WebGL texSubImage2D` cannot carry partial-alpha pixels without color loss.
 
-Almost none. The expensive operation is `getImageData()` (CPU readback), which is unchanged — still one readback per frame regardless. During the ~400ms crossfade window per loop cycle, there is one extra `drawImage` call. The secondary video element holds one decoded frame (~3MB at 720p) and is otherwise idle.
+#### Wall 2: Source-Over Compositing Darkens the Midpoint
 
-### 23.4 Execution Trace
+Even with the correct draw order, `source-over` is not a linear crossfade. At `t=0.5` the composited result is visibly darker than either source frame. The only mathematically correct DOM crossfade requires `mix-blend-mode: plus-lighter` — a CSS-only property with no equivalent in the canvas 2D / WebGL pipeline.
 
-**Normal playback (>400ms before loop end):**
-```
-primary.currentTime → 5.2s / 10.0s
-timeLeft = 4.8s  →  > CROSSFADE_DURATION
-→ drawImage(primary) only  →  getImageData  →  texSubImage2D
-```
+#### Wall 3: Dual Decoder Jank
 
-**Crossfade window starts (≤400ms before end):**
-```
-primary.currentTime → 9.6s / 10.0s
-timeLeft = 0.4s  →  ≤ CROSSFADE_DURATION
-→ secondary.currentTime = 0; secondary.play()  ← starts secondary
-→ t = timeLeft / CROSSFADE_DURATION = 1.0 → 0.0 over 400ms
-→ clearRect()
-→ globalAlpha = t;     drawImage(primary)     ← fading out
-→ globalAlpha = 1-t;   drawImage(secondary)   ← fading in
-→ globalAlpha = 1.0
-→ getImageData  →  texSubImage2D
-```
+Spawning a second `<video>` element forces the browser to run two simultaneous hardware decode pipelines for the same file. When the secondary starts playing 400ms before the primary ends, both decoders compete — causing visible stutter in the primary. WKWebView is especially sensitive to this.
 
-**Primary ends (swap roles):**
-```
-primary.ended = true  (or currentTime ≥ duration)
-→ anim.videoElement   = secondary  ← new primary (already playing)
-→ anim.videoElementB  = primary    ← new secondary
-→ old primary: pause(), currentTime = 0  ← ready for next loop
-→ anim.crossfading = false
-```
+### 23.3 The Only Real Solution: Media Source Extensions
 
-**Next loop cycle:** secondary (now called primary) plays normally until 400ms before *its* end, at which point the original primary is now the secondary and crossfades back in. They alternate every cycle.
+The technically correct approach is MSE (`MediaSource` + `SourceBuffer`). Append the same video segment repeatedly with an adjusted `timestampOffset` — the `<video>` element sees one continuous, gapless stream with no seek gap, ever.
 
-### 23.5 Touch Points — 3 Changes, All in `visualizer.js`
+**Why it is still off the table:**
+- Requires video encoded as **fragmented MP4** — not standard MP4/WebM
+- `MediaSource` is not available in **WKWebView** on macOS (our primary shipped target)
+- Would require FFmpeg.wasm to re-encode every imported video at add-time
 
-`inspector.js` is untouched. All existing inspector controls (play/pause, loop checkbox, scrub, speed) read `anim.videoElement`, which always points to the current primary after each swap.
+### 23.4 Actual Best Practice for VJ Loops
 
-#### Touch Point 1: `_loadVideoTexture()` — ~line 1244
+The correct fix is in the **content**, not the player. A video trimmed so frame 0 visually matches the last frame produces an invisible hard cut — no code needed. The Clipper (§17) gives users exactly this tool.
 
-After the existing upload canvas creation, before `videoElement.loop = true`:
+The existing 1–4 frame hard cut is less distracting to a VJ audience than a 400ms dissolve firing on every loop cycle.
 
-```javascript
-// Secondary element for seamless crossfade
-const CROSSFADE_DURATION = 0.4; // seconds — cap at 30% of video duration for short clips
-const videoElementB = document.createElement('video');
-videoElementB.src = videoElement.src;  // same blob URL — already kept alive by _videoUrl
-videoElementB.playsInline = true;
-videoElementB.muted = true;
-videoElementB.preload = 'metadata';
-videoElementB.style.cssText = videoElement.style.cssText;  // same off-screen style
-document.body.appendChild(videoElementB);
-videoElementB.currentTime = 0;  // pre-seek to start
-```
+### 23.5 Future Path (If Revisited)
 
-Register entry with secondary added:
-
-```javascript
-this._videoAnimations.set(name, {
-  videoElement,       // current primary (updated in-place after each swap)
-  videoElementB,      // current secondary
-  gl, texture, width, height, uploadCanvas, uploadCtx,
-  crossfading: false,
-  CROSSFADE_DURATION  // may be clamped per video after duration is known
-});
-```
-
-Modify `ended` listener (WKWebView fallback — fires if crossfade was skipped because secondary wasn't ready):
-
-```javascript
-videoElement.addEventListener('ended', () => {
-  const anim = this._videoAnimations.get(name);
-  if (!anim || !videoElement.loop) return;
-  if (anim.crossfading && anim.videoElementB.readyState >= 2) {
-    // Crossfade already in progress — just do the swap
-    _doSwap(anim);
-  } else {
-    // Fallback hard restart (secondary wasn't ready in time)
-    videoElement.currentTime = 0;
-    videoElement.play().catch(() => {});
-  }
-});
-```
-
-#### Touch Point 2: `_tickVideoAnimations()` — ~line 1359
-
-Replace the single `drawImage` line with crossfade-aware logic:
-
-```javascript
-_tickVideoAnimations() {
-  if (this._videoAnimations.size === 0) return;
-  for (const [, anim] of this._videoAnimations) {
-    const { gl, texture, width, height, uploadCanvas, uploadCtx } = anim;
-    const primary = anim.videoElement;
-    const secondary = anim.videoElementB;
-
-    if (primary.paused || primary.ended) continue;
-    if (primary.readyState < 2) continue;
-
-    const FADE = Math.min(anim.CROSSFADE_DURATION, primary.duration * 0.3);
-    const timeLeft = primary.duration - primary.currentTime;
-
-    // Enter crossfade window
-    if (!anim.crossfading && isFinite(primary.duration) && timeLeft <= FADE) {
-      anim.crossfading = true;
-      secondary.currentTime = 0;
-      secondary.play().catch(() => {});
-    }
-
-    // Draw frame(s) to canvas
-    uploadCtx.clearRect(0, 0, width, height);
-    if (anim.crossfading && secondary.readyState >= 2) {
-      const t = Math.max(0, Math.min(1, timeLeft / FADE));
-      uploadCtx.globalAlpha = t;
-      uploadCtx.drawImage(primary, 0, 0, width, height);    // fading out
-      uploadCtx.globalAlpha = 1 - t;
-      uploadCtx.drawImage(secondary, 0, 0, width, height);  // fading in
-      uploadCtx.globalAlpha = 1.0;
-
-      // Swap when primary is done
-      if (primary.ended || timeLeft <= 0.016) {
-        _doSwap(anim);
-      }
-    } else {
-      uploadCtx.drawImage(primary, 0, 0, width, height);    // normal
-    }
-
-    // getImageData + texSubImage2D — unchanged
-    const frameData = uploadCtx.getImageData(0, 0, width, height).data;
-    // ... rest of upload unchanged
-  }
-}
-
-function _doSwap(anim) {
-  const oldPrimary = anim.videoElement;
-  anim.videoElement  = anim.videoElementB;  // secondary becomes primary
-  anim.videoElementB = oldPrimary;           // old primary becomes secondary
-  oldPrimary.pause();
-  oldPrimary.currentTime = 0;
-  anim.crossfading = false;
-}
-```
-
-#### Touch Point 3: `removeVideoAnimation()` — ~line 1021
-
-Add cleanup of secondary element:
-
-```javascript
-removeVideoAnimation(name) {
-  const anim = this._videoAnimations.get(name);
-  if (anim) {
-    for (const el of [anim.videoElement, anim.videoElementB]) {
-      if (!el) continue;
-      el.pause();
-      el.src = '';
-      if (el.parentNode) el.parentNode.removeChild(el);
-    }
-  }
-  this._videoAnimations.delete(name);
-}
-```
-
-### 23.6 Edge Cases
-
-| Scenario | Handling |
-|---|---|
-| **Video duration < 2× CROSSFADE** | `FADE = Math.min(0.4, duration * 0.3)` — cap at 30% |
-| **Secondary not ready in time** | Fall through to normal `drawImage(primary)` — hard cut as fallback |
-| **`loop = false`** | Crossfade still runs but `ended` listener does nothing; `_doSwap` never called since `timeLeft ≤ 0` would require loop to continue — harmless |
-| **User scrubs primary** | `anim.crossfading = false`, secondary pauses naturally on next tick since primary isn't ending |
-| **Two video layers simultaneous** | Each `_videoAnimations` entry is independent — no interaction |
-
-### 23.7 What Is NOT Changing
-
-- No GLSL changes
-- No new uniforms or shader rebuilds
-- No inspector.js changes
-- No changes to Beat Fade, Pulse, Bounce, or any other audio-reactive controls
-- No new UI controls — seamless looping is automatic and always on
-- Blob URL lifecycle management unchanged (`_videoUrl` on the texObj keeps both elements' shared URL alive)
-
-### 23.8 Testing Checklist
-
-- [ ] Loop plays without visible cut on Chrome/Safari/Firefox
-- [ ] Loop plays without visible cut on macOS Tauri (WKWebView)
-- [ ] `removeVideoAnimation` cleans up both elements (no DOM leak)
-- [ ] Play/pause/scrub controls in inspector still work (they target `anim.videoElement` = current primary)
-- [ ] Loop checkbox disabling stops crossfade correctly
-- [ ] Short video (< 1s) doesn't break (FADE clamping)
-- [ ] Two simultaneous video layers both loop cleanly
+If MSE becomes available in WKWebView or the macOS requirement is dropped:
+1. Use FFmpeg.wasm (already in project) to re-encode imported video as fragmented MP4 at upload time
+2. Fetch the ArrayBuffer, manage a `SourceBuffer` append loop with `timestampOffset` advancement
+3. Feed the MSE-backed `<video>` element into the existing `_tickVideoAnimations` texture upload — no canvas changes needed
