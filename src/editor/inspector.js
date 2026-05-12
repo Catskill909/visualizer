@@ -13,7 +13,7 @@
  *  All three swatches can be freely overridden after applying a palette.
  */
 
-import { createCustomPreset, saveCustomPreset, getImage, storeImage, generateId } from '../customPresets.js';
+import { createCustomPreset, saveCustomPreset, getImage, storeImage, generateId, buildMotionReactFrameEqs } from '../customPresets.js';
 import {
     parseGifFile, processGifFrames, generateFrameStrip,
     shouldOptimize, getRecommendedSettings, formatBytes,
@@ -4920,66 +4920,12 @@ export class EditorInspector {
 
     _buildRuntimePreset(state) {
         const runtime = deepClone(state);
-        const injected = this._buildMotionReactFrameEqs(state.motionReact);
+        const injected = buildMotionReactFrameEqs(state.motionReact);
         const baseFrame = runtime.frame_eqs_str || '';
         runtime.frame_eqs_str = injected
             ? `${baseFrame}\n${injected}`.trim()
             : baseFrame;
         return runtime;
-    }
-
-    _buildMotionReactFrameEqs(mr) {
-        // butterchurn compiles frame_eqs_str as JavaScript with `a` as scope.
-        // Use a.* properties and Math.* helpers (not bare MilkDrop identifiers).
-        const conf = mr || BLANK.motionReact;
-        const srcMap = { bass: 'a.bass', mid: 'a.mid', treb: 'a.treb', vol: 'a.vol' };
-        const src = srcMap[conf.source] || 'a.bass';
-        const curve = conf.curve || 'linear';
-
-        const zoomAmt = Number(conf.zoomAmt || 0).toFixed(4);
-        const rotAmt = Number(conf.rotAmt || 0).toFixed(4);
-        const warpAmt = Number(conf.warpAmt || 0).toFixed(4);
-        const warpSpeedAmt = Number(conf.warpSpeedAmt || 0).toFixed(4);
-        const driftXAmt = Number(conf.driftXAmt || 0).toFixed(4);
-        const driftYAmt = Number(conf.driftYAmt || 0).toFixed(4);
-        const pulseAmp = Number(conf.pulseAmp || 0).toFixed(4);
-        const bounceAmp = Number(conf.bounceAmp || 0).toFixed(4);
-        const shakeAmp = Number(conf.shakeAmp || 0).toFixed(4);
-        const beatFadeAmp = Number(conf.beatFadeAmp || 0).toFixed(4);
-        const strobeAmp = Number(conf.strobeAmp || 0).toFixed(4);
-        const shrink = conf.shrink ? 1 : 0;
-
-        const hasAny = [zoomAmt, rotAmt, warpAmt, warpSpeedAmt, driftXAmt, driftYAmt,
-            pulseAmp, bounceAmp, shakeAmp, beatFadeAmp, strobeAmp]
-            .some(v => Math.abs(Number(v)) > 0.00001);
-        if (!hasAny) return '';
-
-        let curveExpr = '_mr_raw';
-        if (curve === 'squared') curveExpr = '_mr_raw*_mr_raw';
-        else if (curve === 'cubed') curveExpr = '_mr_raw*_mr_raw*_mr_raw';
-        else if (curve === 'threshold') curveExpr = 'Math.max(0,Math.min(1,(_mr_raw-0.3)*8))';
-
-        return [
-            `var _mr_raw=${src};`,
-            `var _mr=${curveExpr};`,
-            `a.zoom=Math.max(0.30,Math.min(2.50,a.zoom+_mr*${zoomAmt}));`,
-            `a.rot=Math.max(-2.00,Math.min(2.00,a.rot+_mr*${rotAmt}));`,
-            `a.warp=Math.max(0.00,Math.min(5.00,a.warp+_mr*${warpAmt}));`,
-            `a.warpanimspeed=Math.max(0.05,Math.min(5.00,a.warpanimspeed+_mr*${warpSpeedAmt}));`,
-            `a.dx=Math.max(-0.25,Math.min(0.25,a.dx+_mr*${driftXAmt}));`,
-            `a.dy=Math.max(-0.25,Math.min(0.25,a.dy+_mr*${driftYAmt}));`,
-            `var _pulseDir=${shrink ? '-1.0' : '1.0'};`,
-            `a.zoom=Math.max(0.30,Math.min(2.50,a.zoom+(_mr*${pulseAmp}*0.0600*_pulseDir)));`,
-            `a.dy=Math.max(-0.25,Math.min(0.25,a.dy+(Math.sin(a.time*16.0)*_mr*${bounceAmp}*0.0200)));`,
-            `var _shake=(Math.sin(a.time*57.0)+Math.sin(a.time*91.0))*0.5;`,
-            `a.dx=Math.max(-0.25,Math.min(0.25,a.dx+(_shake*_mr*${shakeAmp}*0.0150)));`,
-            `a.rot=Math.max(-2.00,Math.min(2.00,a.rot+(_shake*_mr*${shakeAmp}*0.0800)));`,
-            // Beat Fade: proportional reduction so it respects preset-native decay value
-            `a.decay=Math.max(0.85,a.decay*(1.0-(_mr*${beatFadeAmp}*0.0400)));`,
-            // Strobe: multiplicative brightness spike — scales from preset-native gammaadj, never blows past 4.0
-            `var _strobe=(_mr>0.40)?1.0:0.0;`,
-            `a.gammaadj=Math.max(0.50,Math.min(4.00,a.gammaadj*(1.0+(_strobe*${strobeAmp}*0.6000))));`,
-        ].join('\n');
     }
 
     _applyToEngine(skipTextures = false) {

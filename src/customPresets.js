@@ -71,34 +71,12 @@ export function deleteCustomPreset(id) {
  * Create a new custom preset from a source preset object + user-provided name.
  * Returns the saved record.
  */
-export function createCustomPreset({
-    name,
-    baseVals = {},
-    shapes = [],
-    waves = [],
-    warp = '',
-    comp = '',
-    init_eqs_str = '',
-    frame_eqs_str = '',
-    pixel_eqs_str = '',
-    images = [],
-    parentPresetName = null,
-}) {
+export function createCustomPreset(data) {
     const id = generateId();
     return saveCustomPreset({
+        ...data,
         id,
-        name,
         schemaVersion: SCHEMA_VERSION,
-        baseVals,
-        shapes,
-        waves,
-        warp,
-        comp,
-        init_eqs_str,
-        frame_eqs_str,
-        pixel_eqs_str,
-        images,
-        parentPresetName,
         createdAt: Date.now(),
         updatedAt: Date.now(),
     });
@@ -392,4 +370,64 @@ export async function importFromFile(json) {
         }
     }
     return { imported, names, failed };
+}
+
+// ---------------------------------------------------------------------------
+// Motion reactivity — frame equation injection
+// Shared by the editor (runtime preview) and the player (preset registration).
+// ---------------------------------------------------------------------------
+
+/**
+ * Build the frame_eqs_str snippet that drives MilkDrop motion reactivity.
+ * Returns an empty string when all amounts are zero (no-op preset).
+ * @param {object} mr - preset.motionReact object (may be null/undefined)
+ */
+export function buildMotionReactFrameEqs(mr) {
+    const conf = mr || {};
+    const srcMap = { bass: 'a.bass', mid: 'a.mid', treb: 'a.treb', vol: 'a.vol' };
+    const src = srcMap[conf.source] || 'a.bass';
+    const curve = conf.curve || 'linear';
+
+    const zoomAmt      = Number(conf.zoomAmt      || 0).toFixed(4);
+    const rotAmt       = Number(conf.rotAmt        || 0).toFixed(4);
+    const warpAmt      = Number(conf.warpAmt       || 0).toFixed(4);
+    const warpSpeedAmt = Number(conf.warpSpeedAmt  || 0).toFixed(4);
+    const driftXAmt    = Number(conf.driftXAmt     || 0).toFixed(4);
+    const driftYAmt    = Number(conf.driftYAmt     || 0).toFixed(4);
+    const pulseAmp     = Number(conf.pulseAmp      || 0).toFixed(4);
+    const bounceAmp    = Number(conf.bounceAmp     || 0).toFixed(4);
+    const shakeAmp     = Number(conf.shakeAmp      || 0).toFixed(4);
+    const beatFadeAmp  = Number(conf.beatFadeAmp   || 0).toFixed(4);
+    const strobeAmp    = Number(conf.strobeAmp     || 0).toFixed(4);
+    const shrink       = conf.shrink ? 1 : 0;
+
+    const hasAny = [zoomAmt, rotAmt, warpAmt, warpSpeedAmt, driftXAmt, driftYAmt,
+        pulseAmp, bounceAmp, shakeAmp, beatFadeAmp, strobeAmp]
+        .some(v => Math.abs(Number(v)) > 0.00001);
+    if (!hasAny) return '';
+
+    let curveExpr = '_mr_raw';
+    if (curve === 'squared')   curveExpr = '_mr_raw*_mr_raw';
+    else if (curve === 'cubed') curveExpr = '_mr_raw*_mr_raw*_mr_raw';
+    else if (curve === 'threshold') curveExpr = 'Math.max(0,Math.min(1,(_mr_raw-0.3)*8))';
+
+    return [
+        `var _mr_raw=${src};`,
+        `var _mr=${curveExpr};`,
+        `a.zoom=Math.max(0.30,Math.min(2.50,a.zoom+_mr*${zoomAmt}));`,
+        `a.rot=Math.max(-2.00,Math.min(2.00,a.rot+_mr*${rotAmt}));`,
+        `a.warp=Math.max(0.00,Math.min(5.00,a.warp+_mr*${warpAmt}));`,
+        `a.warpanimspeed=Math.max(0.05,Math.min(5.00,a.warpanimspeed+_mr*${warpSpeedAmt}));`,
+        `a.dx=Math.max(-0.25,Math.min(0.25,a.dx+_mr*${driftXAmt}));`,
+        `a.dy=Math.max(-0.25,Math.min(0.25,a.dy+_mr*${driftYAmt}));`,
+        `var _pulseDir=${shrink ? '-1.0' : '1.0'};`,
+        `a.zoom=Math.max(0.30,Math.min(2.50,a.zoom+(_mr*${pulseAmp}*0.0600*_pulseDir)));`,
+        `a.dy=Math.max(-0.25,Math.min(0.25,a.dy+(Math.sin(a.time*16.0)*_mr*${bounceAmp}*0.0200)));`,
+        `var _shake=(Math.sin(a.time*57.0)+Math.sin(a.time*91.0))*0.5;`,
+        `a.dx=Math.max(-0.25,Math.min(0.25,a.dx+(_shake*_mr*${shakeAmp}*0.0150)));`,
+        `a.rot=Math.max(-2.00,Math.min(2.00,a.rot+(_shake*_mr*${shakeAmp}*0.0800)));`,
+        `a.decay=Math.max(0.85,a.decay*(1.0-(_mr*${beatFadeAmp}*0.0400)));`,
+        `var _strobe=(_mr>0.40)?1.0:0.0;`,
+        `a.gammaadj=Math.max(0.50,Math.min(4.00,a.gammaadj*(1.0+(_strobe*${strobeAmp}*0.6000))));`,
+    ].join('\n');
 }

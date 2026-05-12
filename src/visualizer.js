@@ -7,7 +7,7 @@ import butterchurnPresetsImport from 'butterchurn-presets';
 import butterchurnPresetsExtra from 'butterchurn-presets/lib/butterchurnPresetsExtra.min.js';
 import butterchurnPresetsExtra2 from 'butterchurn-presets/lib/butterchurnPresetsExtra2.min.js';
 import butterchurnPresetsMD1 from 'butterchurn-presets/lib/butterchurnPresetsMD1.min.js';
-import { loadAllCustomPresets, CUSTOM_PREFIX, registryKey, getImage } from './customPresets.js';
+import { loadAllCustomPresets, CUSTOM_PREFIX, registryKey, getImage, buildMotionReactFrameEqs } from './customPresets.js';
 import { parseGIF, decompressFrames } from 'gifuct-js';
 
 // Baron pack: bypass the package's runtime `await import()` loop (which would cause
@@ -513,6 +513,12 @@ export class VisualizerEngine {
         preset.init_eqs_str = preset.init_eqs || '';
         preset.frame_eqs_str = preset.frame_eqs || '';
         preset.pixel_eqs_str = preset.pixel_eqs || '';
+      }
+      // Inject motionReact equations so the player honours Motion tab reactivity.
+      const mrInjected = buildMotionReactFrameEqs(preset.motionReact);
+      if (mrInjected) {
+        const base = preset.frame_eqs_str || '';
+        preset.frame_eqs_str = base ? `${base}\n${mrInjected}` : mrInjected;
       }
       this.presets[key] = preset;
     }
