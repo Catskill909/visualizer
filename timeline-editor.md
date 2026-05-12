@@ -1,7 +1,7 @@
 # Timeline Editor — Design & Planning Doc
 
 **Status:** Phases 1–4.3 complete ✅, Phase 4.8 (Palette Opacity) shipped ✅, Phase 4.4-A + 4.5 shipped ✅, Phase 4.10-A (Real-time Live Editing) shipped ✅, Phase 4.4-B (Menu Icon UX) shipped ✅ — Next: Loop/Loop Solo transport toggles → 4.6 (Overlap Crossfade) → 4.7 (Undo/Redo) → 4.9 (Zone Stack) → 4.11 (Staging Mode) → 4.12 (Timeline Sets Switching). Phase 5 in research (Multi-monitor output). Performance Panel deferred until video processing controls are built out.  
-**Last updated:** 2026-05-12 — Added Timeline Sets concept + UI naming spec; specced Phase 4.11 (Staging Mode), Phase 4.12 (Timeline Sets Switching + My Sets panel), Phase 4.13 (Timeline Set Export/Import with metadata envelope, .dcset.json format, export modal, import preview card)  
+**Last updated:** 2026-05-12 — Deep doc audit: fixed 4.4-A/4.4-B interaction model description, removed duplicate Phase 4.5 section, renumbered 4.4 remaining sub-phases to C/D/E, updated Current State to include 4.4-B and 4.10-A, fixed Phase 4.10-A sub-headers to correct level, removed stale "Upcoming Phase 4.x" divider, noted Backlog Timeline Library → Phase 4.12-B, annotated Save & Naming section as legacy labels pending 4.12-C rename. Added Timeline Sets concept, Phase 4.11 (Staging), 4.12 (Timeline Sets Switching), 4.13 (Export/Import).  
 **Architecture:** Standalone page (`/timeline.html`) — self-contained MPA entry in Vite.
 
 ---
@@ -206,18 +206,15 @@ Markers on the ruler ARE the cue point system. The 1–9 keyboard shortcuts are 
 
 ---
 
-#### Upcoming Phase 4.x
 
----
+**✅ Phase 4.4-A — Block Action Modal (Consolidate)** *(shipped 2026-05-12, interaction model revised in 4.4-B)*
 
-**✅ Phase 4.4-A — Block Action Modal (Consolidate)** *(shipped 2026-05-12)*
-
-- **Single-click block body** → opens `#tl-quick-edit` modal directly (no more hover icon row)
+- **Single-click block body** → opened `#tl-quick-edit` modal directly *(this behavior was superseded by Phase 4.4-B — single-click is now select-only)*
 - **Duplicate + Delete** moved into the modal as a utility row below the fields, separated by a hairline
 - **Hover icon row** (`.tl-block-actions`) removed from block DOM and CSS entirely
 - **Right-click context menu** removed from block (`contextmenu` listener deleted)
 - **Click vs. drag** distinguished in `_startMoveDrag`: drag only activates after > 4px movement; clean click on `pointerup` routes to `_handleBlockClick`
-- **Double-click detection** in `_handleBlockClick`: second click within 300ms on same block → `_cueEntry` (Phase 4.5)
+- **Double-click detection** in `_handleBlockClick`: second click within 300ms on same block → `_cueEntry` (Phase 4.5) *(timing-based detection later replaced by native `dblclick` in 4.4-B)*
 - **Files:** `timelineEditor.js`, `timeline.html`, `src/timeline/style.css`
 
 **✅ Phase 4.4-B — Block Menu Icon** *(shipped 2026-05-12)*
@@ -245,15 +242,15 @@ Single-click on the block body was conflicting with double-click-to-cue and caus
 - All active loops are released on Cue (once Loop/Loop Solo buttons are built, `_cueEntry` will clear `_loopTimer` and `_loopZoneId` here)
 - **Files:** `timelineEditor.js`
 
-**⚡ Phase 4.4 — Block Action Modal (remaining sub-phases)**
+**⚡ Phase 4.4 — Block Settings Menu (remaining sub-phases)**
 
-The 4.4-A consolidation is complete. Remaining phases:
+4.4-A and 4.4-B are complete. Remaining sub-phases:
 
 | Phase | What's added |
 |-------|-------------|
-| **B — Full Edit** | "Full Edit →" deep-link into Preset Studio for this preset |
-| **C — Utilities** | Block color picker |
-| **D — Preset Controls** | Full `controls.js` panel as a new section below the fields, re-targeted to this zone's engine; live during playback |
+| **C — Full Edit** | "Full Edit →" deep-link into Preset Studio for this preset |
+| **D — Utilities** | Block color picker |
+| **E — Preset Controls** | Full `controls.js` panel as a new section below the fields, re-targeted to this zone's engine; live during playback |
 
 **Styling (prerequisite for Phase A):** Size and padding are correct — controls must stay easy to see and hit. Fix is visual hierarchy and anchoring:
 - "s" unit labels feel orphaned — should be anchored to their input (suffix inside the field, or a pill flush alongside it)
@@ -263,22 +260,6 @@ The 4.4-A consolidation is complete. Remaining phases:
 **Technical note (for Phase D):** `src/controls.js` currently targets the primary engine. For timeline zones, each zone has its own slave `VisualizerEngine` at `_zoneMap.get(zoneId).engine`. The modal re-targets controls to the correct engine on open, then restores the original target on close. No new slider widgets — just a target-swap.
 
 ---
-
-**⚡ Phase 4.5 — Double-click to Cue**
-
-Double-click any block to immediately crossfade from the currently-playing preset into that block's preset, then continue the timeline forward from that block's `startTime`. This is the VJ's primary live performance gesture — the equivalent of pressing a hot-cue button on a DJ controller.
-
-**Exact behavior:**
-1. Crossfade from whatever is currently visible in the zone into the cued preset, using the block's `blendTime` (same code path as a normal scheduled transition — `engine.loadPreset(entry.presetName, entry.blendTime)` + `_fadeZoneCover(zoneId, 0, entry.blendTime)`).
-2. Seek the timeline to `entry.startTime` — `_scrubTo(entry.startTime)` — so the scheduler continues forward from the cued block, not from wherever playback was.
-3. Release all active loops (clear `_loopTimer`, `_loopZoneId`, remove active classes from Loop/Loop Solo buttons).
-
-**Double-click disambiguates from drag:** only fire if the pointer-down and pointer-up happen within ~300ms with no significant movement (< 5px). Drag threshold must be checked first.
-
-**Why this is the right primary gesture:** the timeline is a score. Double-click is "play this now" — the show continues from the cued position. Loop/Loop Solo in the transport are the "hold this" tools. These two surfaces complement each other cleanly.
-
-**Why here (after 4.4):** Phase 4.4 removes hover icon clutter and makes single-click the edit path. Double-click is then unambiguously free for Cue.
-
 
 **⚡ Phase 4.6 — Overlap-driven Crossfade Timing**
 
@@ -370,7 +351,7 @@ The timeline should feel like a live mixing desk, not a static playlist. Block p
 
 ---
 
-### Root Cause — The Stale Timer Problem
+#### Root Cause — The Stale Timer Problem
 
 When `play()` is called, `_playZone(zoneId)` schedules every future entry as a `setTimeout` handle. These handles are stored in `_zoneTimers = Map<zoneId, timerHandle[]>`. The scheduler is a snapshot taken once at play time.
 
@@ -388,7 +369,7 @@ The engine runs the original plan. It has no knowledge that the score changed.
 
 ---
 
-### The Fix — `_rescheduleIfPlaying()`
+#### The Fix — `_rescheduleIfPlaying()`
 
 ```js
 _rescheduleIfPlaying() {
@@ -407,7 +388,7 @@ After `_rescheduleIfPlaying()`, the scheduler is a perfect snapshot of the data 
 
 ---
 
-### The Currently-Playing Preset Problem (Most Critical Edge Case)
+#### The Currently-Playing Preset Problem (Most Critical Edge Case)
 
 `_playZone` finds the active entry at `fromTime` and calls:
 ```js
@@ -446,7 +427,7 @@ Clear `_currentZonePreset` in `stop()` so a fresh `play()` always loads correctl
 
 ---
 
-### The 5 Mutation Call Sites
+#### The 6 Mutation Call Sites
 
 Every place that modifies `_tl.entries` must call `_rescheduleIfPlaying()` after the data model update:
 
@@ -464,7 +445,7 @@ Call `_rescheduleIfPlaying()` AFTER the model write, BEFORE `_renderStrip()`. St
 
 ---
 
-### Delete While Playing — Zone Blackout Edge Case
+#### Delete While Playing — Zone Blackout Edge Case
 
 If the deleted entry is the currently-playing one in its zone:
 - `_rescheduleIfPlaying()` calls `_playZone(zoneId, tNow)`
@@ -477,7 +458,7 @@ Also clear `_currentZonePreset.delete(zoneId)` for the zone when the playing ent
 
 ---
 
-### Add Block While Playing — Needs Reschedule Too
+#### Add Block While Playing — Needs Reschedule Too
 
 The `addEntry()` / preset picker `_addEntry()` path currently does not call `_rescheduleIfPlaying()`. A block added while playing is never scheduled. Add the call to the end of `addEntry()` (called from both the `+` button and the preset picker confirm path).
 
@@ -485,7 +466,7 @@ This is mutation call site #6, not listed in the Phase 4.4 quick-edit scope beca
 
 ---
 
-### Wall-clock Accuracy
+#### Wall-clock Accuracy
 
 `_scrubTo(tNow)` sets:
 ```js
@@ -498,7 +479,7 @@ This re-anchors the wall clock so that `(performance.now() - _playStartWall) / 1
 
 ---
 
-### Interaction with Loop / Loop Solo (Future)
+#### Interaction with Loop / Loop Solo (Future)
 
 When Loop or Loop Solo is active, a `_loopTimer` is running a recursive cycle. `_rescheduleIfPlaying()` calls `_scrubTo`, which must decide whether to break the loop.
 
@@ -516,7 +497,7 @@ _rescheduleIfPlaying() {
 
 ---
 
-### Sub-phases
+#### Sub-phases
 
 **4.10-A — Core (ship first, self-contained)**
 - Add `_currentZonePreset = new Map()` to constructor and `stop()` clear
@@ -532,7 +513,7 @@ _rescheduleIfPlaying() {
 
 ---
 
-### Testing Matrix
+#### Testing Matrix
 
 Run each scenario WHILE the timeline is playing:
 
@@ -553,8 +534,6 @@ Run each scenario WHILE the timeline is playing:
 | Rapid consecutive mutations | Any | No orphan timers; last reschedule wins |
 
 **Cross-platform checklist:** test on web (Chrome), then macOS app (Tauri/WKWebView). The fix is pure JS + `setTimeout` — no platform-specific behavior expected. Confirm `performance.now()` is monotonic in WKWebView (it is, but verify no offset drift over 10+ minutes of playback).
-
----
 
 ---
 
@@ -977,7 +956,7 @@ No new storage primitives needed. The existing preset export/import and timeline
 - **Auto-fill from Favorites** — button in transport to quickly fill a zone.
 - **Multi-select (Shift-click)** — bulk duration stamping and movement.
 - **Setlist text export** — plain-text or HTML table.
-- **Timeline Library modal** — replace the topbar `<select>` dropdown with a "Library" button that opens a card-grid modal (mirrors `presetLibrary.js` patterns). Each card: name, last-edited relative time, entry count, zone-layout chip, per-card Load + Delete actions. Search box, sort by recent/name, multi-select for bulk delete. Save button gains a "Save As…" dialog for new/clone flows. Discard-confirm guard when switching timelines with unsaved changes.
+- ~~**Timeline Library modal**~~ → now specced as **Phase 4.12-B — My Sets Panel**. The `<select>` dropdown will be replaced by a card-based My Sets panel with NOW/UP NEXT chips, queued switching, + New Set, Save Set, Import Set, Export Set. See Phase 4.12-B for full spec.
 - **Auto-save behavior** — debounced "draft" slot rather than spawning a new entry per page load.
 
 *Deferred — After Video Processing*
@@ -1042,7 +1021,7 @@ Same design language as the rest of the app: full-screen canvas, glassmorphic ov
 
 ## Current State — What's Built and Shipped
 
-Phases 1 through 4.3, 4.4-A, 4.5, and 4.8 are fully working. Here's an accurate picture of the running code:
+Phases 1 through 4.3, 4.4-A, 4.4-B, 4.5, 4.8, and 4.10-A are fully working. Here's an accurate picture of the running code:
 
 ### Entry point
 `timeline.html` → `src/timeline/main.js` → `TimelineEditor` class in `src/timeline/timelineEditor.js`
@@ -1426,16 +1405,18 @@ Defined in `src/timeline/style.css` `:root`:
 
 ## Save & Naming UX Design
 
+> **Note:** The labels in this section use legacy "timeline" language. The shipped UI uses these labels — the rename to "Timeline Set" language (`Save Set`, `My Sets`, etc.) is part of Phase 4.12-C. This section documents the current running code.
+
 ### The Problem
 Three distinct concerns were visually flattened into one topbar with no state differentiation:
-1. **Navigate** between timelines — the `<select>` dropdown
-2. **Name** the current timeline — the text input (same text, same size, visually parallel)
+1. **Navigate** between Timeline Sets — the `<select>` dropdown *(to be replaced by My Sets panel in Phase 4.12-B)*
+2. **Name** the current set — the text input (same text, same size, visually parallel)
 3. **Persist** the current state — Save button (fires immediately, no feedback on *what* it's doing)
 
 The `<select>` and `<input>` both showed "Untitled Timeline" with no explanation of why. Save had one label for two very different operations (first-time save vs. overwrite).
 
-### Timeline State Machine
-Every timeline is in one of three states. The UI makes the current state legible at a glance:
+### Timeline Set State Machine
+Every Timeline Set is in one of three states. The UI makes the current state legible at a glance:
 
 | State | Meaning | `_isNew()` | `_dirty` |
 |---|---|---|---|
@@ -1443,9 +1424,9 @@ Every timeline is in one of three states. The UI makes the current state legible
 | **Saved / Dirty** | In storage, has unsaved edits | `false` | `true` |
 | **Saved / Clean** | In storage, matches last save | `false` | `false` |
 
-`_isNew()` checks `!this._timelines[this._tl?.id]` — a timeline is new if its ID is not in the in-memory map (which mirrors localStorage).
+`_isNew()` checks `!this._timelines[this._tl?.id]` — a set is new if its ID is not in the in-memory map (which mirrors localStorage).
 
-### Save Button — Three Behaviors
+### Save Button — Three Behaviors *(current labels — will become "Save Set" in Phase 4.12-C)*
 | State | Button Label | Click Behavior |
 |---|---|---|
 | **New** | `Save…` (ellipsis = step follows) | Opens naming dialog |
