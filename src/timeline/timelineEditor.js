@@ -145,6 +145,13 @@ export class TimelineEditor {
         // Quick-edit
         this._qeEntryId    = null;
 
+        // Block click / cue state
+        this._cueZoneId      = null;   // guard: set during _cueEntry so _playZone skips double-load
+
+        // Live-edit reschedule: tracks which preset is currently showing in each zone.
+        // Used to skip reloading a preset that's already playing when _rescheduleIfPlaying fires.
+        this._currentZonePreset = new Map(); // Map<zoneId, presetName>
+
         // Context menu
         this._ctxEntryId   = null;
 
@@ -343,6 +350,19 @@ export class TimelineEditor {
         this._qeApply.addEventListener('click',  () => this._applyQuickEdit());
         this._qeCancel.addEventListener('click', () => this._closeQuickEdit());
 
+        document.getElementById('qe-dupe').addEventListener('click', () => {
+            if (!this._qeEntryId) return;
+            const id = this._qeEntryId;
+            this._closeQuickEdit();
+            this._duplicateEntry(id);
+        });
+        document.getElementById('qe-del').addEventListener('click', () => {
+            if (!this._qeEntryId) return;
+            const id = this._qeEntryId;
+            this._closeQuickEdit();
+            this._confirmRemoveEntry(id);
+        });
+
         this._meApply.addEventListener('click', () => this._applyMarkerEdit());
         this._meCancel.addEventListener('click', () => this._closeMarkerEdit());
         this._meDelete.addEventListener('click', () => {
@@ -433,11 +453,11 @@ export class TimelineEditor {
         });
 
         // Global pointer — close menus
+        // NOTE: #tl-quick-edit is intentionally NOT auto-dismissed on outside click.
+        // The menu icon button is the sole toggle — deliberate open/close only.
         document.addEventListener('pointerdown', e => {
             if (!this._ctxMenu.hidden && !this._ctxMenu.contains(e.target))
                 this._closeContextMenu();
-            if (!this._quickEditEl.hidden && !this._quickEditEl.contains(e.target))
-                this._closeQuickEdit();
             if (!this._markerEditEl.hidden && !this._markerEditEl.contains(e.target))
                 this._closeMarkerEdit();
         }, { capture: true });
@@ -861,6 +881,7 @@ export class TimelineEditor {
         entry.color = colorFor(presetName);
         this._tl.entries.push(entry);
         this._setDirty();
+        this._rescheduleIfPlaying();
         this._renderStrip();
     }
 
@@ -875,17 +896,22 @@ export class TimelineEditor {
 
     _removeEntry(id) {
         if (!this._tl || !id) return;
-        if (!this._playing) {
-            const entry = this._tl.entries.find(e => e.id === id);
-            if (entry) {
-                const zd = this._zoneMap.get(entry.zoneId);
-                if (zd) zd.engine.stopRenderLoop();
-                this._fadeZoneCover(entry.zoneId, 1, 0);  // instant cover
-            }
-        }
+        const entry = this._tl.entries.find(e => e.id === id);
+        const zoneId = entry?.zoneId;
+
         this._tl.entries = this._tl.entries.filter(e => e.id !== id);
         if (this._selectedId === id) this._selectedId = null;
         this._setDirty();
+
+        if (this._playing) {
+            // Reschedule: _playZone will blackout the zone if no entry is active there now
+            this._rescheduleIfPlaying();
+        } else if (zoneId) {
+            const zd = this._zoneMap.get(zoneId);
+            if (zd) zd.engine.stopRenderLoop();
+            this._fadeZoneCover(zoneId, 1, 0);
+        }
+
         this._renderStrip();
     }
 
@@ -897,6 +923,7 @@ export class TimelineEditor {
         const copy = { ...orig, id: generateId() };
         this._tl.entries.splice(idx + 1, 0, copy);
         this._setDirty();
+        this._rescheduleIfPlaying();
         this._renderStrip();
     }
 
@@ -1185,6 +1212,7 @@ export class TimelineEditor {
         block.style.width           = `${width}px`;
         block.style.backgroundColor = color + '55';
         block.style.borderColor     = color;
+        block.style.setProperty('--block-color', color);
 
         if (this._selectedId === entry.id) block.classList.add('selected');
 
@@ -1194,6 +1222,14 @@ export class TimelineEditor {
             blend.style.width = `${Math.min(entry.blendTime * this._pxPerSec, width * 0.4)}px`;
             block.appendChild(blend);
         }
+
+        // Menu icon — left side; opens/closes quick-edit modal
+        const menuBtn = document.createElement('button');
+        menuBtn.className = 'tl-block-menu-btn';
+        menuBtn.type = 'button';
+        menuBtn.title = 'Edit block';
+        menuBtn.innerHTML = '<svg width="14" height="11" viewBox="0 0 14 11" fill="currentColor"><rect y="0" width="14" height="2" rx="1"/><rect y="4.5" width="14" height="2" rx="1"/><rect y="9" width="14" height="2" rx="1"/></svg>';
+        block.appendChild(menuBtn);
 
         const body = document.createElement('div');
         body.className = 'tl-block-body';
@@ -1216,51 +1252,34 @@ export class TimelineEditor {
         block.appendChild(body);
         block.appendChild(resize);
 
-        // ── Inline action buttons (visible on hover) ──
-        const actions = document.createElement('div');
-        actions.className = 'tl-block-actions';
+        // Menu button — toggle quick-edit; stop propagation so drag doesn't start
+        menuBtn.addEventListener('pointerdown', e => e.stopPropagation());
+        menuBtn.addEventListener('click', e => {
+            e.stopPropagation();
+            if (!this._quickEditEl.hidden && this._qeEntryId === entry.id) {
+                this._closeQuickEdit();
+            } else {
+                this._openQuickEdit(entry.id, block);
+            }
+        });
 
-        const mkActionBtn = (icon, title) => {
-            const btn = document.createElement('button');
-            btn.className = 'tl-block-action';
-            btn.type = 'button';
-            btn.title = title;
-            btn.innerHTML = icon;
-            return btn;
-        };
-
-        const editBtn  = mkActionBtn('<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>', 'Edit');
-        const dupeBtn  = mkActionBtn('<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>', 'Duplicate');
-        const delBtn   = mkActionBtn('<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>', 'Delete');
-
-        editBtn.addEventListener('pointerdown', e => e.stopPropagation());
-        dupeBtn.addEventListener('pointerdown', e => e.stopPropagation());
-        delBtn.addEventListener('pointerdown',  e => e.stopPropagation());
-
-        editBtn.addEventListener('click', e => { e.stopPropagation(); this._openQuickEdit(entry.id, block); });
-        dupeBtn.addEventListener('click', e => { e.stopPropagation(); this._duplicateEntry(entry.id); });
-        delBtn.addEventListener('click',  e => { e.stopPropagation(); this._confirmRemoveEntry(entry.id); });
-
-        actions.appendChild(editBtn);
-        actions.appendChild(dupeBtn);
-        actions.appendChild(delBtn);
-        block.appendChild(actions);
-
+        // Block body — drag to move; double-click to cue
         block.addEventListener('pointerdown', e => {
-            if (e.target.closest('.tl-block-actions, .tl-block-resize')) return;
+            if (e.target.closest('.tl-block-resize')) return;
+            if (e.target.closest('.tl-block-menu-btn')) return;
             this._select(entry.id);
             this._startMoveDrag(e, entry, trackEl);
+        });
+
+        block.addEventListener('dblclick', e => {
+            if (e.target.closest('.tl-block-resize')) return;
+            if (e.target.closest('.tl-block-menu-btn')) return;
+            this._cueEntry(entry.id);
         });
 
         resize.addEventListener('pointerdown', e => {
             e.stopPropagation();
             this._startResizeDrag(e, entry, trackEl);
-        });
-
-        block.addEventListener('contextmenu', e => {
-            e.preventDefault();
-            this._select(entry.id);
-            this._openContextMenu(e, entry.id);
         });
 
         return block;
@@ -1283,14 +1302,20 @@ export class TimelineEditor {
 
         const origStartTime = entry.startTime ?? 0;
         const startX        = e.clientX;
+        const startY        = e.clientY;
         let   newStartTime  = origStartTime;
-
-        blockEl.style.zIndex     = '20';
-        blockEl.style.opacity    = '0.8';
-        blockEl.style.transition = 'none';
+        let   moved         = false;
 
         const onMove = ev => {
             const dx = ev.clientX - startX;
+            const dy = ev.clientY - startY;
+            if (!moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
+                moved = true;
+                blockEl.style.zIndex     = '20';
+                blockEl.style.opacity    = '0.8';
+                blockEl.style.transition = 'none';
+            }
+            if (!moved) return;
             newStartTime = Math.max(0, origStartTime + dx / this._pxPerSec);
             if (this._snapSec > 0) newStartTime = Math.round(newStartTime / this._snapSec) * this._snapSec;
             blockEl.style.left = `${newStartTime * this._pxPerSec}px`;
@@ -1303,9 +1328,12 @@ export class TimelineEditor {
             blockEl.style.opacity    = '';
             blockEl.style.transition = '';
 
+            if (!moved) return;
+
             entry.startTime = Math.max(0, Math.round(newStartTime));
             if (this._snapSec > 0) entry.startTime = Math.round(entry.startTime / this._snapSec) * this._snapSec;
             this._setDirty();
+            this._rescheduleIfPlaying();
             this._renderStrip();
         };
 
@@ -1338,6 +1366,7 @@ export class TimelineEditor {
             document.removeEventListener('pointermove', onMove);
             document.removeEventListener('pointerup',   onUp);
             this._setDirty();
+            this._rescheduleIfPlaying();
             this._renderStrip();
         };
 
@@ -1421,6 +1450,11 @@ export class TimelineEditor {
         const entry = this._tl?.entries.find(e => e.id === id);
         if (!entry) return;
 
+        // Deactivate any previously active menu button, then activate this one
+        document.querySelectorAll('.tl-block-menu-btn.is-active').forEach(el => el.classList.remove('is-active'));
+        const menuBtn = anchorEl?.querySelector?.('.tl-block-menu-btn') ?? anchorEl?.closest?.('.tl-block')?.querySelector('.tl-block-menu-btn');
+        if (menuBtn) menuBtn.classList.add('is-active');
+
         this._qeEntryId        = id;
         this._qeTitle.textContent = displayName(entry.presetName);
         this._qeDur.value   = entry.duration;
@@ -1447,12 +1481,46 @@ export class TimelineEditor {
         const blend = Math.max(0, Math.min(10,  parseFloat(this._qeBlend.value)   || 2));
         const label = this._qeLabel.value.trim() || null;
         this._updateEntry(this._qeEntryId, { duration: dur, blendTime: blend, label });
+        this._rescheduleIfPlaying();
         this._closeQuickEdit();
     }
 
     _closeQuickEdit() {
         this._quickEditEl.hidden = true;
         this._qeEntryId = null;
+        document.querySelectorAll('.tl-block-menu-btn.is-active').forEach(el => el.classList.remove('is-active'));
+    }
+
+    // ─── Cue — double-click a block to crossfade in and continue timeline ─────
+
+    _cueEntry(id) {
+        const entry = this._tl?.entries.find(e => e.id === id);
+        if (!entry) return;
+        const zd = this._zoneMap.get(entry.zoneId);
+        if (!zd) return;
+
+        const blend = entry.blendTime ?? 2;
+
+        // Load preset with crossfade immediately — before seeking so _playZone
+        // doesn't double-load this zone with blend 0.
+        zd.engine.loadPreset(entry.presetName, blend).catch(() => {});
+        this._currentZonePreset.set(entry.zoneId, entry.presetName);
+        this._fadeZoneCover(entry.zoneId, 0, blend);
+
+        // Guard: _scrubTo → _playZone will skip the immediate-entry load for this zone
+        this._cueZoneId = entry.zoneId;
+        this._scrubTo(entry.startTime);
+        this._cueZoneId = null;
+    }
+
+    // ─── Live-edit reschedule ─────────────────────────────────────────────────
+    // Called after any data-model mutation (drag, resize, edit, duplicate, delete, add).
+    // Cancels all stale setTimeout handles and rebuilds the schedule from the current
+    // playhead position against the updated data model. No-op when not playing.
+    _rescheduleIfPlaying() {
+        if (!this._playing) return;
+        const tNow = (performance.now() - this._playStartWall) / 1000;
+        this._scrubTo(tNow);
     }
 
     // ─── Context menu ─────────────────────────────────────────────────────────
@@ -1486,6 +1554,9 @@ export class TimelineEditor {
         const from = this._currentTime;
         this._playStartWall = performance.now() - from * 1000;
         this._lastTickTime  = from;
+
+        // Clear preset tracking — fresh play always reloads (no stale same-preset guards)
+        this._currentZonePreset.clear();
 
         // Re-cover all zones; _playZone() lifts each cover when its first entry fires
         for (const [zId] of this._zoneCovers) this._fadeZoneCover(zId, 1, 0);  // instant cover all
@@ -1549,8 +1620,15 @@ export class TimelineEditor {
             const st = entry.startTime ?? 0;
             if (st <= fromTime && fromTime < st + entry.duration) {
                 immediateEntryId = entry.id;
-                this._fadeZoneCover(zoneId, 0, 0);  // instant reveal (scrub/seek)
-                zd.engine.loadPreset(entry.presetName, 0).catch(() => {});
+                if (this._cueZoneId !== zoneId) {
+                    // Skip loadPreset if this preset is already showing (live-edit reschedule).
+                    // Always lift the cover — play() may have just covered everything to black.
+                    if (this._currentZonePreset.get(zoneId) !== entry.presetName) {
+                        zd.engine.loadPreset(entry.presetName, 0).catch(() => {});
+                    }
+                    this._fadeZoneCover(zoneId, 0, 0);  // instant reveal (scrub/seek)
+                    this._currentZonePreset.set(zoneId, entry.presetName);
+                }
 
                 // Schedule fade-out at end of this entry if there's a gap after it
                 const entryEnd  = st + entry.duration;
@@ -1567,6 +1645,13 @@ export class TimelineEditor {
                 }
                 break;
             }
+        }
+
+        // In a gap at fromTime — raise cover to black so next entry's fade-in starts clean.
+        // This handles: delete-while-playing, and playback starting in a gap.
+        if (immediateEntryId === null) {
+            this._fadeZoneCover(zoneId, 1, 0);
+            this._currentZonePreset.delete(zoneId);
         }
 
         // Track true end of last processed entry — entries[i-1] is wrong after skips
@@ -1594,25 +1679,32 @@ export class TimelineEditor {
             const hasGapBefore = st > lastEnd + 0.01;
             const fadeDurIn    = hasGapBefore ? entry.blendTime : 0;
             const fadeInDelay  = Math.max(0, (st - fadeDurIn - fromTime) * 1000);
+            const delay        = (st - fromTime) * 1000;
 
-            // Schedule fade-in (cover → transparent)
-            if (hasGapBefore && fadeDurIn > 0) {
+            if (hasGapBefore) {
+                // Load preset first with blend=0 (instant GPU write — previous preset
+                // is overwritten in the framebuffer on the very next frame). Then wait
+                // one rAF tick so that frame renders, then fade the cover. This prevents
+                // the previous preset bleeding through the cover during the fade-in.
                 timers.push(setTimeout(() => {
                     if (!this._playing) return;
-                    this._fadeZoneCover(zoneId, 0, fadeDurIn);  // fade in from black
+                    zd.engine.loadPreset(entry.presetName, 0).catch(() => {});
+                    this._currentZonePreset.set(zoneId, entry.presetName);
+                    requestAnimationFrame(() => {
+                        if (!this._playing) return;
+                        this._fadeZoneCover(zoneId, 0, fadeDurIn);
+                    });
                 }, fadeInDelay));
-            }
-
-            // Schedule preset load
-            const delay     = (st - fromTime) * 1000;
-            const loadDelay = hasGapBefore && fadeDurIn > 0 ? fadeInDelay : delay;
-            timers.push(setTimeout(() => {
-                if (!this._playing) return;
-                if (!hasGapBefore || fadeDurIn <= 0) {
+            } else {
+                // Consecutive block — cover stays transparent, Butterchurn's internal
+                // blend handles the visual crossfade.
+                timers.push(setTimeout(() => {
+                    if (!this._playing) return;
                     this._fadeZoneCover(zoneId, 0, 0);
-                }
-                zd.engine.loadPreset(entry.presetName, entry.blendTime).catch(() => {});
-            }, loadDelay));
+                    zd.engine.loadPreset(entry.presetName, entry.blendTime).catch(() => {});
+                    this._currentZonePreset.set(zoneId, entry.presetName);
+                }, delay));
+            }
 
             // Schedule fade-out at end of this entry if there's a gap after it
             const entryEnd  = st + entry.duration;
@@ -1676,6 +1768,8 @@ export class TimelineEditor {
 
         cancelAnimationFrame(this._rafId);
         this._rafId = null;
+
+        this._currentZonePreset.clear();
 
         // VJ MODE: DO NOT stop engines - keep animations running!
         // DO NOT fade zone covers - show keeps displaying visuals
@@ -1791,9 +1885,10 @@ export class TimelineEditor {
                     if (activeEntry) {
                         const zd = this._zoneMap.get(zone.id);
                         if (zd && zd.engine) {
-                            zd.engine.loadPreset(activeEntry.presetName, 0).catch(() => {});
-                            // Ensure the black cover is hidden so we can see the preset
-                            this._fadeZoneCover(zone.id, 0, 0);
+                            if (this._cueZoneId !== zone.id) {
+                                zd.engine.loadPreset(activeEntry.presetName, 0).catch(() => {});
+                                this._fadeZoneCover(zone.id, 0, 0);
+                            }
                             // Try to render a single frame if the engine allows it when stopped
                             if (typeof zd.engine.renderFrame === 'function' && !zd.engine.isRunning) {
                                 zd.engine.renderFrame();
