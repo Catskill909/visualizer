@@ -1,327 +1,471 @@
-# APNG Support — Dev Document
+# Transparent WebM on macOS — Dev Document
 
-> **Status:** 🔨 In Progress — Web + Windows ✅ shipped May 12, macOS APNG Phase 1 next
-> **Date:** May 12, 2026
-> **Goal:** Transparent video that works on all platforms — WebM as source of truth, APNG as macOS-only derived format
+> **Status:** ✅ **SOLVED (research validated May 13)** — Stacked-alpha format works in WKWebView. All three validation tests passed in Safari with full transparency. Ready to build the Tauri sidecar implementation.
+> **Last updated:** May 13, 2026
+> **Scope:** macOS Tauri ONLY. Web + Windows work natively — do not touch.
+
+---
+
+## 🚀 HANDOFF — Read This First (Continuing Next Session)
+
+### ✅ Validation outcome (May 13)
+
+All three Safari tests passed empirically:
+
+- **Test A — ffmpeg encoding:** ✅ Produced `bunny_stacked.webm` (3.3MB, 1280×1440 regular VP9, no alpha track)
+- **Test B — Safari plays it:** ✅ Loads as a normal tall video. Status: `✓ loaded — 1280×1440`
+- **Test C — WebGL alpha composite:** ✅ **Bunny renders with full transparency over candy-stripe background.** Stripes clearly visible THROUGH the transparent areas around the bunny's silhouette. Status: `✓ rendering`
+
+**Confirmed on:** Safari 26.4 (WebKit 605.1.15), M1 Mac, macOS 26.4.1.
+
+Screenshots are in the conversation history if needed. Test pages preserved at `~/Desktop/hevc-alpha-test/test-stacked.html` for re-running.
+
+### What this means
+The stacked-alpha approach is the solution. We can now build it with confidence — the format works end-to-end through the same pipeline our app uses (`<video>` → WebGL texture → composite shader → display).
+
+### Current state of the repo
+- Branch: `main`, HEAD: `eaf5a5c` (last good build, May 12)
+- Working tree: clean (`git restore .` ran after the APNG rollback)
+- DMG in `promo/DiscoCast-Visualizer.dmg` is the May 12 build — use it if you need to test the existing app
+
+### Files created during research (preserved for the next session)
+All in `~/Desktop/hevc-alpha-test/`:
+- `bunny_stacked.webm` (3.3MB) — the stacked-alpha format under test
+- `yes_hevc.mov` (989KB) — HEVC alpha via `hevc_videotoolbox` — Safari refused to load it
+- `bunny_v2.mov`, `bunny_sw.mov`, `bunny_prores.mov` — other failed attempts
+- `test.html` — original HEVC alpha Safari test page
+- `test-stacked.html` — stacked-alpha Safari test page (the current test)
+- `*_frame.png` — diagnostic frame extracts
+
+**Source files (do not delete) on `~/Desktop/`:** `bunny.webm`, `yes.webm`, `not.webm` — user's test transparent WebM files.
+
+### Where things stand in plain English
+
+The user is building an app that lets people import transparent video (rotoscoped cutouts from Sammie Roto). It works on web and Windows. On macOS, Apple's WebKit refuses to decode VP9 alpha in the `<video>` element — that's the bug we're fighting.
+
+We've ruled out three approaches empirically:
+1. APNG via FFmpeg.wasm — wrong (alpha bug + huge files)
+2. WASM VP9 decoder (ogv.js) — wrong (source code has no alpha support)
+3. HEVC alpha via ffmpeg `hevc_videotoolbox` — wrong (Safari `<video>` won't load the file even though it's valid HEVC alpha per macOS Spotlight)
+
+The current candidate is **stacked-alpha** — encode the WebM as a 2× tall regular VP9 video, with RGB in the top half and alpha as luma in the bottom half. WKWebView plays it natively as plain VP9, our shader composites it back to RGBA. Test A (encoding) passed. Tests B (Safari plays it) and C (WebGL composite works) are running in Safari now.
+
+### Implementation plan (Outcome 1 confirmed — proceed)
+
+Build the Tauri sidecar:
+1. Phase 1 — bundle a stripped-down macOS universal ffmpeg binary (~15-25MB per arch) at `src-tauri/binaries/ffmpeg-{aarch64,x86_64}-apple-darwin`
+2. Phase 2 — Rust command in `src-tauri/src/main.rs` that pipes WebM in, stacked WebM out
+3. Phase 3 — JS `_handleWebmAlphaUpload()` in `inspector.js`, macOS-gated, calls sidecar
+4. Phase 4 — new WebGL composite shader for stacked-alpha texture sampling (top half RGB, bottom half luma → RGBA output). This goes in a new `_loadStackedAlphaVideo()` method in `visualizer.js`, parallel to `_loadVideoTexture()`
+5. Phase 5 — preset import/export: store WebM source, regenerate stacked cache on demand
+6. Phase 6 — conversion modal (reuse the pattern documented earlier; pauses music; shows progress)
+
+The shader code is in `test-stacked.html` — copy from there.
+
+### The ffmpeg conversion command (working, tested)
+```bash
+ffmpeg -c:v libvpx-vp9 -i input.webm \
+  -filter_complex "[0:v]format=yuva420p,split=2[a][b];[a]alphaextract,format=gray[alpha];[b]format=yuv420p[rgb];[rgb][alpha]vstack[stacked]" \
+  -map "[stacked]" \
+  -c:v libvpx-vp9 -pix_fmt yuv420p \
+  -b:v 2M \
+  -an \
+  output_stacked.webm
+```
+
+### The WebGL shader pattern (working, in test-stacked.html)
+```glsl
+// Fragment shader — sample top half for RGB, bottom half for alpha
+vec2 rgbUV = vec2(v_uv.x, v_uv.y * 0.5);
+vec2 aUV   = vec2(v_uv.x, v_uv.y * 0.5 + 0.5);
+vec3 rgb = texture2D(u_tex, rgbUV).rgb;
+float a  = texture2D(u_tex, aUV).r;
+gl_FragColor = vec4(rgb, a);
+```
+
+### Critical: macOS-only gate
+Every change must be gated by:
+```javascript
+const isMacTauri = !!window.__TAURI__ && navigator.userAgent.includes('Mac');
+```
+**Web + Windows must continue to use the existing `_addVideoLayer()` path unchanged.** That path already works for transparent WebM on those platforms (shipped May 12 at `eaf5a5c`).
+
+### Memory entries to consult
+- `project-webm-alpha-dead-ends` — what NOT to try (FFmpeg.wasm, ogv.js, HEVC alpha .mov)
+- `project-transparent-webm-macos-plan` — overall plan
+- `feedback-verify-before-coding` — require empirical evidence before touching code
+
+### Conversation context (token cost)
+A heavy session was spent on this. Three failed approaches, two failed code paths rolled back, all documented in this file. The user wants this solved — transparent video is a powerful creator tool — but is reasonably frustrated at the iteration count. Don't propose another approach without empirical evidence it works.
+
+---
+
+---
+
+## The Problem in One Sentence
+
+WKWebView (macOS Tauri's browser engine) plays VP9 video fine, but silently drops the alpha channel — transparent WebM from Sammie Roto imports as an opaque video with a black background.
+
+**This is an Apple decision, not a bug we can patch.** VP9 is a Google codec; Apple chose not to expose its alpha stream in WebKit.
+
+**Web and Windows are not affected.** WebView2 (Windows Tauri) and Chrome are Chromium-based and decode VP9 alpha natively. The existing `_addVideoLayer()` path works perfectly on both. **This entire document is about macOS Tauri only.**
+
+---
+
+## Platform Matrix — Where Things Stand
+
+| Platform | Engine | Transparent WebM | Status |
+|---|---|---|---|
+| **macOS Tauri** | WKWebView | ❌ alpha dropped | **This is what we're solving** |
+| **Windows Tauri** | WebView2 | ✅ native | Confirmed May 12 — WebM bypass + clearRect fix |
+| **Web (Chrome)** | Chromium | ✅ native | Confirmed May 12 |
+
+Two fixes shipped May 12 that make Web + Windows work end-to-end:
+- `inspector.js`: WebM files bypass the 720p transcoder (`isWebM` check)
+- `visualizer.js`: `clearRect` before each canvas draw eliminates alpha trail accumulation
+
+**These are in `main` at `eaf5a5c`. They must never be touched by the macOS fix.**
 
 ---
 
 ## Why This Matters — The Sammie Roto Workflow
 
-[Sammie Roto](https://sammieroto.com) is an AI-powered rotoscoping tool. Point and click masking, exports WebM with full alpha channel. The workflow it unlocks for DiscoCast users:
+[Sammie Roto](https://sammieroto.com) is an AI rotoscoping tool — point and click to cut out any subject, export as WebM with alpha.
 
 ```
 Sammie Roto
-  → AI cutout of any subject (person, object, creature)
-  → Export WebM with alpha
-        │
-        ▼
-DiscoCast — import as transparent video layer
-  → Subject floats above MilkDrop visualizer
-  → Full VJ effects: Pulse, Orbit, Spin, Mirror, Luma Key, Wave Distort...
-  → Audio-reactive transparency, scale, position
-  → Multiple cutout layers composited together
+  → AI cutout of person/object/creature
+  → Export WebM with alpha channel
+        ↓
+DiscoCast (macOS)
+  → Subject floats over MilkDrop visualizer
+  → Full VJ effects: Pulse, Orbit, Spin, Mirror, Luma Key...
+  → Audio-reactive alpha, scale, position
 ```
 
-**This doesn't exist in any other VJ tool.** Most VJ software either has no transparency support, or requires pre-keyed footage. Sammie Roto does the hard work — DiscoCast does the creative work.
-
-**The blocker:** WebM VP9 *with alpha* does not decode in WKWebView (macOS Tauri). Regular VP9 landed in Safari 14 (2020), but the alpha stream — a separate channel in the container — is not exposed. APNG is the fix.
+This doesn't exist in any other VJ tool. Getting it to work on macOS is the goal.
 
 ---
 
-## Platform Matrix — Where Things Actually Stand
+## ❌ Dead-End #1 — APNG via FFmpeg.wasm (Tried & Rolled Back May 13)
 
-| Platform | Engine | WebM VP9 alpha | APNG | Notes |
-|---|---|---|---|---|
-| **macOS Tauri** | WKWebView (Apple) | ❌ alpha only | ✅ | VP9 alpha stream not decoded — APNG Phase 1 needed |
-| **Windows Tauri** | WebView2 (Edge Chromium) | ✅ native | ✅ | ✅ **Confirmed working May 12** — WebM bypasses transcoder, clearRect trail fix applied |
-| **Web (Chrome)** | Chromium | ✅ native | ✅ | ✅ **Confirmed working May 12** — same fixes; web held back (not hosted) |
+**Two fatal flaws confirmed in testing:**
 
-**Windows is not a problem.** WebView2 is Chromium-based so VP9 alpha plays natively. Two fixes shipped May 12 make it work end-to-end: WebM files bypass the 720p transcoder (`inspector.js`), and `clearRect` before each canvas draw eliminates alpha trail accumulation (`visualizer.js`). The APNG conversion is a macOS-only remaining task.
+### Flaw 1: FFmpeg.wasm cannot decode VP9 alpha
+[**Bug #621 — ffmpegwasm/ffmpeg.wasm**](https://github.com/ffmpegwasm/ffmpeg.wasm/issues/621) — open, unresolved, no fix in sight (reported Nov 2023, still open May 2026).
 
-## Why APNG Is the Right macOS Conversion Target
+When native `ffmpeg` decodes a VP9-alpha WebM, it outputs `yuva420p` (with alpha). FFmpeg.wasm outputs `yuv420p` — the alpha stream is silently dropped. **Any** conversion run in FFmpeg.wasm starts with opaque source data. Transparency is gone before we even start encoding.
 
-| Property | GIF | WebM VP9 | APNG |
-|---|---|---|---|
-| **Alpha** | Binary (1-bit) | Full 8-bit | Full 8-bit |
-| **Color depth** | 256 palette | 24-bit | 24-bit |
-| **macOS Tauri (WKWebView)** | ✅ | ❌ | ✅ |
-| **Windows Tauri (WebView2)** | ✅ | ✅ | ✅ |
-| **FFmpeg encode** | ✅ | ✅ | ✅ (`apng` encoder) |
-| **File size** | Large | Small | Medium |
-| **Speed control** | Frame-delay math | `playbackRate` | Frame-delay math |
-| **Frame-perfect loops** | Messy timing | ✅ | ✅ (proper fps) |
+**Confirmed empirically:** the APNG we produced had no alpha. Black background.
 
-APNG is the right **macOS conversion target** — it decodes in WKWebView with full alpha. It is never the source of truth. WebM is stored on all platforms; APNG is derived on macOS only. Windows plays WebM natively and never converts.
+### Flaw 2: File size explosion
+APNG stores raw, lossless RGBA pixels per frame. A 5MB VP9 WebM (which is ~50× compressed) becomes 100MB+ as APNG. Mathematically unavoidable for real video content.
 
-**Why not HEVC with alpha?** Apple's HEVC-with-alpha encoder lives in `VideoToolbox` (macOS native) — FFmpeg.wasm's `libx265` has no alpha support. And even if encoded, `<video>` in WKWebView doesn't expose the alpha stream for WebGL compositing. HEVC alpha is a Final Cut / Metal workflow, not a web rendering pipeline.
-
-**Future path:** AV1 with alpha. Apple joined AOM in 2018, added hardware AV1 decode on M2, and Safari 16 supports AV1. AV1 also supports a separate alpha stream. If WKWebView gains AV1 alpha decode, APNG conversion becomes unnecessary. Watch WebKit release notes for AV1 alpha. Until then, APNG is the bridge.
+### Rollback
+All APNG code reverted at commit `eaf5a5c`. Do not resurrect this approach.
 
 ---
 
-## Storage Strategy — WebM Is the Source of Truth
+## ❌ Dead-End #2 — WASM VP9 Decoder (ogv.js) — Confirmed Unviable May 13
 
-**WebM is stored in IndexedDB on all platforms.** It is the master — small files, the user's original content.
+**Initial hypothesis:** Use `ogv.js` (the most mature JS WebM decoder) to decode VP9 alpha frames in JS, skip all file conversion, feed RGBA frames directly into the existing `_gifAnimations` pipeline.
 
-APNG is a **macOS-only derived format** — converted at upload time and cached. It is never the source. When a preset is exported and shared cross-platform, the WebM blob travels with it. macOS converts on import.
+**Three independent confirmations this won't work:**
 
-```
-User drops WebM alpha
-    │
-    ├─ Windows → stored as WebM → plays natively (2–5MB)
-    │
-    └─ macOS → stored as WebM → APNG cached separately → plays via frame pipeline
-               on preset import: WebM blob → convert → cache APNG → play
+1. **Source code inspection.** [`ogv-decoder-video-vpx.c`](https://github.com/bvibber/ogv.js/blob/main/src/c/ogv-decoder-video-vpx.c) — the VPX decoder only processes 3 planes (Y, U, V). No alpha plane handling, no separate alpha stream detection, no YUVA output. The callback `ogvjs_callback_frame()` only emits YUV.
 
-Preset export: always contains WebM blob (small, portable)
-Preset import on macOS: WebM found → convert to APNG → cache → done
-```
+2. **GitHub Issue #590** — ["Support for VP8/VP9 alpha transparency"](https://github.com/bvibber/ogv.js/issues/590). Opened May 2021, **still open four years later**. The maintainer has never implemented alpha support.
 
-This keeps storage efficient everywhere. Windows users never pay the APNG size penalty. Mac users convert once and the result is cached.
+3. **GitHub Issue #603** — a user tried to add alpha support themselves: "Try to add alpha channel support to the player by myself, but get an alpha buffer array which values are all zero from wasm". Closed without resolution.
+
+**The broader ecosystem gap:** there is no production-quality JavaScript/WASM library that correctly decodes VP9 alpha from WebM. The WebM spec is clear that VP9 alpha is a separate stream needing two decoder instances, but no JS port implements this. FFmpeg.wasm doesn't (#621), ogv.js doesn't (#590), `webm-wasm` is encoder-only, WebCodecs in WKWebView is hardware-dependent (M3+ only) and has its own spec issue ([w3c/webcodecs #377](https://github.com/w3c/webcodecs/issues/377)). 
+
+**Lesson:** the spec being clear ≠ libraries implementing it. Always check source code, not just specs and search snippets.
 
 ---
 
-## Scope — Three Conversion Paths
+## ❌ Dead-End #3 — HEVC Alpha via ffmpeg `hevc_videotoolbox` (Tested & Failed May 13)
 
-### Path A: WebM (alpha) → APNG — macOS Only
-**Trigger:** WebM file uploaded OR imported in macOS Tauri build.
-**Why:** WKWebView can't decode VP9. APNG plays natively via frame pipeline.
-**FFmpeg command:**
-```
-ffmpeg -i input.webm -pix_fmt rgba -plays 0 -vf scale=-2:480 output.apng
-```
-- `-plays 0` = infinite loop
-- `-pix_fmt rgba` = full alpha preserved
-- `-vf scale=-2:480` = cap at 480p (RAM budget — see Performance section)
-- Windows: WebM plays natively, zero conversion
+**Initial hypothesis:** Apple's WWDC 2019 introduced HEVC with alpha — it's their official transparent video format. Bundle a native macOS ffmpeg binary, convert WebM → HEVC alpha .mov using `hevc_videotoolbox -alpha_quality 0.75`, play in `<video>` element in WKWebView.
 
-**Detection:**
+**Phase 0 manual test (May 13, 2026 — macOS 26.4.1, M1 Mac):**
+
+1. ✅ Conversion produced a valid HEVC alpha file:
+   - 989 KB (vs 5.4 MB source WebM)
+   - macOS Spotlight (`mdls`) reports `kMDItemCodecs = "HEVC with Alpha"`
+   - Alpha data is in the file (verified via ffprobe + Spotlight metadata)
+
+2. ❌ **The .mov file does not load in Safari/WKWebView's `<video>` element at all.**
+   - Plain HTML page with `<video src="yes_hevc.mov">` in Safari: video element collapsed to zero size, no controls, no error visible, no playback
+   - Same WKWebView engine as our Tauri app, so Tauri behavior would be identical
+
+3. ✅ Side test — confirmed Safari's VP9 alpha limitation directly:
+   - `<video src="bunny.webm">` in Safari: plays, but renders the full opaque scene (tree, background, etc.) instead of just the masked bunny. Alpha is ignored.
+
+**Conclusion:** Even though the file is a valid Apple-recognized HEVC alpha file, WKWebView's `<video>` element refuses it. Apple's HEVC alpha appears to work in `<img>` tags / picture-in-picture / native AVFoundation views, but **NOT in `<video>` element** — which is what we need for our WebGL frame extraction pipeline.
+
+This may be specific to current macOS WebKit (26.x), to the `hevc_videotoolbox` flag combination, or to MOV-as-video-tag in general. We did not pursue further diagnostic because the rotoscoped use case demands the `<video>` element pathway.
+
+**Files used in this test (preserved for reference):** `~/Desktop/hevc-alpha-test/` — contains the converted .mov files, source frame samples, and a Safari test HTML page.
+
+---
+
+## 🔬 Path Now Under Consideration — Stacked Alpha (Untested)
+
+**Concept (Jake Archibald, 2024):** encode the alpha as a regular grayscale image stacked underneath the color frame, producing a single regular VP9 video at 2× the height. No alpha track. No special codec features. Just regular VP9 that WKWebView decodes natively.
+
+```
+Stacked WebM (1280 × 1440)
+┌──────────────────┐
+│                  │
+│   RGB color      │   ← top half — sampled for color
+│   data           │
+│                  │
+├──────────────────┤
+│                  │
+│   Alpha as       │   ← bottom half — sampled for alpha
+│   grayscale      │
+│                  │
+└──────────────────┘
+```
+
+### Why this might actually work where the others didn't
+
+| Requirement | Stacked Alpha |
+|---|---|
+| WKWebView plays the video | ✅ It's regular VP9 with no alpha stream — no special decoder features needed |
+| WebKit `<video>` element loads it | ✅ Standard WebM, same as any other VP9 video |
+| Canvas / WebGL pipeline gets pixel data | ✅ Standard `drawImage(video)` → `getImageData` works |
+| Alpha is recoverable in our pipeline | ✅ Sample top half for RGB, bottom half luma as alpha — composite in WebGL shader |
+| File size | ✅ Similar to source WebM (~1.5×, alpha as luma compresses well) |
+| Conversion needs native ffmpeg | ⚠️ Yes — still needs VP9-alpha decode which FFmpeg.wasm can't do. Tauri sidecar required. |
+
+### Production encoder command (to test)
+
+```bash
+ffmpeg -c:v libvpx-vp9 -i input.webm \
+  -filter_complex "[0:v]format=yuva420p,split=2[a][b];[a]alphaextract,format=gray[alpha];[b]format=yuv420p[rgb];[rgb][alpha]vstack[stacked]" \
+  -map "[stacked]" \
+  -c:v libvpx-vp9 -pix_fmt yuv420p \
+  -b:v 1M \
+  -an \
+  output_stacked.webm
+```
+
+### Open questions to test before committing
+
+1. **Does Safari/WKWebView play the double-height regular VP9 file?** Should be yes (it's just regular VP9), but must verify.
+2. **Can we read both halves via `<video>` → canvas → `getImageData` reliably?** Standard pipeline — high confidence.
+3. **What's the file size vs source?** Untested but Jake Archibald reports ~1.1MB for similar content (vs 989KB for HEVC alpha — comparable).
+4. **WebGL shader compositing:** straightforward — sample texture at `y` for RGB, sample at `y + 0.5` for alpha, output RGBA. ~5 lines of GLSL.
+
+### Risk
+
+The only encoding step requires VP9-alpha decode on the input side — same step FFmpeg.wasm fails on (#621). So we still need a native ffmpeg sidecar. But once we have a sidecar producing stacked-alpha WebM, the output is a regular VP9 that WKWebView definitely plays. The unknown is whether the playback + canvas extraction roundtrip preserves the data we need (which it should — it's just luma values, not an alpha channel).
+
+---
+
+## ~~Path Forward — HEVC Alpha via Tauri Sidecar~~ (Abandoned May 13 after Safari test)
+
+**The only realistic path:** bundle a native macOS `ffmpeg` binary in the Tauri app as a sidecar. At upload time, invoke it to convert WebM VP9 alpha → HEVC alpha MOV using Apple's `hevc_videotoolbox` (hardware-accelerated). The resulting MOV plays in WKWebView's `<video>` element with transparency — natively, with hardware decode.
+
+### Why this is the right answer
+
+- **HEVC with alpha is Apple's official transparent video format** (introduced WWDC 2019, session #506)
+- **Hardware-accelerated** encode and decode on every Mac since Catalina (Intel + Apple Silicon)
+- **File size: ~1–1.5× the WebM source** — not 20× like APNG
+- **Plays in `<video>` element with full alpha** — same pipeline as our existing video layers
+- **Well-trodden Tauri pattern** — projects like [66HEX/frame](https://github.com/66HEX/frame) use this exact stack (Tauri + ffmpeg sidecar + hevc_videotoolbox)
+
+### FFmpeg command (runs in the sidecar)
+
+```bash
+ffmpeg -i input.webm \
+  -c:v hevc_videotoolbox \
+  -tag:v hvc1 \
+  -alpha_quality 0.75 \
+  -q:v 35 \
+  -an \
+  output.mov
+```
+
+- `-c:v hevc_videotoolbox` — Apple's hardware-accelerated HEVC encoder
+- `-tag:v hvc1` — fourcc tag Safari requires for HEVC playback
+- `-alpha_quality 0.75` — alpha channel quality (0.0–1.0)
+- `-q:v 35` — RGB quality (lower = higher quality)
+- `-an` — strip audio (we don't use it for VJ visuals)
+
+### Architecture Overview
+
+```
+WebM dropped on macOS Tauri
+  ↓
+_handleWebmAlphaUpload(file)   [macOS Tauri only — gated]
+  ↓
+Show conversion modal (file info, Go/Cancel, music auto-pauses on Go)
+  ↓
+Tauri invoke → ffmpeg sidecar → hevc_videotoolbox conversion (hardware accel)
+  ↓
+Receive HEVC alpha .mov bytes
+  ↓
+Store BOTH blobs in IndexedDB:
+  - videoId      → WebM source (portable; for export + cache-miss recovery)
+  - videoId+_hevc → HEVC alpha cache (what plays on macOS)
+  ↓
+Build layer entry with type='video', play via existing _addVideoLayer()
+  ↓
+<video> element plays HEVC with native alpha
+  ↓
+_tickVideoAnimations() draws to canvas → getImageData → texSubImage2D
+  ↓
+WebGL composite shader renders with transparency ✓
+```
+
+### Critical gate: only macOS Tauri enters this path
+
 ```javascript
 const isMacTauri = !!window.__TAURI__ && navigator.userAgent.includes('Mac');
-const isWebM = file.type === 'video/webm' || file.name.endsWith('.webm');
-if (isMacTauri && isWebM) → convertToApng(file) → cache as `${videoId}_apng`;
-// Windows Tauri (WebView2): play WebM natively, no conversion ever
-```
-
-### Path B: GIF → APNG — Quality Upgrade
-**Trigger:** GIF uploaded on any platform.
-**Why:** GIF is 256 colors, messy frame timing, large files. APNG is full-color, precise timing, smaller — and works in WKWebView unlike WebM. GIF→WebM was the earlier plan (video-dev.md §20, now superseded); APNG is better because it works on macOS and Windows with no platform split.
-**FFmpeg command:**
-```
-ffmpeg -i input.gif -pix_fmt rgba -plays 0 -r 30 output.apng
-```
-- `-r 30` normalizes frame rate (fixes the 0ms/10ms GIF timing chaos)
-- Alpha preserved through conversion
-- User-visible result: richer colors, smoother playback, smaller file
-
-**UX:** User drops a GIF → silent background conversion → loads as APNG. No friction.
-
-### Path C: MOV (alpha) → APNG — Pro Import
-**Trigger:** `.mov` file with alpha codec (ProRes 4444, Apple Animation) dropped on macOS.
-**Why:** These are professional export formats from After Effects, Motion, DaVinci Resolve. Common in professional VJ libraries.
-**FFmpeg command:**
-```
-ffmpeg -i input.mov -pix_fmt rgba -plays 0 output.apng
-```
-**Note:** MOV without alpha (standard H.264 MOV) should route to MP4 transcode instead. Detection: attempt load → if alpha detected in metadata or colorspace, use APNG path.
-
----
-
-## Technical Architecture
-
-### APNG Decode Pipeline
-
-APNG frames are decoded in JS using `upng-js` (lightweight, no canvas, pure Uint8Array output — same philosophy as our gifuct-js GIF decoder):
-
-```
-APNG file
-  → upng-js decode → raw RGBA frame array (Uint8ClampedArray[])
-  → same _tickGifAnimations() path (texSubImage2D, no premultiply)
-  → WebGL texture → shader compositing
-```
-
-**Key principle:** reuse the existing GIF frame animation pipeline entirely. APNG frames are just RGBA arrays — identical to what gifuct-js produces. The visualizer doesn't need to know the difference.
-
-### What Changes vs. GIF Path
-
-| Step | GIF (current) | APNG (new) |
-|---|---|---|
-| **Decode library** | `gifuct-js` | `upng-js` |
-| **Frame extraction** | gifuct `decompressFrames()` | upng `decode()` + `toRGBA8()` |
-| **Frame compositing** | gifuct handles disposal | upng handles disposal |
-| **Upload to GL** | `texSubImage2D` | Same — no change |
-| **Speed control** | frame delay multiplier | Same — no change |
-| **Storage** | IndexedDB blob | Same — no change |
-
-The GL upload, speed slider, and animation tick are **unchanged**. Only the decode step differs.
-
-### FFmpeg Conversion — In `videoTranscoder.js`
-
-New function alongside `transcodeTo720p()`:
-
-```javascript
-export async function convertToApng(file, onProgress = null) {
-  // WebM → APNG, GIF → APNG, MOV → APNG
-  // Output: File object with type 'image/apng'
+const isWebM = file.name.toLowerCase().endsWith('.webm') || file.type === 'video/webm';
+if (isWebM && isMacTauri) {
+    await this._handleWebmAlphaUpload(file);   // new macOS-only path
+} else {
+    this._addVideoLayer(file);                  // existing path — DO NOT TOUCH
 }
 ```
 
-Input extension is preserved via `getExtension(file.name)` — FFmpeg handles all three source formats.
-
-### Detection Logic in `inspector.js`
-
-```
-File dropped / picked
-  │
-  ├─ .gif → convertToApng() → _handleApngUpload()
-  │
-  ├─ .webm + macOS Tauri → convertToApng() → _handleApngUpload()
-  ├─ .webm + Windows Tauri → _addVideoLayer() (WebView2 plays VP9 natively)
-  ├─ .webm + web → _addVideoLayer() (existing, no change)
-  │
-  ├─ .mov + alpha → convertToApng() → _handleApngUpload()
-  ├─ .mov + no alpha → _addVideoLayer() (existing, Safari/WKWebView native)
-  │
-  ├─ .mp4 → _addVideoLayer() (existing, no change)
-  └─ image → _addImageLayer() (existing, no change)
-```
+Web and Windows never enter the new code path. The existing `_addVideoLayer` flow remains byte-identical on those platforms.
 
 ---
 
-## Files to Touch
+## Open Questions To Resolve Before Coding
+
+These need answers before we commit to bundling a 15–25MB binary.
+
+### Q1: Does HEVC alpha survive the `<video>` → canvas → `texSubImage2D` roundtrip in WKWebView?
+
+The existing `_tickVideoAnimations()` pipeline does:
+```javascript
+uploadCtx.drawImage(videoElement, 0, 0, width, height);
+const frameData = uploadCtx.getImageData(0, 0, width, height).data;
+gl.texSubImage2D(...rgba..., frameData);
+```
+
+If WKWebView strips alpha during `drawImage(videoElement)` even though the video has alpha, then HEVC alone is not enough — we'd need WebGL-direct video texture upload via `gl.texImage2D(target, level, format, ..., videoElement)`.
+
+**Test plan before committing:** manually produce one HEVC alpha .mov on developer's local Mac (using brew-installed ffmpeg), drop it into the macOS build via the existing video upload path, confirm transparency renders end-to-end. Half-hour test. Validates the whole architecture or kills it before we bundle anything.
+
+### Q2: Universal binary or arm64-only?
+
+Apple Silicon binary (~15MB stripped) vs. universal arm64+x86_64 (~30MB).
+- Apple Silicon only: smaller, but breaks Intel Macs
+- Universal: doubles binary size but covers all Macs since Catalina
+
+**Recommendation:** universal binary. Intel Macs are still common.
+
+### Q3: Convert all WebM on macOS, or only transparent ones?
+
+We can't reliably probe for alpha from JS in WKWebView (the alpha stream is stripped before JS sees it — that's the whole problem). So either:
+- **Convert all WebM unconditionally on macOS** — wastes time on non-transparent WebM, but simple
+- **Heuristic: only convert if user opts in or filename suggests alpha** — fragile
+
+**Recommendation:** convert all WebM on macOS. HEVC encoding is hardware-accelerated and fast (5–10× realtime on Apple Silicon). A 5-second 720p WebM converts in ~1 second. Acceptable.
+
+---
+
+## Phased Implementation Plan
+
+### Phase 0 — Validate Q1 before bundling anything (30 minutes, no commits)
+1. On developer Mac, manually convert a Sammie Roto WebM to HEVC alpha using brew-installed ffmpeg
+2. Drop the .mov into the existing macOS build via the standard video upload
+3. Verify alpha renders correctly in the visualizer (subject floats over MilkDrop with transparency)
+4. **GO/NO-GO decision** — if alpha is lost, the entire Path 2 architecture needs rethinking
+
+### Phase 1 — Tauri sidecar plumbing
+- Build/obtain stripped macOS universal ffmpeg binary (~30MB)
+- Place at `src-tauri/binaries/ffmpeg-x86_64-apple-darwin` and `src-tauri/binaries/ffmpeg-aarch64-apple-darwin`
+- Enable sidecar in `tauri.conf.json` (`"sidecar": true`, externalBin entry)
+- Rust command wrapper exposes `invoke('convert_webm_to_hevc', { webmBytes })` returning HEVC bytes
+- Smoke test: call from JS, get a version string back
+
+### Phase 2 — JS upload routing (macOS Tauri only)
+- New `_handleWebmAlphaUpload(file)` method in `inspector.js` 
+- Routes only when `isMacTauri && isWebM` — every other path untouched
+- Store both blobs (WebM source + HEVC cache)
+- Build layer entry as `type='video'`, plug into existing `_addVideoLayer`/`_videoAnimations` pipeline
+
+### Phase 3 — Conversion modal (reuse pattern from earlier session)
+- Pre-conversion confirm modal: file info, time estimate, Go/Cancel
+- On Go: pause music, switch to progress view
+- Progress driven by sidecar stdout parse (ffmpeg's `frame=` lines)
+- On complete: dismiss, add layer
+
+### Phase 4 — Preset import/export
+- Export: WebM always bundled (portable); HEVC optional (regenerated on macOS import)
+- Import on macOS: check HEVC cache → reconvert from WebM source if cache miss
+- Import on web/Windows: ignore HEVC entirely, load WebM via existing path
+
+---
+
+## Files That Will Change
 
 | File | Change |
 |---|---|
-| `src/videoTranscoder.js` | Add `convertToApng(file, onProgress)` function |
-| `src/visualizer.js` | Add `_loadApngTexture()` + `_tickApngAnimations()` OR fold into existing GIF path with unified handler |
-| `src/editor/inspector.js` | Add APNG detection in upload/drop handler; add `_handleApngUpload()` |
-| `package.json` | Add `upng-js` dependency |
-| `video-dev.md` | Add §27 reference to this doc |
+| `src-tauri/tauri.conf.json` | Enable sidecar, add externalBin entry |
+| `src-tauri/src/main.rs` | Add Tauri command that wraps ffmpeg sidecar |
+| `src-tauri/binaries/ffmpeg-*` | Pre-compiled ffmpeg binary (new file) |
+| `src/editor/inspector.js` | `_handleWebmAlphaUpload()`, macOS routing in upload handlers |
+| `package.json` | No new npm deps — sidecar is native, not JS |
 
-**Existing files NOT modified:**
-- `src/customPresets.js` — IndexedDB blob storage works as-is
-- `vite.config.js` — no changes needed
-- `src-tauri/src/main.rs` — `pick_image_file` already allows `.webm`, `.gif`, `.mov`
+### Files that MUST NOT change
 
----
-
-## Phased Plan
-
-### Phase 1 — WebM Alpha on macOS (Sammie Roto Fix)
-**Goal:** Sammie Roto exports work in the macOS app.
-**Scope:** Path A only. WebM → APNG on Tauri + macOS UA detection.
-**Checklist:**
-- [x] WebM files bypass 720p transcoder in `inspector.js` — `isWebM` check added May 12
-- [x] `clearRect` canvas fix in `visualizer.js` `_tickVideoAnimations()` — alpha trails eliminated May 12
-- [x] Test: Sammie Roto WebM plays with alpha on web + Windows ✅ May 12
-- [ ] `upng-js` added to dependencies
-- [ ] `convertToApng()` in `videoTranscoder.js` (WebM input only)
-- [ ] APNG upload handler in `inspector.js`
-- [ ] Reuse GIF frame pipeline in `visualizer.js` for APNG frames
-- [ ] Test: Sammie Roto WebM plays with alpha in macOS build
-
-### Phase 2 — GIF → APNG Quality Upgrade
-**Goal:** All GIF imports get full-color, properly-timed APNG treatment.
-**Scope:** Path B. Replace existing GIF decode path at upload time.
-**Checklist:**
-- [ ] Add GIF detection → `convertToApng()` route
-- [ ] Remove gifuct-js from upload path (keep in visualizer for legacy stored GIFs)
-- [ ] Test: GIF with transparency renders correctly as APNG
-- [ ] Test: GIF without transparency still works
-- [ ] Test: Speed slider still works on converted APNG
-
-### Phase 3 — MOV Alpha Import
-**Goal:** After Effects / DaVinci Resolve exports with alpha work.
-**Scope:** Path C. MOV with alpha codec → APNG.
-**Checklist:**
-- [ ] Alpha detection logic for MOV (codec sniff via MediaInfo.js or FFmpeg probe)
-- [ ] Route alpha MOV → `convertToApng()`
-- [ ] Route non-alpha MOV → existing video path
+- `_addVideoLayer()` — web + Windows path
+- `_tickVideoAnimations()` — existing video pipeline (already alpha-safe via clearRect fix)
+- `_loadGifTexture()` / `_tickGifAnimations()` — GIF pipeline
+- `videoTranscoder.js` — existing 720p transcoder for non-alpha video (unrelated)
 
 ---
 
-## Performance Budget — macOS APNG Frame Memory
+## Research Summary — Why Other Approaches Fail
 
-All frames are decoded into RAM upfront (same as GIF pipeline). The RAM cost per layer:
-
-| Resolution | Per frame | 5 sec @ 30fps | 10 sec @ 30fps |
-|---|---|---|---|
-| 720p | 3.5MB | ~525MB | ~1050MB |
-| **480p (our cap)** | **1.6MB** | **~240MB** | **~480MB** |
-| 360p | 0.9MB | ~135MB | ~270MB |
-
-**Rules baked into conversion:**
-- Cap output at **480p max** (`-vf scale=-2:480`)
-- If clip > 5 seconds: drop to **15fps** (`-r 15`) — halves frame count
-- Warn via toast if source is > 10 seconds (suggest trimming in Clipper first)
-
-**Apple Silicon advantage:** Unified memory means `texSubImage2D` upload cost is near-zero — RAM and VRAM are the same pool. M1 with 8GB can comfortably run all 5 layer slots as APNG simultaneously (~1.2GB total at 480p/5sec). Intel Mac: 3–4 seconds max at 360p on 8GB.
-
----
-
-## Open Questions — Resolved
-
-1. **Unified pipeline vs. parallel:** Fold APNG into existing GIF path. Same `Uint8ClampedArray[]` frame structure, same `texSubImage2D` upload. `_tickGifAnimations` renamed `_tickFrameAnimations` or APNG added as a second map — decision at implementation time.
-
-2. **Max frame count / size:** Resolved — 480p cap, 15fps above 5 seconds, toast warning above 10 seconds.
-
-3. **Progress UX:** Reuse existing transcoder toast system exactly. "Converting for macOS... 45%"
-
-4. **Storage:** WebM stored as source in IndexedDB. APNG cached separately as `${videoId}_apng` on macOS only. On preset reload: check for cached APNG first, re-convert from WebM if cache miss.
-
----
-
-## User Education — What to Communicate and When
-
-### What's Actually Happening (for docs/help text)
-
-When a user drops a transparent WebM on macOS, the app silently converts it to APNG before loading. This happens because Apple's WebKit engine (used in the macOS app) doesn't support the VP9 video codec — a Google format Apple has chosen not to ship. The conversion is automatic and the result is cached, so it only happens once per clip.
-
-On Windows, transparent WebM plays natively with no conversion. Windows uses Edge's Chromium engine which supports VP9 fully.
-
-### Honest Platform Comparison (for help docs)
-
-| | macOS | Windows |
+| Approach | Status | Reason |
 |---|---|---|
-| Transparent video format | WebM → converted to APNG | WebM native |
-| Max practical clip length | ~5–8 sec (M1), ~3–4 sec (Intel) | No practical limit |
-| Quality ceiling | 480p for transparent layers | 720p+ |
-| Speed control | Frame-delay multiplier | Native `playbackRate` |
-| Load time | ~20–40s conversion on first use | Instant |
-| Cached after first load | ✅ Yes | N/A |
-
-**Bottom line for users:** Windows is the better platform for long or high-resolution transparent video clips. macOS works great for the typical Sammie Roto use case — short 2–5 second loops — which is the natural output of AI rotoscoping tools anyway.
-
-### When to Surface This to Users
-
-- **On conversion start:** toast says "Converting for macOS compatibility... 45%" — honest, not alarming
-- **If clip is over 8 seconds:** warn "This clip will be trimmed to 8 seconds for macOS. Use the Clipper to select your best section first."
-- **In help/FAQ:** explain the Mac limitation plainly, without apologizing for it — it's Apple's decision, not ours
-- **Never:** hide that conversion is happening. Users deserve to know their clip is being processed.
-
-### What NOT to Do
-
-- Don't call it "optimizing" when it's actually working around a platform limitation
-- Don't silently fail on long clips — warn and truncate with a clear reason
-- Don't pretend macOS and Windows have identical transparent video support — they don't
+| FFmpeg.wasm → APNG | ❌ Dead | Bug #621 drops alpha; 20× file size |
+| FFmpeg.wasm → stacked-alpha | ❌ Dead | Same bug #621 — needs VP9 alpha decode first |
+| ogv.js → frame extraction | ❌ Dead | Source code has no alpha support; issue #590 open 4 years |
+| webm-wasm (Google) | ❌ N/A | Encoder-only, not a decoder |
+| WebCodecs in WKWebView | ❌ Fragile | Hardware-dependent (M3+ only); w3c issue #377 open |
+| Animated AVIF | ❌ Broken | Safari renders alpha incorrectly; single-digit FPS |
+| Native ffmpeg → HEVC alpha .mov | ❌ Dead | Tested May 13 — Safari `<video>` element refuses to load even valid "HEVC with Alpha" files |
+| **Native ffmpeg → stacked alpha VP9 WebM** | **🔬 Untested** | Plays as regular VP9 (no special decoder needed). Still requires native ffmpeg sidecar for the input alpha decode. |
+| Two-`<video>` canvas composite | ⚠️ Backup | Two separate WebMs (color + alpha); JS canvas composite per frame. Performance penalty. |
+| Native ffmpeg → ProRes 4444 | ❌ Too large | Alpha works (307MB / 13 sec) — unusable file size |
 
 ---
 
-## Why This Is Groundbreaking (Seriously)
+## Decision Log
 
-Every VJ tool has layers. Almost none have effortless transparent animation layers. The workflow is:
-
-1. Shoot or find any footage
-2. Open in Sammie Roto → 2 minutes of point-and-click masking → export WebM
-3. Drop into DiscoCast → subject floats over the MilkDrop field
-4. Add Orbit + Pulse + Mirror → it's orbiting, breathing with the bass, reflected
-5. Stack 3 of these with different subjects → visual chaos with structure
-
-This is the `subject isolation + compositing` workflow that costs thousands of dollars in professional VJ software. APNG support is what makes it work on macOS.
-
-The §23 (Subject Isolation / AI) section of video-dev.md describes building this capability *inside* DiscoCast using YOLO/SAM. That's months of work. Sammie Roto already does it — we just need to accept its output.
+| Date | Decision | Reason |
+|---|---|---|
+| May 12 | WebM bypass added in `inspector.js` | Prevent 720p transcode on WebM files |
+| May 12 | `clearRect` fix in `_tickVideoAnimations` | Eliminate alpha trail accumulation on Web/Windows |
+| May 13 | APNG approach attempted via FFmpeg.wasm | Initial plan based on outdated assumption |
+| May 13 | APNG approach abandoned, code rolled back to `eaf5a5c` | Bug #621 strips alpha; 100MB file size confirmed |
+| May 13 | Path 1 (WASM VP9 decode via ogv.js) hypothesized | Avoid file conversion entirely |
+| May 13 | Path 1 abandoned without coding | Deeper research: ogv.js source has no alpha (issue #590 open 4 yrs) |
+| May 13 | Path 2 (HEVC via Tauri sidecar) selected | Only realistic option; Apple's official format |
+| May 13 | Path 2 abandoned after Safari test | HEVC alpha .mov produced by `hevc_videotoolbox` fails to load in WKWebView's `<video>` element despite being valid per macOS Spotlight |
+| May 13 | Stacked alpha approach selected for next test | Plays as regular VP9 — no special decoder features needed. Confidence: high. |
 
 ---
 
-*Document created May 12, 2026. Companion to video-dev.md §27.*
+## User Education — What to Communicate
+
+When a transparent WebM lands on macOS, the conversion modal should say (plainly):
+
+> This video has transparency. macOS requires a one-time conversion to a format Apple's WebKit can play with alpha (HEVC). The result is cached so this only happens once per clip. Music will pause during conversion to free up processing power.
+
+**Don't apologize for it.** It's Apple's decision not to support VP9 alpha in WebKit. State the fact, do the conversion, move on.
+
+---
+
+*Document originally created May 12 as `apng-dev.md`. Repurposed May 13 after APNG and ogv.js paths confirmed dead. Companion to `video-dev.md`.*
