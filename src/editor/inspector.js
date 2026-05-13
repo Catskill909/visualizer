@@ -2412,7 +2412,10 @@ export class EditorInspector {
             videoDuration = video.duration || 0;
 
             // Auto-transcode oversized videos instead of rejecting
-            if (videoWidth > MAX_VIDEO_WIDTH || videoHeight > MAX_VIDEO_HEIGHT) {
+            // WebM files skip transcoding — VP9 streams don't need a frame RAM budget,
+            // and libvpx-vp9 encoding is not available in the FFmpeg.wasm CDN build.
+            const isWebM = file.name.toLowerCase().endsWith('.webm') || file.type === 'video/webm';
+            if (!isWebM && (videoWidth > MAX_VIDEO_WIDTH || videoHeight > MAX_VIDEO_HEIGHT)) {
                 URL.revokeObjectURL(videoUrl);
                 
                 const originalSize = formatBytes(file.size);

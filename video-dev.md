@@ -24,6 +24,7 @@
 | VJ Effects — Luma Key, Wave Distort, Invert, Threshold, Pixelate, Scan Lines, Film Grain | May 8 |
 | Width/Height sliders — independent non-uniform scaling 0.25×–4× (video only) | May 11 |
 | Video Border — width, color picker, feather (video only) | May 11 |
+| **Transparent WebM (web + Windows)** — WebM files bypass 720p transcoder; `clearRect` canvas fix eliminates alpha trail accumulation | May 12 |
 
 ### 🔨 Up Next
 
@@ -225,8 +226,13 @@ const frameIndex = Math.floor(videoTime * fps);
 const MAX_VIDEO_WIDTH = 1280;
 const MAX_VIDEO_HEIGHT = 720;
 
-if (videoWidth > MAX_VIDEO_WIDTH || videoHeight > MAX_VIDEO_HEIGHT) {
-  // Auto-transcode instead of rejecting
+// WebM files bypass transcoding — VP9 streams don't consume frame RAM like GIFs/APNG,
+// and libvpx-vp9 encoding is not available in the FFmpeg.wasm CDN build.
+// A 1080p WebM alpha from Sammie Roto loads directly; macOS converts to APNG separately.
+const isWebM = file.name.toLowerCase().endsWith('.webm') || file.type === 'video/webm';
+
+if (!isWebM && (videoWidth > MAX_VIDEO_WIDTH || videoHeight > MAX_VIDEO_HEIGHT)) {
+  // Auto-transcode instead of rejecting (MP4/MOV only)
   showToast(`Video is ${videoWidth}×${videoHeight}. Optimizing to 720p...`);
   file = await transcodeTo720p(file, onProgress);
   showToast(`Optimized: ${originalSize} → ${newSize}`);
@@ -602,7 +608,25 @@ This left video elements in DOM, blob URLs unrevoked, GL textures active, and `_
 
 ---
 
-### 14.8 Performance Monitoring & Machine Auditing — Future Dev
+### 14.8 Transparent Video — Canvas Trail Fix (May 12, 2026)
+
+**Bug:** Transparent WebM (VP9 alpha) showed a ghosting trail — previous frames accumulated through transparent areas of the current frame.
+
+**Root Cause:** `_tickVideoAnimations()` in `visualizer.js` called `ctx.drawImage(video, ...)` without clearing the canvas first. Canvas 2D default compositing is `source-over`: transparent pixels in the new frame let the previous frame bleed through.
+
+**Fix:** One line before `drawImage`:
+```javascript
+uploadCtx.clearRect(0, 0, width, height);  // ← added
+uploadCtx.drawImage(videoElement, 0, 0, width, height);
+```
+
+**Location:** `src/visualizer.js` `_tickVideoAnimations()`.
+
+**Applies to:** All platforms (web, Windows, macOS). APNG frames go through the GIF path (`_tickGifAnimations`) which never had this issue — GIF frames are pre-composited RGBA arrays, not drawn via canvas 2D.
+
+---
+
+### 14.9 Performance Monitoring & Machine Auditing — Future Dev
 
 > **Status:** Research complete — implementation not started  
 > **Goal:** Real-time performance graphs and video layer impact auditing

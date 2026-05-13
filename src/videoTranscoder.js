@@ -47,7 +47,7 @@ export async function getFFmpeg() {
  */
 export async function transcodeTo720p(file, onProgress = null) {
   const ffmpeg = await getFFmpeg();
-  
+
   const inputName = 'input' + getExtension(file.name);
   const outputName = 'output.mp4';
 
@@ -85,7 +85,7 @@ export async function transcodeTo720p(file, onProgress = null) {
   // Read output file
   console.log('[VideoTranscoder] Reading output file...');
   const data = await ffmpeg.readFile(outputName);
-  
+
   // Cleanup virtual FS
   await ffmpeg.deleteFile(inputName);
   await ffmpeg.deleteFile(outputName);

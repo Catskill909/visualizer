@@ -1,6 +1,6 @@
 # APNG Support — Dev Document
 
-> **Status:** 📋 Active Planning
+> **Status:** 🔨 In Progress — Web + Windows ✅ shipped May 12, macOS APNG Phase 1 next
 > **Date:** May 12, 2026
 > **Goal:** Transparent video that works on all platforms — WebM as source of truth, APNG as macOS-only derived format
 
@@ -25,7 +25,7 @@ DiscoCast — import as transparent video layer
 
 **This doesn't exist in any other VJ tool.** Most VJ software either has no transparency support, or requires pre-keyed footage. Sammie Roto does the hard work — DiscoCast does the creative work.
 
-**The blocker:** WebM VP9 with alpha does not play in WKWebView (macOS Tauri). Apple doesn't ship VP9. APNG is the fix.
+**The blocker:** WebM VP9 *with alpha* does not decode in WKWebView (macOS Tauri). Regular VP9 landed in Safari 14 (2020), but the alpha stream — a separate channel in the container — is not exposed. APNG is the fix.
 
 ---
 
@@ -33,11 +33,11 @@ DiscoCast — import as transparent video layer
 
 | Platform | Engine | WebM VP9 alpha | APNG | Notes |
 |---|---|---|---|---|
-| **macOS Tauri** | WKWebView (Apple) | ❌ | ✅ | Apple doesn't ship VP9 — APNG is the fix |
-| **Windows Tauri** | WebView2 (Edge Chromium) | ✅ native | ✅ | Sammie Roto WebM already works here |
-| **Web (Chrome)** | Chromium | ✅ native | ✅ | Held back — not currently hosted |
+| **macOS Tauri** | WKWebView (Apple) | ❌ alpha only | ✅ | VP9 alpha stream not decoded — APNG Phase 1 needed |
+| **Windows Tauri** | WebView2 (Edge Chromium) | ✅ native | ✅ | ✅ **Confirmed working May 12** — WebM bypasses transcoder, clearRect trail fix applied |
+| **Web (Chrome)** | Chromium | ✅ native | ✅ | ✅ **Confirmed working May 12** — same fixes; web held back (not hosted) |
 
-**Windows is not a problem.** WebView2 is Chromium-based so VP9 alpha plays natively. Sammie Roto exports work on Windows out of the box today. The APNG conversion is a macOS-only fix.
+**Windows is not a problem.** WebView2 is Chromium-based so VP9 alpha plays natively. Two fixes shipped May 12 make it work end-to-end: WebM files bypass the 720p transcoder (`inspector.js`), and `clearRect` before each canvas draw eliminates alpha trail accumulation (`visualizer.js`). The APNG conversion is a macOS-only remaining task.
 
 ## Why APNG Is the Right macOS Conversion Target
 
@@ -53,6 +53,10 @@ DiscoCast — import as transparent video layer
 | **Frame-perfect loops** | Messy timing | ✅ | ✅ (proper fps) |
 
 APNG is the right **macOS conversion target** — it decodes in WKWebView with full alpha. It is never the source of truth. WebM is stored on all platforms; APNG is derived on macOS only. Windows plays WebM natively and never converts.
+
+**Why not HEVC with alpha?** Apple's HEVC-with-alpha encoder lives in `VideoToolbox` (macOS native) — FFmpeg.wasm's `libx265` has no alpha support. And even if encoded, `<video>` in WKWebView doesn't expose the alpha stream for WebGL compositing. HEVC alpha is a Final Cut / Metal workflow, not a web rendering pipeline.
+
+**Future path:** AV1 with alpha. Apple joined AOM in 2018, added hardware AV1 decode on M2, and Safari 16 supports AV1. AV1 also supports a separate alpha stream. If WKWebView gains AV1 alpha decode, APNG conversion becomes unnecessary. Watch WebKit release notes for AV1 alpha. Until then, APNG is the bridge.
 
 ---
 
@@ -208,12 +212,14 @@ File dropped / picked
 **Goal:** Sammie Roto exports work in the macOS app.
 **Scope:** Path A only. WebM → APNG on Tauri + macOS UA detection.
 **Checklist:**
+- [x] WebM files bypass 720p transcoder in `inspector.js` — `isWebM` check added May 12
+- [x] `clearRect` canvas fix in `visualizer.js` `_tickVideoAnimations()` — alpha trails eliminated May 12
+- [x] Test: Sammie Roto WebM plays with alpha on web + Windows ✅ May 12
 - [ ] `upng-js` added to dependencies
 - [ ] `convertToApng()` in `videoTranscoder.js` (WebM input only)
 - [ ] APNG upload handler in `inspector.js`
 - [ ] Reuse GIF frame pipeline in `visualizer.js` for APNG frames
 - [ ] Test: Sammie Roto WebM plays with alpha in macOS build
-- [ ] Test: same WebM still plays natively on web (no conversion)
 
 ### Phase 2 — GIF → APNG Quality Upgrade
 **Goal:** All GIF imports get full-color, properly-timed APNG treatment.

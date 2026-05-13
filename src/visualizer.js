@@ -1370,7 +1370,8 @@ export class VisualizerEngine {
       if (videoElement.paused || videoElement.ended) continue;
       // HAVE_CURRENT_DATA (2) or HAVE_ENOUGH_DATA (4) required for drawImage
       if (videoElement.readyState < 2) continue;
-      // Draw video frame to canvas
+      // Clear first so transparent areas don't accumulate previous frames
+      uploadCtx.clearRect(0, 0, width, height);
       uploadCtx.drawImage(videoElement, 0, 0, width, height);
       // Get pixel data
       const frameData = uploadCtx.getImageData(0, 0, width, height).data;
