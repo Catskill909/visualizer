@@ -30,7 +30,7 @@
 
 | Feature | § | Status |
 |---|---|---|
-| **APNG Support** — WebM alpha on macOS (Sammie Roto fix), GIF→APNG quality upgrade, MOV alpha import | §27 | 📋 Active planning — see `apng-dev.md` |
+| **Transparent WebM on macOS — Stacked-Alpha** (Sammie Roto fix) | §27 | 🔬 Validated May 13, ready to build — see `apng-dev.md` |
 | **Clipper** (`/clipper.html`) — video trim tool, In/Out markers, FFmpeg trim-encode | §19 | 📋 Active planning |
 
 ### ⏭️ Skipped / Blocked
@@ -226,9 +226,9 @@ const frameIndex = Math.floor(videoTime * fps);
 const MAX_VIDEO_WIDTH = 1280;
 const MAX_VIDEO_HEIGHT = 720;
 
-// WebM files bypass transcoding — VP9 streams don't consume frame RAM like GIFs/APNG,
+// WebM files bypass transcoding — VP9 streams don't consume frame RAM like GIFs,
 // and libvpx-vp9 encoding is not available in the FFmpeg.wasm CDN build.
-// A 1080p WebM alpha from Sammie Roto loads directly; macOS converts to APNG separately.
+// A 1080p WebM alpha from Sammie Roto loads directly; macOS converts to stacked-alpha separately (§27).
 const isWebM = file.name.toLowerCase().endsWith('.webm') || file.type === 'video/webm';
 
 if (!isWebM && (videoWidth > MAX_VIDEO_WIDTH || videoHeight > MAX_VIDEO_HEIGHT)) {
@@ -622,7 +622,7 @@ uploadCtx.drawImage(videoElement, 0, 0, width, height);
 
 **Location:** `src/visualizer.js` `_tickVideoAnimations()`.
 
-**Applies to:** All platforms (web, Windows, macOS). APNG frames go through the GIF path (`_tickGifAnimations`) which never had this issue — GIF frames are pre-composited RGBA arrays, not drawn via canvas 2D.
+**Applies to:** All platforms (web, Windows, macOS). GIF frames go through the separate `_tickGifAnimations` path which never had this issue — GIF frames are pre-composited RGBA arrays, not drawn via canvas 2D.
 
 ---
 
@@ -1063,7 +1063,7 @@ Building it once unlocks an entire category of temporal effects.
 ## 18. Video Clip Editor / Sampler — Background Brainstorm
 
 > **Status:** 📋 **Superseded by §19** — Architectural decisions made May 10, 2026  
-> **See:** §19 (Clipper refined spec), §20 (GIF→APNG, supersedes GIF→WebM), §21 (Export formats), §23 (AI future)
+> **See:** §19 (Clipper refined spec), §21 (Export formats), §23 (AI future), §27 (Transparent WebM on macOS)
 
 ### 16.1 Vision: Video Sampler Mode
 
@@ -1225,7 +1225,7 @@ winamp-screen/
 │   ├── clipper/
 │   │   ├── clipper.js       ← NEW: clipper UI logic
 │   │   └── clipper.css      ← NEW: clipper styles
-│   └── videoTranscoder.js   ← MODIFY: add trimSegment() + GIF→APNG path
+│   └── videoTranscoder.js   ← MODIFY: add trimSegment()
 ```
 
 **Existing files NOT modified for Phase 1:**
@@ -1302,7 +1302,7 @@ One job: drop video, mark In/Out, add to layer. Nothing else.
 |---|---|---|
 | HTML5 `<video>` | Playback | `playsInline` + `muted` required — see §14 |
 | Canvas API | Timeline thumbnail strip, scrubber | No audio waveform — visuals only |
-| FFmpeg.wasm | Trim, encode, GIF→APNG | Already in DiscoCast — same lazy-load |
+| FFmpeg.wasm | Trim, encode | Already in DiscoCast — same lazy-load |
 | MediaInfo.js | Fast metadata on drop | Duration, resolution, codec before FFmpeg loads (~1.5MB WASM) |
 
 > **No WaveSurfer.js.** The clipper is for finding visual cut points, not audio cues. A canvas thumbnail strip is sufficient and consistent with the visual-first use case.
@@ -1328,7 +1328,6 @@ Muted:       #5A5A7A
 - [ ] MediaInfo.js — metadata display on file drop
 - [ ] In/Out marker controls (`I`/`O` keyboard + click buttons)
 - [ ] `videoTranscoder.js` — add `trimSegment(start, duration)` function
-- [ ] GIF → APNG conversion path in `videoTranscoder.js` (see §27 / `apng-dev.md`)
 - [ ] `postMessage` from clipper → `inspector.js` listener
 - [ ] "✂️ Import from Clipper" button on video layer in Preset Studio
 - [ ] 720p guard on output (reuse existing `transcodeTo720p`)
@@ -1337,25 +1336,17 @@ Muted:       #5A5A7A
 
 ---
 
-## 20. GIF → APNG Conversion
+## 20. GIF Optimization — Status
 
-> **Status:** ~~GIF→WebM~~ superseded — **GIF→APNG is the settled path** (see §27 and [`apng-dev.md`](apng-dev.md))
+> **Status:** Existing GIF Optimizer ships in `gifOptimizer.js` (frame reduction + resize). No conversion to other formats planned.
 
-**Why GIF→APNG instead of GIF→WebM:** WebM alpha doesn't decode in WKWebView (macOS). APNG works everywhere, preserves full 8-bit alpha, and normalizes GIF's chaotic frame timing to a clean 30fps. The existing GIF frame animation pipeline (`gifuct-js` → `texSubImage2D`) is reused with `upng-js` as the decoder — no new GL code.
+Earlier drafts proposed GIF→WebM and then GIF→APNG conversion. Both abandoned May 13, 2026:
+- **GIF→WebM** abandoned because VP9 alpha doesn't decode in WKWebView (macOS)
+- **GIF→APNG** abandoned because FFmpeg.wasm cannot decode VP9 alpha (bug #621) and APNG file sizes are 20× the source
 
-The original GIF→WebM spec is preserved below for context only. **Do not implement it.**
+The existing GIF Optimizer (smart frame skipping + resolution capping) addresses the practical problem (file size / GPU RAM) without a format change. GIFs play correctly on all platforms via the existing `_gifAnimations` pipeline. No action needed.
 
-<details>
-<summary>Original GIF→WebM spec (superseded)</summary>
-
-GIF stores frame timing as integers in centiseconds — coarse, inconsistent across browsers, and corrupted by re-encoding history. Converting to WebM gave `video.playbackRate` speed control in one line, full 24-bit color, and smaller files. But WebM VP9 alpha fails in WKWebView, making it a dead end for macOS. APNG solves the same problems and works everywhere.
-
-FFmpeg command that was planned:
-```
-ffmpeg -i input.gif -c:v libvpx-vp9 -b:v 0 -crf 30 -pix_fmt yuva420p -r 30 output.webm
-```
-
-</details>
+For transparent VIDEO (not GIF) on macOS, see §27 and [`apng-dev.md`](apng-dev.md).
 
 ---
 
@@ -1366,18 +1357,18 @@ ffmpeg -i input.gif -c:v libvpx-vp9 -b:v 0 -crf 30 -pix_fmt yuva420p -r 30 outpu
 | Format | Web Chrome | Mac Tauri | Win Tauri | Transparent | Strategy |
 |---|---|---|---|---|---|
 | **MP4 H.264** | ✅ | ✅ | ✅ | ❌ | Default for opaque video |
-| **WebM VP9** | ✅ | ❌ VP9 | ✅ | ✅ | **Source of truth for alpha** |
-| **APNG** | ✅ | ✅ | ✅ | ✅ | macOS-only derived/cached format |
-| Animated GIF | ✅ | ✅ | ✅ | Binary only | Legacy — convert to APNG on import |
+| **WebM VP9** | ✅ | ✅ (no-alpha) ❌ (alpha) | ✅ | ✅ Web/Win only | Source of truth — Sammie Roto exports land here |
+| **Stacked-Alpha WebM** (VP9, 2× height) | ✅ | ✅ | ✅ | ✅ via WebGL shader | **macOS-only derived/cached** transparent path |
+| Animated GIF | ✅ | ✅ | ✅ | Binary only | Legacy — kept as-is (GIF Optimizer handles size/RAM) |
 
-**Transparent video strategy (settled May 12, 2026):**
-- **WebM VP9 alpha = the format.** Small files, real codec, portable. Stored in IndexedDB on all platforms.
-- **Windows:** plays WebM alpha natively via WebView2. Zero conversion.
-- **macOS:** converts WebM → APNG at upload via FFmpeg.wasm. Cached as `${videoId}_apng`. 480p cap, 15fps above 5 seconds.
-- **Preset portability:** exports always carry WebM blob. macOS converts on import. No platform mismatch.
-- **APNG is never the user-facing format** — it is internal macOS plumbing only.
+**Transparent video strategy (validated May 13, 2026):**
+- **WebM VP9 alpha = the source format.** Small files, real codec, portable. Stored in IndexedDB on all platforms.
+- **Web (Chrome) & Windows (WebView2):** plays WebM alpha natively. Zero conversion.
+- **macOS:** WKWebView refuses VP9 alpha streams. At upload time we convert to a **stacked-alpha WebM** (regular VP9, 2× height: RGB top half + alpha as luma bottom half) via native ffmpeg in a Tauri sidecar. WKWebView plays this as plain VP9. A WebGL composite shader re-assembles RGBA from the two halves at render time.
+- **Preset portability:** exports carry the original WebM blob (small, portable). macOS regenerates the stacked cache on import.
+- **The stacked format is internal macOS plumbing only.** Users still drop normal WebM files — they never see or touch the stacked variant.
 
-See [`apng-dev.md`](apng-dev.md) for full architecture.
+See [`apng-dev.md`](apng-dev.md) for full architecture, validated tests, and implementation plan.
 
 ---
 
@@ -1584,23 +1575,50 @@ If MSE becomes available in WKWebView or the macOS requirement is dropped:
 
 ---
 
-## 27. APNG Support — Universal Alpha Animation
+## 27. Transparent WebM on macOS — Stacked-Alpha
 
-> **Status:** 📋 Active Planning — full spec in [`apng-dev.md`](apng-dev.md)
-> **Priority:** High — unblocks the Sammie Roto workflow on macOS
+> **Status:** ✅ Research validated May 13, 2026 — ready to build. Full spec, validation results, and implementation plan in [`apng-dev.md`](apng-dev.md).
+> **Priority:** High — unblocks the Sammie Roto workflow on macOS.
 
-Three conversion paths via FFmpeg.wasm:
+**The problem:** WKWebView (macOS Tauri's browser engine) plays VP9 video but silently drops the alpha channel. Sammie Roto exports import as opaque on macOS. Web (Chrome) and Windows (WebView2) work natively — shipped May 12.
 
-| Path | Input | Trigger | Why |
-|---|---|---|---|
-| **A** | WebM with alpha | macOS Tauri only | WKWebView can't decode VP9 — Windows plays natively, zero conversion |
-| **B** | GIF | All platforms | Full 8-bit color, clean 30fps, smaller file — GIF is poor quality everywhere |
-| **C** | MOV with alpha | macOS Tauri + web | ProRes 4444 / After Effects exports — WKWebView can't decode these codecs |
+**The solution (validated empirically in Safari, May 13):** convert the WebM to a *stacked-alpha* format — a regular VP9 video at 2× the source height, with RGB pixels in the top half and the alpha channel encoded as plain grayscale luma in the bottom half. WKWebView plays it as ordinary VP9 (no alpha decoding needed — there's no alpha stream). A WebGL shader samples the top half for RGB and the bottom half for alpha, outputting a transparent texture.
 
-All three output APNG → decoded via `upng-js` → feeds existing GIF frame animation pipeline unchanged (`texSubImage2D`, no canvas, no premultiply). Zero new GL code.
+**Why this works where APNG, ogv.js, and HEVC alpha all failed:** none of those approaches got WKWebView to actually decode alpha. Stacked-alpha avoids the problem entirely by hiding the alpha as plain luma in a regular VP9 video.
 
-**The Sammie Roto workflow this unlocks:**
+**Pipeline:**
 ```
-AI cutout tool → WebM with alpha → DiscoCast macOS → transparent layer → VJ effects
+WebM with VP9 alpha (Sammie Roto)
+   ↓  macOS Tauri only
+   ↓  Tauri sidecar invokes bundled ffmpeg binary
+   ↓
+Stacked-alpha WebM (2× height, regular VP9, no alpha track)
+   ↓
+WKWebView <video> element (native VP9 playback)
+   ↓
+WebGL composite shader (samples top half RGB, bottom half luma → RGBA)
+   ↓
+Existing layer pipeline — VJ effects, audio reactivity, all unchanged
 ```
-No other VJ tool supports this end-to-end. See `apng-dev.md` for full architecture and phased checklist.
+
+**File sizes (measured):** source `bunny.webm` 5.4 MB → stacked `bunny_stacked.webm` 3.3 MB. Smaller than the source. Hardware-accelerated VP9 encode on M1 runs at ~0.9× real-time.
+
+**Test files preserved at `~/Desktop/hevc-alpha-test/`** including a working Safari validation page (`test-stacked.html`).
+
+**Files to be modified to ship this:**
+- `src-tauri/tauri.conf.json` — enable sidecar
+- `src-tauri/src/main.rs` — Rust command wrapping the ffmpeg sidecar
+- `src-tauri/binaries/ffmpeg-{aarch64,x86_64}-apple-darwin` — bundled ffmpeg binary (new)
+- `src/editor/inspector.js` — `_handleWebmAlphaUpload()` method, macOS-gated
+- `src/visualizer.js` — `_loadStackedAlphaVideo()` and stacked-alpha shader
+
+**Files that must NOT be touched** (web + Windows transparent WebM path):
+- `_addVideoLayer()` — existing video upload, unchanged on web/Windows
+- `_tickVideoAnimations()` — existing tick loop (the May 12 `clearRect` fix is load-bearing)
+
+The Sammie Roto workflow this finally unlocks:
+```
+AI cutout tool → WebM with alpha → DiscoCast (any platform) → transparent layer → VJ effects
+```
+
+No other VJ tool supports this end-to-end. See `apng-dev.md` for the validated research, phased implementation checklist, and handoff details.
