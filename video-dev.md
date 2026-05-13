@@ -29,8 +29,8 @@
 
 | Feature | § | Status |
 |---|---|---|
+| **APNG Support** — WebM alpha on macOS (Sammie Roto fix), GIF→APNG quality upgrade, MOV alpha import | §27 | 📋 Active planning — see `apng-dev.md` |
 | **Clipper** (`/clipper.html`) — video trim tool, In/Out markers, FFmpeg trim-encode | §19 | 📋 Active planning |
-| **GIF → WebM** — normalize messy GIFs to proper 30fps WebM in the Clipper | §20 | 📋 Ships with Clipper |
 
 ### ⏭️ Skipped / Blocked
 
@@ -1039,7 +1039,7 @@ Building it once unlocks an entire category of temporal effects.
 ## 18. Video Clip Editor / Sampler — Background Brainstorm
 
 > **Status:** 📋 **Superseded by §19** — Architectural decisions made May 10, 2026  
-> **See:** §19 (Clipper refined spec), §20 (GIF→WebM), §21 (Export formats), §23 (AI future)
+> **See:** §19 (Clipper refined spec), §20 (GIF→APNG, supersedes GIF→WebM), §21 (Export formats), §23 (AI future)
 
 ### 16.1 Vision: Video Sampler Mode
 
@@ -1201,7 +1201,7 @@ winamp-screen/
 │   ├── clipper/
 │   │   ├── clipper.js       ← NEW: clipper UI logic
 │   │   └── clipper.css      ← NEW: clipper styles
-│   └── videoTranscoder.js   ← MODIFY: add trimSegment() + GIF→WebM path
+│   └── videoTranscoder.js   ← MODIFY: add trimSegment() + GIF→APNG path
 ```
 
 **Existing files NOT modified for Phase 1:**
@@ -1278,7 +1278,7 @@ One job: drop video, mark In/Out, add to layer. Nothing else.
 |---|---|---|
 | HTML5 `<video>` | Playback | `playsInline` + `muted` required — see §14 |
 | Canvas API | Timeline thumbnail strip, scrubber | No audio waveform — visuals only |
-| FFmpeg.wasm | Trim, encode, GIF→WebM | Already in DiscoCast — same lazy-load |
+| FFmpeg.wasm | Trim, encode, GIF→APNG | Already in DiscoCast — same lazy-load |
 | MediaInfo.js | Fast metadata on drop | Duration, resolution, codec before FFmpeg loads (~1.5MB WASM) |
 
 > **No WaveSurfer.js.** The clipper is for finding visual cut points, not audio cues. A canvas thumbnail strip is sufficient and consistent with the visual-first use case.
@@ -1304,7 +1304,7 @@ Muted:       #5A5A7A
 - [ ] MediaInfo.js — metadata display on file drop
 - [ ] In/Out marker controls (`I`/`O` keyboard + click buttons)
 - [ ] `videoTranscoder.js` — add `trimSegment(start, duration)` function
-- [ ] GIF → WebM conversion path in `videoTranscoder.js` (see §18)
+- [ ] GIF → APNG conversion path in `videoTranscoder.js` (see §27 / `apng-dev.md`)
 - [ ] `postMessage` from clipper → `inspector.js` listener
 - [ ] "✂️ Import from Clipper" button on video layer in Preset Studio
 - [ ] 720p guard on output (reuse existing `transcodeTo720p`)
@@ -1313,72 +1313,25 @@ Muted:       #5A5A7A
 
 ---
 
-## 20. GIF → WebM Conversion
+## 20. GIF → APNG Conversion
 
-> **Status:** 📋 **Planned for Phase 1** — Add to `videoTranscoder.js`  
-> **Value:** Converts messy internet GIFs into clean, speed-controllable WebM loops for DiscoCast
+> **Status:** ~~GIF→WebM~~ superseded — **GIF→APNG is the settled path** (see §27 and [`apng-dev.md`](apng-dev.md))
 
-### 18.1 Why GIF Speed Control Is Hard
+**Why GIF→APNG instead of GIF→WebM:** WebM alpha doesn't decode in WKWebView (macOS). APNG works everywhere, preserves full 8-bit alpha, and normalizes GIF's chaotic frame timing to a clean 30fps. The existing GIF frame animation pipeline (`gifuct-js` → `texSubImage2D`) is reused with `upng-js` as the decoder — no new GL code.
 
-The GIF spec stores frame timing as integers in **centiseconds** (1/100th of a second):
+The original GIF→WebM spec is preserved below for context only. **Do not implement it.**
 
-| Problem | What Happens |
-|---|---|
-| **Coarse timing** | 10ms increment only — 30fps needs 33.33ms, rounds to 30ms or 40ms → judder |
-| **0ms delay** | Chrome renders 0ms as 10ms, Firefox as 100ms — same GIF, different speeds |
-| **No global FPS** | Every frame has its own delay, or none. Speed control must rebuild the entire frame schedule |
-| **Encoding history** | Internet GIFs are often through Photoshop → Twitter → re-upload. Each pass corrupts timing |
+<details>
+<summary>Original GIF→WebM spec (superseded)</summary>
 
-This is why `gifuct-js` does so much work — and why speed control still fights the source material.
+GIF stores frame timing as integers in centiseconds — coarse, inconsistent across browsers, and corrupted by re-encoding history. Converting to WebM gave `video.playbackRate` speed control in one line, full 24-bit color, and smaller files. But WebM VP9 alpha fails in WKWebView, making it a dead end for macOS. APNG solves the same problems and works everywhere.
 
-### 18.2 Why WebM Is Better for DiscoCast
-
-| Property | GIF | WebM |
-|---|---|---|
-| **Speed control** | Re-parse frame schedule, rebuild timing | `video.playbackRate = 0.5` — one line |
-| **Color depth** | 256 colors (palette) | Full 24-bit |
-| **File size** | Large | Much smaller at same quality |
-| **Alpha channel** | Binary on/off | Full alpha (VP9 `yuva420p`) |
-| **Browser consistency** | Varies widely | Consistent video decode pipeline |
-
-### 18.3 Conversion Workflow
-
-```
-Drag GIF into Clipper
-    │ (FFmpeg.wasm: normalize frame rate, fix timing, preserve alpha)
-    ▼
-Preview + set In/Out
-    │
-    ▼
-Export as WebM VP9 (30fps, proper frame rate)
-    │
-    ▼
-Drag into DiscoCast as video layer
-    │ (playbackRate control, smooth loops, full color, alpha support)
-    ▼
-Reacts to audio — smooth, consistent, predictable
-```
-
-### 18.4 FFmpeg Command
-
+FFmpeg command that was planned:
 ```
 ffmpeg -i input.gif -c:v libvpx-vp9 -b:v 0 -crf 30 -pix_fmt yuva420p -r 30 output.webm
 ```
 
-- `-r 30` normalizes frame rate to 30fps regardless of source timing
-- `-pix_fmt yuva420p` preserves GIF transparency as proper WebM alpha
-- `-crf 30` quality-based encoding — no bitrate cap
-
-**Trigger:** On file drop in the clipper, detect GIF and convert immediately. Work with WebM internally. User never sees the intermediate.
-
-### 18.5 Strategy
-
-| Use case | Format |
-|---|---|
-| Import GIF from internet | Convert to WebM on import — use WebM in DiscoCast |
-| Need transparency (silhouette) | WebM VP9 `yuva420p` — Chrome/Windows only (see §21) |
-| Share outside DiscoCast | GIF (universal) |
-| Maximum quality/smoothness in DiscoCast | WebM always |
+</details>
 
 ---
 
@@ -1386,14 +1339,21 @@ ffmpeg -i input.gif -c:v libvpx-vp9 -b:v 0 -crf 30 -pix_fmt yuva420p -r 30 outpu
 
 > Cross-platform video quirks (WKWebView `playsInline`, blob URL lifecycle, SharedArrayBuffer) are already solved in DiscoCast — §14 covers the established patterns. The clipper inherits those fixes directly.
 
-| Export Type | Web Chrome | Web Safari | Mac Tauri | Win Tauri | v0.1–0.3 Plan |
+| Format | Web Chrome | Mac Tauri | Win Tauri | Transparent | Strategy |
 |---|---|---|---|---|---|
-| **MP4 H.264, no alpha** | ✅ | ✅ | ✅ | ✅ | **Default export** |
-| **WebM VP9, no alpha** | ✅ | ✅ | ⚠️ | ✅ | Secondary option |
-| WebM VP9, with alpha | ✅ | 🔴 | 🔴 | ✅ | Defer to v0.5+ |
-| Animated GIF | ✅ | ✅ | ✅ | ✅ | For legacy/sharing |
+| **MP4 H.264** | ✅ | ✅ | ✅ | ❌ | Default for opaque video |
+| **WebM VP9** | ✅ | ❌ VP9 | ✅ | ✅ | **Source of truth for alpha** |
+| **APNG** | ✅ | ✅ | ✅ | ✅ | macOS-only derived/cached format |
+| Animated GIF | ✅ | ✅ | ✅ | Binary only | Legacy — convert to APNG on import |
 
-**v0.1–v0.3 safe strategy:** MP4 H.264 as default. GIF as legacy/share target. WebM alpha deferred — Safari and Mac WKWebView don't support VP9 alpha; HEVC alpha export requires macOS hardware encoder not available in FFmpeg.wasm.
+**Transparent video strategy (settled May 12, 2026):**
+- **WebM VP9 alpha = the format.** Small files, real codec, portable. Stored in IndexedDB on all platforms.
+- **Windows:** plays WebM alpha natively via WebView2. Zero conversion.
+- **macOS:** converts WebM → APNG at upload via FFmpeg.wasm. Cached as `${videoId}_apng`. 480p cap, 15fps above 5 seconds.
+- **Preset portability:** exports always carry WebM blob. macOS converts on import. No platform mismatch.
+- **APNG is never the user-facing format** — it is internal macOS plumbing only.
+
+See [`apng-dev.md`](apng-dev.md) for full architecture.
 
 ---
 
@@ -1597,3 +1557,26 @@ If MSE becomes available in WKWebView or the macOS requirement is dropped:
 1. Use FFmpeg.wasm (already in project) to re-encode imported video as fragmented MP4 at upload time
 2. Fetch the ArrayBuffer, manage a `SourceBuffer` append loop with `timestampOffset` advancement
 3. Feed the MSE-backed `<video>` element into the existing `_tickVideoAnimations` texture upload — no canvas changes needed
+
+---
+
+## 27. APNG Support — Universal Alpha Animation
+
+> **Status:** 📋 Active Planning — full spec in [`apng-dev.md`](apng-dev.md)
+> **Priority:** High — unblocks the Sammie Roto workflow on macOS
+
+Three conversion paths via FFmpeg.wasm:
+
+| Path | Input | Trigger | Why |
+|---|---|---|---|
+| **A** | WebM with alpha | macOS Tauri only | WKWebView can't decode VP9 — Windows plays natively, zero conversion |
+| **B** | GIF | All platforms | Full 8-bit color, clean 30fps, smaller file — GIF is poor quality everywhere |
+| **C** | MOV with alpha | macOS Tauri + web | ProRes 4444 / After Effects exports — WKWebView can't decode these codecs |
+
+All three output APNG → decoded via `upng-js` → feeds existing GIF frame animation pipeline unchanged (`texSubImage2D`, no canvas, no premultiply). Zero new GL code.
+
+**The Sammie Roto workflow this unlocks:**
+```
+AI cutout tool → WebM with alpha → DiscoCast macOS → transparent layer → VJ effects
+```
+No other VJ tool supports this end-to-end. See `apng-dev.md` for full architecture and phased checklist.
