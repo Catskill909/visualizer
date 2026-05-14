@@ -5907,6 +5907,23 @@ export class EditorInspector {
      * @param {string|null} thumbDataUrl - JPEG data URL for the thumbnail (optional)
      * @returns {object} the saved preset record
      */
+    // ⚠️ PERSISTENCE BOUNDARY ⚠️
+    // If you add a `this._foo` instance variable on EditorInspector that affects
+    // RENDERING (comp shader, baseVals, image textures, butterchurn state), you
+    // MUST persist it here AND restore it in `loadPresetData`. Otherwise saved
+    // presets reload missing that state and the user sees a regression that's
+    // invisible until they hit the specific configuration.
+    //
+    // Burned 1.5 days on `_solidColor` not being persisted (May 14 2026). See
+    // memory: project_solidcolor_persistence.md and apng-dev.md "Black-background-
+    // on-reload fix" section.
+    //
+    // Already covered:
+    //   - currentState.* — round-trips via the spread below
+    //   - _imagesOnly   — round-trips via currentState.imagesOnly
+    //   - _imageTextures — repopulated on layer mount during load
+    //   - _baseComp     — internal cache, rebuilt by _buildCompShader
+    //   - _solidColor   — persisted explicitly below
     saveCurrent(name, id, thumbDataUrl = null) {
         const presetNameInput = document.getElementById('preset-name-input');
         if (presetNameInput) presetNameInput.value = name;
@@ -5914,10 +5931,8 @@ export class EditorInspector {
         const data = {
             name,
             ...this.currentState,
-            // `_solidColor` is an instance var, not part of currentState, but it
-            // drives whether _buildCompShader produces the solid-color base or
-            // the sampler_main base. Persist it so reload reproduces what the
-            // user actually saw.
+            // Instance var, not part of currentState — drives _buildCompShader's
+            // solid-color vs sampler_main branch. See PERSISTENCE BOUNDARY above.
             solidColor: this._solidColor,
             ...(thumbDataUrl ? { thumbnailDataUrl: thumbDataUrl } : {}),
         };
@@ -6038,7 +6053,10 @@ export class EditorInspector {
             images: [],
         };
 
-        // Restore internal flags from the loaded state
+        // ⚠️ PERSISTENCE BOUNDARY ⚠️
+        // Mirror of `saveCurrent` — every render-affecting instance variable
+        // saved there must be restored here. See the long comment above
+        // `saveCurrent` for the full audit list and the bug history.
         this._imagesOnly = !!this.currentState.imagesOnly;
         // Restore _solidColor (instance var, not in currentState). Without this,
         // presets saved while in a solid-color variation reload with a black

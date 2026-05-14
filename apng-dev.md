@@ -1,5 +1,26 @@
 # Transparent WebM on macOS — Dev Document
 
+---
+
+## ⚠️ Black-background-on-reload fix (May 14 2026, afternoon)
+
+**Bug surfaced after the macOS session, root cause was unrelated:** every preset saved while in a "solid-color" base variation (Solid, Shift — the default — etc.) reloaded with a black background on every platform (web, Windows, macOS), and the same happened on export/import. Clicking any palette swatch restored the rendering until the next reload.
+
+**Why it happened:** `_solidColor` is an instance variable on `EditorInspector` (not in `currentState`), and it drives whether `_buildCompShader` emits the **solid-color base** (`vec3 col = mix(_colA, _colB, ...)`) or the **sampler_main base** (`vec3 col = texture(sampler_main, uv_m).xyz * 2.0`). It was never persisted in saved presets. On reload, `_clearForLoad` sets it to `null`; `_buildCompShader` then emits the sampler_main path; and for solid-color presets Butterchurn renders nothing into `sampler_main` (e.g. `wave_a = 0` on the Shift variation) → black canvas.
+
+This bug had existed since `_solidColor` was introduced — it only became visible after a session of testing where every new preset used the default Shift variation.
+
+**Fix (two small edits in [src/editor/inspector.js](src/editor/inspector.js)):**
+
+1. `saveCurrent` now writes `solidColor: this._solidColor` alongside the `currentState` spread, so the saved preset record carries the instance var.
+2. `loadPresetData` now restores `this._solidColor = Array.isArray(stateFields.solidColor) ? stateFields.solidColor.slice() : null;` right after the BLANK/stateFields spread.
+
+`exportPreset` and `importPreset` need no change — they spread all fields, so the new `solidColor` field rides along through the JSON.
+
+**Backward compat:** presets saved before the fix do not have the `solidColor` field. They will still load black on first open. Resave (after touching any palette swatch to restore the rendering) writes the field, after which save/reload + export/import behave correctly.
+
+---
+
 > **Status (May 14 2026, ~9:35am):** ✅ **SHIPPED — DMG #11 confirmed working by user.**
 > Transparent WebM (from Sammie Roto or any VP9-alpha source) now imports correctly in the production macOS DMG. The bunny renders with full transparency over the MilkDrop visualizer; sliders + palette + all controls stay responsive; presets save and reload correctly with the stacked-alpha layer.
 > **Scope:** macOS Tauri ONLY. Web + Windows transparent WebM already worked natively (shipped May 12, untouched).
