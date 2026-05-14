@@ -20,7 +20,7 @@
 | macOS WKWebView fixes — `playsInline`, blob URL lifecycle, manual loop restart | May 7 |
 | Playback speed control 0.25×–4× | May 9 |
 | Auto-transcoding — drag 4K/1080p → auto-converts to 720p via FFmpeg.wasm | May 9 |
-| Color grading — Brightness, Contrast, Gamma (GLSL, video layers only) | May 9 |
+| Color grading — Brightness, Contrast, Gamma sliders in Layers tab Tint section (all layer types — images, GIFs, video, text). GLSL previously gated `isVideo`; now universal. Note: Saturation + Hue were already shared Tint controls for all layer types. | May 14 |
 | VJ Effects — Luma Key, Wave Distort, Invert, Threshold, Pixelate, Scan Lines, Film Grain | May 8 |
 | Width/Height sliders — independent non-uniform scaling 0.25×–4× (video only) | May 11 |
 | Video Border — width, color picker, feather (video only) | May 11 |

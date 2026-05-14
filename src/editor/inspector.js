@@ -2318,6 +2318,9 @@ export class EditorInspector {
             hueSpinSpeed: 0.00, // tint hue rotation speed (cycles/sec)
             imageSaturation: 1.00, // per-layer saturation (0=grey, 1=original, 2=vivid)
             imageHue: 0,           // per-layer static hue offset in degrees (0–360)
+            brightness: 1.0,       // per-layer brightness multiplier (0=black, 1=original, 2=double)
+            contrast: 1.0,         // per-layer contrast (0=flat grey, 1=original, 2=high contrast)
+            gamma: 1.0,            // per-layer gamma curve (0.5=bright mids, 1=original, 2.5=dark mids)
             tile: true,
             blendMode: 'overlay',
             audioPulse: 0.00,  // bass drives size
@@ -2782,6 +2785,9 @@ export class EditorInspector {
             hueSpinSpeed: 0.00,
             imageSaturation: 1.00,
             imageHue: 0,
+            brightness: 1.0,
+            contrast: 1.0,
+            gamma: 1.0,
             tile: false,
             spacing: 0.00,
             tileScaleX: 1.00,
@@ -3324,6 +3330,24 @@ export class EditorInspector {
                 value="${(entry.imageHue ?? 0)}" style="--pct:${pct(entry.imageHue ?? 0, 0, 360)}">
               <span class="lsv layer-img-hue-val">${(entry.imageHue ?? 0).toFixed(0)}°</span>
             </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Multiply brightness — 0=black, 1=original, 2=double">Brightness</span>
+              <input type="range" class="slider layer-brightness-sl" min="0" max="2" step="0.01"
+                value="${(entry.brightness ?? 1.0).toFixed(2)}" style="--pct:${pct(entry.brightness ?? 1.0, 0, 2)}">
+              <span class="lsv layer-brightness-val">${(entry.brightness ?? 1.0).toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Contrast — 0=flat grey, 1=original, 2=high contrast">Contrast</span>
+              <input type="range" class="slider layer-contrast-sl" min="0" max="2" step="0.01"
+                value="${(entry.contrast ?? 1.0).toFixed(2)}" style="--pct:${pct(entry.contrast ?? 1.0, 0, 2)}">
+              <span class="lsv layer-contrast-val">${(entry.contrast ?? 1.0).toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Gamma — below 1 lifts midtones bright, above 1 darkens them">Gamma</span>
+              <input type="range" class="slider layer-gamma-sl" min="0.5" max="2.5" step="0.05"
+                value="${(entry.gamma ?? 1.0).toFixed(2)}" style="--pct:${pct(entry.gamma ?? 1.0, 0.5, 2.5)}">
+              <span class="lsv layer-gamma-val">${(entry.gamma ?? 1.0).toFixed(2)}</span>
+            </div>
             <div class="layer-section-divider"></div>
             ${entry.type === 'video' ? `
             <p class="layer-section-label">Border</p>
@@ -3771,12 +3795,13 @@ export class EditorInspector {
         // Remaining slider rows — DOM order must match sliderKeys exactly:
         // opacity, spacing, orbitRadius, tunnelSpeed,
         // swayAmt, swaySpeed, wanderAmt, wanderSpeed, hueSpinSpeed
+
         const sliderKeys = ['opacity', 'spacing', 'orbitRadius', 'tunnelSpeed', 'depthOffset',
             'swayAmt', 'swaySpeed', 'wanderAmt', 'wanderSpeed', 'hueSpinSpeed'];
         const sliderMins = [0, 0, 0, -2, 0, 0, 0, 0, 0, 0];
         const sliderMaxes = [1, 0.8, 0.45, 2, 1, 0.4, 4, 0.4, 2, 2];
 
-        card.querySelectorAll('.layer-slider-row input[type=range]:not(.layer-bounce-sl):not(.layer-size-sl):not(.layer-liss-sl):not(.layer-strobe-thr-sl):not(.layer-pan-x-sl):not(.layer-pan-y-sl):not(.layer-pan-range-sl):not(.layer-beat-fade-sl):not(.layer-tile-sx-sl):not(.layer-tile-sy-sl):not(.layer-vid-sx-sl):not(.layer-vid-sy-sl):not(.layer-vid-border-w-sl):not(.layer-vid-border-feather-sl):not(.layer-shake-sl):not(.layer-persp-x-sl):not(.layer-persp-y-sl):not(.layer-radius-sl):not(.layer-gif-speed-sl):not(.layer-gif-stability-sl):not(.layer-video-speed-sl):not(.layer-video-scrub-sl):not(.layer-font-size-sl):not(.layer-letter-spacing-sl):not(.layer-line-height-sl):not(.layer-shadow-blur-sl):not(.layer-shadow-x-sl):not(.layer-shadow-y-sl):not(.layer-outline-width-sl):not(.layer-kaleido-speed-sl)').forEach((sl, i) => {
+        card.querySelectorAll('.layer-slider-row input[type=range]:not(.layer-bounce-sl):not(.layer-size-sl):not(.layer-liss-sl):not(.layer-strobe-thr-sl):not(.layer-pan-x-sl):not(.layer-pan-y-sl):not(.layer-pan-range-sl):not(.layer-beat-fade-sl):not(.layer-tile-sx-sl):not(.layer-tile-sy-sl):not(.layer-vid-sx-sl):not(.layer-vid-sy-sl):not(.layer-vid-border-w-sl):not(.layer-vid-border-feather-sl):not(.layer-shake-sl):not(.layer-persp-x-sl):not(.layer-persp-y-sl):not(.layer-radius-sl):not(.layer-gif-speed-sl):not(.layer-gif-stability-sl):not(.layer-video-speed-sl):not(.layer-video-scrub-sl):not(.layer-font-size-sl):not(.layer-letter-spacing-sl):not(.layer-line-height-sl):not(.layer-shadow-blur-sl):not(.layer-shadow-x-sl):not(.layer-shadow-y-sl):not(.layer-outline-width-sl):not(.layer-kaleido-speed-sl):not(.layer-brightness-sl):not(.layer-contrast-sl):not(.layer-gamma-sl)').forEach((sl, i) => {
             const valEl = sl.nextElementSibling;
             sl.addEventListener('input', () => {
                 const v = parseFloat(sl.value);
@@ -4152,6 +4177,42 @@ export class EditorInspector {
                 entry.imageHue = parseFloat(imgHueSl.value);
                 imgHueVal.textContent = entry.imageHue.toFixed(0) + '°';
                 imgHueSl.style.setProperty('--pct', `${(entry.imageHue / 360 * 100).toFixed(1)}%`);
+                refresh();
+            });
+        }
+
+        // Per-layer Brightness slider
+        const brightSl = card.querySelector('.layer-brightness-sl');
+        const brightVal = card.querySelector('.layer-brightness-val');
+        if (brightSl) {
+            brightSl.addEventListener('input', () => {
+                entry.brightness = parseFloat(brightSl.value);
+                brightVal.textContent = entry.brightness.toFixed(2);
+                brightSl.style.setProperty('--pct', `${(entry.brightness / 2 * 100).toFixed(1)}%`);
+                refresh();
+            });
+        }
+
+        // Per-layer Contrast slider
+        const contrastSl = card.querySelector('.layer-contrast-sl');
+        const contrastVal = card.querySelector('.layer-contrast-val');
+        if (contrastSl) {
+            contrastSl.addEventListener('input', () => {
+                entry.contrast = parseFloat(contrastSl.value);
+                contrastVal.textContent = entry.contrast.toFixed(2);
+                contrastSl.style.setProperty('--pct', `${(entry.contrast / 2 * 100).toFixed(1)}%`);
+                refresh();
+            });
+        }
+
+        // Per-layer Gamma slider
+        const gammaSl = card.querySelector('.layer-gamma-sl');
+        const gammaVal = card.querySelector('.layer-gamma-val');
+        if (gammaSl) {
+            gammaSl.addEventListener('input', () => {
+                entry.gamma = parseFloat(gammaSl.value);
+                gammaVal.textContent = entry.gamma.toFixed(2);
+                gammaSl.style.setProperty('--pct', `${((entry.gamma - 0.5) / 2.0 * 100).toFixed(1)}%`);
                 refresh();
             });
         }
@@ -5770,8 +5831,8 @@ export class EditorInspector {
             // Film Grain: animated hash-based noise overlay
             (hasFilmGrain ? `    { float _gn = fract(sin(dot(uv + fract(time * 0.1), vec2(12.9898, 78.233))) * 43758.5453); _src += (_gn - 0.5) * ${filmGrainAmt} * 0.4; }
 ` : '') +
-            // Color grading for videos (brightness, contrast, gamma)
-            (isVideo ? (() => {
+            // Color grading — brightness, contrast, gamma (all layer types)
+            (() => {
                 const br = (img.brightness || 1.0).toFixed(4);
                 const ct = (img.contrast || 1.0).toFixed(4);
                 const gm = (img.gamma || 1.0).toFixed(4);
@@ -5787,7 +5848,7 @@ export class EditorInspector {
                 // Gamma: pow(value, gamma)
                 if (hasGm) s += `    _src = pow(max(_src, 0.0), vec3(${gm}));\n`;
                 return s;
-            })() : '') +
+            })() +
             // Luma Key: darken-below-lo and brighten-above-hi thresholds cut alpha
             (hasLumaKey ? (() => {
                 let lk = `    { float _luma = dot(_src, vec3(0.299, 0.587, 0.114));\n`;
@@ -5971,7 +6032,7 @@ export class EditorInspector {
             vignette: 0, vignetteCX: 0.5, vignetteCY: 0.5, vignetteW: 0.5, vignetteH: 0.5, vignetteCorner: 0.3, vignetteStrength: 0.5, vignetteFeather: 0.3, vignetteColor: '#000000',
             audioPulse: 0.00, pulseInvert: false,
             blendMode: 'overlay', tile: true, groupSpin: false,
-            hueSpinSpeed: 0.00, imageSaturation: 1.00, imageHue: 0, tintR: 1.0, tintG: 1.0, tintB: 1.0,
+            hueSpinSpeed: 0.00, imageSaturation: 1.00, imageHue: 0, brightness: 1.0, contrast: 1.0, gamma: 1.0, tintR: 1.0, tintG: 1.0, tintB: 1.0,
             name: 'Layer', fileName: '', collapsed: false,
             isHd: false, solo: false, muted: false,
         };
