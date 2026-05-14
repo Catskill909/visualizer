@@ -28,6 +28,8 @@
 | **Transparent WebM on macOS — Stacked-Alpha** (Sammie Roto fix) — ffmpeg sidecar converts VP9-alpha → 2× tall **H.264 MP4** (RGB top, alpha-as-luma bottom). Shader composites. Production WKWebView refuses pixel access to VP9 video; H.264 works. Live progress toast during conversion. See §14.10 for the codec-tainting root cause and §27 for the pipeline. | May 14 |
 | **Black-background-on-reload fix** (cross-platform, surfaced during macOS session) — `_solidColor` instance var on `EditorInspector` was never persisted, causing every solid-color preset (default Shift variation) to reload with a black background on web, Windows, and macOS. `saveCurrent` + `loadPresetData` now round-trip it. Guardrail comments added at the persistence boundary. Pre-fix presets need a one-time resave (click any palette swatch → save). | May 14 |
 | **Streak-based video-tick error banner** — the `TICK ERROR: SecurityError…` red banner in the visualizer now only fires after 3 consecutive failed frames on the same layer (a successful frame resets the counter). Transient one-frame hiccups at video startup (e.g. WKWebView blessing a new blob URL) stay silent. Real broken states still surface. | May 14 |
+| **Cross-platform transparent video portability** — preset exported on web (raw VP9-alpha WebM) and imported on macOS DMG now transcodes through the same ffmpeg sidecar at the import boundary (`src/customPresets.js` `importPreset`). Web/Windows imports unchanged. Closes the last hole — round-trip in any direction now works. | May 14 |
+| **Windows CI build green** — `bundle.externalBin: ["binaries/ffmpeg"]` and its `shell.scope` entry moved from base `tauri.conf.json` into new `src-tauri/tauri.macos.conf.json` (auto-merged on macOS builds only by Tauri v1.5). Windows build no longer looks for `ffmpeg-x86_64-pc-windows-msvc.exe`. | May 14 |
 
 ### 🔨 Up Next
 
@@ -1631,11 +1633,15 @@ Existing layer pipeline — VJ effects, audio reactivity, all unchanged
 
 **Test files preserved at `~/Desktop/hevc-alpha-test/`** including a working Safari validation page (`test-stacked.html`).
 
-**Files modified to ship this** (final state, as of DMG #13 + May 14 afternoon):
-- `src-tauri/tauri.conf.json` — sidecar enabled, `shell-sidecar` + `protocol-asset` features
+**Cross-platform portability** — a preset created on **web** stores transparent video as raw VP9-alpha WebM (because Chrome decodes it natively). When that preset is exported to JSON and imported on **macOS**, `src/customPresets.js` `importPreset` runs the same `convert_to_stacked_alpha_b64` sidecar that fresh uploads use — the imported entry gets `isStackedAlpha: true`, `alphaMode: 'preserve'`, fileName swapped to `.mp4`, and the blob in IndexedDB is the converted MP4. Web and Windows imports skip the conversion (no `window.__TAURI__` or wrong UA). The export side is identity — `exportPreset` just inlines whatever blob is in IndexedDB, so round-tripping in any direction works. (Confirmed by user May 14 evening.)
+
+**Files modified to ship this** (final state, as of DMG #15 + May 14 evening):
+- `src-tauri/tauri.conf.json` — base config (Windows-safe). `shell-sidecar` + `protocol-asset` Cargo features enabled. **No `externalBin` here** — that lives in the macOS-only config below.
+- `src-tauri/tauri.macos.conf.json` — macOS-only override (auto-merged by Tauri v1.5). Declares `bundle.externalBin: ["binaries/ffmpeg"]` and the matching `shell.scope` entry.
 - `src-tauri/src/main.rs` — `convert_to_stacked_alpha` / `convert_to_stacked_alpha_b64` commands invoking ffmpeg with **H.264 libx264 → .mp4** output (codec change is THE fix — see DMG #11 in apng-dev.md)
-- `src-tauri/binaries/ffmpeg-{aarch64,x86_64}-apple-darwin` — bundled ffmpeg (45 MB arm64, 79 MB x86_64)
+- `src-tauri/binaries/ffmpeg-{aarch64,x86_64}-apple-darwin` — bundled ffmpeg (45 MB arm64, 79 MB x86_64). macOS-only by design.
 - `src/editor/inspector.js` — `_handleWebmAlphaUpload()` method (macOS+WebM gate), `_addVideoLayer(file, opts)` signature, three upload-path gates, stacked-alpha branch in `loadPresetData`
+- `src/customPresets.js` — `importPreset` mirrors `_handleWebmAlphaUpload` at the import boundary: any imported `video/webm` blob on macOS Tauri runs through `convert_to_stacked_alpha_b64` before storage, with entry patched to `isStackedAlpha: true`, `alphaMode: 'preserve'`, `.mp4` filename.
 - `src/visualizer.js` — stacked-alpha branch in `_loadVideoTexture` and `_tickVideoAnimations`, shader-side composite (skip canvas for stacked layers), streak-based error banner in tick loop
 
 **Files that must NOT be touched on web/Windows** (transparent WebM there works natively):
