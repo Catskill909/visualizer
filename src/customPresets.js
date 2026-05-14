@@ -284,12 +284,56 @@ export async function importPreset(json) {
     const id = generateId();
     const images = [];
 
+    // Detect macOS Tauri — transparent (or any) WebM imports MUST be transcoded
+    // to H.264 stacked-alpha MP4 via the ffmpeg sidecar, otherwise production
+    // WKWebView throws SecurityError on gl.texSubImage2D for VP9 video. Web and
+    // Windows decode VP9 alpha natively, so they skip this entirely.
+    // See apng-dev.md DMG #11 and video-dev.md §14.10.
+    const isMacTauri = !!(typeof window !== 'undefined' && window.__TAURI__ && navigator.userAgent.includes('Mac'));
+
     for (const img of data.images || []) {
         if (img._inlinedDataUrl) {
-            const blob = dataUrlToBlob(img._inlinedDataUrl);
+            let blob = dataUrlToBlob(img._inlinedDataUrl);
+            const { _inlinedDataUrl: _discarded, ...rest } = img;
+            let imgClean = rest;
+
+            // Mirror of _handleWebmAlphaUpload at the import boundary. Any video
+            // layer arriving as video/webm on macOS Tauri gets transcoded to
+            // stacked-alpha H.264 MP4 the same way fresh uploads do. Non-alpha
+            // WebMs still convert correctly — ffmpeg adds an opaque alpha and
+            // the resulting all-white luma bottom half renders as fully opaque.
+            if (isMacTauri && img.type === 'video' && blob.type === 'video/webm') {
+                try {
+                    const buf = await blob.arrayBuffer();
+                    const u8 = new Uint8Array(buf);
+                    let binary = '';
+                    const chunk = 0x8000;
+                    for (let i = 0; i < u8.length; i += chunk) {
+                        binary += String.fromCharCode.apply(null, u8.subarray(i, i + chunk));
+                    }
+                    const inputB64 = btoa(binary);
+                    const outputB64 = await window.__TAURI__.invoke('convert_to_stacked_alpha_b64', { inputB64 });
+                    const outBin = atob(outputB64);
+                    const outBytes = new Uint8Array(outBin.length);
+                    for (let i = 0; i < outBin.length; i++) outBytes[i] = outBin.charCodeAt(i);
+                    blob = new Blob([outBytes], { type: 'video/mp4' });
+                    imgClean = {
+                        ...imgClean,
+                        fileName: (imgClean.fileName || 'video').replace(/\.webm$/i, '.mp4'),
+                        isStackedAlpha: true,
+                        alphaMode: 'preserve',
+                    };
+                } catch (err) {
+                    // Conversion failed — fall back to the original WebM. On
+                    // macOS this means alpha will be lost and the user will
+                    // see the TICK ERROR banner, but at least the import
+                    // doesn't fail outright and other layers still come in.
+                    console.error('[Import] Transparent WebM transcode failed; keeping original WebM:', err);
+                }
+            }
+
             const newId = generateId();
             await storeImage(newId, blob);
-            const { _inlinedDataUrl: _discarded, ...imgClean } = img;
             // Video layers use videoId, image layers use imageId
             if (img.type === 'video') {
                 images.push({ ...imgClean, videoId: newId });
