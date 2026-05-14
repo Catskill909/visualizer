@@ -117,6 +117,7 @@ Three lines. After 10 failed builds.
 | #11 | May 14 ~9:30am | **The actual fix.** Asked user to drop a regular MP4 in the same DMG — it rendered fine. Confirmed: regular MP4 works, stacked-alpha WebM doesn't. Conclusion: **VP9 codec specifically is what production WKWebView refuses pixel-extraction from.** Changed ffmpeg sidecar args from `libvpx-vp9 → .webm` to `libx264 → .mp4`. Stacked-alpha trick is codec-agnostic. | ✅ **WORKS.** User confirmed transparent bunny renders over the visualizer. |
 | #12 | May 14 ~9:45am | Cleanup-only: removed the now-unneeded 500 ms diagnostic strip in `_loadVideoTexture`. Removed dead `compositeBuf` variable. Updated stale comments. Kept all defensive infrastructure (red banners, render-loop try/catches, global error handlers, play-rejection toasts, metadata timeout). | Same as #11 — feature still works. Code is clean. |
 | #13 | May 14 ~10:05am | **REGRESSION FIX — broke web transparency on preset save/reload.** User reported: web upload of transparent WebM renders fine, but after Save preset → Open preset the transparency was GONE. Root cause: `video.crossOrigin = 'anonymous'` (added speculatively in DMG #10 as a Hail-Mary against the prod WKWebView bug, never reverted after DMG #11's H.264 fix made it unnecessary). For blob URLs in Chrome, setting `crossOrigin = 'anonymous'` is implementation-defined and can flip the canvas to "tainted" mode even though the underlying blob is same-origin — silently kills `getImageData` for alpha. Fresh upload still worked because of some load-order/cache quirk; preset-reload (blob fetched from IndexedDB) consistently tainted. Removed `crossOrigin` from all 5 video-element creation sites. The H.264 codec fix from DMG #11 is what actually solves the prod WKWebView issue; `crossOrigin` was speculative dead code that broke web. | Web save+reload transparency restored. Mac app save+reload still works. |
+| #14 | May 14 afternoon | **Cross-platform regression fix + diagnostic polish.** Two changes shipped together: (1) `_solidColor` (instance var on `EditorInspector`, drives whether the comp shader uses solid-color formula or `sampler_main`) was never persisted in saved presets — every solid-color preset (default Shift variation) reloaded with a black background on web, Windows, AND macOS. Fixed by adding `solidColor: this._solidColor` to `saveCurrent` and restoring it in `loadPresetData`. Export/import rides along automatically (both functions just spread all fields). Pre-fix presets need a one-time resave to acquire the field. PERSISTENCE BOUNDARY comments added at both functions to prevent the next instance-var omission. (2) Streak-based video-tick banner: the `TICK ERROR: SecurityError…` red banner now only fires after 3 consecutive failed frames on the same layer; a successful frame resets the counter. Transient one-frame hiccups at video startup stay silent. Memory: `project_solidcolor_persistence.md`, `feedback_ask_for_artifact.md`. | Both fixes confirmed by user on localhost + Coolify production. Transparent video import/save/reload/export/import all clean. Image presets clean. Banner no longer false-fires on import. |
 
 ---
 
@@ -171,9 +172,9 @@ A single uncaught throw in the per-frame video tick kills Butterchurn's draw loo
 
 ---
 
-## 🧱 What is in the code right now (file-by-file inventory, accurate as of DMG #7)
+## 🧱 What is in the code right now (file-by-file inventory, accurate as of DMG #14 / May 14 afternoon)
 
-> Use this section to verify what the codebase actually contains. Works in `npm run tauri-dev` end-to-end. In production DMG, all of this runs without error — but the layer still doesn't display (see the End-of-session summary above for the remaining bug).
+> ⚠️ The inventory text immediately below describes the **DMG #7 intermediate state**, kept for the post-mortem narrative. **It does NOT describe the current shipping code.** For the current final state, jump to "Final shipping state (post DMG #14)" further down. The DMG #14 row of the chronological log above is the source of truth.
 
 **`src-tauri/binaries/ffmpeg-aarch64-apple-darwin`** (45 MB)
 - Static ffmpeg 6.0 arm64 binary, eugeneware/ffmpeg-static b6.1.1. Includes libvpx-vp9.
@@ -235,6 +236,46 @@ ffmpeg -y -hide_banner -loglevel error -stats \
 2. **`/tmp/` ≠ `std::env::temp_dir()` on macOS.** Rust resolves to `/var/folders/<hash>/T/`. Trust the log, not assumptions.
 3. **ffmpeg `-stats` requires explicit flag.** With `-loglevel error`, stats are suppressed unless you add `-stats`. ffmpeg prints stats via `fprintf(stderr)` directly (not `av_log`), so `-stats` overrides loglevel suppression.
 4. **Progress events: parse `time=` not `frame=`.** Stats lines emit `time=HH:MM:SS.ms` reliably; frame count requires knowing total frames up front.
+
+---
+
+## 🧱 Final shipping state (post DMG #14)
+
+> Source of truth for what the codebase contains right now. Verified May 14 2026 afternoon. Pairs with the row for DMG #14 in the chronological log above.
+
+### Files & responsibilities
+
+| File | Final state |
+|---|---|
+| `src-tauri/Cargo.toml` | Tauri features include `shell-sidecar` and `protocol-asset` |
+| `src-tauri/tauri.conf.json` | `shell.sidecar: true`, scope `binaries/ffmpeg` (args: true); `bundle.externalBin: ["binaries/ffmpeg"]`; `protocol.asset: true` with `assetScope: ["$TEMP/*", "/var/folders/**", "/tmp/**"]`; `connect-src` extended with `asset:` and `https://asset.localhost` |
+| `src-tauri/binaries/ffmpeg-aarch64-apple-darwin` | 45 MB static ffmpeg 6.0 arm64 (eugeneware/ffmpeg-static b6.1.1, includes libvpx-vp9 + libx264) |
+| `src-tauri/binaries/ffmpeg-x86_64-apple-darwin` | 79 MB static ffmpeg 6.0 x86_64 |
+| `src-tauri/src/main.rs` | `convert_to_stacked_alpha(window, input_path)` runs the stacked filter graph and encodes **H.264 libx264 → `.mp4`** at `$TMPDIR/stacked_<timestamp>.mp4`. `convert_to_stacked_alpha_b64(window, input_b64)` wraps it for base64 IPC. `parse_ffmpeg_time(line)` extracts progress from ffmpeg `-stats` stderr; emits `webm-convert-progress` window events. |
+| `src/editor/inspector.js` `_handleWebmAlphaUpload(file)` | macOS+WebM upload path. Live `Converting transparent video… Ns` toast. After invoke returns, builds `mp4Name = file.name.replace(/\.webm$/i, '.mp4')` + `File([outBytes], mp4Name, { type: 'video/mp4' })` and calls `_addVideoLayer(stackedFile, { isStackedAlpha: true })`. Three upload gates (Tauri picker, drop, file input) all route here on `isMacTauri && isWebM`; everything else falls through to `_addVideoLayer(file)` unchanged. |
+| `src/editor/inspector.js` `_addVideoLayer(file, opts)` | `isStackedAlpha = !!opts.isStackedAlpha` controls texH (`/2` for stacked) and `alphaMode` (`'preserve'` for stacked, `'fade'` otherwise). 10-second metadata timeout. Entry + texObj carry `isStackedAlpha` through. |
+| `src/editor/inspector.js` `_buildCompShader` | For non-stacked image/video layers the sampleLine is unchanged (`vec4 _t = texture(${tex}, _u)`). For stacked-alpha layers it samples top half for RGB + bottom-half R for alpha. Uses `this._solidColor` to decide solid-color vs `sampler_main` base — that var is now persisted (see PERSISTENCE BOUNDARY comments). |
+| `src/editor/inspector.js` `saveCurrent` / `loadPresetData` | **PERSISTENCE BOUNDARY** comment blocks. `saveCurrent` writes `solidColor: this._solidColor`; `loadPresetData` restores it. Stacked-alpha video entries restore `isStackedAlpha` flag and the halved texH. |
+| `src/visualizer.js` `_loadVideoTexture` | Allocates a **2× tall texture** for stacked-alpha (skips the 2D canvas entirely — video uploads direct via `gl.texSubImage2D(videoElement)`). Non-stacked path unchanged (drawImage → getImageData → texSubImage2D). |
+| `src/visualizer.js` `_tickVideoAnimations` | Per-layer try/catch with **streak counter**: banner fires only after 3 consecutive failed frames, success resets the streak. Stacked-alpha branch uploads video element directly; non-stacked branch is unchanged from May 12. |
+| `src/visualizer.js` render loop | NO outer try/catches — removed May 14. A real exception in `visualizer.render()` now propagates (good — surfaces real bugs). The per-layer try/catch in `_tickVideoAnimations` is the load-bearing safety net. |
+
+### Cargo features clarification
+
+`protocol-asset` was added during DMG #3 to support an `asset://` fetch path that was later abandoned (DMG #7 switched back to base64 IPC). The feature is still enabled in `Cargo.toml` and `tauri.conf.json` — it's not used by the current code but kept available for future features that need `asset://` URLs. No harm in removing it if a future cleanup pass wants to tighten the surface.
+
+### Memory entries (load-bearing, read before re-debugging)
+
+- `project_transparent_webm_macos_plan.md` — overall architecture, do-not-touch list
+- `project_webm_alpha_dead_ends.md` — what NOT to try (FFmpeg.wasm bug #621, ogv.js issue #590, HEVC alpha .mov)
+- `project_solidcolor_persistence.md` — the May 14 black-bg-on-reload root cause and audit of other at-risk instance vars
+- `feedback_verify_before_coding.md` — require empirical evidence before touching code
+- `feedback_ask_for_artifact.md` — when the user is in panic, ask for the smallest artifact FIRST (the lesson from this 2-day session)
+
+### Cross-doc references
+
+- macOS-specific lessons live in [`video-dev.md` §14 (macOS WKWebView Notes)](video-dev.md), especially **§14.10 VP9 cross-origin tainting** — the single most important macOS Tauri video gotcha.
+- The pipeline diagram + Sammie Roto workflow context is in [`video-dev.md` §27](video-dev.md).
 
 ---
 

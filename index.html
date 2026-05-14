@@ -935,7 +935,20 @@
                 <li><strong>All effects work</strong> — Spin, Orbit, Bounce, Chromatic Aberration, Luma Key, Wave Distort,
                   Invert, Threshold, Pixelate, Scan Lines, Film Grain, audio reactivity,
                   and color grading (brightness, contrast, gamma) apply to every video frame.</li>
+                <li><strong>Transparency support</strong> — Drop a WebM with an alpha channel and the video composites over the visualizer with full transparency. See <em>Transparent Video Layers</em> below for the full workflow.</li>
                 <li><strong>Limits</strong> — 2 video layers recommended for best performance. Videos stream from disk so length is flexible; 1–2 minute clips work smoothly, longer videos may show memory pressure on low-end devices.</li>
+              </ul>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Transparent Video Layers ✨</div>
+              <p>Drop a <strong>transparent WebM</strong> (a video with a built-in alpha channel) onto any preset and the subject floats over the MilkDrop visualizer with full transparency — no green screen, no black box, no compositing chops required. This unlocks rotoscoped cutouts, animated logos, talking-head loops, particle accents, and AI-isolated subjects as first-class VJ elements.</p>
+              <ul class="welcome-list">
+                <li><strong>Sammie Roto workflow</strong> — <a href="https://sammieroto.com" target="_blank" rel="noopener">Sammie Roto</a> is an AI rotoscoping tool: point and click to cut out any subject (a dancer, a logo, an object, an animal) and export as transparent WebM. Drop that WebM into DiscoCast and it renders with perfect alpha over your visuals.</li>
+                <li><strong>Works on every platform</strong> — Web, Windows, and macOS all support transparent WebM. On macOS the app automatically converts incoming transparent WebMs to a format Apple’s WebKit can decode (one-time, per-clip, with a live progress toast).</li>
+                <li><strong>All effects still apply</strong> — Spin, Orbit, Wave Distort, Luma Key, Pulse, Mirror, Chromatic Aberration, audio-reactive opacity — every effect that works on a regular video layer works on the transparent one. The alpha channel survives the full pipeline.</li>
+                <li><strong>Use Alpha Mode = Preserve</strong> for a clean cutout look (default for transparent imports), or set it to Fade to dissolve the cutout into the background by audio reactivity.</li>
+                <li><strong>No other VJ tool does this end-to-end</strong> — point-and-click AI cutout → transparent video → live audio-reactive VJ effects, all in one workflow.</li>
               </ul>
             </div>
 

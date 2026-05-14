@@ -25,7 +25,9 @@
 | Width/Height sliders — independent non-uniform scaling 0.25×–4× (video only) | May 11 |
 | Video Border — width, color picker, feather (video only) | May 11 |
 | **Transparent WebM (web + Windows)** — WebM files bypass 720p transcoder; `clearRect` canvas fix eliminates alpha trail accumulation | May 12 |
-| **Transparent WebM on macOS — Stacked-Alpha** (Sammie Roto fix) — ffmpeg sidecar converts VP9-alpha → 2× tall **H.264 MP4** (RGB top, alpha-as-luma bottom). Shader composites. Production WKWebView refuses pixel access to VP9 video; H.264 works. Live progress toast during conversion. | May 14 |
+| **Transparent WebM on macOS — Stacked-Alpha** (Sammie Roto fix) — ffmpeg sidecar converts VP9-alpha → 2× tall **H.264 MP4** (RGB top, alpha-as-luma bottom). Shader composites. Production WKWebView refuses pixel access to VP9 video; H.264 works. Live progress toast during conversion. See §14.10 for the codec-tainting root cause and §27 for the pipeline. | May 14 |
+| **Black-background-on-reload fix** (cross-platform, surfaced during macOS session) — `_solidColor` instance var on `EditorInspector` was never persisted, causing every solid-color preset (default Shift variation) to reload with a black background on web, Windows, and macOS. `saveCurrent` + `loadPresetData` now round-trip it. Guardrail comments added at the persistence boundary. Pre-fix presets need a one-time resave (click any palette swatch → save). | May 14 |
+| **Streak-based video-tick error banner** — the `TICK ERROR: SecurityError…` red banner in the visualizer now only fires after 3 consecutive failed frames on the same layer (a successful frame resets the counter). Transient one-frame hiccups at video startup (e.g. WKWebView blessing a new blob URL) stay silent. Real broken states still surface. | May 14 |
 
 ### 🔨 Up Next
 
@@ -572,6 +574,27 @@ videoElement.addEventListener('ended', () => {
 | `muted` for autoplay | Often required | **Always required** |
 | Blob URL revocation | Can revoke after load | **Must keep valid** |
 | `loop` property | Works reliably | Needs manual restart |
+| VP9 video → canvas/WebGL pixel read | Works | **Throws SecurityError in PRODUCTION** (see 14.10) |
+| H.264 video → canvas/WebGL pixel read | Works | Works |
+| `video.crossOrigin = 'anonymous'` on blob URLs | Implementation-defined; can **taint canvas** | No effect |
+
+### 14.10 VP9 cross-origin tainting in production WKWebView (May 13–14, 2026)
+
+**The single most important macOS Tauri video gotcha.** Two days of debugging discovered this:
+
+**Behavior:** in a **production** (signed + notarized + hardened-runtime) macOS Tauri DMG, calling `canvas.getImageData(...)` or `gl.texSubImage2D(..., videoElement)` on a video element playing **VP9** throws `SecurityError: The operation is insecure.` — even when the video came from a same-origin blob URL. The error does NOT occur in `npm run tauri-dev` (no hardened runtime). It does NOT occur on Chrome / Safari / WebView2.
+
+**The same `<video>` element playing H.264 from the same blob URL works fine** — codec is the differential.
+
+**Fix:** any feature that needs JS pixel access to video frames on macOS must transcode to **H.264 MP4**, not WebM/VP9. The transparent-WebM stacked-alpha pipeline (§27) does this — the stacked-alpha trick is codec-agnostic so swapping the output container from `.webm`/`libvpx-vp9` to `.mp4`/`libx264` was a three-line change after 10 failed DMGs that chased symptoms (canvas tainting, blob-URL origin, `crossOrigin` attribute).
+
+**Diagnostic that exposes this fast (if you ever hit it again):**
+1. In `_tickVideoAnimations`, the streak-based error banner (visualizer.js) will show `TICK ERROR: SecurityError: The operation is insecure.` after 3 consecutive failed frames.
+2. The differential test that collapses the hypothesis space in 30 seconds: **does a regular MP4 work in the same DMG?** If yes, the codec is the bug; everything else (byte path, blob URL, origin, CORS) is a red herring.
+
+**Speculative attributes to avoid:** do NOT set `video.crossOrigin = 'anonymous'` on blob URLs hoping it will help — on Chromium this can **taint** the canvas for `getImageData`, silently breaking transparency on web preset-reload (see apng-dev.md DMG #13).
+
+**Cross-platform rendering gotcha discovered same day:** the `_solidColor` instance variable on `EditorInspector` was never persisted in saved presets, causing every solid-color preset to reload with a **black background** on every platform. Fixed May 14. See memory: `project_solidcolor_persistence.md`, apng-dev.md "Black-background-on-reload fix" section, and the `PERSISTENCE BOUNDARY` comment in `saveCurrent` / `loadPresetData`.
 
 ### 14.6 Testing Checklist for macOS
 
@@ -1608,16 +1631,16 @@ Existing layer pipeline — VJ effects, audio reactivity, all unchanged
 
 **Test files preserved at `~/Desktop/hevc-alpha-test/`** including a working Safari validation page (`test-stacked.html`).
 
-**Files to be modified to ship this:**
-- `src-tauri/tauri.conf.json` — enable sidecar
-- `src-tauri/src/main.rs` — Rust command wrapping the ffmpeg sidecar
-- `src-tauri/binaries/ffmpeg-{aarch64,x86_64}-apple-darwin` — bundled ffmpeg binary (new)
-- `src/editor/inspector.js` — `_handleWebmAlphaUpload()` method, macOS-gated
-- `src/visualizer.js` — `_loadStackedAlphaVideo()` and stacked-alpha shader
+**Files modified to ship this** (final state, as of DMG #13 + May 14 afternoon):
+- `src-tauri/tauri.conf.json` — sidecar enabled, `shell-sidecar` + `protocol-asset` features
+- `src-tauri/src/main.rs` — `convert_to_stacked_alpha` / `convert_to_stacked_alpha_b64` commands invoking ffmpeg with **H.264 libx264 → .mp4** output (codec change is THE fix — see DMG #11 in apng-dev.md)
+- `src-tauri/binaries/ffmpeg-{aarch64,x86_64}-apple-darwin` — bundled ffmpeg (45 MB arm64, 79 MB x86_64)
+- `src/editor/inspector.js` — `_handleWebmAlphaUpload()` method (macOS+WebM gate), `_addVideoLayer(file, opts)` signature, three upload-path gates, stacked-alpha branch in `loadPresetData`
+- `src/visualizer.js` — stacked-alpha branch in `_loadVideoTexture` and `_tickVideoAnimations`, shader-side composite (skip canvas for stacked layers), streak-based error banner in tick loop
 
-**Files that must NOT be touched** (web + Windows transparent WebM path):
-- `_addVideoLayer()` — existing video upload, unchanged on web/Windows
-- `_tickVideoAnimations()` — existing tick loop (the May 12 `clearRect` fix is load-bearing)
+**Files that must NOT be touched on web/Windows** (transparent WebM there works natively):
+- `_addVideoLayer()` non-stacked path — existing video upload, unchanged on web/Windows
+- `_tickVideoAnimations()` non-stacked branch — the May 12 `clearRect` fix is load-bearing
 
 The Sammie Roto workflow this finally unlocks:
 ```

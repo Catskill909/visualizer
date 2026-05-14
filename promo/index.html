@@ -32,14 +32,19 @@
 
         <p class="promo-modal-subtitle">What's new:</p>
         <ul class="promo-modal-list">
-          <li><strong>Palette Opacity</strong> — new slider at the top of the Palette tab. Drag it to zero and the
-            MilkDrop background fades out completely — only your image, video, or GIF layers remain. Designed to work
-            with the Timeline Editor's multi-zone compositor so layers can float over other presets. Double-click the
-            label to reset.</li>
+
           <li><strong>Video Layers</strong> — Drop MP4/WebM files into presets with full playback controls (play/pause,
             loop, speed, scrub), independent Width &amp; Height scaling, colored Border ring (width, color, feather),
             and color grading. Auto conversion to 720p on non HD settings and non GPU machines.</li>
-          <li><strong>Timeline Editor (Beta)</strong> — Full-screen show sequencer with multi-zone compositor, transport controls, markers, and VJ mode (visuals never stop). New this build: <strong>real-time live editing</strong> — drag, resize, or delete blocks while playing with no interruption; <strong>double-click any block to cue it</strong> instantly with a crossfade; and a per-block <strong>hamburger menu</strong> for settings — click the icon to open, click again to close.</li>
+          <li><strong>Transparent Video Layers ✨ NEW</strong> — Drop a WebM with an alpha channel (e.g. an AI-rotoscoped
+            subject from <a href="https://sammieroto.com" target="_blank" rel="noopener">Sammie Roto</a>) and the subject
+            floats over the visualizer with full transparency. Works on web, Windows, and macOS (Mac auto-converts on
+            first import). All VJ effects, audio reactivity, and motion controls apply to every frame.</li>
+          <li><strong>Timeline Editor (Beta)</strong> — Full-screen show sequencer with multi-zone compositor, transport
+            controls, markers, and VJ mode (visuals never stop). New this build: <strong>real-time live editing</strong>
+            — drag, resize, or delete blocks while playing with no interruption; <strong>double-click any block to cue
+              it</strong> instantly with a crossfade; and a per-block <strong>hamburger menu</strong> for settings —
+            click the icon to open, click again to close.</li>
           <li><strong>Animated GIF layers</strong> with speed control, Alpha Mode, timing smoothing, and GIF Optimizer.
           </li>
           <li><strong>Text Layers</strong> — Add live text to any preset. Choose font (Inter, Roboto, Oswald), size,
@@ -153,6 +158,13 @@
           <h3>Video Layers</h3>
           <p>Drop MP4 or WebM files into any preset. Independent Width &amp; Height scaling, colored Border ring, full
             playback controls, color grading, and the entire VJ effects suite apply to every frame at 60 fps.</p>
+        </div>
+        <div class="feature-card fade-in">
+          <h3>Transparent Video Layers ✨</h3>
+          <p>Drop a WebM with an alpha channel — AI-rotoscoped subjects from <a href="https://sammieroto.com"
+              target="_blank" rel="noopener">Sammie Roto</a>, animated logos, particle overlays — and the cutout floats
+            over the visualizer with full transparency. Web, Windows, and macOS. No green screen, no compositing chops.
+          </p>
         </div>
         <div class="feature-card fade-in">
           <h3>Animated GIF Layers</h3>
@@ -288,6 +300,9 @@
             <div class="image-layers-grid">
               <div class="il-item"><span class="il-dot"></span>MP4 &amp; WebM — rendered as real-time GPU textures at up
                 to 720p</div>
+              <div class="il-item"><span class="il-dot"></span><strong>Transparent WebM ✨</strong> — drop a video with
+                an alpha channel (Sammie Roto cutouts, animated logos) and the subject floats over the visualizer; macOS
+                auto-converts on first import</div>
               <div class="il-item"><span class="il-dot"></span>Playback — play/pause, loop toggle, speed (0.25×–4×),
                 scrub bar</div>
               <div class="il-item"><span class="il-dot"></span>Color grading — per-layer brightness, contrast, and gamma
@@ -442,19 +457,22 @@
               <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              <strong>Real-time live editing</strong> — drag, resize, edit, duplicate, or delete blocks while the timeline is playing; changes take effect instantly with no flash
+              <strong>Real-time live editing</strong> — drag, resize, edit, duplicate, or delete blocks while the
+              timeline is playing; changes take effect instantly with no flash
             </li>
             <li>
               <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              <strong>Double-click to cue</strong> — double-click any block to crossfade into it and seek the playhead to its start; instant live VJ control
+              <strong>Double-click to cue</strong> — double-click any block to crossfade into it and seek the playhead
+              to its start; instant live VJ control
             </li>
             <li>
               <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              <strong>Block settings menu</strong> — hamburger icon on each block opens its settings popover; click icon again to close; glows in block color when active
+              <strong>Block settings menu</strong> — hamburger icon on each block opens its settings popover; click icon
+              again to close; glows in block color when active
             </li>
             <li>
               <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

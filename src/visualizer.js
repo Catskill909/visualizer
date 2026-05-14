@@ -1425,7 +1425,13 @@ export class VisualizerEngine {
         gl.pixelStorei(gl.UNPACK_ALIGNMENT, prevAlign);
         gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, prevColorspace);
       } catch (err) {
-        if (!anim._errorToasted) {
+        // Transient hiccups at video startup (e.g. one-frame SecurityError when
+        // WKWebView is just blessing a new blob URL) are normal and self-heal.
+        // Only surface the banner if the same layer fails on 3+ consecutive
+        // frames — that's a real broken state. A successful frame resets the
+        // counter, so we never accumulate noise from rare hiccups.
+        anim._errorStreak = (anim._errorStreak || 0) + 1;
+        if (anim._errorStreak >= 3 && !anim._errorToasted) {
           anim._errorToasted = true;
           console.error('[VIDEO TICK ERROR]', err);
           try {
@@ -1438,6 +1444,9 @@ export class VisualizerEngine {
         }
         continue;
       }
+      // Successful frame — reset the consecutive-error counter so a single
+      // bad frame followed by good frames doesn't accumulate toward the banner.
+      anim._errorStreak = 0;
     }
   }
 
