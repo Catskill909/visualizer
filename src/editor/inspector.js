@@ -1555,7 +1555,12 @@ export class EditorInspector {
                 // Handle based on file extension
                 const ext = result.name.split('.').pop()?.toLowerCase();
                 if (ext === 'mp4' || ext === 'webm' || ext === 'mov') {
-                    this._addVideoLayer(file);
+                    const isMacTauri = !!window.__TAURI__ && navigator.userAgent.includes('Mac');
+                    if (isMacTauri && ext === 'webm') {
+                        await this._handleWebmAlphaUpload(file);
+                    } else {
+                        this._addVideoLayer(file);
+                    }
                 } else if (ext === 'gif') {
                     await this._handleGifUpload(file);
                 } else {
@@ -1581,7 +1586,13 @@ export class EditorInspector {
             }
             // Handle video files
             if (file.type.startsWith('video/')) {
-                this._addVideoLayer(file);
+                const isMacTauri = !!window.__TAURI__ && navigator.userAgent.includes('Mac');
+                const isWebM = file.name.toLowerCase().endsWith('.webm') || file.type === 'video/webm';
+                if (isMacTauri && isWebM) {
+                    await this._handleWebmAlphaUpload(file);
+                } else {
+                    this._addVideoLayer(file);
+                }
                 return;
             }
             // Intercept GIFs for optimization check
@@ -1601,7 +1612,13 @@ export class EditorInspector {
             }
             // Handle video files
             if (file.type.startsWith('video/')) {
-                this._addVideoLayer(file);
+                const isMacTauri = !!window.__TAURI__ && navigator.userAgent.includes('Mac');
+                const isWebM = file.name.toLowerCase().endsWith('.webm') || file.type === 'video/webm';
+                if (isMacTauri && isWebM) {
+                    await this._handleWebmAlphaUpload(file);
+                } else {
+                    this._addVideoLayer(file);
+                }
                 fileInput.value = '';
                 return;
             }
@@ -2373,11 +2390,60 @@ export class EditorInspector {
         if (this.currentState.images.length === 1) showHint();
     }
 
+    // ─── Transparent WebM on macOS — Stacked-Alpha conversion ─────────────────
+    // WKWebView drops VP9 alpha. Convert the WebM to a stacked-alpha VP9 (RGB top,
+    // alpha-as-luma bottom) via a native ffmpeg sidecar, then route through the
+    // regular video layer path with isStackedAlpha=true so the visualizer
+    // composites top/bottom into RGBA on every frame.
+
+    async _handleWebmAlphaUpload(file) {
+        if (!this.currentState.images) this.currentState.images = [];
+        if (this.currentState.images.length >= MAX_LAYERS) {
+            showToast(`Max ${MAX_LAYERS} layers`, true);
+            return;
+        }
+        const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+        const startTime = Date.now();
+        showToast(`Converting transparent video (${sizeMB}MB)… 0s`, false, 0);
+
+        let unlisten = null;
+        if (window.__TAURI__?.event) {
+            unlisten = await window.__TAURI__.event.listen('webm-convert-progress', () => {
+                const elapsed = Math.round((Date.now() - startTime) / 1000);
+                showToast(`Converting transparent video… ${elapsed}s`, false, 0);
+            });
+        }
+
+        try {
+            const buf = await file.arrayBuffer();
+            const u8 = new Uint8Array(buf);
+            let binary = '';
+            const chunk = 0x8000;
+            for (let i = 0; i < u8.length; i += chunk) {
+                binary += String.fromCharCode.apply(null, u8.subarray(i, i + chunk));
+            }
+            const inputB64 = btoa(binary);
+            const outputB64 = await window.__TAURI__.invoke('convert_to_stacked_alpha_b64', { inputB64 });
+            const outBin = atob(outputB64);
+            const outBytes = new Uint8Array(outBin.length);
+            for (let i = 0; i < outBin.length; i++) outBytes[i] = outBin.charCodeAt(i);
+            const stackedFile = new File([outBytes], file.name, { type: 'video/webm' });
+            showToast('Conversion done — loading layer…', false, 1500);
+            await this._addVideoLayer(stackedFile, { isStackedAlpha: true });
+        } catch (err) {
+            console.error('[Editor] Stacked-alpha conversion failed:', err);
+            showToast('Transparent WebM conversion failed: ' + (err?.message || err), true);
+        } finally {
+            if (unlisten) unlisten();
+        }
+    }
+
     // ─── Add a video layer ─────────────────────────────────────────────────────
     // Videos are single-instance (no tiling), with playback controls and color grading.
     // Auto-transcodes oversized videos to 720p using FFmpeg.wasm.
 
-    async _addVideoLayer(file) {
+    async _addVideoLayer(file, opts = {}) {
+        const isStackedAlpha = !!opts.isStackedAlpha;
         if (!this.currentState.images) this.currentState.images = [];
         if (this.currentState.images.length >= MAX_LAYERS) {
             showToast(`Max ${MAX_LAYERS} layers (images + videos)`, true);
@@ -2609,8 +2675,9 @@ export class EditorInspector {
             name: file.name.replace(/\.[^.]+$/, '') || 'Video Layer',
             // Metadata
             texW: finalVideo.videoWidth,
-            texH: finalVideo.videoHeight,
+            texH: isStackedAlpha ? Math.floor(finalVideo.videoHeight / 2) : finalVideo.videoHeight,
             isHd: false,  // Videos don't use HD toggle
+            isStackedAlpha,
         };
 
         this.currentState.images.push(entry);
@@ -2619,11 +2686,12 @@ export class EditorInspector {
         const texObj = {
             data: finalVideoUrl,        // Object URL for video element
             width: finalVideo.videoWidth,
-            height: finalVideo.videoHeight,
+            height: isStackedAlpha ? Math.floor(finalVideo.videoHeight / 2) : finalVideo.videoHeight,
             isVideo: true,              // Flag for visualizer
             videoElement: finalVideo,   // Reference for texture upload loop
             videoId,
             _videoUrl: finalVideoUrl,   // Keep reference for cleanup
+            isStackedAlpha,
         };
 
         this._mountLayerCard(entry, texObj);

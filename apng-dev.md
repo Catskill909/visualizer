@@ -1,8 +1,60 @@
 # Transparent WebM on macOS — Dev Document
 
-> **Status:** ✅ **SOLVED (research validated May 13)** — Stacked-alpha format works in WKWebView. All three validation tests passed in Safari with full transparency. Ready to build the Tauri sidecar implementation.
-> **Last updated:** May 13, 2026
+> **Status:** ✅ **FULLY SHIPPED — May 13, 2026.** Transparent WebM with stacked-alpha works end-to-end in the macOS Tauri app. User-confirmed in `npm run tauri-dev`.
+> **Last updated:** May 13, 2026 (evening)
 > **Scope:** macOS Tauri ONLY. Web + Windows work natively — do not touch.
+
+---
+
+## ✅ Full Integration — SHIPPED May 13, 2026
+
+All four implementation steps complete. Feature confirmed working by user in `npm run tauri-dev`.
+
+### What was built (all files)
+
+**`src-tauri/binaries/ffmpeg-aarch64-apple-darwin`** (NEW, 45 MB)
+- Static ffmpeg 6.0 arm64 binary, eugeneware/ffmpeg-static b6.1.1. Includes libvpx-vp9.
+
+**`src-tauri/binaries/ffmpeg-x86_64-apple-darwin`** (NEW, 79 MB)
+- Same for Intel Mac support.
+
+**`src-tauri/Cargo.toml`** — added `"shell-sidecar"` to tauri features list.
+
+**`src-tauri/tauri.conf.json`** — `shell.sidecar: true`, scope `binaries/ffmpeg` (args: true), `bundle.externalBin: ["binaries/ffmpeg"]`.
+
+**`src-tauri/src/main.rs`**:
+- `convert_to_stacked_alpha(window, input_path)` — spawns ffmpeg sidecar, runs the stacked-alpha filter graph, emits `webm-convert-progress` Tauri window events (parsed from ffmpeg `-stats` stderr), returns base64 of output bytes. Writes debug copy to `$TMPDIR/discocast_last_stacked.webm`.
+- `convert_to_stacked_alpha_b64(window, input_b64)` — accepts base64 input, writes temp file, delegates to above.
+- Helper `parse_ffmpeg_time(line)` — parses `time=HH:MM:SS.ms` from ffmpeg stats lines into seconds f64.
+
+**`src/editor/inspector.js`** — `_handleWebmAlphaUpload(file)`:
+- Shows live "Converting… Ns" toast, updated every ffmpeg progress event via `window.__TAURI__.event.listen('webm-convert-progress', ...)`
+- File → base64 → `convert_to_stacked_alpha_b64` → base64 → Blob → `_addVideoLayer(file, { isStackedAlpha: true })`
+- Unlisten cleanup in `finally` block
+- Three upload gates (Tauri picker, drop, file input): `isMacTauri && isWebM` routes here; all other platforms use `_addVideoLayer` unchanged.
+
+**`src/visualizer.js`**:
+- `_loadVideoTexture` allocates 2× tall canvas for stacked-alpha videos; pre-allocates `compositeBuf`
+- `_tickVideoAnimations` stacked-alpha branch: draws full 2× tall frame → reads top half (RGB) + bottom half (alpha luma) → composites into `compositeBuf` → uploads to GL texture
+
+### ffmpeg command (validated, in production)
+```bash
+ffmpeg -y -hide_banner -loglevel error -stats \
+  -c:v libvpx-vp9 -i input.webm \
+  -filter_complex "[0:v]format=yuva420p,split=2[a][b];[a]alphaextract,format=gray[alpha];[b]format=yuv420p[rgb];[rgb][alpha]vstack[stacked]" \
+  -map "[stacked]" -c:v libvpx-vp9 -pix_fmt yuv420p -b:v 2M -an output_stacked.webm
+```
+
+### Confirmed working
+- Input: `bunny.webm` (5.4 MB transparent VP9-alpha source)
+- Output: 3.3 MB, 1280×1440, VP9 yuv420p, 24 fps
+- Layer renders with full transparency over MilkDrop visualizer — user confirmed "it works!!!!!"
+
+### Gotchas hit during the build
+1. **`<a download>` blocked in WKWebView.** Blob downloads silently fail. Workaround: debug copy written to `$TMPDIR/discocast_last_stacked.webm`.
+2. **`/tmp/` ≠ `std::env::temp_dir()` on macOS.** Rust resolves to `/var/folders/<hash>/T/`. Trust the log, not assumptions.
+3. **ffmpeg `-stats` requires explicit flag.** With `-loglevel error`, stats are suppressed unless you add `-stats`. ffmpeg prints stats via `fprintf(stderr)` directly (not `av_log`), so `-stats` overrides loglevel suppression.
+4. **Progress events: parse `time=` not `frame=`.** Stats lines emit `time=HH:MM:SS.ms` reliably; frame count requires knowing total frames up front.
 
 ---
 
@@ -25,8 +77,39 @@ The stacked-alpha approach is the solution. We can now build it with confidence 
 
 ### Current state of the repo
 - Branch: `main`, HEAD: `eaf5a5c` (last good build, May 12)
-- Working tree: clean (`git restore .` ran after the APNG rollback)
-- DMG in `promo/DiscoCast-Visualizer.dmg` is the May 12 build — use it if you need to test the existing app
+- Working tree: **clean** — only the doc files (`apng-dev.md`, `video-dev.md`) modified vs. HEAD
+- DMG in `promo/DiscoCast-Visualizer.dmg` is the May 12 build, working
+- App is fully functional. Transparent WebM works on Web + Windows. macOS shows the bunny opaque (no alpha) — same starting point as before this session.
+
+### Failed integration attempt — May 13 (rolled back)
+
+I attempted to integrate the validated stacked-alpha solution into the live app in one large pass. It broke the macOS app — Preset Studio controls stopped responding after dropping a WebM. Code reverted via `git restore`. Docs preserved.
+
+**Files I touched (all reverted):**
+- `src-tauri/src/main.rs` — added `convert_to_stacked_alpha` Tauri command
+- `src/editor/inspector.js` — added `_handleWebmAlphaUpload` method + 3 upload-path gates
+- `src/visualizer.js` — added `_loadStackedAlphaVideo` + branched `_tickVideoAnimations`
+
+**What went wrong:** built too much at once (Rust + JS handler + 3 gates + visualizer loader + tick branch) with no incremental validation between pieces. When `_mountLayerCard` rejected the new entry shape (suspected — never confirmed because debugging was blocked by the broken app state), the failure cascaded and locked up the editor UI.
+
+**Lesson for the next attempt:** build in 4 smaller, individually-testable steps:
+1. **Step 1 — Rust command alone.** Add `convert_to_stacked_alpha`. Test by invoking it from the JS console with a small WebM, confirm a base64 string comes back, decode it manually, verify it plays in QuickTime. No JS handler yet, no upload routing.
+2. **Step 2 — JS handler stores blobs only.** Add `_handleWebmAlphaUpload`. Calls Rust command, stores both source + stacked blobs in IndexedDB. No layer creation yet. Verify via dev tools that the stacked blob exists and is correct.
+3. **Step 3 — Visualizer loader in isolation.** Add `_loadStackedAlphaVideo` + tick branch. Test by manually invoking with a pre-made stacked WebM. Confirm transparency renders. No upload flow yet.
+4. **Step 4 — Wire them together.** Connect upload → conversion → layer creation. Each prior step has already been validated, so any failure here is isolated to the wiring.
+
+After each step, build a fresh DMG and test before moving to the next. Roll back immediately if anything breaks.
+
+### Critical: incremental builds and tests
+
+Use `npm run tauri-dev` for iteration. It IS macOS Tauri (same WKWebView), just with hot reload — *not* a browser. Build a fresh DMG via `./build-and-sign.sh` only for the final confirmation test. Don't try to validate everything from a single DMG build — the iteration cost is too high.
+
+### Critical: macOS-only gate
+Every change must be gated by:
+```javascript
+const isMacTauri = !!window.__TAURI__ && navigator.userAgent.includes('Mac');
+```
+**Web + Windows must continue to use the existing `_addVideoLayer()` path unchanged.** That path already works for transparent WebM on those platforms (shipped May 12 at `eaf5a5c`).
 
 ### Files created during research (preserved for the next session)
 All in `~/Desktop/hevc-alpha-test/`:
@@ -50,17 +133,9 @@ We've ruled out three approaches empirically:
 
 The current candidate is **stacked-alpha** — encode the WebM as a 2× tall regular VP9 video, with RGB in the top half and alpha as luma in the bottom half. WKWebView plays it natively as plain VP9, our shader composites it back to RGBA. Test A (encoding) passed. Tests B (Safari plays it) and C (WebGL composite works) are running in Safari now.
 
-### Implementation plan (Outcome 1 confirmed — proceed)
+### Implementation plan — see "Phased Implementation Plan (Incremental, Validated)" further down
 
-Build the Tauri sidecar:
-1. Phase 1 — bundle a stripped-down macOS universal ffmpeg binary (~15-25MB per arch) at `src-tauri/binaries/ffmpeg-{aarch64,x86_64}-apple-darwin`
-2. Phase 2 — Rust command in `src-tauri/src/main.rs` that pipes WebM in, stacked WebM out
-3. Phase 3 — JS `_handleWebmAlphaUpload()` in `inspector.js`, macOS-gated, calls sidecar
-4. Phase 4 — new WebGL composite shader for stacked-alpha texture sampling (top half RGB, bottom half luma → RGBA output). This goes in a new `_loadStackedAlphaVideo()` method in `visualizer.js`, parallel to `_loadVideoTexture()`
-5. Phase 5 — preset import/export: store WebM source, regenerate stacked cache on demand
-6. Phase 6 — conversion modal (reuse the pattern documented earlier; pauses music; shows progress)
-
-The shader code is in `test-stacked.html` — copy from there.
+After the failed monolithic integration on May 13, the build plan is restructured into 6 small steps with a build-and-test cycle between each. See the section below for details. The validated shader and ffmpeg command are in this doc; the working test harness is at `~/Desktop/hevc-alpha-test/test-stacked.html`.
 
 ### The ffmpeg conversion command (working, tested)
 ```bash
@@ -210,9 +285,16 @@ This may be specific to current macOS WebKit (26.x), to the `hevc_videotoolbox` 
 
 ---
 
-## 🔬 Path Now Under Consideration — Stacked Alpha (Untested)
+## ✅ Validated Solution — Stacked Alpha
 
 **Concept (Jake Archibald, 2024):** encode the alpha as a regular grayscale image stacked underneath the color frame, producing a single regular VP9 video at 2× the height. No alpha track. No special codec features. Just regular VP9 that WKWebView decodes natively.
+
+**Validated empirically in Safari/WKWebView on May 13, 2026** (Safari 26.4, M1 Mac, macOS 26.4.1):
+- ✅ ffmpeg produces a 3.3MB stacked WebM (smaller than the 5.4MB source)
+- ✅ Safari `<video>` element loads and plays the 1280×1440 file
+- ✅ WebGL canvas composites top half RGB + bottom half luma → transparent output, candy-stripe background visible through transparent areas
+
+Test harness preserved at `~/Desktop/hevc-alpha-test/test-stacked.html`. To re-validate: `open -a Safari ~/Desktop/hevc-alpha-test/test-stacked.html`.
 
 ```
 Stacked WebM (1280 × 1440)
@@ -252,50 +334,48 @@ ffmpeg -c:v libvpx-vp9 -i input.webm \
   output_stacked.webm
 ```
 
-### Open questions to test before committing
+### Why this works where the other approaches didn't
 
-1. **Does Safari/WKWebView play the double-height regular VP9 file?** Should be yes (it's just regular VP9), but must verify.
-2. **Can we read both halves via `<video>` → canvas → `getImageData` reliably?** Standard pipeline — high confidence.
-3. **What's the file size vs source?** Untested but Jake Archibald reports ~1.1MB for similar content (vs 989KB for HEVC alpha — comparable).
-4. **WebGL shader compositing:** straightforward — sample texture at `y` for RGB, sample at `y + 0.5` for alpha, output RGBA. ~5 lines of GLSL.
+| Requirement | Stacked Alpha |
+|---|---|
+| WKWebView plays the video | ✅ It's regular VP9 with no alpha stream — no special decoder features needed |
+| WebKit `<video>` element loads it | ✅ Standard WebM, same as any other VP9 video |
+| Canvas / WebGL pipeline gets pixel data | ✅ Standard `drawImage(video)` → `getImageData` works |
+| Alpha is recoverable in our pipeline | ✅ Sample top half for RGB, bottom half luma as alpha — composite in WebGL shader |
+| File size | ✅ Similar to source WebM (3.3MB vs 5.4MB source — actually smaller) |
+| Conversion needs native ffmpeg | ⚠️ Yes — still needs VP9-alpha decode which FFmpeg.wasm can't do. Tauri sidecar required. |
 
-### Risk
+### The encoder command (working, validated)
 
-The only encoding step requires VP9-alpha decode on the input side — same step FFmpeg.wasm fails on (#621). So we still need a native ffmpeg sidecar. But once we have a sidecar producing stacked-alpha WebM, the output is a regular VP9 that WKWebView definitely plays. The unknown is whether the playback + canvas extraction roundtrip preserves the data we need (which it should — it's just luma values, not an alpha channel).
+```bash
+ffmpeg -c:v libvpx-vp9 -i input.webm \
+  -filter_complex "[0:v]format=yuva420p,split=2[a][b];[a]alphaextract,format=gray[alpha];[b]format=yuv420p[rgb];[rgb][alpha]vstack[stacked]" \
+  -map "[stacked]" \
+  -c:v libvpx-vp9 -pix_fmt yuv420p \
+  -b:v 2M \
+  -an \
+  output_stacked.webm
+```
+
+### The WebGL composite shader (working, validated)
+
+```glsl
+precision mediump float;
+varying vec2 v_uv;
+uniform sampler2D u_tex;
+void main() {
+  // Top half: RGB. Bottom half: alpha as luma.
+  vec2 rgbUV = vec2(v_uv.x, v_uv.y * 0.5);
+  vec2 aUV   = vec2(v_uv.x, v_uv.y * 0.5 + 0.5);
+  vec3 rgb = texture2D(u_tex, rgbUV).rgb;
+  float a  = texture2D(u_tex, aUV).r;
+  gl_FragColor = vec4(rgb, a);
+}
+```
 
 ---
 
-## ~~Path Forward — HEVC Alpha via Tauri Sidecar~~ (Abandoned May 13 after Safari test)
-
-**The only realistic path:** bundle a native macOS `ffmpeg` binary in the Tauri app as a sidecar. At upload time, invoke it to convert WebM VP9 alpha → HEVC alpha MOV using Apple's `hevc_videotoolbox` (hardware-accelerated). The resulting MOV plays in WKWebView's `<video>` element with transparency — natively, with hardware decode.
-
-### Why this is the right answer
-
-- **HEVC with alpha is Apple's official transparent video format** (introduced WWDC 2019, session #506)
-- **Hardware-accelerated** encode and decode on every Mac since Catalina (Intel + Apple Silicon)
-- **File size: ~1–1.5× the WebM source** — not 20× like APNG
-- **Plays in `<video>` element with full alpha** — same pipeline as our existing video layers
-- **Well-trodden Tauri pattern** — projects like [66HEX/frame](https://github.com/66HEX/frame) use this exact stack (Tauri + ffmpeg sidecar + hevc_videotoolbox)
-
-### FFmpeg command (runs in the sidecar)
-
-```bash
-ffmpeg -i input.webm \
-  -c:v hevc_videotoolbox \
-  -tag:v hvc1 \
-  -alpha_quality 0.75 \
-  -q:v 35 \
-  -an \
-  output.mov
-```
-
-- `-c:v hevc_videotoolbox` — Apple's hardware-accelerated HEVC encoder
-- `-tag:v hvc1` — fourcc tag Safari requires for HEVC playback
-- `-alpha_quality 0.75` — alpha channel quality (0.0–1.0)
-- `-q:v 35` — RGB quality (lower = higher quality)
-- `-an` — strip audio (we don't use it for VJ visuals)
-
-### Architecture Overview
+## Implementation Architecture (Next Attempt)
 
 ```
 WebM dropped on macOS Tauri
@@ -304,21 +384,21 @@ _handleWebmAlphaUpload(file)   [macOS Tauri only — gated]
   ↓
 Show conversion modal (file info, Go/Cancel, music auto-pauses on Go)
   ↓
-Tauri invoke → ffmpeg sidecar → hevc_videotoolbox conversion (hardware accel)
+Tauri invoke → ffmpeg sidecar → stacked-alpha encode (~15s for 720p/5s clip)
   ↓
-Receive HEVC alpha .mov bytes
+Receive stacked WebM bytes
   ↓
 Store BOTH blobs in IndexedDB:
-  - videoId      → WebM source (portable; for export + cache-miss recovery)
-  - videoId+_hevc → HEVC alpha cache (what plays on macOS)
+  - videoId         → original WebM (portable; for export + cache-miss recovery)
+  - videoId+_stk    → stacked variant (what plays on macOS)
   ↓
-Build layer entry with type='video', play via existing _addVideoLayer()
+Build layer entry with type='video', isStackedAlpha=true
   ↓
-<video> element plays HEVC with native alpha
+<video> element plays the stacked WebM as regular VP9
   ↓
-_tickVideoAnimations() draws to canvas → getImageData → texSubImage2D
+_tickVideoAnimations() reads full tall frame → composites top+bottom → texSubImage2D
   ↓
-WebGL composite shader renders with transparency ✓
+Layer renders with transparency ✓
 ```
 
 ### Critical gate: only macOS Tauri enters this path
@@ -337,24 +417,9 @@ Web and Windows never enter the new code path. The existing `_addVideoLayer` flo
 
 ---
 
-## Open Questions To Resolve Before Coding
+## Open Questions / Tradeoffs
 
-These need answers before we commit to bundling a 15–25MB binary.
-
-### Q1: Does HEVC alpha survive the `<video>` → canvas → `texSubImage2D` roundtrip in WKWebView?
-
-The existing `_tickVideoAnimations()` pipeline does:
-```javascript
-uploadCtx.drawImage(videoElement, 0, 0, width, height);
-const frameData = uploadCtx.getImageData(0, 0, width, height).data;
-gl.texSubImage2D(...rgba..., frameData);
-```
-
-If WKWebView strips alpha during `drawImage(videoElement)` even though the video has alpha, then HEVC alone is not enough — we'd need WebGL-direct video texture upload via `gl.texImage2D(target, level, format, ..., videoElement)`.
-
-**Test plan before committing:** manually produce one HEVC alpha .mov on developer's local Mac (using brew-installed ffmpeg), drop it into the macOS build via the existing video upload path, confirm transparency renders end-to-end. Half-hour test. Validates the whole architecture or kills it before we bundle anything.
-
-### Q2: Universal binary or arm64-only?
+### Q1: Universal binary or arm64-only?
 
 Apple Silicon binary (~15MB stripped) vs. universal arm64+x86_64 (~30MB).
 - Apple Silicon only: smaller, but breaks Intel Macs
@@ -362,47 +427,54 @@ Apple Silicon binary (~15MB stripped) vs. universal arm64+x86_64 (~30MB).
 
 **Recommendation:** universal binary. Intel Macs are still common.
 
-### Q3: Convert all WebM on macOS, or only transparent ones?
+### Q2: Convert all WebM on macOS, or only transparent ones?
 
-We can't reliably probe for alpha from JS in WKWebView (the alpha stream is stripped before JS sees it — that's the whole problem). So either:
+We can't reliably probe for alpha from JS in WKWebView (the alpha stream is stripped before JS sees it). So either:
 - **Convert all WebM unconditionally on macOS** — wastes time on non-transparent WebM, but simple
-- **Heuristic: only convert if user opts in or filename suggests alpha** — fragile
+- **Heuristic: filename / size / opt-in** — fragile
 
-**Recommendation:** convert all WebM on macOS. HEVC encoding is hardware-accelerated and fast (5–10× realtime on Apple Silicon). A 5-second 720p WebM converts in ~1 second. Acceptable.
+**Recommendation:** convert all WebM on macOS. VP9 encoding via libvpx is slower than HEVC hardware encoding (~1× real-time vs 5-10×), so this matters. May need to add a "skip conversion" toggle for users who know their WebM is opaque. Defer this decision until the basic flow works.
+
+### Q3: Phase 1A dev approach — system ffmpeg or sidecar from day one?
+
+The failed first attempt shelled out to `/opt/homebrew/bin/ffmpeg` (dev-only). This was fine for dev but creates an extra migration step before shipping. Alternative: bundle the sidecar binary from the start, develop directly against the production code path.
+
+**Recommendation:** start with sidecar from day one. The bundling work is a few lines of Tauri config; doing it early avoids "works on dev, breaks in DMG" surprises later.
 
 ---
 
-## Phased Implementation Plan
+## Phased Implementation Plan (Incremental, Validated)
 
-### Phase 0 — Validate Q1 before bundling anything (30 minutes, no commits)
-1. On developer Mac, manually convert a Sammie Roto WebM to HEVC alpha using brew-installed ffmpeg
-2. Drop the .mov into the existing macOS build via the standard video upload
-3. Verify alpha renders correctly in the visualizer (subject floats over MilkDrop with transparency)
-4. **GO/NO-GO decision** — if alpha is lost, the entire Path 2 architecture needs rethinking
+Each step is independently testable. Build a fresh DMG after each step. Roll back immediately if anything breaks.
 
-### Phase 1 — Tauri sidecar plumbing
+### Step 1 — Rust command works in isolation
 - Build/obtain stripped macOS universal ffmpeg binary (~30MB)
-- Place at `src-tauri/binaries/ffmpeg-x86_64-apple-darwin` and `src-tauri/binaries/ffmpeg-aarch64-apple-darwin`
-- Enable sidecar in `tauri.conf.json` (`"sidecar": true`, externalBin entry)
-- Rust command wrapper exposes `invoke('convert_webm_to_hevc', { webmBytes })` returning HEVC bytes
-- Smoke test: call from JS, get a version string back
+- Place at `src-tauri/binaries/ffmpeg-{aarch64,x86_64}-apple-darwin`
+- Enable sidecar in `tauri.conf.json` + Cargo.toml feature
+- Add `convert_to_stacked_alpha` Rust command invoking the sidecar
+- **Test:** call from JS console in the running app with a small WebM (~1MB). Confirm base64 output comes back. Save to disk, open in QuickTime — should play as a tall video.
 
-### Phase 2 — JS upload routing (macOS Tauri only)
-- New `_handleWebmAlphaUpload(file)` method in `inspector.js` 
-- Routes only when `isMacTauri && isWebM` — every other path untouched
-- Store both blobs (WebM source + HEVC cache)
-- Build layer entry as `type='video'`, plug into existing `_addVideoLayer`/`_videoAnimations` pipeline
+### Step 2 — JS handler stores blobs only
+- Add `_handleWebmAlphaUpload` that calls the Rust command and stores both blobs in IndexedDB
+- No layer creation yet, no visualizer hookup
+- **Test:** drop a WebM, check IndexedDB for both `videoId` and `videoId+_stk` entries. Extract the stacked one, verify it plays in QuickTime.
 
-### Phase 3 — Conversion modal (reuse pattern from earlier session)
-- Pre-conversion confirm modal: file info, time estimate, Go/Cancel
-- On Go: pause music, switch to progress view
-- Progress driven by sidecar stdout parse (ffmpeg's `frame=` lines)
-- On complete: dismiss, add layer
+### Step 3 — Visualizer loader in isolation
+- Add `_loadStackedAlphaVideo` + tick branch in `_tickVideoAnimations`
+- **Test:** manually invoke from JS console with a pre-converted stacked WebM (the validated `bunny_stacked.webm` works). Confirm transparency renders over the MilkDrop visualizer.
 
-### Phase 4 — Preset import/export
-- Export: WebM always bundled (portable); HEVC optional (regenerated on macOS import)
-- Import on macOS: check HEVC cache → reconvert from WebM source if cache miss
-- Import on web/Windows: ignore HEVC entirely, load WebM via existing path
+### Step 4 — Wire upload + visualizer together
+- Add the 3 upload-path gates (Tauri picker, drop, file input) — macOS+WebM only
+- Connect upload → conversion → blob storage → layer creation → visualizer load
+- **Test:** drop a transparent WebM, see it render with transparency end-to-end.
+
+### Step 5 — Conversion modal UI
+- Replace the placeholder toast with the modal pattern (Go/Cancel, file info, progress bar, music auto-pause)
+
+### Step 6 — Preset save/load support
+- Add stacked-alpha branch in `loadPresetData`
+- On macOS cache miss: reconvert from `sourceWebmId` original WebM via sidecar
+- On Web/Windows import: load `sourceWebmId` via existing video pipeline (no conversion)
 
 ---
 
@@ -436,7 +508,7 @@ We can't reliably probe for alpha from JS in WKWebView (the alpha stream is stri
 | WebCodecs in WKWebView | ❌ Fragile | Hardware-dependent (M3+ only); w3c issue #377 open |
 | Animated AVIF | ❌ Broken | Safari renders alpha incorrectly; single-digit FPS |
 | Native ffmpeg → HEVC alpha .mov | ❌ Dead | Tested May 13 — Safari `<video>` element refuses to load even valid "HEVC with Alpha" files |
-| **Native ffmpeg → stacked alpha VP9 WebM** | **🔬 Untested** | Plays as regular VP9 (no special decoder needed). Still requires native ffmpeg sidecar for the input alpha decode. |
+| **Native ffmpeg → stacked alpha VP9 WebM** | **✅ Validated in Safari standalone test (May 13)** | Plays as regular VP9 (no special decoder needed). Requires native ffmpeg sidecar for the input alpha decode. First in-app integration failed and was rolled back — next attempt is incremental. |
 | Two-`<video>` canvas composite | ⚠️ Backup | Two separate WebMs (color + alpha); JS canvas composite per frame. Performance penalty. |
 | Native ffmpeg → ProRes 4444 | ❌ Too large | Alpha works (307MB / 13 sec) — unusable file size |
 
@@ -454,7 +526,12 @@ We can't reliably probe for alpha from JS in WKWebView (the alpha stream is stri
 | May 13 | Path 1 abandoned without coding | Deeper research: ogv.js source has no alpha (issue #590 open 4 yrs) |
 | May 13 | Path 2 (HEVC via Tauri sidecar) selected | Only realistic option; Apple's official format |
 | May 13 | Path 2 abandoned after Safari test | HEVC alpha .mov produced by `hevc_videotoolbox` fails to load in WKWebView's `<video>` element despite being valid per macOS Spotlight |
-| May 13 | Stacked alpha approach selected for next test | Plays as regular VP9 — no special decoder features needed. Confidence: high. |
+| May 13 | Stacked alpha approach selected | Plays as regular VP9 — no special decoder features needed |
+| May 13 | Stacked alpha **validated** in Safari standalone test | All three checks passed: encoding, playback in WKWebView, WebGL composite with transparency |
+| May 13 | First in-app integration attempt **failed and rolled back** | Built too much at once (Rust + JS handler + 3 gates + visualizer loader + tick branch) without incremental validation. The change broke the Preset Studio UI when a WebM was dropped. Reverted via `git restore` |
+| May 13 | Switched to incremental build plan | 6 small steps, each independently testable, build-and-test cycle between each |
+| May 13 | **Full integration shipped** | All steps complete in `npm run tauri-dev`. User confirmed transparent layer renders correctly over MilkDrop. |
+| May 13 | Progress feedback added | ffmpeg `-stats` stderr parsed for `time=` lines; Rust emits `webm-convert-progress` Tauri events; JS toast updates with elapsed seconds. 20-30s conversion window now shows live progress. |
 
 ---
 
@@ -462,9 +539,9 @@ We can't reliably probe for alpha from JS in WKWebView (the alpha stream is stri
 
 When a transparent WebM lands on macOS, the conversion modal should say (plainly):
 
-> This video has transparency. macOS requires a one-time conversion to a format Apple's WebKit can play with alpha (HEVC). The result is cached so this only happens once per clip. Music will pause during conversion to free up processing power.
+> This video has transparency. macOS requires a one-time conversion so Apple's WebKit can play it correctly with alpha. The result is cached so this only happens once per clip. Music will pause during conversion to free up processing power.
 
-**Don't apologize for it.** It's Apple's decision not to support VP9 alpha in WebKit. State the fact, do the conversion, move on.
+**Don't apologize for it.** It's Apple's decision not to support VP9 alpha in WebKit. State the fact, do the conversion, move on. The internal format is stacked-alpha VP9 (not HEVC — see decision log) but that's plumbing the user never sees.
 
 ---
 

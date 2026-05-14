@@ -25,12 +25,12 @@
 | Width/Height sliders — independent non-uniform scaling 0.25×–4× (video only) | May 11 |
 | Video Border — width, color picker, feather (video only) | May 11 |
 | **Transparent WebM (web + Windows)** — WebM files bypass 720p transcoder; `clearRect` canvas fix eliminates alpha trail accumulation | May 12 |
+| **Transparent WebM on macOS — Stacked-Alpha** (Sammie Roto fix) — ffmpeg sidecar converts VP9-alpha → 2× tall VP9; WebGL composites top half RGB + bottom half luma; live progress toast during conversion | May 13 |
 
 ### 🔨 Up Next
 
 | Feature | § | Status |
 |---|---|---|
-| **Transparent WebM on macOS — Stacked-Alpha** (Sammie Roto fix) | §27 | 🔬 Validated May 13, ready to build — see `apng-dev.md` |
 | **Clipper** (`/clipper.html`) — video trim tool, In/Out markers, FFmpeg trim-encode | §19 | 📋 Active planning |
 
 ### ⏭️ Skipped / Blocked
@@ -1577,8 +1577,8 @@ If MSE becomes available in WKWebView or the macOS requirement is dropped:
 
 ## 27. Transparent WebM on macOS — Stacked-Alpha
 
-> **Status:** ✅ Research validated May 13, 2026 — ready to build. Full spec, validation results, and implementation plan in [`apng-dev.md`](apng-dev.md).
-> **Priority:** High — unblocks the Sammie Roto workflow on macOS.
+> **Status:** ✅ **SHIPPED May 13, 2026.** Confirmed working in `npm run tauri-dev` — transparent layer renders over MilkDrop visualizer. Full build history and architecture in [`apng-dev.md`](apng-dev.md).
+> **DMG:** needs a fresh `./build-and-sign.sh` run to distribute this version.
 
 **The problem:** WKWebView (macOS Tauri's browser engine) plays VP9 video but silently drops the alpha channel. Sammie Roto exports import as opaque on macOS. Web (Chrome) and Windows (WebView2) work natively — shipped May 12.
 

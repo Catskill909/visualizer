@@ -6,6 +6,7 @@
 use std::process::{Child, Command};
 use std::sync::Mutex;
 use tauri::api::dialog::FileDialogBuilder;
+use tauri::api::process::{Command as TauriCommand, CommandEvent};
 use tauri::async_runtime::channel;
 use base64::{engine::general_purpose, Engine as _};
 
@@ -153,10 +154,107 @@ async fn pick_image_file() -> Option<AudioFileResult> {
     Some(AudioFileResult { name, data })
 }
 
+fn parse_ffmpeg_time(line: &str) -> Option<f64> {
+    let idx = line.find("time=")?;
+    let rest = &line[idx + 5..];
+    let time_str = rest.split_whitespace().next()?;
+    let parts: Vec<&str> = time_str.split(':').collect();
+    if parts.len() == 3 {
+        let h: f64 = parts[0].parse().ok()?;
+        let m: f64 = parts[1].parse().ok()?;
+        let s: f64 = parts[2].parse().ok()?;
+        return Some(h * 3600.0 + m * 60.0 + s);
+    }
+    None
+}
+
+#[tauri::command]
+async fn convert_to_stacked_alpha(window: tauri::Window, input_path: String) -> Result<String, String> {
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| e.to_string())?
+        .as_nanos();
+    let output_path = std::env::temp_dir().join(format!("stacked_{}.webm", timestamp));
+    let output_path_str = output_path.to_string_lossy().into_owned();
+
+    let cmd = TauriCommand::new_sidecar("ffmpeg")
+        .map_err(|e| format!("sidecar lookup failed: {}", e))?
+        .args([
+            "-y",
+            "-hide_banner",
+            "-loglevel", "error",
+            "-stats",
+            "-c:v", "libvpx-vp9",
+            "-i", &input_path,
+            "-filter_complex",
+            "[0:v]format=yuva420p,split=2[a][b];[a]alphaextract,format=gray[alpha];[b]format=yuv420p[rgb];[rgb][alpha]vstack[stacked]",
+            "-map", "[stacked]",
+            "-c:v", "libvpx-vp9",
+            "-pix_fmt", "yuv420p",
+            "-b:v", "2M",
+            "-an",
+            &output_path_str,
+        ]);
+
+    let (mut rx, _child) = cmd.spawn().map_err(|e| format!("spawn failed: {}", e))?;
+
+    let mut stderr_log = String::new();
+    while let Some(event) = rx.recv().await {
+        match event {
+            CommandEvent::Stderr(line) => {
+                if let Some(t) = parse_ffmpeg_time(&line) {
+                    let _ = window.emit("webm-convert-progress", t);
+                }
+                stderr_log.push_str(&line);
+                stderr_log.push('\n');
+            }
+            CommandEvent::Error(e) => {
+                let _ = std::fs::remove_file(&output_path);
+                return Err(format!("ffmpeg error: {}\nstderr:\n{}", e, stderr_log));
+            }
+            CommandEvent::Terminated(payload) => {
+                if payload.code != Some(0) {
+                    let _ = std::fs::remove_file(&output_path);
+                    return Err(format!(
+                        "ffmpeg exited code={:?} signal={:?}\nstderr:\n{}",
+                        payload.code, payload.signal, stderr_log
+                    ));
+                }
+                break;
+            }
+            _ => {}
+        }
+    }
+
+    let bytes = std::fs::read(&output_path)
+        .map_err(|e| format!("read output failed: {}", e))?;
+    let debug_copy = std::env::temp_dir().join("discocast_last_stacked.webm");
+    let _ = std::fs::copy(&output_path, &debug_copy);
+    eprintln!("[convert_to_stacked_alpha] debug copy at {}", debug_copy.display());
+    let _ = std::fs::remove_file(&output_path);
+    Ok(general_purpose::STANDARD.encode(&bytes))
+}
+
+#[tauri::command]
+async fn convert_to_stacked_alpha_b64(window: tauri::Window, input_b64: String) -> Result<String, String> {
+    let bytes = general_purpose::STANDARD
+        .decode(&input_b64)
+        .map_err(|e| format!("decode input failed: {}", e))?;
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| e.to_string())?
+        .as_nanos();
+    let input_path = std::env::temp_dir().join(format!("stacked_in_{}.webm", timestamp));
+    std::fs::write(&input_path, &bytes).map_err(|e| format!("write input failed: {}", e))?;
+    let result = convert_to_stacked_alpha(window, input_path.to_string_lossy().into_owned()).await;
+    let _ = std::fs::remove_file(&input_path);
+    result
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(CaffeinateState(Mutex::new(None)))
-        .invoke_handler(tauri::generate_handler![caffeinate_start, caffeinate_stop, toggle_fullscreen, get_fullscreen, pick_audio_file, pick_image_file, save_file, store_blob, get_blob, delete_blob])
+        .invoke_handler(tauri::generate_handler![caffeinate_start, caffeinate_stop, toggle_fullscreen, get_fullscreen, pick_audio_file, pick_image_file, save_file, store_blob, get_blob, delete_blob, convert_to_stacked_alpha, convert_to_stacked_alpha_b64])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

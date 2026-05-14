@@ -828,7 +828,7 @@ export class VisualizerEngine {
       return;
     }
     if (texObj.isVideo && texObj.videoElement) {
-      this._loadVideoTexture(name, texObj.videoElement, texObj.width, texObj.height);
+      this._loadVideoTexture(name, texObj.videoElement, texObj.width, texObj.height, !!texObj.isStackedAlpha);
       return;
     }
     if (texObj.isText && texObj.textLayer) {
@@ -1219,7 +1219,7 @@ export class VisualizerEngine {
    * Load a video file as a WebGL texture for continuous frame upload.
    * Creates a canvas for frame extraction and starts the video playing.
    */
-  _loadVideoTexture(name, videoElement, width, height) {
+  _loadVideoTexture(name, videoElement, width, height, isStackedAlpha = false) {
     try {
       // Validate video element has loaded
       if (!videoElement || videoElement.videoWidth === 0 || videoElement.videoHeight === 0) {
@@ -1247,11 +1247,18 @@ export class VisualizerEngine {
       }
       this._videoAnimations.delete(name);
 
-      // Create upload canvas for frame extraction
+      // Create upload canvas for frame extraction.
+      // For stacked-alpha videos the source is 2× tall (RGB top, alpha-as-luma bottom);
+      // we read the whole tall frame into this canvas then composite into a half-height
+      // RGBA buffer for upload.
       const uploadCanvas = document.createElement('canvas');
       uploadCanvas.width = width;
-      uploadCanvas.height = height;
+      uploadCanvas.height = isStackedAlpha ? height * 2 : height;
       const uploadCtx = uploadCanvas.getContext('2d', { willReadFrequently: true });
+      // Pre-allocated composite buffer (half-height RGBA), reused every frame.
+      const compositeBuf = isStackedAlpha
+        ? new Uint8ClampedArray(width * height * 4)
+        : null;
 
       // Create texture
       const texture = gl.createTexture();
@@ -1306,10 +1313,12 @@ export class VisualizerEngine {
         width,
         height,
         uploadCanvas,
-        uploadCtx
+        uploadCtx,
+        isStackedAlpha,
+        compositeBuf
       });
 
-      console.log('[DiscoCast Visualizer] Video loaded:', name, `${width}×${height}`);
+      console.log('[DiscoCast Visualizer] Video loaded:', name, `${width}×${height}`, isStackedAlpha ? '(stacked-alpha)' : '');
     } catch (e) {
       console.warn('[DiscoCast Visualizer] _loadVideoTexture failed for', name, e.message);
     }
@@ -1365,16 +1374,36 @@ export class VisualizerEngine {
   _tickVideoAnimations() {
     if (this._videoAnimations.size === 0) return;
     for (const [, anim] of this._videoAnimations) {
-      const { videoElement, gl, texture, width, height, uploadCanvas, uploadCtx } = anim;
+      const { videoElement, gl, texture, width, height, uploadCanvas, uploadCtx, isStackedAlpha, compositeBuf } = anim;
       // Only upload if video is playing and has data ready
       if (videoElement.paused || videoElement.ended) continue;
       // HAVE_CURRENT_DATA (2) or HAVE_ENOUGH_DATA (4) required for drawImage
       if (videoElement.readyState < 2) continue;
-      // Clear first so transparent areas don't accumulate previous frames
-      uploadCtx.clearRect(0, 0, width, height);
-      uploadCtx.drawImage(videoElement, 0, 0, width, height);
-      // Get pixel data
-      const frameData = uploadCtx.getImageData(0, 0, width, height).data;
+
+      let uploadData;
+      if (isStackedAlpha) {
+        // Stacked-alpha (macOS WKWebView VP9 alpha workaround):
+        // source video is 2× tall — top half holds RGB, bottom half holds alpha as luma.
+        // Draw the whole tall frame, then combine top RGB + bottom R into a half-height RGBA.
+        const fullH = height * 2;
+        uploadCtx.clearRect(0, 0, width, fullH);
+        uploadCtx.drawImage(videoElement, 0, 0, width, fullH);
+        const topData = uploadCtx.getImageData(0, 0, width, height).data;
+        const botData = uploadCtx.getImageData(0, height, width, height).data;
+        const out = compositeBuf;
+        for (let i = 0; i < topData.length; i += 4) {
+          out[i]     = topData[i];     // R
+          out[i + 1] = topData[i + 1]; // G
+          out[i + 2] = topData[i + 2]; // B
+          out[i + 3] = botData[i];     // alpha from bottom-half R channel
+        }
+        uploadData = out;
+      } else {
+        // Clear first so transparent areas don't accumulate previous frames
+        uploadCtx.clearRect(0, 0, width, height);
+        uploadCtx.drawImage(videoElement, 0, 0, width, height);
+        uploadData = uploadCtx.getImageData(0, 0, width, height).data;
+      }
       // Save pixel-store state
       const prevFlip = gl.getParameter(gl.UNPACK_FLIP_Y_WEBGL);
       const prevPremul = gl.getParameter(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL);
@@ -1386,7 +1415,7 @@ export class VisualizerEngine {
       gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
       gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE);
       // Upload frame
-      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, frameData);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, uploadData);
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, prevFlip);
       gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, prevPremul);
       gl.pixelStorei(gl.UNPACK_ALIGNMENT, prevAlign);
