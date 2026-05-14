@@ -1241,10 +1241,7 @@ export class EditorInspector {
     _bindToggles() {
         const map = {
             'toggle-invert': 'invert',
-            'toggle-darken': 'darken',
-            'toggle-brighten-fx': 'brighten',
             'toggle-solarize': 'solarize',
-            'toggle-darken-center': 'darken_center',
             'toggle-dots': 'wave_usedots',
             'toggle-additive': 'additivewave',
             'toggle-brighten': 'wave_brighten',
@@ -6162,10 +6159,7 @@ export class EditorInspector {
         this._syncFeelSliders();
         this._syncSolidFx();
         this._syncToggle('toggle-invert', 'invert');
-        this._syncToggle('toggle-darken', 'darken');
-        this._syncToggle('toggle-brighten-fx', 'brighten');
         this._syncToggle('toggle-solarize', 'solarize');
-        this._syncToggle('toggle-darken-center', 'darken_center');
     }
 
     _syncPaletteSliders() {
