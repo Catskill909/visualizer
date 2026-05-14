@@ -1,0 +1,14 @@
+{
+  "tauri": {
+    "allowlist": {
+      "shell": {
+        "scope": [
+          { "name": "binaries/ffmpeg", "sidecar": true, "args": true }
+        ]
+      }
+    },
+    "bundle": {
+      "externalBin": ["binaries/ffmpeg"]
+    }
+  }
+}

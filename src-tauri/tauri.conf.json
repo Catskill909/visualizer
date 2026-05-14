@@ -19,9 +19,7 @@
       "shell": {
         "execute": true,
         "sidecar": true,
-        "scope": [
-          { "name": "binaries/ffmpeg", "sidecar": true, "args": true }
-        ]
+        "scope": []
       },
       "window": {
         "setFullscreen": true
@@ -49,7 +47,6 @@
       "macOS": {
         "entitlements": "entitlements.plist"
       },
-      "externalBin": ["binaries/ffmpeg"],
       "windows": {
         "webviewInstallMode": {
           "type": "embedBootstrapper"
