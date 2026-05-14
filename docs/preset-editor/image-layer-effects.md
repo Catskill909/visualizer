@@ -65,6 +65,17 @@
 | **Chromatic** | 0–1 (squared curve) | RGB channel split with animated offset. Speed sub-slider. |
 | **Saturation** | 0–2 | 0 = full greyscale, 1 = original, 2 = hyper-vivid. Luminance-mix on `_src`, after tint + hue spin, before posterize. |
 | **Hue** | 0–360° | Rodrigues RGB rotation — shifts image hue independently of the Palette tab. After tint + hue spin + saturation. |
+| **Blur** | 0–1 | 5-tap cross re-sample at baked `1/texW` pixel step. Applied first — before edge/tint/grading. Pairs with Additive blend for glow layers. |
+| **Brightness** | 0–2 | Multiplies RGB. 0=black, 1=original, 2=double. Applied post-film-grain in color grading block. |
+| **Contrast** | 0–2 | `(col − 0.5) × contrast + 0.5`. 0=flat grey, 1=original, 2=high contrast. |
+| **Gamma** | 0.5–2.5 | `pow(col, gamma)`. Below 1 lifts midtones, above 1 darkens them. |
+| **Fade** | 0–0.5 | Lifts black point: `col × (1−fade) + fade`. Faded/vintage film look. |
+| **Temp** | −1 to +1 | Color temperature: positive=warm/orange (`+R −B`), negative=cool/blue (`−R +B`). ±15% shift at ±1. |
+| **Shadows** | −1 to +1 | Luma-weighted add to dark areas. Negative=crush darks, positive=lift. |
+| **Highlights** | −1 to +1 | Luma-weighted add to bright areas. Negative=pull down, positive=boost. |
+| **Lift** | −0.5 to +0.5 | Additive shadow bias: `col + lift×(1−luma)`. More effect on darks than lights. |
+| **Gain** | −0.5 to +0.5 | Multiplicative highlight boost: `col×(1+gain×luma)`. More effect on lights than darks. |
+| **Tint M/G** | −1 to +1 | Magenta/green axis: negative=magenta (+R +B), positive=green (+G). ±15% shift at ±1. |
 | **Posterize** | Off / 2 / 4 / 8 / 16 | `floor(_src * n + 0.5) / n` per channel, after tint. |
 | **Edge / Sobel** | Off / On | 3×3 Sobel kernel → luminance gradient magnitude replaces `_src`. Best with Tint + Hue Spin. |
 | **Luma Key Lo** | 0–1 | Pixels darker than this → transparent. Cuts dark backgrounds. Under "Luma Key" header. |
@@ -118,7 +129,19 @@ posterize         color quantize
 invert            blend normal ↔ 1−color
 threshold         binary B&W at luminance cutoff (audio-reactive)
 scan lines        CRT horizontal dark bands
+blur              5-tap cross sample (texture-space pixel step)
 film grain        animated hash noise overlay
+brightness        multiply RGB (0–2)
+contrast          (col−0.5)×c+0.5 (0–2)
+gamma             pow(col,g) (0.5–2.5)
+fade              lift black point (0–0.5)
+colorTemp         warm/cool RGB shift (−1 to +1)
+sepia             mix toward sepia matrix (0–1)
+shadows           luma-weighted dark-area adjust (−1 to +1)
+highlights        luma-weighted bright-area adjust (−1 to +1)
+lift              shadow bias additive (−0.5 to +0.5)
+gain              highlight boost multiplicative (−0.5 to +0.5)
+tintMG            magenta/green balance (−1 to +1)
 luma key          alpha modulation by luminance
 opacity           _op = opacity × opacityPulse × gapMask
 blend             composite into col
@@ -166,8 +189,8 @@ Difficulty: 🟢 < 1 hr · 🟡 2–4 hrs · 🔴 4+ hrs (structural)
 
 | Feature | Effort | Notes |
 |---|---|---|
-| **Per-layer Blur** | 🟡 | 3×5 gaussian tap after `_src`. Pairs with additive blend for glow layers. |
-| **Beat Fade** | 🟢 | Opacity envelope — peaks on beat, decays to baseline. Follow `shakeAmp` pattern. Fields: `beatFadeAmt` + `beatFadeDecay`. |
+| ~~**Per-layer Blur**~~ | ✅ Shipped May 14 | 5-tap cross blur via texture re-sample. `img.blur` 0–1. Applied before edge/tint/grading. |
+| ~~**Beat Fade**~~ | ✅ Already shipped | Opacity envelope in Layers tab Audio Reactivity section. |
 | **Scatter / Radial Clone** | 🔴 | N copies in a ring (count 2–12 × radius). Each clone can spin. Requires unrolled GLSL loop — structural pipeline change. |
 | **Displacement mapping** | 🔴 | Layer B warps Layer A UVs. Heat-haze, ripple, glitch. Requires cross-layer sampling + defined evaluation order. |
 
@@ -189,7 +212,7 @@ Difficulty: 🟢 < 1 hr · 🟡 2–4 hrs · 🔴 4+ hrs (structural)
 | **Canvas snapshot layer** | 🟡 | Freeze current frame → texture. Still first; live feedback is Phase 9+. |
 | **SVG import** | 🟢 | Render SVG → canvas → texture. Scales cleanly. |
 | **Path recording** | 🔴 | Record 4-sec anchor drag → looping path. Needs path data in preset JSON + GLSL interpolator. |
-| **Per-layer color grade** | 🟡 | Brightness / contrast / saturation after tint stage. |
+| ~~**Per-layer color grade**~~ | ✅ Shipped May 14 | Brightness, Contrast, Gamma, Fade, Color Temperature — all layer types. |
 | **Per-layer vignette** | 🟢 | Darken edges, focus attention on center layers. |
 | **Webcam layer** | 🔴 | `getUserMedia` as live texture. Product/privacy decision more than engineering. Needs nginx policy change. |
 | **Beat divider** | 🟡 | Trigger every 2nd/4th/8th beat. Needs CPU-side beat counter uniform — audio engine refactor. |
@@ -218,8 +241,16 @@ Sliders wired individually (not via generic `sliderKeys[]`) must be added to the
 ```
 layer-bounce-sl, layer-size-sl, layer-liss-sl, layer-strobe-thr-sl,
 layer-pan-x-sl, layer-pan-y-sl, layer-pan-range-sl, layer-beat-fade-sl,
-layer-tile-sx-sl, layer-tile-sy-sl, layer-shake-sl,
-layer-persp-x-sl, layer-persp-y-sl
+layer-tile-sx-sl, layer-tile-sy-sl, layer-vid-sx-sl, layer-vid-sy-sl,
+layer-vid-border-w-sl, layer-vid-border-feather-sl,
+layer-shake-sl, layer-persp-x-sl, layer-persp-y-sl, layer-radius-sl,
+layer-gif-speed-sl, layer-gif-stability-sl, layer-video-speed-sl, layer-video-scrub-sl,
+layer-font-size-sl, layer-letter-spacing-sl, layer-line-height-sl,
+layer-shadow-blur-sl, layer-shadow-x-sl, layer-shadow-y-sl,
+layer-outline-width-sl, layer-kaleido-speed-sl,
+layer-brightness-sl, layer-contrast-sl, layer-gamma-sl,
+layer-fade-sl, layer-colortemp-sl, layer-sepia-sl, layer-blur-sl,
+layer-shadows-sl, layer-highlights-sl, layer-lift-sl, layer-gain-sl, layer-tintmg-sl
 ```
 
 ### Dev reset helpers

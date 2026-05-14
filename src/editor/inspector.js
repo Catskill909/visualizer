@@ -2321,6 +2321,15 @@ export class EditorInspector {
             brightness: 1.0,       // per-layer brightness multiplier (0=black, 1=original, 2=double)
             contrast: 1.0,         // per-layer contrast (0=flat grey, 1=original, 2=high contrast)
             gamma: 1.0,            // per-layer gamma curve (0.5=bright mids, 1=original, 2.5=dark mids)
+            fade: 0.0,             // per-layer fade/lift — lifts black point for faded film look (0–0.5)
+            colorTemp: 0.0,        // per-layer color temperature: negative=cool/blue, positive=warm/orange (−1 to +1)
+            sepia: 0.0,            // per-layer sepia tone blend (0=off, 1=full classic sepia)
+            blur: 0.0,             // per-layer soft blur — re-samples texture at offset UVs (0=off, 1=heavy)
+            shadows: 0.0,          // per-layer shadow brightness (−1=crush, 0=off, +1=lift)
+            highlights: 0.0,       // per-layer highlight brightness (−1=pull down, 0=off, +1=boost)
+            lift: 0.0,             // per-layer shadow bias — affects darks more than lights (−0.5 to +0.5)
+            gain: 0.0,             // per-layer highlight boost — affects lights more than darks (−0.5 to +0.5)
+            tintMG: 0.0,           // per-layer tint: negative=magenta, positive=green (−1 to +1)
             tile: true,
             blendMode: 'overlay',
             audioPulse: 0.00,  // bass drives size
@@ -2638,6 +2647,15 @@ export class EditorInspector {
             brightness: 1.0,
             contrast: 1.0,
             gamma: 1.0,
+            fade: 0.0,
+            colorTemp: 0.0,
+            sepia: 0.0,
+            blur: 0.0,
+            shadows: 0.0,
+            highlights: 0.0,
+            lift: 0.0,
+            gain: 0.0,
+            tintMG: 0.0,
             // Effects (reused)
             tintR: 1.00, tintG: 1.00, tintB: 1.00,
             hueSpinSpeed: 0.00,
@@ -2788,6 +2806,15 @@ export class EditorInspector {
             brightness: 1.0,
             contrast: 1.0,
             gamma: 1.0,
+            fade: 0.0,
+            colorTemp: 0.0,
+            sepia: 0.0,
+            blur: 0.0,
+            shadows: 0.0,
+            highlights: 0.0,
+            lift: 0.0,
+            gain: 0.0,
+            tintMG: 0.0,
             tile: false,
             spacing: 0.00,
             tileScaleX: 1.00,
@@ -3348,6 +3375,60 @@ export class EditorInspector {
                 value="${(entry.gamma ?? 1.0).toFixed(2)}" style="--pct:${pct(entry.gamma ?? 1.0, 0.5, 2.5)}">
               <span class="lsv layer-gamma-val">${(entry.gamma ?? 1.0).toFixed(2)}</span>
             </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Lift black point — faded/vintage film look (0=none, 0.5=heavy fade)">Fade</span>
+              <input type="range" class="slider layer-fade-sl" min="0" max="0.5" step="0.01"
+                value="${(entry.fade ?? 0).toFixed(2)}" style="--pct:${pct(entry.fade ?? 0, 0, 0.5)}">
+              <span class="lsv layer-fade-val">${(entry.fade ?? 0).toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Color temperature — negative=cool/blue, positive=warm/orange">Temp</span>
+              <input type="range" class="slider layer-colortemp-sl" min="-1" max="1" step="0.01"
+                value="${(entry.colorTemp ?? 0).toFixed(2)}" style="--pct:${pct(entry.colorTemp ?? 0, -1, 1)}">
+              <span class="lsv layer-colortemp-val">${(entry.colorTemp ?? 0).toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Sepia tone — 0=off, 1=full classic warm sepia">Sepia</span>
+              <input type="range" class="slider layer-sepia-sl" min="0" max="1" step="0.01"
+                value="${(entry.sepia ?? 0).toFixed(2)}" style="--pct:${pct(entry.sepia ?? 0, 0, 1)}">
+              <span class="lsv layer-sepia-val">${(entry.sepia ?? 0).toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Soft blur — re-samples texture at offset UVs (0=off, 1=heavy)">Blur</span>
+              <input type="range" class="slider layer-blur-sl" min="0" max="1" step="0.01"
+                value="${(entry.blur ?? 0).toFixed(2)}" style="--pct:${pct(entry.blur ?? 0, 0, 1)}">
+              <span class="lsv layer-blur-val">${(entry.blur ?? 0).toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Shadows — negative crushes darks, positive lifts them (luma-weighted)">Shadows</span>
+              <input type="range" class="slider layer-shadows-sl" min="-1" max="1" step="0.01"
+                value="${(entry.shadows ?? 0).toFixed(2)}" style="--pct:${pct(entry.shadows ?? 0, -1, 1)}">
+              <span class="lsv layer-shadows-val">${(entry.shadows ?? 0).toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Highlights — negative pulls down brights, positive boosts them (luma-weighted)">Highlights</span>
+              <input type="range" class="slider layer-highlights-sl" min="-1" max="1" step="0.01"
+                value="${(entry.highlights ?? 0).toFixed(2)}" style="--pct:${pct(entry.highlights ?? 0, -1, 1)}">
+              <span class="lsv layer-highlights-val">${(entry.highlights ?? 0).toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Lift — shadow bias: affects darks more than lights (−0.5 to +0.5)">Lift</span>
+              <input type="range" class="slider layer-lift-sl" min="-0.5" max="0.5" step="0.01"
+                value="${(entry.lift ?? 0).toFixed(2)}" style="--pct:${pct(entry.lift ?? 0, -0.5, 0.5)}">
+              <span class="lsv layer-lift-val">${(entry.lift ?? 0).toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Gain — highlight boost: affects lights more than darks (−0.5 to +0.5)">Gain</span>
+              <input type="range" class="slider layer-gain-sl" min="-0.5" max="0.5" step="0.01"
+                value="${(entry.gain ?? 0).toFixed(2)}" style="--pct:${pct(entry.gain ?? 0, -0.5, 0.5)}">
+              <span class="lsv layer-gain-val">${(entry.gain ?? 0).toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Tint — negative=magenta (+R +B), positive=green (+G), color balance axis">Tint M/G</span>
+              <input type="range" class="slider layer-tintmg-sl" min="-1" max="1" step="0.01"
+                value="${(entry.tintMG ?? 0).toFixed(2)}" style="--pct:${pct(entry.tintMG ?? 0, -1, 1)}">
+              <span class="lsv layer-tintmg-val">${(entry.tintMG ?? 0).toFixed(2)}</span>
+            </div>
             <div class="layer-section-divider"></div>
             ${entry.type === 'video' ? `
             <p class="layer-section-label">Border</p>
@@ -3800,8 +3881,21 @@ export class EditorInspector {
             'swayAmt', 'swaySpeed', 'wanderAmt', 'wanderSpeed', 'hueSpinSpeed'];
         const sliderMins = [0, 0, 0, -2, 0, 0, 0, 0, 0, 0];
         const sliderMaxes = [1, 0.8, 0.45, 2, 1, 0.4, 4, 0.4, 2, 2];
-
-        card.querySelectorAll('.layer-slider-row input[type=range]:not(.layer-bounce-sl):not(.layer-size-sl):not(.layer-liss-sl):not(.layer-strobe-thr-sl):not(.layer-pan-x-sl):not(.layer-pan-y-sl):not(.layer-pan-range-sl):not(.layer-beat-fade-sl):not(.layer-tile-sx-sl):not(.layer-tile-sy-sl):not(.layer-vid-sx-sl):not(.layer-vid-sy-sl):not(.layer-vid-border-w-sl):not(.layer-vid-border-feather-sl):not(.layer-shake-sl):not(.layer-persp-x-sl):not(.layer-persp-y-sl):not(.layer-radius-sl):not(.layer-gif-speed-sl):not(.layer-gif-stability-sl):not(.layer-video-speed-sl):not(.layer-video-scrub-sl):not(.layer-font-size-sl):not(.layer-letter-spacing-sl):not(.layer-line-height-sl):not(.layer-shadow-blur-sl):not(.layer-shadow-x-sl):not(.layer-shadow-y-sl):not(.layer-outline-width-sl):not(.layer-kaleido-speed-sl):not(.layer-brightness-sl):not(.layer-contrast-sl):not(.layer-gamma-sl)').forEach((sl, i) => {
+        const sliderExclude = [
+            'layer-bounce-sl','layer-size-sl','layer-liss-sl','layer-strobe-thr-sl',
+            'layer-pan-x-sl','layer-pan-y-sl','layer-pan-range-sl','layer-beat-fade-sl',
+            'layer-tile-sx-sl','layer-tile-sy-sl','layer-vid-sx-sl','layer-vid-sy-sl',
+            'layer-vid-border-w-sl','layer-vid-border-feather-sl','layer-shake-sl',
+            'layer-persp-x-sl','layer-persp-y-sl','layer-radius-sl',
+            'layer-gif-speed-sl','layer-gif-stability-sl','layer-video-speed-sl','layer-video-scrub-sl',
+            'layer-font-size-sl','layer-letter-spacing-sl','layer-line-height-sl',
+            'layer-shadow-blur-sl','layer-shadow-x-sl','layer-shadow-y-sl',
+            'layer-outline-width-sl','layer-kaleido-speed-sl',
+            'layer-brightness-sl','layer-contrast-sl','layer-gamma-sl',
+            'layer-fade-sl','layer-colortemp-sl','layer-sepia-sl','layer-blur-sl',
+            'layer-shadows-sl','layer-highlights-sl','layer-lift-sl','layer-gain-sl','layer-tintmg-sl',
+        ].map(c => `:not(.${c})`).join('');
+        card.querySelectorAll(`.layer-slider-row input[type=range]${sliderExclude}`).forEach((sl, i) => {
             const valEl = sl.nextElementSibling;
             sl.addEventListener('input', () => {
                 const v = parseFloat(sl.value);
@@ -4213,6 +4307,114 @@ export class EditorInspector {
                 entry.gamma = parseFloat(gammaSl.value);
                 gammaVal.textContent = entry.gamma.toFixed(2);
                 gammaSl.style.setProperty('--pct', `${((entry.gamma - 0.5) / 2.0 * 100).toFixed(1)}%`);
+                refresh();
+            });
+        }
+
+        // Per-layer Fade slider
+        const fadeSl = card.querySelector('.layer-fade-sl');
+        const fadeVal = card.querySelector('.layer-fade-val');
+        if (fadeSl) {
+            fadeSl.addEventListener('input', () => {
+                entry.fade = parseFloat(fadeSl.value);
+                fadeVal.textContent = entry.fade.toFixed(2);
+                fadeSl.style.setProperty('--pct', `${(entry.fade / 0.5 * 100).toFixed(1)}%`);
+                refresh();
+            });
+        }
+
+        // Per-layer Color Temperature slider
+        const colorTempSl = card.querySelector('.layer-colortemp-sl');
+        const colorTempVal = card.querySelector('.layer-colortemp-val');
+        if (colorTempSl) {
+            colorTempSl.addEventListener('input', () => {
+                entry.colorTemp = parseFloat(colorTempSl.value);
+                colorTempVal.textContent = entry.colorTemp.toFixed(2);
+                colorTempSl.style.setProperty('--pct', `${((entry.colorTemp + 1) / 2 * 100).toFixed(1)}%`);
+                refresh();
+            });
+        }
+
+        // Per-layer Sepia slider
+        const sepiaSl = card.querySelector('.layer-sepia-sl');
+        const sepiaVal = card.querySelector('.layer-sepia-val');
+        if (sepiaSl) {
+            sepiaSl.addEventListener('input', () => {
+                entry.sepia = parseFloat(sepiaSl.value);
+                sepiaVal.textContent = entry.sepia.toFixed(2);
+                sepiaSl.style.setProperty('--pct', `${(entry.sepia * 100).toFixed(1)}%`);
+                refresh();
+            });
+        }
+
+        // Per-layer Blur slider
+        const blurSl = card.querySelector('.layer-blur-sl');
+        const blurVal = card.querySelector('.layer-blur-val');
+        if (blurSl) {
+            blurSl.addEventListener('input', () => {
+                entry.blur = parseFloat(blurSl.value);
+                blurVal.textContent = entry.blur.toFixed(2);
+                blurSl.style.setProperty('--pct', `${(entry.blur * 100).toFixed(1)}%`);
+                refresh();
+            });
+        }
+
+        // Per-layer Shadows slider
+        const shadowsSl = card.querySelector('.layer-shadows-sl');
+        const shadowsVal = card.querySelector('.layer-shadows-val');
+        if (shadowsSl) {
+            shadowsSl.addEventListener('input', () => {
+                entry.shadows = parseFloat(shadowsSl.value);
+                shadowsVal.textContent = entry.shadows.toFixed(2);
+                shadowsSl.style.setProperty('--pct', `${((entry.shadows + 1) / 2 * 100).toFixed(1)}%`);
+                refresh();
+            });
+        }
+
+        // Per-layer Highlights slider
+        const highlightsSl = card.querySelector('.layer-highlights-sl');
+        const highlightsVal = card.querySelector('.layer-highlights-val');
+        if (highlightsSl) {
+            highlightsSl.addEventListener('input', () => {
+                entry.highlights = parseFloat(highlightsSl.value);
+                highlightsVal.textContent = entry.highlights.toFixed(2);
+                highlightsSl.style.setProperty('--pct', `${((entry.highlights + 1) / 2 * 100).toFixed(1)}%`);
+                refresh();
+            });
+        }
+
+        // Per-layer Lift slider
+        const liftSl = card.querySelector('.layer-lift-sl');
+        const liftVal = card.querySelector('.layer-lift-val');
+        if (liftSl) {
+            liftSl.addEventListener('input', () => {
+                entry.lift = parseFloat(liftSl.value);
+                liftVal.textContent = entry.lift.toFixed(2);
+                liftSl.style.setProperty('--pct', `${((entry.lift + 0.5) * 100).toFixed(1)}%`);
+                refresh();
+            });
+        }
+
+        // Per-layer Gain slider
+        const gainSl = card.querySelector('.layer-gain-sl');
+        const gainVal = card.querySelector('.layer-gain-val');
+        if (gainSl) {
+            gainSl.addEventListener('input', () => {
+                entry.gain = parseFloat(gainSl.value);
+                gainVal.textContent = entry.gain.toFixed(2);
+                gainSl.style.setProperty('--pct', `${((entry.gain + 0.5) * 100).toFixed(1)}%`);
+                refresh();
+            });
+        }
+
+        // Per-layer Tint M/G slider
+        const tintMGSl = card.querySelector('.layer-tintmg-sl');
+        const tintMGVal = card.querySelector('.layer-tintmg-val');
+        if (tintMGSl) {
+            tintMGSl.addEventListener('input', () => {
+                entry.tintMG = parseFloat(tintMGSl.value);
+                tintMGVal.textContent = entry.tintMG.toFixed(2);
+                tintMGSl.style.setProperty('--pct', `${((entry.tintMG + 1) / 2 * 100).toFixed(1)}%`);
                 refresh();
             });
         }
@@ -5323,7 +5525,9 @@ export class EditorInspector {
         const hasScanLines = parseFloat(scanLinesAmt) > 0.001;
         const filmGrainAmt = (img.filmGrain || 0).toFixed(4);
         const hasFilmGrain = parseFloat(filmGrainAmt) > 0.001;
-        // Pixel step for Sobel: 1/texW × 1/texH, falling back to 1/512
+        const blurAmt = (img.blur || 0.0).toFixed(4);
+        const hasBlur = parseFloat(blurAmt) > 0.001;
+        // Pixel step for Sobel and Blur: 1/texW × 1/texH, falling back to 1/512
         const edgeStepX = img.texW ? (1.0 / img.texW).toFixed(6) : '0.001953';
         const edgeStepY = img.texH ? (1.0 / img.texH).toFixed(6) : '0.001953';
         const tex = `sampler_${img.texName}`;
@@ -5755,6 +5959,19 @@ export class EditorInspector {
             sampleLine +
             chromaticLines +
             `    vec3 _src = _t.xyz;\n` +
+            // Blur: 5-tap cross re-sample using texture-space pixel step baked at build time
+            (hasBlur ? (() => {
+                const bsuv = hasTunnel ? `mix(_uA, _uB, _tf)` : `_u`;
+                const bscale = `${blurAmt} * 15.0`;
+                return (
+                    `    { vec2 _bluv = ${bsuv};\n` +
+                    `      float _bx = ${edgeStepX} * ${bscale}; float _by = ${edgeStepY} * ${bscale};\n` +
+                    `      _src = (_src + texture(${tex}, clamp(_bluv+vec2(_bx,0.),0.,1.)).xyz\n` +
+                    `             + texture(${tex}, clamp(_bluv+vec2(-_bx,0.),0.,1.)).xyz\n` +
+                    `             + texture(${tex}, clamp(_bluv+vec2(0.,_by),0.,1.)).xyz\n` +
+                    `             + texture(${tex}, clamp(_bluv+vec2(0.,-_by),0.,1.)).xyz) * 0.2; }\n`
+                );
+            })() : '') +
             (hasEdge ? (() => {
                 // Sobel edge detect — sample 3x3 neighbourhood in texture space,
                 // compute luminance gradient, replace _src with edge magnitude.
@@ -5831,15 +6048,31 @@ export class EditorInspector {
             // Film Grain: animated hash-based noise overlay
             (hasFilmGrain ? `    { float _gn = fract(sin(dot(uv + fract(time * 0.1), vec2(12.9898, 78.233))) * 43758.5453); _src += (_gn - 0.5) * ${filmGrainAmt} * 0.4; }
 ` : '') +
-            // Color grading — brightness, contrast, gamma (all layer types)
+            // Color grading — brightness, contrast, gamma, fade, colorTemp, sepia, shadows, highlights, lift, gain, tintMG (all layer types)
             (() => {
                 const br = (img.brightness || 1.0).toFixed(4);
                 const ct = (img.contrast || 1.0).toFixed(4);
                 const gm = (img.gamma || 1.0).toFixed(4);
+                const fd = (img.fade || 0.0).toFixed(4);
+                const tp = (img.colorTemp || 0.0).toFixed(4);
+                const sp = (img.sepia || 0.0).toFixed(4);
+                const sh = (img.shadows || 0.0).toFixed(4);
+                const hl = (img.highlights || 0.0).toFixed(4);
+                const lf = (img.lift || 0.0).toFixed(4);
+                const gn = (img.gain || 0.0).toFixed(4);
+                const mg = (img.tintMG || 0.0).toFixed(4);
                 const hasBr = parseFloat(br) !== 1.0;
                 const hasCt = parseFloat(ct) !== 1.0;
                 const hasGm = parseFloat(gm) !== 1.0;
-                if (!hasBr && !hasCt && !hasGm) return '';
+                const hasFd = parseFloat(fd) > 0.001;
+                const hasTp = Math.abs(parseFloat(tp)) > 0.001;
+                const hasSp = parseFloat(sp) > 0.001;
+                const hasSh = Math.abs(parseFloat(sh)) > 0.001;
+                const hasHl = Math.abs(parseFloat(hl)) > 0.001;
+                const hasLf = Math.abs(parseFloat(lf)) > 0.001;
+                const hasGn = Math.abs(parseFloat(gn)) > 0.001;
+                const hasMG = Math.abs(parseFloat(mg)) > 0.001;
+                if (!hasBr && !hasCt && !hasGm && !hasFd && !hasTp && !hasSp && !hasSh && !hasHl && !hasLf && !hasGn && !hasMG) return '';
                 let s = '';
                 // Brightness: multiply
                 if (hasBr) s += `    _src *= ${br};\n`;
@@ -5847,6 +6080,23 @@ export class EditorInspector {
                 if (hasCt) s += `    _src = (_src - 0.5) * ${ct} + 0.5;\n`;
                 // Gamma: pow(value, gamma)
                 if (hasGm) s += `    _src = pow(max(_src, 0.0), vec3(${gm}));\n`;
+                // Fade: lift black point for faded/vintage film look
+                if (hasFd) s += `    _src = _src * (1.0 - ${fd}) + vec3(${fd});\n`;
+                // Color Temperature: warm (positive) shifts R up/B down; cool (negative) shifts B up/R down
+                if (hasTp) s += `    { float _ct = ${tp}; _src = clamp(_src + vec3(_ct, 0.0, -_ct) * 0.15, 0.0, 1.0); }\n`;
+                // Sepia: blend toward classic warm sepia tone
+                if (hasSp) s += `    { vec3 _sep = vec3(dot(_src,vec3(0.393,0.769,0.189)),dot(_src,vec3(0.349,0.686,0.168)),dot(_src,vec3(0.272,0.534,0.131))); _src = mix(_src,_sep,${sp}); }\n`;
+                // Shadows: luma-weighted add to dark areas
+                if (hasSh) s += `    { float _sl = dot(_src,vec3(0.299,0.587,0.114)); _src = clamp(_src + ${sh}*max(0.,0.5-_sl)*2., 0., 1.); }\n`;
+                // Highlights: luma-weighted add to bright areas
+                if (hasHl) s += `    { float _sl = dot(_src,vec3(0.299,0.587,0.114)); _src = clamp(_src + ${hl}*max(0.,_sl-0.5)*2., 0., 1.); }\n`;
+                // Lift: shadow bias — additive offset weighted toward darks
+                if (hasLf) s += `    { float _sl = dot(_src,vec3(0.299,0.587,0.114)); _src = clamp(_src + ${lf}*(1.-_sl), 0., 1.); }\n`;
+                // Gain: highlight boost — multiplicative offset weighted toward lights
+                if (hasGn) s += `    { float _sl = dot(_src,vec3(0.299,0.587,0.114)); _src = clamp(_src*(1.+${gn}*_sl), 0., 1.); }\n`;
+                // Tint M/G: magenta/green color balance axis
+                // Pre-negate in JS to avoid --literal in GLSL (invalid syntax when mg is negative)
+                if (hasMG) { const nmg = (-parseFloat(mg)).toFixed(4); s += `    { _src = clamp(_src + vec3(${nmg},${mg},${nmg})*0.15, 0., 1.); }\n`; }
                 return s;
             })() +
             // Luma Key: darken-below-lo and brighten-above-hi thresholds cut alpha
@@ -6032,7 +6282,7 @@ export class EditorInspector {
             vignette: 0, vignetteCX: 0.5, vignetteCY: 0.5, vignetteW: 0.5, vignetteH: 0.5, vignetteCorner: 0.3, vignetteStrength: 0.5, vignetteFeather: 0.3, vignetteColor: '#000000',
             audioPulse: 0.00, pulseInvert: false,
             blendMode: 'overlay', tile: true, groupSpin: false,
-            hueSpinSpeed: 0.00, imageSaturation: 1.00, imageHue: 0, brightness: 1.0, contrast: 1.0, gamma: 1.0, tintR: 1.0, tintG: 1.0, tintB: 1.0,
+            hueSpinSpeed: 0.00, imageSaturation: 1.00, imageHue: 0, brightness: 1.0, contrast: 1.0, gamma: 1.0, fade: 0.0, colorTemp: 0.0, sepia: 0.0, blur: 0.0, shadows: 0.0, highlights: 0.0, lift: 0.0, gain: 0.0, tintMG: 0.0, tintR: 1.0, tintG: 1.0, tintB: 1.0,
             name: 'Layer', fileName: '', collapsed: false,
             isHd: false, solo: false, muted: false,
         };

@@ -4,13 +4,13 @@
 > **Date:** May 9, 2026  
 > **Goal:** Video layer playback with auto-transcoding (720p), macOS WKWebView support
 
-**Latest:** Auto-transcoding implemented — drag 4K videos, automatically optimized to 720p
+**Latest:** Full color grading toolkit shipped (12 controls, all layer types) — Brightness, Contrast, Gamma, Fade, Temp, Sepia, Blur, Shadows, Highlights, Lift, Gain, Tint M/G
 
 ---
 
 ## Current Status & Phase Roadmap
 
-> **As of May 12, 2026**
+> **As of May 14, 2026**
 
 ### ✅ Shipped — All Complete
 
@@ -20,7 +20,7 @@
 | macOS WKWebView fixes — `playsInline`, blob URL lifecycle, manual loop restart | May 7 |
 | Playback speed control 0.25×–4× | May 9 |
 | Auto-transcoding — drag 4K/1080p → auto-converts to 720p via FFmpeg.wasm | May 9 |
-| Color grading — Brightness, Contrast, Gamma sliders in Layers tab Tint section (all layer types — images, GIFs, video, text). GLSL previously gated `isVideo`; now universal. Note: Saturation + Hue were already shared Tint controls for all layer types. | May 14 |
+| Color grading — Brightness, Contrast, Gamma, Fade, Color Temperature, Sepia, Blur (5-tap), Shadows, Highlights, Lift, Gain, Tint M/G sliders in Layers tab Tint section (all layer types). GLSL universal. Saturation + Hue were already shared. | May 14 |
 | VJ Effects — Luma Key, Wave Distort, Invert, Threshold, Pixelate, Scan Lines, Film Grain | May 8 |
 | Width/Height sliders — independent non-uniform scaling 0.25×–4× (video only) | May 11 |
 | Video Border — width, color picker, feather (video only) | May 11 |
@@ -127,28 +127,27 @@ Video layers would extend the existing image layer system (5 layers, GLSL compos
 | **Speed by Energy** | Playback speed modulated by volume |
 | **Reverse on Beat** | Brief backward playback on strong kick |
 
-### 3.3 Color Controls (Video Grading)
+### 3.3 Color Controls (Video Grading) ✅ All Shipped May 14
 
-These are **new** — image layers only have tint/saturation/hue:
+All controls live in the **Tint section** of every layer card (images, GIFs, video, text). Saturation + Hue were already shared controls before this work.
 
-| Control | Range | Use Case |
-|---------|-------|----------|
-| **Brightness** | 0–2 | Exposure adjustment |
-| **Contrast** | 0–2 | Punch/flat look |
-| **Saturation** | 0–2 | Vibrancy (extends image layer's per-layer sat) |
-| **Hue Rotate** | 0–360° | Color shift |
-| **Gamma** | 0.5–2.5 | Midtone curve |
-| **Lift** (Shadows RGB) | -1 to +1 | Shadow tint |
-| **Gain** (Highlights RGB) | -1 to +1 | Highlight tint |
-| **Vignette** | 0–1 | Edge darkening |
-| **Vignette Radius** | 0–1 | Falloff control |
-| **Color Temperature** | -1 to +1 | Warm/cool shift |
-| **Tint (Magenta/Green)** | -1 to +1 | Color balance |
-| **Fade** | 0–1 | Lift black point (film look) |
-| **Highlights** | -1 to +1 | Recover/blown highlights |
-| **Shadows** | -1 to +1 | Shadow detail |
+| Control | Range | GLSL | js key |
+|---------|-------|------|--------|
+| **Brightness** | 0–2 | `_src *= br` | `brightness` |
+| **Contrast** | 0–2 | `(_src-0.5)*ct+0.5` | `contrast` |
+| **Gamma** | 0.5–2.5 | `pow(_src, gm)` | `gamma` |
+| **Fade** | 0–0.5 | `_src*(1-fd)+fd` | `fade` |
+| **Color Temp** | -1 to +1 | `+vec3(ct,0,-ct)*0.15` | `colorTemp` |
+| **Sepia** | 0–1 | sepia matrix mix | `sepia` |
+| **Blur** | 0–1 | 5-tap cross re-sample | `blur` |
+| **Shadows** | -1 to +1 | luma-weighted dark-area add | `shadows` |
+| **Highlights** | -1 to +1 | luma-weighted bright-area add | `highlights` |
+| **Lift** | -0.5 to +0.5 | `+lf*(1-luma)` | `lift` |
+| **Gain** | -0.5 to +0.5 | `*(1+gn*luma)` | `gain` |
+| **Tint M/G** | -1 to +1 | `+vec3(-mg,mg,-mg)*0.15` | `tintMG` |
+| **Vignette** | 0–1 | radial darkening overlay | `vignette` (pre-existing) |
 
-**GLSL Implementation:** These would be a color grading matrix/stack applied after texture sampling, before blend. Could be a reusable `_buildColorGradingBlock()` function.
+**GLSL:** Single `_buildColorGradingBlock()` IIFE in `_buildImageBlock()`. Zero-cost when all values are at defaults (early-return guard).
 
 ---
 

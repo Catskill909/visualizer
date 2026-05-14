@@ -838,38 +838,14 @@
           <!-- Preset Studio -->
           <section class="welcome-section" data-section="studio" role="tabpanel">
             <h4>Preset Studio</h4>
-            <p>The Studio is its own separate page — not part of the main visualizer. Click it from the start screen
-              and it opens with a live canvas on the left and a tabbed control panel on the right. Everything is
-              live — drag a slider and the visual updates instantly.</p>
-            <div class="welcome-note">
-              <strong>Heads up: not every slider does something on every preset.</strong>
-              <p style="margin:6px 0 0">MilkDrop presets are little self-contained programs. Each one has its own
-                internal logic that can take over zoom, rotation, color — basically anything — on every frame. So when
-                you move a slider and nothing happens, that's not broken. That preset just isn't using that parameter.</p>
-              <p style="margin:6px 0 0">The sliders are really <em>starting values</em>. Some presets read them and
-                run with them. Others override them completely with their own code. You find out which is which by
-                trying. That's the whole game — grab a preset you like, start turning knobs, and see what responds.</p>
-              <p style="margin:6px 0 0"><strong>Tip:</strong> don't start from scratch. Find a preset in the browser
-                that's already close to what you want, load it in the Studio, and remix it from there.</p>
-            </div>
-
+            <p>From the main screen, click <strong>Preset Studio</strong> under Creative Tools. You'll land on the Studio's own source screen — choose <strong>Live Audio</strong> (mic or audio interface), <strong>Load Track</strong> (MP3, WAV, or FLAC), or <strong>No Audio</strong> to jump straight in. Loading audio is recommended: it activates all the audio-reactive features. Once you're in, a live canvas runs on the left with a tabbed control panel on the right. Every change updates instantly.</p>
             <div class="welcome-feature">
-              <div class="welcome-feature-title">The four tabs — what each one does</div>
+              <div class="welcome-feature-title">The four tabs</div>
               <ul class="welcome-list">
-                <li><strong>Palette</strong> — pick a starting look: solid color, pulse/breath, color shift, slow drift,
-                  and more. 12 one-click palettes, plus three independent color swatches (Wave / Glow / Accent). Color
-                  is the one thing that works on basically every preset. The <strong>Opacity slider</strong> at the top
-                  of the Palette tab controls the brightness of the MilkDrop background itself — drag it to zero and
-                  only your image, video, or GIF layers show. Double-click the label to reset to full.</li>
-                <li><strong>Motion</strong> — zoom, rotation, warp, echo, and beat sensitivity. These set the motion
-                  parameters for the preset. Some presets respond directly; others have equations that take over and
-                  you'll see little or no effect. Try it and see.</li>
-                <li><strong>Wave</strong> — controls the global audio waveform that reacts to your music. Every preset
-                  has one, but some presets hide it by default (opacity at zero). If you can't see a waveform, try
-                  bumping the opacity up.</li>
-                <li><strong>Layers</strong> — add up to 5 image, GIF, video, or <strong>text</strong> layers on top of whatever preset is running.
-                  These always work, on every preset, no exceptions. Full animation, effects, and audio reactivity
-                  per layer.</li>
+                <li><strong>Palette</strong> — 12 one-click palettes plus three independent color swatches (Wave / Glow / Accent), Saturation, Hue Rotate, and scene-level toggles (Brighten, Solarize, Invert, etc.). The <strong>Opacity slider</strong> at the top fades the MilkDrop background itself — drag it to zero and only your layers show over a black canvas. Double-click the label to reset.</li>
+                <li><strong>Motion</strong> — zoom, rotation, warp strength, echo/decay, and beat sensitivity. These shape the core MilkDrop animation. Results vary by preset — some respond dramatically, others run their own equations. Explore to find what moves.</li>
+                <li><strong>Wave</strong> — the global audio waveform overlay. Every preset has one. If it's not visible, bump the opacity slider up. Choose style, thickness, color, and blend mode.</li>
+                <li><strong>Layers</strong> — add up to 5 layers (images, GIFs, video, text) on top of any preset. <strong>Always works on every preset, no exceptions.</strong> Full motion, transforms, 12-control color grading, VJ effects, and per-layer audio reactivity. The most powerful tab in the Studio.</li>
               </ul>
             </div>
 
@@ -890,8 +866,7 @@
                   per tile or across the whole field.</li>
                 <li><strong>Canvas Mirror</strong> — folds the entire rendered scene horizontally, vertically, or both.
                 </li>
-                <li><strong>Tint &amp; Hue Spin</strong> — colorize any layer and animate it through a spinning hue
-                  cycle.</li>
+                <li><strong>Tint &amp; Color Grading</strong> — a full 12-control grading toolkit in the Tint section of every layer card (works on images, GIFs, video, and text): <strong>Brightness</strong>, <strong>Contrast</strong>, <strong>Gamma</strong>, <strong>Fade</strong> (lift black point for a film look), <strong>Color Temperature</strong> (warm/cool shift), <strong>Sepia</strong>, <strong>Blur</strong> (5-tap soft blur), <strong>Shadows</strong>, <strong>Highlights</strong>, <strong>Lift</strong>, <strong>Gain</strong>, and <strong>Tint M/G</strong> (magenta/green balance). Plus <strong>Hue Spin</strong> to animate through a spinning hue cycle.</li>
                 <li><strong>Audio Reactivity</strong> — per layer, choose which audio band drives reactive controls:
                   Bass, Mid, Treble, or Volume. Shape the response with Linear, Squared, Cubed, or Gate curves.</li>
                 <li><strong>HD uploads</strong> — toggle before uploading to resize at 2048 px (default is 1024 px).
@@ -934,7 +909,7 @@
                 <li><strong>Border</strong> — Colored ring drawn just outside the video edge. Set Width, Color (color picker), and Feather (soft glow vs hard line). Found in its own Border section below Tint.</li>
                 <li><strong>All effects work</strong> — Spin, Orbit, Bounce, Chromatic Aberration, Luma Key, Wave Distort,
                   Invert, Threshold, Pixelate, Scan Lines, Film Grain, audio reactivity,
-                  and color grading (brightness, contrast, gamma) apply to every video frame.</li>
+                  and the full color grading suite (Brightness, Contrast, Gamma, Fade, Color Temperature, Sepia, Blur, Shadows, Highlights, Lift, Gain, Tint M/G) apply to every video frame.</li>
                 <li><strong>Transparency support</strong> — Drop a WebM with an alpha channel and the video composites over the visualizer with full transparency. See <em>Transparent Video Layers</em> below for the full workflow.</li>
                 <li><strong>Limits</strong> — 2 video layers recommended for best performance. Videos stream from disk so length is flexible; 1–2 minute clips work smoothly, longer videos may show memory pressure on low-end devices.</li>
               </ul>

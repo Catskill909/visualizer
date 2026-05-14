@@ -35,7 +35,7 @@
 
           <li><strong>Video Layers</strong> — Drop MP4/WebM files into presets with full playback controls (play/pause,
             loop, speed, scrub), independent Width &amp; Height scaling, colored Border ring (width, color, feather),
-            and color grading. Auto conversion to 720p on non HD settings and non GPU machines.</li>
+            full color grading (12 controls: Brightness, Contrast, Gamma, Fade, Color Temperature, Sepia, Blur, Shadows, Highlights, Lift, Gain, Tint M/G). Auto conversion to 720p on upload.</li>
           <li><strong>Transparent Video Layers ✨ NEW</strong> — Drop a WebM with an alpha channel (e.g. an AI-rotoscoped
             subject from <a href="https://sammieroto.com" target="_blank" rel="noopener">Sammie Roto</a>) and the subject
             floats over the visualizer with full transparency. Works on web, Windows, and macOS (Mac auto-converts on
@@ -265,8 +265,7 @@
               <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              Video layers — play/pause, loop, speed (0.25×–4×), scrub bar, per-layer color grading; the entire VJ
-              effects suite applies to every frame
+              Video layers — play/pause, loop, speed (0.25×–4×), scrub bar, 12-control color grading (Brightness, Contrast, Gamma, Fade, Temp, Sepia, Blur, Shadows, Highlights, Lift, Gain, Tint M/G); the entire VJ effects suite applies to every frame
             </li>
             <li>
               <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -305,8 +304,7 @@
                 auto-converts on first import</div>
               <div class="il-item"><span class="il-dot"></span>Playback — play/pause, loop toggle, speed (0.25×–4×),
                 scrub bar</div>
-              <div class="il-item"><span class="il-dot"></span>Color grading — per-layer brightness, contrast, and gamma
-              </div>
+              <div class="il-item"><span class="il-dot"></span>Color grading — 12 controls: Brightness, Contrast, Gamma, Fade, Color Temperature, Sepia, Blur, Shadows, Highlights, Lift, Gain, Tint M/G</div>
               <div class="il-item"><span class="il-dot"></span>Scale 10%–200% coverage · Mirror (H / V / Quad /
                 Kaleidoscope)</div>
               <div class="il-item"><span class="il-dot"></span>Width &amp; Height — independent non-uniform scaling
@@ -358,10 +356,16 @@
             <div class="image-layers-grid">
               <div class="il-item"><span class="il-dot"></span>Chromatic aberration — animated RGB channel split</div>
               <div class="il-item"><span class="il-dot"></span>Tint + Hue Spin — color wheel animation</div>
-              <div class="il-item"><span class="il-dot"></span>Saturation — 0 = greyscale → 1 = original → 2 =
-                hyper-vivid</div>
-              <div class="il-item"><span class="il-dot"></span>Hue Rotate — shift image hue independently of the palette
-                (0–360°)</div>
+              <div class="il-item"><span class="il-dot"></span>Saturation — 0 = greyscale → 1 = original → 2 = hyper-vivid</div>
+              <div class="il-item"><span class="il-dot"></span>Hue Rotate — shift image hue independently of the palette (0–360°)</div>
+              <div class="il-item"><span class="il-dot"></span>Brightness / Contrast / Gamma — exposure, punch, midtone curve</div>
+              <div class="il-item"><span class="il-dot"></span>Fade — lift black point for a faded film look</div>
+              <div class="il-item"><span class="il-dot"></span>Color Temperature — warm/cool shift (−15% per channel)</div>
+              <div class="il-item"><span class="il-dot"></span>Sepia — blend toward classic warm sepia tone</div>
+              <div class="il-item"><span class="il-dot"></span>Blur — 5-tap soft blur (pairs with Additive blend for glow)</div>
+              <div class="il-item"><span class="il-dot"></span>Shadows / Highlights — luma-weighted dark &amp; bright area control</div>
+              <div class="il-item"><span class="il-dot"></span>Lift / Gain — shadow bias &amp; highlight boost (professional grading)</div>
+              <div class="il-item"><span class="il-dot"></span>Tint M/G — magenta/green color balance axis</div>
               <div class="il-item"><span class="il-dot"></span>Mirror — H / V / Quad / Kaleidoscope (per-tile or whole)
               </div>
               <div class="il-item"><span class="il-dot"></span>Canvas Mirror — folds the entire scene</div>

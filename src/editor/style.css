@@ -209,6 +209,7 @@ html, body {
   background: var(--bg-2);
   border-left: 1px solid var(--border);
   overflow: hidden;
+  position: relative; z-index: 1;  /* own stacking context — keeps tooltips above canvas (canvas animation transform creates a stacking context) */
   transition: width 0.3s cubic-bezier(0.4,0,0.2,1),
               opacity 0.25s ease,
               border-color 0.3s ease;
@@ -1705,6 +1706,17 @@ html, body {
   opacity: 1; visibility: visible;
   transform: translateX(-50%) translateY(0);
 }
+/* Inspector panel tooltips: left-align so they extend rightward into the panel,
+   not leftward onto the canvas (labels sit on the left edge of the panel) */
+.editor-panel [data-tooltip]::after {
+  left: 0;
+  transform: translateY(-3px);
+}
+.editor-panel [data-tooltip]:hover::after,
+.editor-panel [data-tooltip]:focus-visible::after {
+  transform: translateY(0);
+}
+
 /* Tooltip above the element — use on items near the top edge */
 [data-tooltip].tooltip-up::after {
   top: auto;
