@@ -25,7 +25,7 @@
 | Width/Height sliders — independent non-uniform scaling 0.25×–4× (video only) | May 11 |
 | Video Border — width, color picker, feather (video only) | May 11 |
 | **Transparent WebM (web + Windows)** — WebM files bypass 720p transcoder; `clearRect` canvas fix eliminates alpha trail accumulation | May 12 |
-| **Transparent WebM on macOS — Stacked-Alpha** (Sammie Roto fix) — ffmpeg sidecar converts VP9-alpha → 2× tall VP9; WebGL composites top half RGB + bottom half luma; live progress toast during conversion | May 13 |
+| **Transparent WebM on macOS — Stacked-Alpha** (Sammie Roto fix) — ffmpeg sidecar converts VP9-alpha → 2× tall **H.264 MP4** (RGB top, alpha-as-luma bottom). Shader composites. Production WKWebView refuses pixel access to VP9 video; H.264 works. Live progress toast during conversion. | May 14 |
 
 ### 🔨 Up Next
 
@@ -1577,8 +1577,11 @@ If MSE becomes available in WKWebView or the macOS requirement is dropped:
 
 ## 27. Transparent WebM on macOS — Stacked-Alpha
 
-> **Status:** ✅ **SHIPPED May 13, 2026.** Confirmed working in `npm run tauri-dev` — transparent layer renders over MilkDrop visualizer. Full build history and architecture in [`apng-dev.md`](apng-dev.md).
-> **DMG:** needs a fresh `./build-and-sign.sh` run to distribute this version.
+> **Status:** ✅ **SHIPPED May 14, 2026** in DMG #11.
+> Real fix: encode the stacked-alpha output as **H.264 MP4** instead of VP9 WebM. Production WKWebView refuses pixel-extraction operations (canvas getImageData, gl.texSubImage2D) on VP9 video, treating it as cross-origin even when loaded from a same-origin blob URL. H.264 is treated as same-origin. The stacked-alpha trick (RGB top + alpha-as-luma bottom in a 2× tall video) is codec-agnostic, so it works through H.264 with no other changes.
+> Three-line code change (codec arg in Rust ffmpeg invocation + file extension + JS MIME type) after 10 failed DMGs that chased symptoms. Full post-mortem on the debug process + permanent defensive infrastructure left in the codebase: see [`apng-dev.md`](apng-dev.md).
+>
+> **Cargo features used:** `shell-sidecar`, `protocol-asset` (the latter was added during debugging but is no longer needed by this feature; kept available for future uses).
 
 **The problem:** WKWebView (macOS Tauri's browser engine) plays VP9 video but silently drops the alpha channel. Sammie Roto exports import as opaque on macOS. Web (Chrome) and Windows (WebView2) work natively — shipped May 12.
 

@@ -174,7 +174,13 @@ async fn convert_to_stacked_alpha(window: tauri::Window, input_path: String) -> 
         .duration_since(std::time::UNIX_EPOCH)
         .map_err(|e| e.to_string())?
         .as_nanos();
-    let output_path = std::env::temp_dir().join(format!("stacked_{}.webm", timestamp));
+    // Output as H.264 MP4, NOT VP9 WebM. In production WKWebView, VP9 video is
+    // treated as cross-origin for pixel-extraction (drawImage→getImageData and
+    // gl.texSubImage2D both throw SecurityError every frame). H.264 is treated
+    // as same-origin and works fine. The stacked-alpha trick (RGB top half +
+    // alpha-as-luma bottom half) is codec-agnostic — alpha is just visible
+    // pixels — so it works identically in H.264.
+    let output_path = std::env::temp_dir().join(format!("stacked_{}.mp4", timestamp));
     let output_path_str = output_path.to_string_lossy().into_owned();
 
     let cmd = TauriCommand::new_sidecar("ffmpeg")
@@ -189,9 +195,11 @@ async fn convert_to_stacked_alpha(window: tauri::Window, input_path: String) -> 
             "-filter_complex",
             "[0:v]format=yuva420p,split=2[a][b];[a]alphaextract,format=gray[alpha];[b]format=yuv420p[rgb];[rgb][alpha]vstack[stacked]",
             "-map", "[stacked]",
-            "-c:v", "libvpx-vp9",
+            "-c:v", "libx264",
+            "-preset", "fast",
+            "-crf", "20",
             "-pix_fmt", "yuv420p",
-            "-b:v", "2M",
+            "-movflags", "+faststart",
             "-an",
             &output_path_str,
         ]);
@@ -226,11 +234,12 @@ async fn convert_to_stacked_alpha(window: tauri::Window, input_path: String) -> 
         }
     }
 
+    if !output_path.exists() {
+        return Err(format!("ffmpeg reported success but output not found at {}", output_path.display()));
+    }
     let bytes = std::fs::read(&output_path)
         .map_err(|e| format!("read output failed: {}", e))?;
-    let debug_copy = std::env::temp_dir().join("discocast_last_stacked.webm");
-    let _ = std::fs::copy(&output_path, &debug_copy);
-    eprintln!("[convert_to_stacked_alpha] debug copy at {}", debug_copy.display());
+    eprintln!("[convert_to_stacked_alpha] output at {} ({} bytes)", output_path.display(), bytes.len());
     let _ = std::fs::remove_file(&output_path);
     Ok(general_purpose::STANDARD.encode(&bytes))
 }
@@ -244,6 +253,7 @@ async fn convert_to_stacked_alpha_b64(window: tauri::Window, input_b64: String) 
         .duration_since(std::time::UNIX_EPOCH)
         .map_err(|e| e.to_string())?
         .as_nanos();
+    // Input is still WebM (Sammie Roto export with VP9-alpha); only the OUTPUT codec changed.
     let input_path = std::env::temp_dir().join(format!("stacked_in_{}.webm", timestamp));
     std::fs::write(&input_path, &bytes).map_err(|e| format!("write input failed: {}", e))?;
     let result = convert_to_stacked_alpha(window, input_path.to_string_lossy().into_owned()).await;

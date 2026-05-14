@@ -2423,12 +2423,17 @@ export class EditorInspector {
                 binary += String.fromCharCode.apply(null, u8.subarray(i, i + chunk));
             }
             const inputB64 = btoa(binary);
+            // Bytes arrive via Tauri IPC (same-origin). Rust runs ffmpeg to produce
+            // a stacked-alpha H.264 MP4 — see src-tauri/src/main.rs for the codec
+            // choice rationale (TL;DR: VP9 is cross-origin-tainted in production
+            // WKWebView, H.264 is not).
             const outputB64 = await window.__TAURI__.invoke('convert_to_stacked_alpha_b64', { inputB64 });
             const outBin = atob(outputB64);
             const outBytes = new Uint8Array(outBin.length);
             for (let i = 0; i < outBin.length; i++) outBytes[i] = outBin.charCodeAt(i);
-            const stackedFile = new File([outBytes], file.name, { type: 'video/webm' });
-            showToast('Conversion done — loading layer…', false, 1500);
+            const mp4Name = file.name.replace(/\.webm$/i, '.mp4');
+            const stackedFile = new File([outBytes], mp4Name, { type: 'video/mp4' });
+            showToast(`Loading layer (${(outBytes.length/1024/1024).toFixed(1)}MB)…`, false, 1500);
             await this._addVideoLayer(stackedFile, { isStackedAlpha: true });
         } catch (err) {
             console.error('[Editor] Stacked-alpha conversion failed:', err);
@@ -2468,8 +2473,9 @@ export class EditorInspector {
 
         try {
             await new Promise((resolve, reject) => {
-                video.onloadedmetadata = resolve;
-                video.onerror = () => reject(new Error('Could not load video'));
+                const timer = setTimeout(() => reject(new Error('video metadata never loaded (10s timeout)')), 10000);
+                video.onloadedmetadata = () => { clearTimeout(timer); resolve(); };
+                video.onerror = () => { clearTimeout(timer); reject(new Error('Could not load video')); };
                 video.src = videoUrl;
             });
 
@@ -2624,7 +2630,7 @@ export class EditorInspector {
             groupSpin: false,
             radius: 0,
             isGif: false,
-            alphaMode: 'fade',
+            alphaMode: isStackedAlpha ? 'preserve' : 'fade',
             // Color grading (new for video)
             brightness: 1.0,
             contrast: 1.0,
@@ -2698,9 +2704,13 @@ export class EditorInspector {
         showToast(`Video layer added (${finalVideo.videoWidth}×${finalVideo.videoHeight})`);
         if (this.currentState.images.length === 1) showHint();
 
-        // Start video playback - critical for texture upload loop
+        // Start video playback - critical for texture upload loop.
+        // Surface rejection as a toast — production hardened-runtime WKWebView
+        // can silently reject autoplay even with muted+playsInline, and a
+        // bare .catch(console.warn) is invisible without devtools.
         finalVideo.play().catch(err => {
             console.warn('[Editor] Video autoplay failed:', err.message);
+            showToast('autoplay rejected: ' + (err?.name || '') + ': ' + (err?.message || err), true);
         });
 
         // NOTE: We do NOT revoke the blob URL here - WKWebView needs it to stay
@@ -5583,7 +5593,12 @@ export class EditorInspector {
                 `      _gapMask = 1.0 - smoothstep(-0.004, 0.004, _rd); }\n` +
                 `    _u = clamp(_uInstanced, 0.0, 1.0);\n` +
                 applyMirrorUV('_u');
-            sampleLine = `    vec4 _t = texture(${tex}, _u);\n`;
+            // Stacked-alpha texture is 2× tall: top half is RGB, bottom half is
+            // alpha-as-luma. Sample top half for color, bottom-half R for alpha.
+            // For non-stacked layers this is the standard single sample.
+            sampleLine = img.isStackedAlpha
+                ? `    vec4 _t = vec4(texture(${tex}, vec2(_u.x, _u.y * 0.5)).rgb, texture(${tex}, vec2(_u.x, _u.y * 0.5 + 0.5)).r);\n`
+                : `    vec4 _t = texture(${tex}, _u);\n`;
         }
 
         // Chromatic aberration: generate offset UV sampling based on which mode we're in
@@ -5899,6 +5914,11 @@ export class EditorInspector {
         const data = {
             name,
             ...this.currentState,
+            // `_solidColor` is an instance var, not part of currentState, but it
+            // drives whether _buildCompShader produces the solid-color base or
+            // the sampler_main base. Persist it so reload reproduces what the
+            // user actually saw.
+            solidColor: this._solidColor,
             ...(thumbDataUrl ? { thumbnailDataUrl: thumbDataUrl } : {}),
         };
 
@@ -6020,6 +6040,11 @@ export class EditorInspector {
 
         // Restore internal flags from the loaded state
         this._imagesOnly = !!this.currentState.imagesOnly;
+        // Restore _solidColor (instance var, not in currentState). Without this,
+        // presets saved while in a solid-color variation reload with a black
+        // background because _buildCompShader falls back to sampler_main when
+        // the underlying preset has no visible Butterchurn output (e.g. wave_a=0).
+        this._solidColor = Array.isArray(stateFields.solidColor) ? stateFields.solidColor.slice() : null;
 
         // Restore image layers (async — fetch blobs from IndexedDB)
         const savedImages = stateFields.images || [];
@@ -6049,22 +6074,27 @@ export class EditorInspector {
                         video.onerror = () => rej(new Error('Video metadata failed'));
                         video.src = videoUrl;
                     });
+                    const isStackedAlpha = !!savedEntry.isStackedAlpha;
                     const entry = this._normalizeImageEntry(deepClone(savedEntry));
                     entry.texW = video.videoWidth;
-                    entry.texH = video.videoHeight;
+                    entry.texH = isStackedAlpha ? Math.floor(video.videoHeight / 2) : video.videoHeight;
                     entry.duration = video.duration || 0;
+                    entry.isStackedAlpha = isStackedAlpha;
                     const texObj = {
                         data: videoUrl,
                         width: video.videoWidth,
-                        height: video.videoHeight,
+                        height: isStackedAlpha ? Math.floor(video.videoHeight / 2) : video.videoHeight,
                         isVideo: true,
                         videoElement: video,
                         videoId: savedEntry.videoId,
                         _videoUrl: videoUrl,
+                        isStackedAlpha,
                     };
                     this.currentState.images.push(entry);
                     this._mountLayerCard(entry, texObj);
-                    video.play().catch(() => {});
+                    video.play().catch(err => {
+                        showToast('preset-load play() rejected: ' + (err?.name || '') + ': ' + (err?.message || err), true);
+                    });
                     continue;
                 }
 
@@ -6157,10 +6187,24 @@ export function showHint() {
 }
 
 export function showToast(msg, isError = false) {
+    if (isError) {
+        // Error toasts stack and persist until clicked
+        const existing = document.querySelectorAll('.toast-error-persistent');
+        let offset = 0;
+        existing.forEach(e => { offset += (e.offsetHeight || 44) + 8; });
+        const err = document.createElement('div');
+        err.className = 'toast toast--error toast-error-persistent';
+        err.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);cursor:pointer;z-index:99999;bottom:calc(1rem + ' + offset + 'px);';
+        err.textContent = '\u2715 ' + msg;
+        err.title = 'Click to dismiss';
+        err.onclick = () => err.remove();
+        document.body.appendChild(err);
+        return;
+    }
     const el = document.getElementById('toast');
     if (!el) return;
     el.textContent = msg;
-    el.className = 'toast' + (isError ? ' toast--error' : '');
+    el.className = 'toast';
     el.hidden = false;
     clearTimeout(el._t);
     el._t = setTimeout(() => { el.hidden = true; }, 3000);

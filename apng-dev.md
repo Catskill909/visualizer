@@ -1,41 +1,200 @@
 # Transparent WebM on macOS — Dev Document
 
-> **Status:** ✅ **FULLY SHIPPED — May 13, 2026.** Transparent WebM with stacked-alpha works end-to-end in the macOS Tauri app. User-confirmed in `npm run tauri-dev`.
-> **Last updated:** May 13, 2026 (evening)
-> **Scope:** macOS Tauri ONLY. Web + Windows work natively — do not touch.
+> **Status (May 14 2026, ~9:35am):** ✅ **SHIPPED — DMG #11 confirmed working by user.**
+> Transparent WebM (from Sammie Roto or any VP9-alpha source) now imports correctly in the production macOS DMG. The bunny renders with full transparency over the MilkDrop visualizer; sliders + palette + all controls stay responsive; presets save and reload correctly with the stacked-alpha layer.
+> **Scope:** macOS Tauri ONLY. Web + Windows transparent WebM already worked natively (shipped May 12, untouched).
+
+## ✅ The actual fix (one-line root cause)
+
+**Production WKWebView treats VP9-decoded video as cross-origin for pixel-extraction operations, but treats H.264 as same-origin.** The fix: have the ffmpeg sidecar encode the stacked-alpha output as **H.264 MP4** instead of VP9 WebM. The stacked-alpha trick (RGB top half + alpha-as-luma bottom half in a 2× tall frame) is codec-agnostic — alpha is just visible pixels — so it works identically through H.264.
+
+### The minimal change set that actually mattered
+
+```rust
+// src-tauri/src/main.rs — convert_to_stacked_alpha
+// OLD:
+"-c:v", "libvpx-vp9", "-pix_fmt", "yuv420p", "-b:v", "2M", "-an",
+let output_path = ... join(format!("stacked_{}.webm", timestamp));
+
+// NEW:
+"-c:v", "libx264", "-preset", "fast", "-crf", "20", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-an",
+let output_path = ... join(format!("stacked_{}.mp4", timestamp));
+```
+
+```js
+// src/editor/inspector.js — _handleWebmAlphaUpload
+const mp4Name = file.name.replace(/\.webm$/i, '.mp4');
+const stackedFile = new File([outBytes], mp4Name, { type: 'video/mp4' });
+```
+
+Three lines. After 10 failed builds.
 
 ---
 
-## ✅ Full Integration — SHIPPED May 13, 2026
+## 🔍 Post-mortem — why did this take 2 days?
 
-All four implementation steps complete. Feature confirmed working by user in `npm run tauri-dev`.
+### Failure modes I made, in order
 
-### What was built (all files)
+1. **Started with the wrong layer of abstraction.** When the production DMG silently locked up the UI after upload, I jumped to "must be the byte path" and rewrote it 3 times (4 MB IPC → asset:// fetch → asset:// + ArrayBuffer → back to IPC). The bug wasn't in the byte path at all — every byte path worked. The bug was at the codec layer, downstream of everything I was changing.
 
-**`src-tauri/binaries/ffmpeg-aarch64-apple-darwin`** (NEW, 45 MB)
+2. **Built the diagnostic infrastructure AFTER 5 silent-failure builds.** The first 5 DMGs failed silently because there was no on-screen error reporting in production (no devtools in the DMG). I should have built the red-error-banner + global error-handler + render-loop try/catches as **DMG #1**, not DMG #5. Once the banner was in place, the actual `SecurityError` revealed itself in one test. Five builds wasted on guessing.
+
+3. **Treated symptoms as causes for 3 more builds.** After the banner showed `SecurityError: The operation is insecure.`, I assumed canvas tainting from blob URL origin. Built fix after fix to "make the blob same-origin" — IPC bytes, ArrayBuffer rebirth, `crossOrigin = 'anonymous'`, shader-based composite to skip canvas entirely. **None of these were the root cause.** The blob *was* same-origin; the codec was the problem. I was four levels removed from the actual bug.
+
+4. **Never asked the differential question.** The single piece of evidence that cracked this was: *does a regular MP4 work in the production DMG?* That test took 30 seconds and immediately collapsed the hypothesis space — if MP4 works, byte path / blob URL / origin / canvas tainting are all eliminated; only codec is left. I should have asked the user this on the *first* DMG failure, not the eleventh. Differential tests are the cheapest evidence we have.
+
+5. **Confused myself (and the user) with terminology.** "Production DMG" vs "the Mac app you installed" vs "the build" — these are all the same thing but I switched between them randomly. User burned an entire test cycle convinced they'd been testing the wrong build because of my unclear language.
+
+6. **Iterated on a 5-10 minute build/notarize/install cycle without checkpointing what I'd ruled out.** Each DMG was a fresh guess. I rebuilt full notarized DMGs to test single hypotheses I could have ruled out with a grep or a curl. The build cost made each iteration feel like progress when it was actually just expensive guessing.
+
+### What I should have done
+
+1. **DMG #1 should ship the diagnostic harness, not a fix.** Red error banner for any uncaught throw + global `unhandledrejection` listener + render-loop try/catch + diagnostic strip showing video state. Then one test → one specific error → one specific fix.
+
+2. **Ask the differential question immediately.** "Does a regular MP4 work in the same DMG?" eliminates entire categories of hypothesis in 30 seconds. Should be the second question after seeing the failure, not the eleventh.
+
+3. **Distinguish "I've reproduced the bug" from "I think I know what's causing it."** I had a confirmed `SecurityError` after DMG #5 but didn't know which operation was throwing or why. Instead of pinning that down with a one-line `console.error('throwing at:', operationName)`, I built three more DMGs trying to "fix" a cause I hadn't actually identified.
+
+4. **Use `npm run tauri-dev` for hypothesis testing, DMG for confirmation only.** Dev mode iterates in seconds. DMG cycle is 5-10 minutes per build. I burned hours rebuilding DMGs to test things that should have been falsified or confirmed in dev — except dev didn't reproduce the bug, which itself was a giant hint that the production-only environment (hardened runtime + WKWebView prod paths) was the differential variable. I should have studied that asymmetry rather than re-trying the same change in different DMG builds.
+
+5. **Stop the build cycle when 3 attempts of the same approach fail.** After DMGs #6 and #7 attacked "canvas tainting" with no improvement, DMG #8's "another shape of the same approach" was structurally guaranteed to fail. The same idea retried doesn't become a better idea on the third build.
+
+### What did go right (worth keeping)
+
+- The defensive infrastructure (red banner, render-loop try/catches, global error listener, metadata timeout, play-rejection toasts) stays in the codebase permanently. It saved diagnosis once and will save the next silent-failure debugging session.
+- The shader-based composite for stacked-alpha (skip canvas, GLSL does the top/bottom assembly) is more efficient than the original JS composite even though it wasn't the fix we needed. Keeping it.
+- The fresh-eyes-AI critique (mid-session) was the kick that broke the bad pattern of treating `console.warn` rejections as invisible. That redirected me to surface the `play()` rejection and the diagnostic strip, which proved the video was fine and shifted my attention to where the error actually was.
+- `loadPresetData` propagating `isStackedAlpha` correctly (the "dual layer" bug found mid-debug) is a real ship-blocking bug that I would have missed entirely without this session — only surfaced because the user was testing save/reload as part of the failure pattern.
+
+### Lessons that should outlast this bug
+
+1. **Production WKWebView ≠ dev mode.** Hardened runtime + custom protocol + signed bundle creates a stricter security context. When dev works and prod doesn't, the difference itself is the most important clue.
+2. **VP9 in production WKWebView cannot have its pixels read from JS.** Anything that needs canvas/WebGL access to video pixels must use H.264. Memorize this.
+3. **Build the visible-error harness before the fix.** Production-only bugs without diagnostic visibility = wasted cycles.
+4. **Differential tests > hypothesis stacking.** "Does the same code path with a different input still fail?" beats "I bet it's because of X."
+5. **Three failed builds of the same idea = wrong idea.** Reset, don't iterate.
+6. **Speculative "fixes" must be cleaned up before declaring victory.** `video.crossOrigin = 'anonymous'` was added in DMG #10 as a guess against the prod bug. It didn't help; DMG #11's H.264 codec fix was the actual answer. I declared victory and updated the docs without removing the speculative `crossOrigin` line. It silently broke web preset-reload transparency for hours. Add a "speculative changes I made that didn't pan out" checklist before shipping, and revert each one if not load-bearing.
+
+---
+
+---
+
+## 📜 Chronological log of fixes shipped tonight (May 13, 2026)
+
+| DMG | Time | Change | Outcome |
+|---|---|---|---|
+| #1 | Earlier today | Initial integration: base64-over-IPC, no progress feedback, no render-loop guards | Controls locked up after upload; cause unknown |
+| #2 | ~7:30pm | Added live progress toast (`webm-convert-progress` event from Rust) | Same lockup, but progress toast confirmed the conversion runs in prod |
+| #3 | ~8:30pm | Switched bytes path: Rust writes file + returns path; JS uses `fetch('asset://…')`. Added `protocol-asset` Cargo feature + `protocol.asset` allowlist + `connect-src asset:` in CSP | Same lockup |
+| #4 | ~9:00pm | Added per-step diagnostic toasts in `_handleWebmAlphaUpload` (`Step 1/4: Got output path…` etc) | Reached "Layer added!" toast — confirmed all of inspector.js completes |
+| #5 | ~9:45pm | Added render-loop hardening: try/catch around `_tickGifAnimations`, `_tickVideoAnimations`, `this.visualizer.render()` + red on-screen banner showing the actual exception. Also added global `error` + `unhandledrejection` listeners + 10s `onloadedmetadata` timeout. Default `alphaMode` for stacked-alpha entries changed `'fade'` → `'preserve'` | 🎯 **Pinpointed the actual error:** red banner showed `TICK ERROR: SecurityError: The operation is insecure.` Controls now stay responsive (render loop survives) |
+| #6 | ~10:05pm | Replaced `response.blob()` with `response.arrayBuffer()` + fresh `new File([buf], …)`, hoping ArrayBuffer would strip the asset:// origin tag | Same `SecurityError` — confirmed the origin tag survives even raw bytes via fetch |
+| #7 | ~10:20pm | Reverted bytes path to Tauri IPC: Rust returns base64 → JS `atob` → `Uint8Array` → `new File([uint8Array])`. Bytes never touch any cross-origin URL. Also fixed `loadPresetData` so saved stacked-alpha videos reload as one composited layer (was rendering as RGB-on-top + alpha-luma-on-bottom because `isStackedAlpha` wasn't propagated through reload) | 🟡 `SecurityError` gone, render loop healthy, no errors of any kind — **but transparent layer still doesn't display on the visualizer canvas.** Root cause of non-display unknown at session end. |
+| #8 | ~10:35pm | **Fresh-eyes feedback applied:** every `video.play().catch(console.warn)` swallowed a handled promise rejection invisibly — neither devtools nor the global `error` listener can see it because `.catch()` consumes it. All three call sites (`_addVideoLayer`, `_loadVideoTexture` initial play, loop-restart) now surface the rejection as a visible toast/banner with `err.name` + `err.message`. Also added a `[name @ t.s] rs=N ct=N.NN paused=B ended=B` diagnostic strip — if `readyState` never reaches ≥2 or `currentTime` never advances past 0, this confirms the video-decode pipeline is the failure point. | Diagnostic strip showed `rs=4 ct=8.438 paused=false` — video IS decoding fine. But canvas `SecurityError` continued to throw. Eliminated the autoplay/decode-stall hypothesis. |
+| #9 | May 14 ~9am | Architectural fix: removed canvas + getImageData entirely for stacked-alpha. Texture allocated at FULL 2× tall video size, video uploaded directly via `gl.texSubImage2D(videoElement)`, fragment shader does the top/bottom composite (sample `(u.x, u.y*0.5)` for RGB, `(u.x, u.y*0.5+0.5)` for alpha). No canvas anywhere in the stacked-alpha path. | Same `SecurityError` from `gl.texSubImage2D` — proved the bug is NOT canvas-tainting; the video itself is being treated as cross-origin even for WebGL pixel-extraction. |
+| #10 | May 14 ~9:15am | Added `video.crossOrigin = 'anonymous'` to all 5 video-element creation sites. Theory: explicitly opt into CORS-checked code path. | Same `SecurityError`. WKWebView ignores `crossOrigin` for blob URLs. Conclusion: the bug is at a deeper layer than blob URL CORS attributes. |
+| #11 | May 14 ~9:30am | **The actual fix.** Asked user to drop a regular MP4 in the same DMG — it rendered fine. Confirmed: regular MP4 works, stacked-alpha WebM doesn't. Conclusion: **VP9 codec specifically is what production WKWebView refuses pixel-extraction from.** Changed ffmpeg sidecar args from `libvpx-vp9 → .webm` to `libx264 → .mp4`. Stacked-alpha trick is codec-agnostic. | ✅ **WORKS.** User confirmed transparent bunny renders over the visualizer. |
+| #12 | May 14 ~9:45am | Cleanup-only: removed the now-unneeded 500 ms diagnostic strip in `_loadVideoTexture`. Removed dead `compositeBuf` variable. Updated stale comments. Kept all defensive infrastructure (red banners, render-loop try/catches, global error handlers, play-rejection toasts, metadata timeout). | Same as #11 — feature still works. Code is clean. |
+| #13 | May 14 ~10:05am | **REGRESSION FIX — broke web transparency on preset save/reload.** User reported: web upload of transparent WebM renders fine, but after Save preset → Open preset the transparency was GONE. Root cause: `video.crossOrigin = 'anonymous'` (added speculatively in DMG #10 as a Hail-Mary against the prod WKWebView bug, never reverted after DMG #11's H.264 fix made it unnecessary). For blob URLs in Chrome, setting `crossOrigin = 'anonymous'` is implementation-defined and can flip the canvas to "tainted" mode even though the underlying blob is same-origin — silently kills `getImageData` for alpha. Fresh upload still worked because of some load-order/cache quirk; preset-reload (blob fetched from IndexedDB) consistently tainted. Removed `crossOrigin` from all 5 video-element creation sites. The H.264 codec fix from DMG #11 is what actually solves the prod WKWebView issue; `crossOrigin` was speculative dead code that broke web. | Web save+reload transparency restored. Mac app save+reload still works. |
+
+---
+
+## 🛡️ Defensive infrastructure left in the codebase (do NOT remove — these are load-bearing)
+
+These were added during diagnosis. They've already saved us once (DMG #5 surfaced the SecurityError) and they protect the render loop against any future per-frame throw.
+
+- **Render loop in `src/visualizer.js:610-680`** wraps `_tickGifAnimations()`, `_tickVideoAnimations()`, and `this.visualizer.render()` each in its own try/catch. One bad frame can no longer kill Butterchurn's draw.
+- **`_showRenderError(msg)` helper in `src/visualizer.js`** posts a red banner at the top of the screen for 15s naming what threw + the source name.
+- **Stacked-alpha branch inside `_tickVideoAnimations`** has its own try/catch — on error, the layer skips frame upload, banner names the error, other layers + Butterchurn keep rendering.
+- **`Inspector` constructor** installs global `window.addEventListener('error')` + `'unhandledrejection'` listeners; any uncaught JS becomes a red toast.
+- **`_addVideoLayer`** has a 10s timeout around `onloadedmetadata` — silent metadata hangs now show a clear error toast.
+- **`_handleWebmAlphaUpload`** retains the "Loading layer (X.XMB)…" toast as a visible signal that we got bytes back from Rust and are about to add the layer.
+- **`alphaMode` default for stacked-alpha video entries** is `'preserve'` (not `'fade'`). `'fade'` would silently destroy the alpha channel via the GLSL `_t.w * _gapMask * …` line at `inspector.js:5816`.
+- **`loadPresetData`** propagates `isStackedAlpha` from saved entries through to `texObj`, so reloaded stacked-alpha videos take the correct composite path in the visualizer.
+
+### The chain of facts (verified tonight)
+
+| ✓ | What we proved | How |
+|---|---|---|
+| ✅ | Source code is correct | `grep` confirmed in `src/` and `dist/` and the installed binary |
+| ✅ | DMG #4 (22:00 build) IS installed in `/Applications` | `ls -la` confirmed timestamps + 45 MB ffmpeg binary present |
+| ✅ | ffmpeg sidecar runs in production | conversion completes, progress toast updates `Converting… Ns` correctly |
+| ✅ | `_handleWebmAlphaUpload` completes successfully | user reported the final `Layer added!` toast appears |
+| ✅ | `_addVideoLayer` completes — including `onloadedmetadata` | 10s metadata timeout never fired |
+| ❌ | After that, the Preset Studio "freezes" | sliders + palette stop having visual effect |
+
+### Why the controls feel broken (the smoking gun)
+
+The render loop at `src/visualizer.js:610-626` is unguarded:
+
+```js
+this._tickGifAnimations();
+this._tickVideoAnimations();   // ← if THIS throws even once
+this.visualizer.render();       // ← never runs
+this.animFrameId = requestAnimationFrame(render);  // ← never runs — LOOP DIES PERMANENTLY
+```
+
+A single uncaught throw in the per-frame video tick kills Butterchurn's draw loop forever. From the user's perspective: sliders still emit events and state still mutates, but the canvas never repaints again — looks identical to "controls do nothing."
+
+### Most-likely throw site
+
+`_tickVideoAnimations` stacked-alpha branch calls `uploadCtx.getImageData(...)` after drawing a video to canvas. In production WKWebView (under hardened runtime + `tauri://localhost` origin) this can throw `SecurityError` if the canvas becomes tainted by the blob URL — even though the same blob URL works fine in dev mode. The error propagates out, killing the loop on the first frame after the layer is added.
+
+### Fixes shipped in DMG #5 (22:03 build, user about to test)
+
+1. **Render-loop hardening:** wrapped `_tickGifAnimations()`, `_tickVideoAnimations()`, and `this.visualizer.render()` each in its own try/catch in `src/visualizer.js`. One bad frame can no longer kill the loop.
+2. **Visible diagnostics:** on first throw from any of those three calls, the visualizer shows a red banner at the top of the screen with the actual error name + message (15 s display). Production now reveals its own errors without devtools.
+3. **Global error trap in inspector:** `window.addEventListener('error')` + `unhandledrejection` listeners in the `Inspector` constructor surface any uncaught JS error as a red toast.
+4. **Stacked-alpha branch try/catch in `_tickVideoAnimations`:** if `getImageData` (or anything else) throws specifically for the stacked layer, that one layer pauses uploads and a red banner names the error — Butterchurn and other layers keep rendering.
+5. **alphaMode default fix:** stacked-alpha entries now default to `alphaMode: 'preserve'` (was `'fade'`, which silently destroys the alpha channel even when the texture is correct). This may turn out to have been the actual rendering bug too — pending test.
+
+---
+
+## 🧱 What is in the code right now (file-by-file inventory, accurate as of DMG #7)
+
+> Use this section to verify what the codebase actually contains. Works in `npm run tauri-dev` end-to-end. In production DMG, all of this runs without error — but the layer still doesn't display (see the End-of-session summary above for the remaining bug).
+
+**`src-tauri/binaries/ffmpeg-aarch64-apple-darwin`** (45 MB)
 - Static ffmpeg 6.0 arm64 binary, eugeneware/ffmpeg-static b6.1.1. Includes libvpx-vp9.
 
-**`src-tauri/binaries/ffmpeg-x86_64-apple-darwin`** (NEW, 79 MB)
+**`src-tauri/binaries/ffmpeg-x86_64-apple-darwin`** (79 MB)
 - Same for Intel Mac support.
 
-**`src-tauri/Cargo.toml`** — added `"shell-sidecar"` to tauri features list.
+**`src-tauri/Cargo.toml`** — tauri features now include `"shell-sidecar"` AND `"protocol-asset"`.
 
-**`src-tauri/tauri.conf.json`** — `shell.sidecar: true`, scope `binaries/ffmpeg` (args: true), `bundle.externalBin: ["binaries/ffmpeg"]`.
+**`src-tauri/tauri.conf.json`**:
+- `shell.sidecar: true` with scope `binaries/ffmpeg` (args: true)
+- `bundle.externalBin: ["binaries/ffmpeg"]`
+- **NEW tonight:** `protocol.asset: true` with `assetScope: ["$TEMP/*", "/var/folders/**", "/tmp/**"]`
+- **NEW tonight:** `connect-src` in CSP extended to include `asset:` and `https://asset.localhost`
 
 **`src-tauri/src/main.rs`**:
-- `convert_to_stacked_alpha(window, input_path)` — spawns ffmpeg sidecar, runs the stacked-alpha filter graph, emits `webm-convert-progress` Tauri window events (parsed from ffmpeg `-stats` stderr), returns base64 of output bytes. Writes debug copy to `$TMPDIR/discocast_last_stacked.webm`.
-- `convert_to_stacked_alpha_b64(window, input_b64)` — accepts base64 input, writes temp file, delegates to above.
+- `convert_to_stacked_alpha(window, input_path)` — spawns ffmpeg sidecar, runs the stacked-alpha filter graph, emits `webm-convert-progress` Tauri window events (parsed from ffmpeg `-stats` stderr).
+- **CHANGED tonight:** Returns the OUTPUT FILE PATH (String) instead of base64-encoded bytes. The file is kept on disk in `$TMPDIR/stacked_<timestamp>.webm` for JS to fetch via asset:// protocol.
+- `convert_to_stacked_alpha_b64(window, input_b64)` — wraps the above; accepts base64 input, writes temp file, calls main function, returns the output path string.
 - Helper `parse_ffmpeg_time(line)` — parses `time=HH:MM:SS.ms` from ffmpeg stats lines into seconds f64.
 
 **`src/editor/inspector.js`** — `_handleWebmAlphaUpload(file)`:
-- Shows live "Converting… Ns" toast, updated every ffmpeg progress event via `window.__TAURI__.event.listen('webm-convert-progress', ...)`
-- File → base64 → `convert_to_stacked_alpha_b64` → base64 → Blob → `_addVideoLayer(file, { isStackedAlpha: true })`
-- Unlisten cleanup in `finally` block
+- Shows live "Converting… Ns" toast, updated every ffmpeg progress event via `window.__TAURI__.event.listen('webm-convert-progress', ...)` — **confirmed working in production**
+- **CHANGED tonight:** No more 4 MB base64 over IPC. After `invoke` returns the path, builds `asset://localhost/<encoded-path>` URL, calls `fetch()`, reads `.blob()`, constructs `File`, then passes to `_addVideoLayer(file, { isStackedAlpha: true })`.
+- `unlisten` cleanup in `finally` block.
 - Three upload gates (Tauri picker, drop, file input): `isMacTauri && isWebM` routes here; all other platforms use `_addVideoLayer` unchanged.
 
-**`src/visualizer.js`**:
-- `_loadVideoTexture` allocates 2× tall canvas for stacked-alpha videos; pre-allocates `compositeBuf`
-- `_tickVideoAnimations` stacked-alpha branch: draws full 2× tall frame → reads top half (RGB) + bottom half (alpha luma) → composites into `compositeBuf` → uploads to GL texture
+**`src/editor/inspector.js`** — `_addVideoLayer(file, opts)`:
+- **CHANGED tonight:** 10-second timeout on the `onloadedmetadata` wait. If metadata never loads, rejects with `'video metadata never loaded (10s timeout)'`. The timer never fired in user testing, confirming metadata loads fine.
+- **CHANGED tonight (DMG #5):** stacked-alpha entries now default to `alphaMode: 'preserve'` (was always `'fade'` — fade silently destroys the alpha channel via the GLSL `_t.w * _gapMask * …` line at inspector.js:5816).
+
+**`src/editor/inspector.js`** — `Inspector` constructor:
+- **NEW tonight:** installs global `window.addEventListener('error')` and `unhandledrejection` listeners that surface uncaught JS errors as red toasts. Production no longer fails silently.
+
+**`src/visualizer.js`** — `_tickVideoAnimations`:
+- `_loadVideoTexture` allocates 2× tall canvas for stacked-alpha videos; pre-allocates `compositeBuf`.
+- Stacked-alpha branch: draws full 2× tall frame → reads top half (RGB) + bottom half (alpha luma) → composites into `compositeBuf` → uploads to GL texture.
+- **NEW tonight (DMG #5):** the stacked-alpha branch is wrapped in its own try/catch — on error, the offending layer is silently skipped and a red banner shows the error name + message.
+
+**`src/visualizer.js`** — render loop (lines ~610-665):
+- **NEW tonight (DMG #5):** `_tickGifAnimations()`, `_tickVideoAnimations()`, and `this.visualizer.render()` are each wrapped in try/catch. If any throws, an error is logged + a red banner shows what threw + the loop continues. Single-frame failures can no longer kill Butterchurn's render loop.
+- **NEW tonight (DMG #5):** `_showRenderError(msg)` helper renders the red banner at the top of the screen for 15 seconds.
 
 ### ffmpeg command (validated, in production)
 ```bash
@@ -58,9 +217,11 @@ ffmpeg -y -hide_banner -loglevel error -stats \
 
 ---
 
-## 🚀 HANDOFF — Read This First (Continuing Next Session)
+## 🗂️ Original handoff doc (May 13 morning — Safari standalone validation)
 
-### ✅ Validation outcome (May 13)
+> This section is the morning-of-May-13 notes from when the stacked-alpha approach was first validated standalone in Safari, BEFORE any in-app integration. Kept as historical context. The current state of the in-app implementation is in the sections ABOVE this one. The phased plan referenced below was largely executed during the 12-hour session — see the chronological DMG log at the top.
+
+### ✅ Validation outcome (May 13 morning, standalone Safari test)
 
 All three Safari tests passed empirically:
 
