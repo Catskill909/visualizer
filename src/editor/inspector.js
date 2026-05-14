@@ -715,7 +715,6 @@ export class EditorInspector {
     _buildPaletteSliders() {
         const container = document.getElementById('palette-sliders');
         const configs = [
-            { id: 'ps-gamma', label: 'Brightness', min: 0.5, max: 4.0, step: 0.05, value: BLANK.baseVals.gammaadj, key: 'gammaadj' },
             { id: 'ps-decay', label: 'Trail', min: 0.85, max: 0.999, step: 0.001, value: BLANK.baseVals.decay, decimals: 3, key: 'decay' },
             { id: 'ps-ob-size', label: 'Outer Border Size', min: 0, max: 0.1, step: 0.001, value: BLANK.baseVals.ob_size, decimals: 3, key: 'ob_size' },
             { id: 'ps-ob-a', label: 'Outer Border Alpha', min: 0, max: 1.0, step: 0.01, value: BLANK.baseVals.ob_a, key: 'ob_a' },
@@ -1241,6 +1240,8 @@ export class EditorInspector {
     _bindToggles() {
         const map = {
             'toggle-invert': 'invert',
+            'toggle-darken': 'darken',
+            'toggle-brighten-fx': 'brighten',
             'toggle-solarize': 'solarize',
             'toggle-dots': 'wave_usedots',
             'toggle-additive': 'additivewave',
@@ -6159,13 +6160,14 @@ export class EditorInspector {
         this._syncFeelSliders();
         this._syncSolidFx();
         this._syncToggle('toggle-invert', 'invert');
+        this._syncToggle('toggle-darken', 'darken');
+        this._syncToggle('toggle-brighten-fx', 'brighten');
         this._syncToggle('toggle-solarize', 'solarize');
     }
 
     _syncPaletteSliders() {
         this._syncSlider('ps-opacity', this.currentState.paletteOpacity ?? 1.0, 0, 1.0, 2);
         const bv = this.currentState.baseVals;
-        this._syncSlider('ps-gamma', bv.gammaadj, 0.5, 4.0, 2);
         this._syncSlider('ps-decay', bv.decay, 0.85, 0.999, 3);
         this._syncSlider('ps-ob-size', bv.ob_size, 0, 0.1, 3);
         this._syncSlider('ps-ob-a', bv.ob_a, 0, 1.0, 2);
