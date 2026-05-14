@@ -68,15 +68,32 @@ if [ ! -d "src-tauri/icons" ]; then
     echo -e "${GREEN}Icons generated!${NC}"
 fi
 
-# Step 0b: Kill any stale Vite dev server that could hold a file lock
-# This includes: the vite node process, any npm run dev* wrapper, and rolldown workers
-pkill -f "node.*vite" 2>/dev/null || true
-pkill -f "npm run dev" 2>/dev/null || true
-pkill -f "rolldown" 2>/dev/null || true
-sleep 1   # Give processes time to die before clearing cache
-rm -rf node_modules/.vite node_modules/.vite-temp dist
+# Step 0b: Kill any stale Vite/rolldown/esbuild workers that could hold a file
+# lock or block the build silently. SIGKILL (-9) because some rolldown workers
+# ignore SIGTERM. Covers: main vite node process, npm wrappers, rolldown's
+# worker pool, esbuild dep-optimizer subprocesses.
+pkill -9 -f "node.*vite" 2>/dev/null || true
+pkill -9 -f "npm run dev" 2>/dev/null || true
+pkill -9 -f "rolldown" 2>/dev/null || true
+pkill -9 -f "esbuild" 2>/dev/null || true
+sleep 1
 
-# Step 1: Build the web app
+# Hard cache wipe. The build has hung repeatedly when Vite/rolldown trusts a
+# stale dep-optimizer cache. None of these are in git; all regenerate on the
+# next build.
+rm -rf \
+    node_modules/.vite \
+    node_modules/.vite-temp \
+    node_modules/.cache \
+    node_modules/.tmp \
+    .vite \
+    .rolldown \
+    dist
+
+# Step 1: Build the web app. The hard cache wipe above already forces Vite
+# to re-optimize dependencies on next run (no cache to trust). Do NOT add
+# `--force` here — Vite v8's `vite build` rejects it (only `vite dev` and
+# `vite optimize` accept --force).
 echo -e "${YELLOW}Step 1: Building web app with Vite...${NC}"
 npm run build
 
