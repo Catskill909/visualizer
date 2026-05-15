@@ -2384,6 +2384,12 @@ export class EditorInspector {
             vignetteFeather: 0.3,  // edge softness (0-1)
             vignetteColor: '#000000', // vignette tint color
             isHd: hdMode,          // badge shown in card header
+            // Phase 1: Per-Cell controls (tile-gated)
+            tileOffsetAxis: 'none',     // 'none' | 'row' | 'col' — brick / half-drop stagger axis
+            tileOffsetAmount: 0.00,     // half-drop amount in cell units (0.5 = classic brick)
+            tileRotateVariance: 0.00,   // per-cell random rotation amount (0=aligned, 1=full random)
+            tileRotateSnap: false,      // snap=on: variance acts as probability of a random 90° rotation
+            tilePopcornAmount: 0.00,    // per-cell audio pulse with hashed phase (0=uniform, 1=full chaos)
         };
         this.currentState.images.push(entry);
 
@@ -2852,6 +2858,12 @@ export class EditorInspector {
             isGif: false,
             isText: true,
             name: 'Text',
+            // Phase 1: Per-Cell controls (tile-gated, off by default for text since tile=false)
+            tileOffsetAxis: 'none',
+            tileOffsetAmount: 0.00,
+            tileRotateVariance: 0.00,
+            tileRotateSnap: false,
+            tilePopcornAmount: 0.00,
         };
         this.currentState.images.push(entry);
 
@@ -3251,6 +3263,39 @@ export class EditorInspector {
               <input type="range" class="slider layer-depth-sl" min="0" max="1" step="0.01"
                 value="${(entry.depthOffset || 0).toFixed(2)}" style="--pct:${pct(entry.depthOffset || 0, 0, 1)}">
               <span class="lsv layer-depth-val">${(entry.depthOffset || 0).toFixed(2)}</span>
+            </div>
+            <div class="layer-section-divider layer-percell-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}></div>
+            <p class="layer-section-label layer-percell-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>Per-Cell</p>
+            <div class="layer-row-inline layer-percell-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
+              <span class="layer-ctrl-label" data-tooltip="Stagger alternating rows or columns">Offset</span>
+              <div class="layer-offset-axis-seg" role="group" aria-label="Offset axis">
+                <button class="lseg lseg-offset${(entry.tileOffsetAxis || 'none') === 'none' ? ' active' : ''}" data-offset-axis="none">Off</button>
+                <button class="lseg lseg-offset${entry.tileOffsetAxis === 'row' ? ' active' : ''}" data-offset-axis="row">Row</button>
+                <button class="lseg lseg-offset${entry.tileOffsetAxis === 'col' ? ' active' : ''}" data-offset-axis="col">Col</button>
+              </div>
+            </div>
+            <div class="layer-slider-row layer-percell-row layer-offset-amt-row"${entry.tile && entry.type !== 'video' && (entry.tileOffsetAxis && entry.tileOffsetAxis !== 'none') ? '' : ' style="display:none"'}>
+              <span class="layer-ctrl-label" data-tooltip="Stagger amount">Amount</span>
+              <input type="range" class="slider layer-offset-amt-sl" min="0" max="1" step="0.01"
+                value="${(entry.tileOffsetAmount || 0).toFixed(2)}" style="--pct:${pct(entry.tileOffsetAmount || 0, 0, 1)}">
+              <span class="lsv layer-offset-amt-val">${(entry.tileOffsetAmount || 0).toFixed(2)}</span>
+            </div>
+            <div class="layer-row-inline layer-percell-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
+              <span class="layer-ctrl-label" data-tooltip="Random rotation per cell">Cell Rotate</span>
+              <input type="range" class="slider layer-slider-inline layer-rotvar-sl" min="0" max="1" step="0.01"
+                value="${(entry.tileRotateVariance || 0).toFixed(2)}" style="--pct:${pct(entry.tileRotateVariance || 0, 0, 1)}">
+              <span class="lsv layer-rotvar-val">${(entry.tileRotateVariance || 0).toFixed(2)}</span>
+              <span class="layer-ctrl-label" style="margin-left:8px;width:auto" data-tooltip="Snap to 90° increments">Snap</span>
+              <label class="toggle-switch toggle-switch--sm">
+                <input type="checkbox" class="layer-rotsnap" ${entry.tileRotateSnap ? 'checked' : ''} />
+                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+              </label>
+            </div>
+            <div class="layer-slider-row layer-percell-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
+              <span class="layer-ctrl-label" data-tooltip="Per-tile audio pulse with a hashed phase — cells dance on different beats">Popcorn</span>
+              <input type="range" class="slider layer-popcorn-sl" min="0" max="1" step="0.01"
+                value="${(entry.tilePopcornAmount || 0).toFixed(2)}" style="--pct:${pct(entry.tilePopcornAmount || 0, 0, 1)}">
+              <span class="lsv layer-popcorn-val">${(entry.tilePopcornAmount || 0).toFixed(2)}</span>
             </div>
             <div class="layer-center-row">
               <span class="layer-ctrl-label" style="margin-bottom:5px">Center</span>
@@ -3688,6 +3733,22 @@ export class EditorInspector {
         const groupSpinWrap = card.querySelector('.layer-group-spin-wrap');
         const mirrorScopeRow = card.querySelector('.layer-mirror-scope');
         const tileScaleRows = card.querySelectorAll('.layer-tile-scale-row');
+        // Phase 1: Per-Cell row visibility helper — referenced by tileCb and the
+        // offset-axis segmented buttons. The Amount row is double-gated: tile=on
+        // AND offset axis ≠ 'none'.
+        const percellRows = card.querySelectorAll('.layer-percell-row');
+        const offsetAmtRow = card.querySelector('.layer-offset-amt-row');
+        const syncPerCellVisibility = () => {
+            const tileOn = entry.tile && entry.type !== 'video';
+            percellRows.forEach(r => {
+                if (r === offsetAmtRow) return;
+                r.style.display = tileOn ? '' : 'none';
+            });
+            if (offsetAmtRow) {
+                offsetAmtRow.style.display = (tileOn && (entry.tileOffsetAxis || 'none') !== 'none') ? '' : 'none';
+            }
+        };
+
         if (tileCb) tileCb.addEventListener('change', () => {
             entry.tile = tileCb.checked;
             if (tunnelRow) tunnelRow.style.display = entry.tile ? '' : 'none';
@@ -3695,11 +3756,56 @@ export class EditorInspector {
             if (groupSpinWrap) groupSpinWrap.style.display = entry.tile ? '' : 'none';
             if (mirrorScopeRow) mirrorScopeRow.style.display = (entry.mirror !== 'none') ? '' : 'none';
             tileScaleRows.forEach(r => { r.style.display = entry.tile ? '' : 'none'; });
+            syncPerCellVisibility();
             if (entry.type === 'text') this.engine._loadTextTexture(entry.texName, entry);
             refresh();
         });
         if (pulseInvCb) pulseInvCb.addEventListener('change', () => { entry.pulseInvert = pulseInvCb.checked; refresh(); });
         if (groupSpinCb) groupSpinCb.addEventListener('change', () => { entry.groupSpin = groupSpinCb.checked; refresh(); });
+
+        // ─── Phase 1: Per-Cell controls ───────────────────────────────────────
+        // Offset axis segmented (Off / Row / Col)
+        card.querySelectorAll('.layer-offset-axis-seg .lseg-offset').forEach(btn => {
+            btn.addEventListener('click', () => {
+                card.querySelectorAll('.layer-offset-axis-seg .lseg-offset').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                entry.tileOffsetAxis = btn.dataset.offsetAxis;
+                syncPerCellVisibility();
+                refresh();
+            });
+        });
+        const offsetAmtSl = card.querySelector('.layer-offset-amt-sl');
+        const offsetAmtVal = card.querySelector('.layer-offset-amt-val');
+        if (offsetAmtSl && offsetAmtVal) offsetAmtSl.addEventListener('input', () => {
+            const v = parseFloat(offsetAmtSl.value);
+            entry.tileOffsetAmount = v;
+            offsetAmtVal.textContent = v.toFixed(2);
+            offsetAmtSl.style.setProperty('--pct', `${(v * 100).toFixed(1)}%`);
+            refresh();
+        });
+        const rotVarSl = card.querySelector('.layer-rotvar-sl');
+        const rotVarVal = card.querySelector('.layer-rotvar-val');
+        if (rotVarSl && rotVarVal) rotVarSl.addEventListener('input', () => {
+            const v = parseFloat(rotVarSl.value);
+            entry.tileRotateVariance = v;
+            rotVarVal.textContent = v.toFixed(2);
+            rotVarSl.style.setProperty('--pct', `${(v * 100).toFixed(1)}%`);
+            refresh();
+        });
+        const rotSnapCb = card.querySelector('.layer-rotsnap');
+        if (rotSnapCb) rotSnapCb.addEventListener('change', () => {
+            entry.tileRotateSnap = rotSnapCb.checked;
+            refresh();
+        });
+        const popcornSl = card.querySelector('.layer-popcorn-sl');
+        const popcornVal = card.querySelector('.layer-popcorn-val');
+        if (popcornSl && popcornVal) popcornSl.addEventListener('input', () => {
+            const v = parseFloat(popcornSl.value);
+            entry.tilePopcornAmount = v;
+            popcornVal.textContent = v.toFixed(2);
+            popcornSl.style.setProperty('--pct', `${(v * 100).toFixed(1)}%`);
+            refresh();
+        });
 
         // Spin inline slider
         const spinSlider = card.querySelector('.layer-spin-sl');
@@ -3892,6 +3998,8 @@ export class EditorInspector {
             'layer-brightness-sl','layer-contrast-sl','layer-gamma-sl',
             'layer-fade-sl','layer-colortemp-sl','layer-sepia-sl','layer-blur-sl',
             'layer-shadows-sl','layer-highlights-sl','layer-lift-sl','layer-gain-sl','layer-tintmg-sl',
+            // Phase 1: Per-Cell sliders — own dedicated handlers below
+            'layer-offset-amt-sl','layer-rotvar-sl','layer-popcorn-sl',
         ].map(c => `:not(.${c})`).join('');
         card.querySelectorAll(`.layer-slider-row input[type=range]${sliderExclude}`).forEach((sl, i) => {
             const valEl = sl.nextElementSibling;
@@ -5552,7 +5660,22 @@ export class EditorInspector {
             strobeLines;
 
         const pulseSign = img.pulseInvert ? '-' : '+';
-        const hasSpin = parseFloat(sp) !== 0 || hasAngle;
+        // Phase 1: Per-Cell variance flags — all tile-only, no-op when img.tile=false.
+        // Brick / half-drop offset: stagger alternating rows or columns.
+        const offsetAxis = img.tileOffsetAxis || 'none';
+        const offsetAmount = (img.tileOffsetAmount || 0).toFixed(4);
+        const hasOffset = !isVideo && img.tile && offsetAxis !== 'none' && parseFloat(offsetAmount) > 0.001;
+        // Per-cell rotation variance — adds hashed rotation to each cell's spin.
+        const rotVar = (img.tileRotateVariance || 0).toFixed(4);
+        const rotSnap = !!img.tileRotateSnap;
+        const hasRotVar = !isVideo && img.tile && parseFloat(rotVar) > 0.001;
+        // Per-cell audio popcorn — each cell pulses on different beat phases.
+        const popcornAmt = (img.tilePopcornAmount || 0).toFixed(4);
+        const hasPopcorn = !isVideo && img.tile && parseFloat(popcornAmt) > 0.001;
+
+        // hasSpin includes hasRotVar so the per-tile spin block emits even when
+        // base spin/angle are zero (rotation variance alone needs the block).
+        const hasSpin = parseFloat(sp) !== 0 || hasAngle || hasRotVar;
         const hasOrbit = parseFloat(orb) !== 0;
         const hasLissajous = hasOrbit && orbitMode === 'lissajous';
         const hasBounce = parseFloat(bnc) !== 0;
@@ -5566,9 +5689,12 @@ export class EditorInspector {
         const fieldMirror = hasMirror && mirrorScope === 'field';
         const tileMirror = hasMirror && mirrorScope === 'tile';
         const hasTint = parseFloat(hueSpin) !== 0 || parseFloat(tintR) !== 1 || parseFloat(tintG) !== 1 || parseFloat(tintB) !== 1;
-        // Videos are never tiled, so no group spin vs per-tile spin distinction
-        const groupSpin = !isVideo && img.tile && hasSpin && !!img.groupSpin;
-        const perTileSpin = !isVideo && img.tile && hasSpin && !img.groupSpin && (parseFloat(sp) !== 0 || hasAngle);
+        // Videos are never tiled, so no group spin vs per-tile spin distinction.
+        // Group spin only when there's a real angular velocity/angle (rotVar by itself
+        // is per-cell, never a whole-grid rotation).
+        const groupSpin = !isVideo && img.tile && (parseFloat(sp) !== 0 || hasAngle) && !!img.groupSpin;
+        // perTileSpin emits when any rotation source exists and groupSpin is off.
+        const perTileSpin = !isVideo && img.tile && hasSpin && !img.groupSpin;
         const fwd = (img.tunnelSpeed || 0) >= 0;
 
         let blendLine;
@@ -5583,9 +5709,14 @@ export class EditorInspector {
         let angLines = '';
         if (hasOrbit && !hasLissajous) angLines += `    float _orbAng = time * 0.5;\n`;
         if (hasSpin) {
-            const spinExpr = parseFloat(sp) !== 0
-                ? (hasAngle ? `time * ${sp} + ${angleRad}` : `time * ${sp}`)
-                : angleRad;
+            // Phase 1: when only hasRotVar is set (no spin/angle), default to 0
+            // so per-cell rotation variance can add to it.
+            const baseSpinPresent = parseFloat(sp) !== 0 || hasAngle;
+            const spinExpr = baseSpinPresent
+                ? (parseFloat(sp) !== 0
+                    ? (hasAngle ? `time * ${sp} + ${angleRad}` : `time * ${sp}`)
+                    : angleRad)
+                : '0.0';
             angLines += `    float _spinAng = ${spinExpr};\n`;
         }
 
@@ -5681,7 +5812,10 @@ export class EditorInspector {
         // dxVar / dyVar: if provided, will emit  vec2 <dxVar> = dFdx(…)  BEFORE the fract wrap
         //   so the caller can use textureGrad(tex, uv, dxVar, dyVar) to avoid mip-seams.
         // maskVar: if provided, a float variable to multiply by 0 in the gap region.
-        const applyTileUV = (varName, sizeExpr, maskVar = null, dxVar = null, dyVar = null) => {
+        // cellIdVar: name for the declared `vec2` cell-index variable (used by Phase 1
+        //   per-cell variance — rotation, popcorn). Each call site must use a unique
+        //   name so tunnel mode (two applyTileUV calls) doesn't collide.
+        const applyTileUV = (varName, sizeExpr, maskVar = null, dxVar = null, dyVar = null, cellIdVar = '_cellId') => {
             let s = '';
             s += `    ${varName}.x *= aspect.y;\n`;
             s += `    ${varName} /= ${sizeExpr};\n`;
@@ -5692,13 +5826,55 @@ export class EditorInspector {
             if (dxVar && dyVar) {
                 s += `    vec2 ${dxVar} = dFdx(${varName}); vec2 ${dyVar} = dFdy(${varName});\n`;
             }
+            // Phase 1: brick / half-drop offset. Computed BEFORE cell-id so the
+            // cell hash reflects the staggered visible position (shifted-row cells
+            // get unique IDs from non-shifted-row cells).
+            if (hasOffset) {
+                if (offsetAxis === 'row') {
+                    s += `    ${varName}.x += mod(floor(${varName}.y + 0.5), 2.0) * ${offsetAmount};\n`;
+                } else if (offsetAxis === 'col') {
+                    s += `    ${varName}.y += mod(floor(${varName}.x + 0.5), 2.0) * ${offsetAmount};\n`;
+                }
+            }
+            // Phase 1: cell id captured BEFORE fract so per-cell hashes are stable.
+            s += `    vec2 ${cellIdVar} = floor(${varName} + 0.5);\n`;
             s += `    ${varName} = fract(${varName} + 0.5);\n`;
-            if (perTileSpin) {
-                s +=
-                    `    { vec2 _tl = ${varName} - 0.5; _tl.x *= aspect.y;\n` +
-                    `      float _ca = cos(_spinAng); float _sa = sin(_spinAng);\n` +
-                    `      _tl = vec2(_ca*_tl.x - _sa*_tl.y, _sa*_tl.x + _ca*_tl.y);\n` +
-                    `      _tl.x /= aspect.y; ${varName} = _tl + 0.5; }\n`;
+            // Per-tile / per-cell rotation block — emits whenever EITHER a base
+            // per-tile spin is active OR per-cell rotation variance is set.
+            // This way Group Spin (which makes perTileSpin=false) does NOT silently
+            // disable Cell Rotate; the two compose cleanly:
+            //   Group Spin = whole grid layout rotates
+            //   Cell Rotate = each tile's contents rotates independently
+            if (perTileSpin || hasRotVar) {
+                s += `    { vec2 _tl = ${varName} - 0.5; _tl.x *= aspect.y;\n`;
+                s += `      float _localAng = ${perTileSpin ? '_spinAng' : '0.0'};\n`;
+                if (hasRotVar) {
+                    // Per-cell rotation: hash the cell id, add an angle.
+                    // snap=on: variance is the *probability* a cell gets a random 90° quarter-turn.
+                    // snap=off: variance scales a continuous 0..360° rotation per cell.
+                    s += `      float _ch = fract(sin(dot(${cellIdVar}, vec2(127.1, 311.7))) * 43758.5);\n`;
+                    if (rotSnap) {
+                        s += `      float _doRot = step(1.0 - ${rotVar}, fract(_ch * 7.17));\n`;
+                        s += `      _localAng += floor(_ch * 4.0) * 1.5708 * _doRot;\n`;
+                    } else {
+                        s += `      _localAng += _ch * 6.28318 * ${rotVar};\n`;
+                    }
+                }
+                s += `      float _ca = cos(_localAng); float _sa = sin(_localAng);\n`;
+                s += `      _tl = vec2(_ca*_tl.x - _sa*_tl.y, _sa*_tl.x + _ca*_tl.y);\n`;
+                s += `      _tl.x /= aspect.y; ${varName} = _tl + 0.5; }\n`;
+            }
+            // Phase 1 fix: when per-cell rotation is active, mask the rotated-out
+            // corners. The rotated square's corners extend beyond [0,1] of the cell;
+            // sampling there wraps the texture and shows a faint "duplicate" sliver
+            // (the texture's opposite side). Mask those areas to alpha=0 instead,
+            // letting the MilkDrop background show through cleanly.
+            // Gated by hasRotVar so uniform Spin alone keeps its existing behaviour.
+            if (hasRotVar && maskVar) {
+                s += `    { float _rotMask = step(0.0, ${varName}.x) * step(${varName}.x, 1.0)\n`;
+                s += `                     * step(0.0, ${varName}.y) * step(${varName}.y, 1.0);\n`;
+                s += `      ${maskVar} *= _rotMask;\n`;
+                s += `      ${varName} = clamp(${varName}, 0.0, 1.0); }\n`;
             }
             if (parseFloat(spc) > 0 && maskVar) {
                 s += `    { float _sg = ${spc} * 0.5;\n`;
@@ -5809,12 +5985,12 @@ export class EditorInspector {
                 `    float _gapMaskA = 1.0; float _gapMaskB = 1.0;\n` +
                 `    vec2 _uA = _u;\n` +
                 aspectPreScale('_uA') +
-                applyTileUV('_uA', `${sizeBase} * _tz1`, '_gapMaskA', '_dxA', '_dyA') +
+                applyTileUV('_uA', `${sizeBase} * _tz1`, '_gapMaskA', '_dxA', '_dyA', '_cellIdA') +
                 applyMirrorUV('_uA') +
                 applyRadius('_uA', '_gapMaskA') +
                 `    vec2 _uB = _u;\n` +
                 aspectPreScale('_uB') +
-                applyTileUV('_uB', `${sizeBase} * _tz2`, '_gapMaskB', '_dxB', '_dyB') +
+                applyTileUV('_uB', `${sizeBase} * _tz2`, '_gapMaskB', '_dxB', '_dyB', '_cellIdB') +
                 applyMirrorUV('_uB') +
                 applyRadius('_uB', '_gapMaskB');
             sampleLine =
@@ -5957,6 +6133,17 @@ export class EditorInspector {
             sampleLine +
             chromaticLines +
             `    vec3 _src = _t.xyz;\n` +
+            // Phase 1: Per-cell popcorn — modulate this cell's brightness with a
+            // hashed phase so cells dance on different beats. Uses _cellIdA in
+            // tunnel mode (the closer of the two zoom layers), _cellId otherwise.
+            (hasPopcorn ? (() => {
+                const pcCell = hasTunnel ? '_cellIdA' : '_cellId';
+                return (
+                    `    { float _pcH = fract(sin(dot(${pcCell}, vec2(269.5, 183.3))) * 43758.5);\n` +
+                    `      float _pcM = 0.5 + 0.5 * sin(time * 6.0 + _pcH * 6.28318);\n` +
+                    `      _src *= 1.0 + _r * 1.8 * ${popcornAmt} * _pcM; }\n`
+                );
+            })() : '') +
             // Blur: 5-tap cross re-sample using texture-space pixel step baked at build time
             (hasBlur ? (() => {
                 const bsuv = hasTunnel ? `mix(_uA, _uB, _tf)` : `_u`;
@@ -6281,6 +6468,10 @@ export class EditorInspector {
             hueSpinSpeed: 0.00, imageSaturation: 1.00, imageHue: 0, brightness: 1.0, contrast: 1.0, gamma: 1.0, fade: 0.0, colorTemp: 0.0, sepia: 0.0, blur: 0.0, shadows: 0.0, highlights: 0.0, lift: 0.0, gain: 0.0, tintMG: 0.0, tintR: 1.0, tintG: 1.0, tintB: 1.0,
             name: 'Layer', fileName: '', collapsed: false,
             isHd: false, solo: false, muted: false,
+            // Phase 1: Per-Cell controls — defaults preserve pre-feature behaviour
+            tileOffsetAxis: 'none', tileOffsetAmount: 0.00,
+            tileRotateVariance: 0.00, tileRotateSnap: false,
+            tilePopcornAmount: 0.00,
         };
         return { ...D, ...entry };
     }

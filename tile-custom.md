@@ -1,11 +1,49 @@
 # Tile Custom — Tiling Enhancement Audit & Phased Dev Plan
 
-**Status:** Planning / audit. Nothing built. Created 2026-05-15, revised same day with phased structure, resolved open questions, tile-tunnel extensions, constrained-camera design principle, 2.5D parallax phase, and code audit for handoff.
+**Last updated:** 2026-05-15 — Phase 1 code complete, awaiting visual verification
 **Scope:** Image and GIF layers in Preset Studio. Videos stay single-instance.
-**Audience:** Anyone implementing this — including a future developer joining cold. §12 is the handoff section.
-**Related files:**
-- [src/editor/inspector.js](src/editor/inspector.js) — primary surface
-- [docs/preset-editor/image-layer-effects.md](docs/preset-editor/image-layer-effects.md) — current image-layer reference
+**Audience:** Anyone implementing this — including a future developer joining cold. §12 is the handoff reference.
+
+---
+
+## 🎯 Status Dashboard
+
+**Current state:** Phase 1 code in (`_cellId` foundation + brick offset + rotation variance + popcorn). Vite dev server starts clean (no syntax errors). **Pending: visual verification in browser.**
+**Next action:** User runs `npm run dev:safe`, opens `/editor.html`, walks the test checklist below. After confirmation → mark Phase 1 ✅ Shipped, green-light Phase 2.
+
+### Phase status
+
+| Phase | What | Status | Shipped | Effort |
+|---|---|---|---|---|
+| [1](#3-phase-1--structural-per-cell-wins) | Brick offset · rotation variance · popcorn | 🔨 Awaiting verification | — | 1 day |
+| [2](#4-phase-2--procedural-variance-suite) | Variance suite + tunnel-var trio + per-layer seed | 📋 Planned | — | 2 days |
+| [3](#5-phase-3--explicit-grid--per-cell-editor-the-replicator) | Density/Grid mode + cell picker + override map + Cascade | 📋 Planned | — | ~1 week |
+| [3.1](#11-build-order-summary) | Drag-multi-select in picker | 📋 Future | — | ~3 days |
+| [4](#103-recursive--nested-grids--phase-4-placeholder) | Recursive / nested grids (pure 2D) | 📋 Deferred | — | TBD |
+| [5](#105-phase-5--25d-parallax-camera-pure-2d) | 2.5D parallax camera (pure 2D) | 📋 Deferred | — | ~5 days |
+
+Legend: 📋 Planned · 🔨 In progress · ✅ Shipped · 🛑 Blocked · 🐛 Bug
+
+### Most recent change
+
+`2026-05-15` — **Phase 1 fix #2: Cell Rotate corner-wrap artifact masked.** Bug: rotating each cell pushed sampled UV outside the cell's `[0,1]` bounds; WebGL's REPEAT wrap mode then sampled the *opposite side* of the texture at those corners, creating a faint "duplicate" sliver in every cell. Fix: when `hasRotVar` is on, multiply `_gapMask` by an in-bounds step mask after rotation and clamp `_u` to `[0,1]`, so rotated-out corners go fully transparent (MilkDrop background shows through) instead of wrap-sampling the texture. Uniform Spin alone (no variance) is unchanged so existing presets don't regress.
+
+`2026-05-15` — **Phase 1 fix #1: Group Spin vs Cell Rotate compose now.** Bug: per-cell rotation lived inside the `perTileSpin` block, which gates on `!groupSpin`. Result: enabling Group Spin silently disabled Cell Rotate. Fix: the rotation block now emits when `perTileSpin OR hasRotVar`; `_localAng` defaults to `0.0` when only variance is active, so Group Spin (whole-grid layout rotation) and Cell Rotate (per-cell content rotation) compose cleanly. Also renamed UI label `Rotate` → `Cell Rotate` to disambiguate from Spin/Angle.
+
+`2026-05-15` — **Phase 1 code in.** Five new state fields wired through templates + normalizer + sliderExclude. New `Per-Cell` section added to layer card (gated by Tile=on). Shader extended: `_cellId` captured before fract, brick offset emitted before cell-id capture (so staggered cells get unique hashes), per-cell rotation injected into `perTileSpin` block, popcorn modulates `_src` after texture sample. Vite starts clean.
+
+`2026-05-15` — Doc created and locked. All 5 open questions resolved (§9). Constrained-camera principle locked as design rule for all future depth work (§10.1). Code audit + handoff checklist added (§12).
+
+### Bugs / blockers
+
+_None tracked — surface area is doc-only at this stage._
+
+When bugs appear during/after implementation, log them here with: phase number, one-line symptom, status (open/fixed), and a link to the fix commit or PR if shipped.
+
+### Related files
+
+- [src/editor/inspector.js](src/editor/inspector.js) — primary code surface
+- [docs/preset-editor/image-layer-effects.md](docs/preset-editor/image-layer-effects.md) — current image-layer reference (update at end of each phase)
 - [custom-preset-editor.md](custom-preset-editor.md) — Preset Studio hub doc
 
 ---
