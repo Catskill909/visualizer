@@ -2368,6 +2368,7 @@ export class EditorInspector {
             waveAmp: 0.00,         // wave distort amplitude (0–1): sinusoidal UV warp strength
             waveFreq: 4.0,         // wave distort frequency (1–20): number of sine cycles across image
             invertMix: 0.00,       // color inversion mix (0–1): 0=normal, 1=fully inverted
+            solarizeMix: 0.00,     // solarize fold mix (0–1): 0=off, 1=full tone-curve fold
             thresholdCutoff: 0.00, // threshold cutoff (0–1): 0=off, >0=binary B&W at that luminance
             pixelate: 0.00,        // pixelate/mosaic amount (0–1): 0=off, 1=maximum blockiness
             scanLines: 0.00,       // CRT scan lines intensity (0–1): 0=off, 1=full dark bands
@@ -2680,6 +2681,7 @@ export class EditorInspector {
             waveAmp: 0.00,         // wave distort amplitude (0–1): sinusoidal UV warp strength
             waveFreq: 4.0,         // wave distort frequency (1–20): number of sine cycles across image
             invertMix: 0.00,       // color inversion mix (0–1): 0=normal, 1=fully inverted
+            solarizeMix: 0.00,     // solarize fold mix (0–1): 0=off, 1=full tone-curve fold
             thresholdCutoff: 0.00, // threshold cutoff (0–1): 0=off, >0=binary B&W at that luminance
             pixelate: 0.00,        // pixelate/mosaic amount (0–1): 0=off, 1=maximum blockiness
             scanLines: 0.00,       // CRT scan lines intensity (0–1): 0=off, 1=full dark bands
@@ -2846,6 +2848,7 @@ export class EditorInspector {
             waveAmp: 0.00,
             waveFreq: 4.0,
             invertMix: 0.00,
+            solarizeMix: 0.00,
             thresholdCutoff: 0.00,
             pixelate: 0.00,
             scanLines: 0.00,
@@ -3561,6 +3564,12 @@ export class EditorInspector {
               <span class="lsv layer-invert-val">${(entry.invertMix || 0).toFixed(2)}</span>
             </div>
             <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Solarize — folds the tone curve so midtones blow bright while darks and highlights crush down. 0 = off, 1 = full solarize.">Solarize</span>
+              <input type="range" class="slider layer-solarize-sl" min="0" max="1" step="0.01"
+                value="${(entry.solarizeMix || 0).toFixed(2)}" style="--pct:${((entry.solarizeMix || 0) * 100).toFixed(1)}%">
+              <span class="lsv layer-solarize-val">${(entry.solarizeMix || 0).toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row">
               <span class="layer-ctrl-label" data-tooltip="Threshold — converts image to binary B&W at this luminance cutoff. Audio-reactive: bass shifts the cutoff for pulsing silhouettes.">Thresh</span>
               <input type="range" class="slider layer-thresh-sl" min="0" max="1" step="0.01"
                 value="${(entry.thresholdCutoff || 0).toFixed(2)}" style="--pct:${((entry.thresholdCutoff || 0) * 100).toFixed(1)}%">
@@ -4000,6 +4009,8 @@ export class EditorInspector {
             'layer-shadows-sl','layer-highlights-sl','layer-lift-sl','layer-gain-sl','layer-tintmg-sl',
             // Phase 1: Per-Cell sliders — own dedicated handlers below
             'layer-offset-amt-sl','layer-rotvar-sl','layer-popcorn-sl',
+            // Color FX — own dedicated handler below
+            'layer-solarize-sl',
         ].map(c => `:not(.${c})`).join('');
         card.querySelectorAll(`.layer-slider-row input[type=range]${sliderExclude}`).forEach((sl, i) => {
             const valEl = sl.nextElementSibling;
@@ -4718,6 +4729,15 @@ export class EditorInspector {
             entry.thresholdCutoff = v;
             threshVal.textContent = v.toFixed(2);
             threshSl.style.setProperty('--pct', `${(v * 100).toFixed(1)}%`);
+            refresh();
+        });
+        const solarizeSl = card.querySelector('.layer-solarize-sl');
+        const solarizeVal = card.querySelector('.layer-solarize-val');
+        if (solarizeSl) solarizeSl.addEventListener('input', () => {
+            const v = parseFloat(solarizeSl.value);
+            entry.solarizeMix = v;
+            solarizeVal.textContent = v.toFixed(2);
+            solarizeSl.style.setProperty('--pct', `${(v * 100).toFixed(1)}%`);
             refresh();
         });
 
@@ -5623,6 +5643,8 @@ export class EditorInspector {
         const hasWave = parseFloat(waveAmp) > 0.001;
         const invertMix = (img.invertMix || 0).toFixed(4);
         const hasInvert = parseFloat(invertMix) > 0.001;
+        const solarizeMix = (img.solarizeMix || 0).toFixed(4);
+        const hasSolarize = parseFloat(solarizeMix) > 0.001;
         const threshCut = (img.thresholdCutoff || 0).toFixed(4);
         const hasThreshold = parseFloat(threshCut) > 0.001;
         const pixelateAmt = (img.pixelate || 0).toFixed(4);
@@ -6226,6 +6248,8 @@ export class EditorInspector {
             (hasPosterize ? `    { float _pn = ${posterize}.0; _src = floor(_src * _pn + 0.5) / _pn; }\n` : '') +
             // Invert: blend between normal and inverted colors
             (hasInvert ? `    _src = mix(_src, 1.0 - _src, ${invertMix});\n` : '') +
+            // Solarize: tone-curve fold (4x(1-x)), blended by amount
+            (hasSolarize ? `    _src = mix(_src, _src * (1.0 - _src) * 4.0, ${solarizeMix});\n` : '') +
             // Threshold: binary B&W at luminance cutoff, audio-reactive shift
             (hasThreshold ? `    { float _tLum = dot(_src, vec3(0.299, 0.587, 0.114)); _src = vec3(step(${threshCut} - _r * 0.2, _tLum)); }\n` : '') +
             // Scan Lines: horizontal CRT bands darkening
@@ -6461,7 +6485,7 @@ export class EditorInspector {
             strobeAmp: 0.00, strobeThr: 0.40,
             chromaticAberration: 0.00, chromaticSpeed: 1.0,
             tileScaleX: 1.00, tileScaleY: 1.00,
-            angle: 0.00, skewX: 0.00, skewY: 0.00, shakeAmp: 0.00, posterize: 0, depthOffset: 0.00, edgeSobel: false, lumaKeyLo: 0.00, lumaKeyHi: 0.00, waveAmp: 0.00, waveFreq: 4.0, invertMix: 0.00, thresholdCutoff: 0.00, pixelate: 0.00, scanLines: 0.00, filmGrain: 0.00, perspX: 0.00, perspY: 0.00,
+            angle: 0.00, skewX: 0.00, skewY: 0.00, shakeAmp: 0.00, posterize: 0, depthOffset: 0.00, edgeSobel: false, lumaKeyLo: 0.00, lumaKeyHi: 0.00, waveAmp: 0.00, waveFreq: 4.0, invertMix: 0.00, solarizeMix: 0.00, thresholdCutoff: 0.00, pixelate: 0.00, scanLines: 0.00, filmGrain: 0.00, perspX: 0.00, perspY: 0.00,
             vignette: 0, vignetteCX: 0.5, vignetteCY: 0.5, vignetteW: 0.5, vignetteH: 0.5, vignetteCorner: 0.3, vignetteStrength: 0.5, vignetteFeather: 0.3, vignetteColor: '#000000',
             audioPulse: 0.00, pulseInvert: false,
             blendMode: 'overlay', tile: true, groupSpin: false,
