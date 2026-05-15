@@ -3292,7 +3292,7 @@ export class EditorInspector {
               </label>
             </div>
             <div class="layer-slider-row layer-percell-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
-              <span class="layer-ctrl-label" data-tooltip="Per-tile audio pulse with a hashed phase — cells dance on different beats">Popcorn</span>
+              <span class="layer-ctrl-label" data-tooltip="Per-cell audio pulse">Popcorn</span>
               <input type="range" class="slider layer-popcorn-sl" min="0" max="1" step="0.01"
                 value="${(entry.tilePopcornAmount || 0).toFixed(2)}" style="--pct:${pct(entry.tilePopcornAmount || 0, 0, 1)}">
               <span class="lsv layer-popcorn-val">${(entry.tilePopcornAmount || 0).toFixed(2)}</span>

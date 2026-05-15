@@ -1,6 +1,6 @@
 # Tile Custom — Tiling Enhancement Audit & Phased Dev Plan
 
-**Last updated:** 2026-05-15 — Phase 1 code complete, awaiting visual verification
+**Last updated:** 2026-05-15 — Phase 1 ✅ shipped + verified in browser
 **Scope:** Image and GIF layers in Preset Studio. Videos stay single-instance.
 **Audience:** Anyone implementing this — including a future developer joining cold. §12 is the handoff reference.
 
@@ -8,14 +8,14 @@
 
 ## 🎯 Status Dashboard
 
-**Current state:** Phase 1 code in (`_cellId` foundation + brick offset + rotation variance + popcorn). Vite dev server starts clean (no syntax errors). **Pending: visual verification in browser.**
-**Next action:** User runs `npm run dev:safe`, opens `/editor.html`, walks the test checklist below. After confirmation → mark Phase 1 ✅ Shipped, green-light Phase 2.
+**Current state:** Phase 1 ✅ Shipped 2026-05-15. Per-Cell section live in the layer card (Offset / Cell Rotate / Popcorn). Two same-day bugfixes (Group Spin composition, corner-wrap mask) and a tooltip-length pass also landed.
+**Next action:** Phase 2 green-light when ready — Variance Suite (Size / Jitter X / Jitter Y / Opacity), Tunnel-Var trio (Speed Var / Direction Var / Phase Var), per-layer Seed + Lock. Spec at §4.
 
 ### Phase status
 
 | Phase | What | Status | Shipped | Effort |
 |---|---|---|---|---|
-| [1](#3-phase-1--structural-per-cell-wins) | Brick offset · rotation variance · popcorn | 🔨 Awaiting verification | — | 1 day |
+| [1](#3-phase-1--structural-per-cell-wins) | Brick offset · cell rotate · popcorn | ✅ Shipped | 2026-05-15 | 1 day |
 | [2](#4-phase-2--procedural-variance-suite) | Variance suite + tunnel-var trio + per-layer seed | 📋 Planned | — | 2 days |
 | [3](#5-phase-3--explicit-grid--per-cell-editor-the-replicator) | Density/Grid mode + cell picker + override map + Cascade | 📋 Planned | — | ~1 week |
 | [3.1](#11-build-order-summary) | Drag-multi-select in picker | 📋 Future | — | ~3 days |
@@ -25,6 +25,8 @@
 Legend: 📋 Planned · 🔨 In progress · ✅ Shipped · 🛑 Blocked · 🐛 Bug
 
 ### Most recent change
+
+`2026-05-15` — **Phase 1 polish: tooltip length pass.** User flagged that the original `Cell Rotate` tooltip ("Hashed rotation per tile — composes with Spin, Angle, and Group. 0=aligned, 1=full random per cell.") was JARRING and created more confusion than it solved. Cut all four Phase 1 tooltips to 2–5 words: Offset = "Stagger alternating rows or columns", Amount = "Stagger amount", Cell Rotate = "Random rotation per cell", Snap = "Snap to 90° increments", Popcorn = "Per-cell audio pulse". Saved a `feedback_slider_discovery_ux` memory: tooltips answer "what does this do", not "what happens with X" — slider play IS the experience.
 
 `2026-05-15` — **Phase 1 fix #2: Cell Rotate corner-wrap artifact masked.** Bug: rotating each cell pushed sampled UV outside the cell's `[0,1]` bounds; WebGL's REPEAT wrap mode then sampled the *opposite side* of the texture at those corners, creating a faint "duplicate" sliver in every cell. Fix: when `hasRotVar` is on, multiply `_gapMask` by an in-bounds step mask after rotation and clamp `_u` to `[0,1]`, so rotated-out corners go fully transparent (MilkDrop background shows through) instead of wrap-sampling the texture. Uniform Spin alone (no variance) is unchanged so existing presets don't regress.
 
@@ -235,6 +237,28 @@ Tunnel variances appear inside the Tunnel section, not here (§5.7).
 
 **Goal:** every cell individually addressable.
 **Build estimate:** ~1 week.
+
+### 5.0 Composition with Phase 1 / 2
+
+**All Phase 1 + 2 Per-Cell controls remain active in Grid mode.** Phase 3 doesn't replace the procedural foundation; it adds an explicit override layer on top.
+
+The cell index (`_cellId`) shipped in Phase 1 is what every per-cell effect hashes from. In Grid mode, `_cellId` is still derived — just from explicit `(col, row)` instead of density-driven `floor()`. So in a 2×4 grid:
+
+- **Offset / Cell Rotate / Popcorn** (Phase 1) — each of the 8 cells still picks up its own hashed offset, rotation, and beat phase.
+- **Size / Jitter / Opacity / Tunnel variances** (Phase 2) — same; each cell deviates per-axis as before.
+- **Per-cell overrides** (Phase 3, new) — click any specific cell in the picker and pin its size / depth / rotation / opacity / offset. The override wins where set; the Phase 1/2 hash drives every other cell.
+
+**Composition stack for any given cell's rotation:**
+
+```
+final_angle = Spin (animated)
+            + Angle (static)
+            + Group Spin (whole-grid layout, if on)
+            + Cell Rotate hash      (Phase 1)
+            + this cell's override.rotation, if set  (Phase 3)
+```
+
+Each stage is additive. Procedural sets the baseline; explicit pins specifics. "Randomize all" (§5.6) is the bridge — it seeds the override map from the current Phase 2 variance values, giving you an editable starting point.
 
 ### 5.1 Tile mode toggle
 

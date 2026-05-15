@@ -41,6 +41,22 @@
 | **Persp X / Y** | −1 to +1 | Projective warp — lines converge to vanishing point. Applied after skew. Singularity clamped to 0.1. |
 | **Tile Width / Height** | 0.25–4.0 (squared curve) | Independent tile cell shape. 1.0 = native aspect. Tile-mode only. |
 
+### Per-layer Controls — Per-Cell (Tile-mode only)
+
+Shipped Phase 1, 2026-05-15. See [`tile-custom.md`](../../tile-custom.md) for full design context.
+
+| Control | Range | Notes |
+|---|---|---|
+| **Offset (Axis)** | Off / Row / Col | Brick / half-drop stagger of alternating rows or columns. Amount slider appears when Axis ≠ Off. |
+| **Offset (Amount)** | 0–1 | Stagger fraction in cell units. 0.5 = classic half-drop / brick. Applied before `fract()` in `applyTileUV` so per-cell hashes reflect staggered position. |
+| **Cell Rotate** | 0–1 | Per-cell hashed rotation variance. 0 = aligned (existing Spin/Angle behaviour). 1 = full random 0–360° per cell. Composes additively with Spin, Angle, and Group Spin. |
+| **Cell Rotate — Snap** | toggle | When on, amount acts as *probability* a cell gets a random 90° quarter-turn (Truchet-style mosaic). |
+| **Popcorn** | 0–1 | Per-cell audio gain with hashed phase. Each cell pulses on a different beat phase. Multiplies `_src` after texture sample. Uses layer's audio reactivity source/curve. |
+
+**Shader-side foundation:** `vec2 _cellId = floor(_u + 0.5)` is captured inside `applyTileUV` before `fract`. Tunnel mode uses `_cellIdA` and `_cellIdB` (one per zoom layer) to avoid GLSL redeclaration. `_cellId` will be reused by Phases 2 & 3 (procedural variance suite, explicit grid replicator).
+
+**Corner-wrap mask:** when `tileRotateVariance > 0`, an in-bounds step mask multiplies `_gapMask` after rotation and `_u` is clamped to `[0,1]`. Prevents the WebGL REPEAT-wrap "duplicate sliver" artifact at rotated corners — they go fully transparent instead, letting MilkDrop background show through. Gated by `hasRotVar` only, so uniform Spin without variance keeps its existing wrap behaviour (no regression).
+
 ### Per-layer Controls — Motion
 
 | Control | Range | Notes |
