@@ -2,7 +2,7 @@
 
 **Architecture:** Standalone page (`/timeline.html`) — self-contained MPA entry in Vite.
 **Completed-phase detail:** lives in **[timeline-editor-archive.md](timeline-editor-archive.md)** — this doc keeps only a one-line index of shipped work.
-**Last updated:** 2026-05-15 — Restructured: split shipped-phase implementation detail into the archive file; added the Status Dashboard; separated Roadmap (planned) from the Completed index so reading order matches build order.
+**Last updated:** 2026-05-15 — Restructured: split shipped-phase implementation detail into the archive file; added the Status Dashboard; separated Roadmap (planned) from the Completed index so reading order matches build order. Roadmap #1 (Loop) refined this session — presets and markers kept distinct: preset Loop / Solo in the block menu loops a single preset; markers do all group / region looping.
 
 ---
 
@@ -35,7 +35,7 @@
 
 | # | Phase | What it adds |
 |---|-------|--------------|
-| 1 | Loop & Loop Solo toggles | Sticky transport toggles — all zones (or one) loop in sync; release resumes the timeline |
+| 1 | Loop — preset & marker looping | Preset Loop (loops a preset's span) / Loop Solo + marker region looping + loop signs (1-B) + relaxed jumps (1-C) |
 | 2 | 4.6 — Overlap Crossfade | Overlap width between blocks drives the crossfade duration directly |
 | 3 | 4.7 — Undo/Redo | `Ctrl+Z` for the 3 destructive gestures: drag, delete, resize |
 | 4 | 4.9 — Zone Stack | Layered compositing — zone opacity + blend-mode popover, overlay layout |
@@ -71,13 +71,14 @@
 
 ## UX Philosophy — The Complexity Ladder
 
-The timeline strip is always the clean base. No new UI appears unless the user deliberately asks for it. Each layer of depth opens on a gesture and closes cleanly back to the layer before. The strip itself never gets busier.
+The timeline editor is for setting up presets and playing them in the clearest, smartest way — with room to breathe. The timeline strip is always the clean base. No new UI appears unless the user deliberately asks for it. Each layer of depth opens on a gesture and closes cleanly back to the layer before. The strip itself never gets busier.
 
 | Layer | What you see | How you get there |
 |-------|-------------|-------------------|
 | 0 | Full-screen canvas + timeline strip | Default |
-| 1 | Block Modal — controls for one preset | Click a block |
-| 2 | Performance Panel — all active presets, all controls | One button in transport |
+| 1 | Block menu — controls + Loop/Solo/Mute for one preset | Click the block's menu icon |
+
+**There is no Layer 2.** An all-zones, all-controls Performance Panel was considered and **rejected** — too much UI at once. Multiple Layer-1 block menus can be open simultaneously; that *is* the live orchestration console. You open only the channels you're performing — the rest stay clean. See the Backlog "Block Menu Orchestration Console" entry.
 
 **Evaluation rule:** Does the idea add to the strip, or does it live behind a deliberate gesture? If it adds to the strip, the answer is no.
 
@@ -151,34 +152,93 @@ Built in the order of the *Up Next* table. Each entry below carries the same num
 
 ---
 
-### 1 · Loop & Loop Solo Transport Toggles ⬜
+### 1 · Loop — Preset & Marker Looping ⬜
 
-*(specced under Phase 3.5; ships together with Phase 4.10-B — loop state preservation)*
+*(specced under Phase 3.5; ships with Phase 4.10-B — loop state preservation)*
 
-Two sticky toggle buttons in the transport bar. Press to activate, press again to release. Think of them as hold buttons on a DJ mixer — press and forget, release when done. Neither is a hard lock; any deliberate gesture overrides cleanly.
+**Decided 2026-05-15:** preset looping lives in the **block menu** (Loop / Solo toggles) — there are **no transport-bar Loop buttons** (the original transport-toggle design is cancelled). A loop always loops a *section*: a preset's Loop loops its own one-preset span, markers bound a larger multi-preset section. This phase has three parts: the control and its rules (**1-A**), its at-a-glance visibility on the strip (**1-B**), and the relaxed jump crossfade that makes loop release — and every timeline jump — feel smooth (**1-C**).
 
-- **Loop** — while active: all zones loop their currently-playing preset simultaneously, in sync. Release → timeline resumes forward from wherever the loop position is. Every zone and stream output loops together as one.
-- **Loop Solo** — while active: only the zone whose preset was active when the button was pressed loops. All other zones continue their normal timeline progression. Release → that zone rejoins the timeline and continues forward from the current position.
+#### 1-A — Loop control & precedence
 
-**Double-click a block releases all loops.** Double-clicking any block (Phase 4.5 — Cue gesture) releases Loop and Loop Solo, loads the cued preset with a crossfade, and the timeline continues from that block's `startTime`. This is the primary override path.
+**Presets and markers — keep them distinct.** Be careful what a "block" is: a block on the timeline is a **preset**. The timeline has two kinds of thing:
 
-**Other overrides:** scrubbing the ruler, pressing Stop, or pressing a hot-cue key (1–9) also releases all loops and resumes normal playback.
+| Thing | What it is | Its job |
+|---|---|---|
+| **Preset** (block) | One preset placed at a start time | Played, jumped to, or used to define a **one-preset-wide** loop section |
+| **Marker** | A flag on the ruler | Defines a **larger**, custom, multi-preset loop section |
 
-**Toggle UI:** buttons have an `is-looping` / `is-loop-solo` active class. Only one can be active at a time — activating one deactivates the other. Both off = normal playback.
+**A loop always loops a *section* — a time span.** Within the section, all tracks loop together. What changes is the section's width and whether playback is soloed.
+
+**Preset looping (block menu):**
+- **Double-click** a preset → jump to it and play from its start (Phase 4.5 Cue gesture), loaded with a relaxed fade-in (1-C).
+- **Loop** (block menu toggle) → arms a loop whose **section is that one preset's span**. Double-click the armed preset → the playhead loops over that section and **all tracks loop together** within it.
+- **Loop Solo** (Loop + Solo) → jumps to the preset and loops **just that preset** — only the selected preset plays; the other tracks go dark.
+- **Remove the loop** (toggle Loop off) → the playhead continues forward; the rest of the timeline plays on.
+
+**Marker looping:**
+- Markers bound a **larger section** — a custom, multi-preset region. Same all-tracks looping, just a wider span than one preset.
+- Markers are a **live performance instrument** — the VJ adds and removes them as the playhead moves, creating and clearing region loops on the fly. Adding / removing markers IS performance.
+
+The only difference between a preset loop and a marker loop is **what bounds the section** — one preset's span, or a marker region. **Solo** is the modifier that narrows playback to just the selected preset.
+
+> **Simplified 2026-05-15 — what was removed.** Earlier drafts had the block menu do *custom* region looping and "preset-based regions" (contiguous block runs), plus an auto-spend mechanic where a live loop turned markers off as it passed (with spent-marker dimming + re-arming rules). All removed. A preset's Loop only ever loops its own one-preset span; larger regions are markers; conflict is handled by precedence — no auto-spend.
+
+> **Marker looping needs a refinement pass** — Phase 4.1 marker `loop` works but is rough. Tightening it — including live add / remove during playback — is part of 1-A.
+
+**Loop precedence — highest wins:**
+1. **Double-click a preset** — runs it immediately with its armed settings (extends the Phase 4.5 Cue gesture). If Loop is armed, that loop takes over and releases any other loop. The deliberate live override.
+2. **A preset's armed Loop**, reached by normal playback.
+3. **Marker region loop** — lowest priority; overridden by an active preset loop.
+
+**Release a loop:** toggle Loop off in the menu, double-click another preset, scrub the ruler, press Stop, or press a hot-cue key (1–9).
+
+> **Build-time subtlety — a loop wraps the playhead over its section.** Whether the section is one preset's span (preset Loop) or a marker region, the playhead wraps: at the section's out point it returns to the in point. **Loop** keeps all tracks visible and looping; **Loop Solo** wraps the same way but darkens every track except the selected preset. Removing the loop lets the playhead continue past the section.
+
+**No conflict prompts.** When loops could conflict, precedence above decides — silently. Never interrupt a live performance with a "loop conflict" dialog. The answer to "loops are hard" is **making state visible** (see 1-B) — never asking the VJ to resolve anything.
 
 **⚠️ Critical implementation requirement — cancelable loop handle**
 
-Butterchurn `loadPreset` and the CSS cover system both handle rapid switching safely (each new call displaces the last one cleanly). The risk specific to Loop/Loop Solo is the repeat timer: if the loop cycle uses a recursive `setTimeout` and that handle is not tracked and cleared, rapid clicking can leave orphaned loop callbacks firing after the user has already moved on.
+Butterchurn `loadPreset` and the CSS cover system both handle rapid switching safely (each new call displaces the last one cleanly). The risk specific to looping is the repeat timer: if the loop cycle uses a recursive `setTimeout` and that handle is not tracked and cleared, rapid clicking can leave orphaned loop callbacks firing after the user has already moved on.
 
-The loop repeat handle must be:
-- Stored in a dedicated slot (`_loopTimer`, separate from `_zoneTimers` which tracks scheduled block transitions)
-- Cancelled at the top of every override path: toggle off, double-click Cue, hot-cue key, scrub, stop
-- The `_loopZoneId` slot (string for Loop Solo, `null` for Loop-all) must be cleared alongside the timer
+Each zone's loop repeat handle must be:
+- Stored in a dedicated per-zone slot (e.g. `_loopTimers = Map<zoneId, handle>`), separate from `_zoneTimers` which tracks scheduled block transitions
+- Cancelled at the top of every override path for that zone: toggle off, double-click Cue, hot-cue key, scrub, stop
 - Never reused — always assign a fresh handle after clearing the old one
 
 Design the cancel path before writing the repeat logic. Do not patch this after the fact.
 
 **Phase 4.10-B (pairs with this):** refactor `_scrubTo` to accept `{ preserveLoopState }` so a mutation/reschedule during an active loop does not break the loop. See the archived Phase 4.10-A "Interaction with Loop / Loop Solo" section for the full design.
+
+#### 1-B — Loop visibility (clear loop signs)
+
+Loop state must be obvious at a glance — the VJ should never have to guess what is looping. State is shown on the strip, not in text:
+
+- **Active loop** — the looping block glows / slow-pulses; its menu Loop button is lit in the same language. A clear, calm pulse — readable across a room, never a strobe.
+- **Armed but overridden** — a loop that is set but currently outranked by a higher-precedence loop shows a distinct *muted* indicator, so the VJ sees it is armed and waiting, not active.
+- **Idle** — no indicator; the block reads normally.
+- The same visual language is shared with Solo / Mute (Backlog console) so the whole strip becomes one consistent status surface — colors and glow tell the entire story.
+
+**Loop section overlay.** Whenever a loop is running, the looped span gets a translucent color band drawn over the timeline — so the loop reads as a *region*, not just an indicator on one block:
+- **Clear start and stop edges** — the band has distinct in / out caps; the VJ sees exactly where the loop begins and ends.
+- **Controller chip** — the band carries a small chip naming what owns the loop: a **preset** (solo loop) or a **marker** (global loop). The VJ always knows which system is in control.
+- **Scope follows loop type** — a **Loop** band (all tracks) spans every zone row across the section; a **Loop Solo** band covers just the selected preset's block; a marker region band spans every zone row across the region.
+- **Active vs inactive** — an active band is bright; an armed-but-overridden loop band is dimmed, matching the armed-but-overridden language above.
+
+Goal: the VJ controls presets and sees exactly what each one is doing, with ease, just by looking at the strip.
+
+#### 1-C — Relaxed jumps & smooth crossfades
+
+Every timeline *jump* — loop release, double-click Cue, hot-cue key, Set switch — should land in a relaxed, unhurried way, never as a hard snap:
+
+- **Preload & align** — before the jump completes, the destination preset for every zone is loaded and given a frame to render; covers and blend state are aligned so nothing flashes.
+- **Smooth crossfade** — the outgoing visual crossfades into the incoming preset (or set of presets) rather than cutting. Reuses the existing cover / `requestAnimationFrame` discipline (see ⚠️ CRITICAL: Playback & Cover System, Rule 7).
+- **Marker-aware** — the jump respects whatever marker settings apply at the destination (a `stop` / `loop` marker at the landing point is honored).
+- **The loop-release case** — when a looping zone rejoins the timeline, the playhead has moved on; the zone crossfades forward to "now" rather than jump-cutting. This is the real implementation risk of looping — design it here, not as an afterthought.
+- **Live scrub-drag stays instant** — dragging the playhead is a preview gesture and must stay responsive (current behavior). "Relaxed crossfade" applies to discrete jumps, not continuous scrubbing.
+
+Distinct from Phase 4.6 (overlap crossfade between consecutive blocks) — 1-C is about discontinuous seeks, not adjacent-block blends.
+
+**Relationship to the Block Menu Orchestration Console (Backlog):** 1-A adds just the Loop control to the block menu (`#tl-quick-edit`, shipped in Phase 4.4-B). The broader console — menus staying open, Solo, Mute — remains a Backlog item. 1-B's visual language is shared with that console. Loop can ship independently as an addition to the menu that already exists.
 
 ---
 
@@ -676,8 +736,34 @@ One line each. Full implementation detail, post-ship fixes, and edge-case notes 
 
 Unscheduled ideas. Promote to the Roadmap and the *Up Next* table when ready to commit.
 
+### ⭐ Block Menu Orchestration Console *(captured 2026-05-15)*
+
+Reframe the per-block menu (the `#tl-quick-edit` popover opened by the left hamburger icon — Phase 4.4-B) from an "edit" popover into a **live per-preset control surface**. Small or busy blocks have no room for on-block controls; the menu is where controls belong. Kept deliberately small — there are not many controls per preset, and Solo / Loop / Mute read clearly. This is not a "crazy menu" — room to breathe is the point.
+
+- **Menus stay open** — reverse the Phase 4.4-B single-open rule (one menu currently closes any other). Set up several blocks' menus, then perform.
+- **Controls per menu:** Loop, Solo, Mute — alongside the existing Duration / Blend / Label fields. A small, clear set. No separate "Loop Solo" — a per-block Loop is already zone-scoped. Loop itself is specced as Roadmap #1.
+- **Color coding** signals state at a glance: muted = dimmed/desaturated block, solo = bright stroke (a *slow* pulse if any — never a strobe).
+- An explicit **close-all** affordance returns the strip to its clean base.
+
+**Interaction model — set up, then fire:**
+The menu *configures* a block; double-click *executes* it (extends the Phase 4.5 Cue gesture).
+- Click the block's menu icon → menu opens → arm Solo / Loop / etc. for that block.
+- Double-click the block → plays it **with the armed settings**. Go straight to a preset and solo it; or go straight to a preset and play all zones from there.
+- The menu holds the intent; the double-click is the trigger. Setup and execution stay separate gestures.
+
+**Decided — no separate Performance Panel.** An all-zones, all-controls overlay was considered and rejected — too much UI at once. This console *is* the performance surface: open only the block menus you're working, leave the rest clean. (UX Philosophy ladder updated — Layer 2 removed.)
+
+**Decided — Loop is one per-block toggle.** No transport buttons, no separate "Loop Solo." Full loop design and precedence rules: see Roadmap #1.
+
+**Decided — no loop-conflict prompts.** Loop conflicts are resolved silently by precedence (Roadmap #1), never by a mid-performance dialog. The one genuine overlap — a preset loop vs a marker region loop — is settled by precedence (the preset loop wins). The fix for "loops are hard" is **visibility, not prompts** — loop state is shown through the color coding (active loop = pulsing indicator; an armed-but-overridden loop = a distinct muted indicator), so the VJ always sees what won without being asked to decide.
+
+**Open design questions — resolve before building:**
+- **Mute/Solo target** — in a real mixer these act on a *channel* (= a zone here), not a clip. Decide whether a block's Mute/Solo acts on its zone or only that block. Lean: zone-level, block menu as the access point.
+- **Multi-open layout** — floating popovers will overlap on small/close blocks. Needs a docking/tray strategy (e.g. menus drop below their zone row) rather than free-floating popovers.
+- **Persistence** — Loop/Mute/Solo are ephemeral live performance state. They must NOT be saved in the Timeline Set (consistent with "a Set does not contain the playhead position").
+
 *Loop & Regions*
-- **Loop section range on ruler** — drag a range on the ruler to set loop bounds. Playback bounces between in and out points.
+- **Loop region markers** — region looping is bounded by markers (Roadmap 1-A). Possible convenience: drag a range on the ruler to drop an in/out marker pair in one gesture — not a separate system, just a faster way to place the two markers.
 - **Advanced Loop logic** — marker action `loop` jumps to previous loop start rather than `0:00`.
 
 *Live Performance*
@@ -698,8 +784,7 @@ Unscheduled ideas. Promote to the Roadmap and the *Up Next* table when ready to 
 - **Setlist text export** — plain-text or HTML table.
 - **Auto-save behavior** — debounced "draft" slot rather than spawning a new entry per page load.
 
-*Deferred — After Video Processing*
-- **Performance Panel** — a full-width overlay showing every active zone as a flex column, each with its full `controls.js` panel re-targeted to that zone's engine. On a large screen or broadcast rig this becomes a complete mixing desk — every zone, every parameter, all live at once. Columns flex to fill available width; smaller screens scroll horizontally. **Blocked on:** video processing controls being built out first — the panel's value comes from having rich controls to surface. Once those are in place, the panel shell is straightforward (see UX Philosophy Layer 2).
+> *Removed 2026-05-15 — **Performance Panel.** A full-width overlay showing every zone's full `controls.js` panel at once was on the backlog. Cut: too much UI at once, against "room to breathe." Its role is filled by the Block Menu Orchestration Console (above) — progressive, one block menu at a time.*
 
 ---
 
