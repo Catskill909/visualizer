@@ -517,6 +517,17 @@ Older research kept for context. Not actively maintained.
 
 ---
 
-## License
+## Licensing & Commercial Use
 
-MilkDrop is open source under the BSD license. Butterchurn is MIT licensed.
+DiscoCast Visualizer is built entirely on free, open-source technologies that permit commercial distribution and monetization. You are legally cleared to distribute, sell, or monetize this application.
+
+### Core Engine
+- **MilkDrop**: Open source under the BSD License.
+- **Butterchurn**: MIT Licensed.
+- **Vite**: MIT Licensed.
+- **FFmpeg.wasm**: MIT Licensed.
+
+### Advanced 3D & Audio Reactivity (Planned)
+- **Three.js**: MIT Licensed. Free for commercial use.
+- **Meyda**: MIT Licensed. Free for commercial use.
+- **GSAP (GreenSock)**: As of 2025, GSAP is 100% free for commercial use in paid applications. The "Business Green" paywall has been removed. The only restriction is that it cannot be used to build a competing visual website builder.
