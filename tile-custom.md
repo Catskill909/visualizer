@@ -1,6 +1,6 @@
 # Tile Custom — Tiling Enhancement Audit & Phased Dev Plan
 
-**Last updated:** 2026-05-16 — Phase 2.5 ✅ scatter sampling (free jitter + tile overlap)
+**Last updated:** 2026-05-16 — Phase 3 ✅ shipped & verified — explicit Grid mode (Cols×Rows, Fit/Fill, Grid Scale)
 **Scope:** Image and GIF layers in Preset Studio. Videos stay single-instance.
 **Audience:** Anyone implementing this — including a future developer joining cold. §12 is the handoff reference.
 
@@ -8,8 +8,8 @@
 
 ## 🎯 Status Dashboard
 
-**Current state:** Phase 2 ✅ + Phase 2.5 ✅ Shipped 2026-05-16. Variance Suite live: Size Var / Jitter X / Jitter Y / Opacity Var / Phase Var (Tunnel section) / Seed + Lock. Phase 2.5 added scatter sampling — jitter now moves tiles freely with overlap (no cropping container). Speed Var + Direction Var deferred (tunnel architecture work needed — see §4 notes).
-**Next action:** Phase 3 — Density/Grid mode + cell picker + override map + Cascade. Spec at §5. Open follow-ups from Phase 2.5: tunnel + free-jitter, and texture-resample FX (chromatic/blur/sobel/wave/pixelate) composing with scatter.
+**Current state:** Phases 1 / 2 / 2.5 / 3 ✅ all shipped 2026-05-16. Variance Suite: Size Var / Jitter X/Y / Opacity Var / Phase Var / Seed + Lock. Scatter sampling: jitter moves tiles freely with overlap. **Grid mode: Density/Grid toggle, explicit Cols×Rows, Fill/Fit, Grid Scale (0.1–3×); Pulse/Strobe react in Grid mode. All verified in browser.** Speed Var + Direction Var deferred (tunnel architecture work — Phase 3.2).
+**Next action:** Phase 3.2 — Tunnel ↔ Scatter convergence (free-jitter in tunnel + Speed/Direction Var) and Phase 3.3 — Scatter-mode FX parity — both §5.9. Phase 3.5 (per-cell override editor) optional, build on demand only.
 
 ### Phase status
 
@@ -18,14 +18,28 @@
 | [1](#3-phase-1--structural-per-cell-wins) | Brick offset · cell rotate · popcorn | ✅ Shipped | 2026-05-15 | 1 day |
 | [2](#4-phase-2--procedural-variance-suite) | Variance suite + per-layer seed (Speed/Dir Var deferred) | ✅ Shipped | 2026-05-16 | 1 day |
 | 2.5 | Scatter sampling — free jitter + tile overlap (3×3 neighbour accumulation) | ✅ Shipped | 2026-05-16 | 1 day |
-| [3](#5-phase-3--explicit-grid--per-cell-editor-the-replicator) | Density/Grid mode + cell picker + override map + Cascade | 📋 Planned | — | ~1 week |
-| [3.1](#11-build-order-summary) | Drag-multi-select in picker | 📋 Future | — | ~3 days |
+| [3](#5-phase-3--explicit-grid-mode) | Explicit Grid mode — Density/Grid toggle, Cols×Rows, Fit/Fill, Grid Scale | ✅ Shipped | 2026-05-16 | 1 day |
+| [3.2](#59-phase-25-scatter--composition-with-phase-3-and-the-deferred-differentials) | Tunnel ↔ Scatter convergence — free-jitter in tunnel + Speed/Direction Var (per-cell `_tz`) | 📋 Planned | — | ~3 days |
+| [3.3](#59-phase-25-scatter--composition-with-phase-3-and-the-deferred-differentials) | Scatter-mode FX parity — chromatic / blur / sobel / wave / pixelate compose inside the scatter loop | 📋 Planned | — | ~2 days |
+| [3.5](#58-phase-35--per-cell-override-editor-deferred-optional) | Per-cell override editor — picker widget + override map + Cascade (includes drag-multi-select) | 📋 Optional | — | ~4–5 days |
 | [4](#103-recursive--nested-grids--phase-4-placeholder) | Recursive / nested grids (pure 2D) | 📋 Deferred | — | TBD |
 | [5](#105-phase-5--25d-parallax-camera-pure-2d) | 2.5D parallax camera (pure 2D) | 📋 Deferred | — | ~5 days |
 
 Legend: 📋 Planned · 🔨 In progress · ✅ Shipped · 🛑 Blocked · 🐛 Bug
 
 ### Most recent change
+
+`2026-05-16` — **Phase 3 ✅ shipped & verified.** Grid mode confirmed working in-browser across the slider suite — Density/Grid toggle, Cols×Rows steppers, Fill/Fit, Grid Scale (0.1–3× — margin below 1, zoom-in above), Pulse/Strobe reacting, per-cell effects + jitter/scatter composing. Propagated to README, the in-app help modal, and the promo page. Phase 3 closed; next is the deferred-differential phases 3.2 / 3.3.
+
+`2026-05-16` — **Phase 3 fix — Pulse / Strobe now react in Grid mode.** Test feedback: audio-reactive Pulse and Strobe did nothing in Grid mode. Cause: both modulate only `sizeBase`, which is the *density* divisor (`_u /= sizeBase`) — the Grid branch maps by `Cols×Rows` and never touched it. Fix: extracted the audio modulation factor (`pulseFactor` = `sizeBase` without the base `sz`) and folded it into the grid scale divisor, so the grid zooms/strobes on the beat exactly as the density field does. `pulseFactor` = 1.0 when Pulse = 0 and no Strobe → no-op. Divisor clamped `max(…, 0.05)` against inverted-pulse div-by-zero. Beat Fade (`opacityPulse`) was already mode-independent (routes through the final `_op` blend) — unaffected.
+
+`2026-05-16` — **Phase 3 — Grid Scale slider added (0.1–3.0).** First test feedback: hiding Size in Grid mode removed the ability to scale the *whole grid*. Fix: new `tileGridScale` field (default 1.0) + a "Scale" slider shown in Grid mode. Shader divides `_u` by the scale before the `Cols×Rows` map: below 1.0 the grid shrinks toward centre (out-of-grid mask turns the freed border transparent); above 1.0 the grid is larger than the canvas — a zoom-in with edge cells cropped (for pushing into mirror/kaleidoscope patterns). Range raised to 3.0 after a second test note. Default 1.0 → backward compatible. Slider added to `sliderExclude`.
+
+`2026-05-16` — **Phase 3 code in — Grid mode (verifying in browser).** Explicit `Cols×Rows` grid as an alternative to density tiling. 4 fields (`tileMode`/`tileCols`/`tileRows`/`tileFit`) added to image template, text template, `_normalizeImageEntry`. Shader: `applyTileUV` and `buildScatterSample` each gained a `useGrid` branch — grid maps the canvas to `Cols×Rows` cells once (`_gu = (_u+0.5)*vec2(C,R)`), no `fract`-wrap; out-of-grid fragments masked transparent; `_cellId` clamped to grid bounds; the scatter neighbour scan drops cells outside the grid. Fit mode letterboxes the image into each cell (`_cellAR = aspect.y*Rows/Cols`). `useGrid` gated `!hasTunnel` (grid inert under tunnel — §5.6) and skips `aspectPreScale`. UI: Density/Grid segmented toggle + Cols/Rows integer steppers + Fill/Fit toggle in `_mountLayerCard`; Size slider hidden in Grid mode, Width/Height hidden in Grid mode (§5.6 decision — Cols:Rows ratio is the grid's shape control). Steppers are `type="number"` → no `sliderExclude` touch. `node --check` clean; **pending in-browser GLSL verification before propagating to user-facing docs.**
+
+`2026-05-16` — **Phase 3 spec reworked — Grid mode only; per-cell editor → optional Phase 3.5.** Phase 3 originally bundled Grid mode *and* an explicit per-cell override editor (picker widget + `tileOverrides` map). Split: **Phase 3 = Grid mode only** (~2–3 days — `density|grid` toggle, `Cols×Rows`, `Fit/Fill`); the **per-cell override editor is now optional Phase 3.5**, built only on real beta-user demand. Rationale (§5.0): DiscoCast is a live audio-reactive VJ tool — the procedural per-cell variance from Phases 1/2/2.5 already delivers per-cell creativity (infinite, reactive, generative), whereas the override editor is a *compositional* tool producing static authored layouts, doesn't scale past a handful of cells, and is the heaviest footgun surface in the codebase. Grid mode is a cheap layout primitive that makes the procedural system *easier* to use. §5 fully rewritten (5.0 scope decision · 5.1–5.6 Grid mode · 5.7 Tunnel · 5.8 the preserved Phase 3.5 editor spec). Phase table, §6 diagram, §11 build order, §7.1 schema, §9 Q2–Q4 all reconciled; old standalone Phase 3.1 (drag-multi-select) folded into 3.5.
+
+`2026-05-16` — **Phase 3 code audit + differential scheduling.** Audited the §5 spec against live `inspector.js`. Three spec gaps the build must close, recorded in new **§5.9.1**: grid-mode UV path (per-axis Cols/Rows divisor, finite non-repeating mapping, threads through `applyTileUV` *and* `buildScatterSample`), `_cellId` array-index clamping, and the scatter × grid interaction (the §5 spec predates Phase 2.5). Green-lit: override-map persistence (`deepClone` JSON round-trip clones nested objects safely through undo/save/export), the `.xy-pad` widget as the cell-picker template, the baked `vec4` array. The deferred Phase 2/2.5 differentials are now scheduled phases — **3.2** Tunnel ↔ Scatter convergence (free-jitter in tunnel + Speed/Direction Var) and **3.3** Scatter-mode FX parity — see §5.9.2–5.9.3. §12.1 handoff line numbers refreshed (all drifted after Phase 2/2.5; `_layerCardHtml`/`_bindLayerCard` corrected to the single real method `_mountLayerCard`).
 
 `2026-05-16` — **Phase 2.5: scatter sampling — the architectural fix for jitter cropping.** Every prior jitter fix failed because the bug was architectural, not UV math. `applyTileUV` does `_u = fract(_u + 0.5)`, which collapses each pixel into its own cell's `[0,1]` box; the texture is sampled exactly once, from that cell only. A tile physically *cannot* draw into a neighbour's pixels — so jitter could only ever slide a crop around inside the box (the "container" the user kept hitting). **Fix:** a new `buildScatterSample()` renderer. Each fragment scans the 3×3 block of cells around it; for every neighbour it computes that cell's jittered/scaled/rotated placement and composites the tile where the fragment lands inside it. Tiles now move freely past cell edges and **overlap** each other — true replicator behaviour, no cropping container. Gated by `useScatter` = jitter active + tile layer + non-video + non-tunnel; every other preset keeps the untouched `fract()` path (zero regression). All per-cell effects (size/depth/rotation/popcorn/opacity/spacing/radius/mirror) compose inside the loop. **v1 deferrals (documented, not silent):** tunnel + free-jitter, and texture-resample FX (chromatic/blur/sobel/wave/pixelate) are disabled when scatter is active — they assume a single `_u`. Depth Var is zoom-out-only in scatter mode (keeps every footprint ≤ 1 cell so 3×3 always suffices).
 
@@ -92,7 +106,7 @@ Tiers stack: Tier C's "Randomize all" seeds the override array using Tier B vari
 
 ### 2.1 Shader math (the tile pipeline)
 
-Tiling lives in the comp shader generated by `_buildImageBlock()` per layer. The relevant helper is `applyTileUV()` at [inspector.js:5684](src/editor/inspector.js#L5684):
+Tiling lives in the comp shader generated by `_buildImageBlock()` per layer. The relevant helper is `applyTileUV()` at [inspector.js:5979](src/editor/inspector.js#L5979) (line numbers current as of the 2026-05-16 audit):
 
 ```
 _u.x *= aspect.y;            // un-stretch to square space
@@ -252,120 +266,100 @@ Tunnel variances appear inside the Tunnel section, not here (§5.7).
 
 ---
 
-## 5. Phase 3 — Explicit grid + per-cell editor (the replicator)
+## 5. Phase 3 — Explicit grid mode
 
-**Goal:** every cell individually addressable.
-**Build estimate:** ~1 week.
+**Goal:** an explicit `Cols × Rows` grid as an alternative to density-driven tiling.
+**Build estimate:** ~2–3 days.
 
-### 5.0 Composition with Phase 1 / 2
+### 5.0 Scope decision — Grid mode only (locked 2026-05-16)
 
-**All Phase 1 + 2 Per-Cell controls remain active in Grid mode.** Phase 3 doesn't replace the procedural foundation; it adds an explicit override layer on top.
+Phase 3 as first specced bundled two features: **Grid mode** (an explicit cell count) and a **per-cell override editor** (picker widget + hand-pinned `tileOverrides` map). They are now split:
 
-The cell index (`_cellId`) shipped in Phase 1 is what every per-cell effect hashes from. In Grid mode, `_cellId` is still derived — just from explicit `(col, row)` instead of density-driven `floor()`. So in a 2×4 grid:
+- **Phase 3 = Grid mode only.** Bounded (~2–3 days), pure upside, no new UX paradigm.
+- **Phase 3.5 = per-cell override editor** — *optional and deferred*; build only if real beta users ask for hand-authored cell control. Full spec preserved at §5.8.
 
-- **Offset / Cell Rotate / Popcorn** (Phase 1) — each of the 8 cells still picks up its own hashed offset, rotation, and beat phase.
-- **Size / Jitter / Opacity / Tunnel variances** (Phase 2) — same; each cell deviates per-axis as before.
-- **Per-cell overrides** (Phase 3, new) — click any specific cell in the picker and pin its size / depth / rotation / opacity / offset. The override wins where set; the Phase 1/2 hash drives every other cell.
+**Rationale.** DiscoCast is a live, audio-reactive VJ tool. The procedural per-cell variance shipped in Phases 1 / 2 / 2.5 — Size / Jitter / Rotate / Opacity / Popcorn, scatter overlap, seed control — *already* delivers per-cell creative variety: infinite, reactive, generative. You move a slider, the system surprises you. The override editor is a *compositional* tool (hand-pin cell 5 large, rotate cell 8): it produces a **static authored layout** that does not react, does not scale past a handful of cells, and is the heaviest footgun surface in the codebase (canvas picker, sparse map, `sliderExclude` dodging, baked `vec4` array). It competes with the procedural system rather than complementing a live tool. Grid mode, by contrast, is a cheap layout primitive that makes the procedural variance *easier* to use — a known, explicit cell count to reason about.
 
-**Composition stack for any given cell's rotation:**
+### 5.1 What Grid mode is
 
-```
-final_angle = Spin (animated)
-            + Angle (static)
-            + Group Spin (whole-grid layout, if on)
-            + Cell Rotate hash      (Phase 1)
-            + this cell's override.rotation, if set  (Phase 3)
-```
-
-Each stage is additive. Procedural sets the baseline; explicit pins specifics. "Randomize all" (§5.6) is the bridge — it seeds the override map from the current Phase 2 variance values, giving you an editable starting point.
-
-### 5.1 Tile mode toggle
+A new tile-mode toggle on every tiled image / GIF / text layer:
 
 ```
 Mode   [ Density · Grid ]
 ```
 
-- **Density** (current): Size slider drives count. Default for new layers.
-- **Grid** (new): `Cols` × `Rows` integer steppers. Cells exactly fill the canvas.
+- **Density** (current behaviour): the Size slider drives cell count. Default for every new layer — and every existing preset stays here, byte-for-byte unchanged.
+- **Grid** (new): explicit `Cols` × `Rows` integer steppers. The cells exactly fill the canvas, once — no density math, no partial cells bleeding off the edge.
 
-In Grid mode, an additional toggle:
-
-```
-Fit    [ Fit · Fill ]
-```
-
-- **Fit**: image aspect preserved, transparent padding if cell mismatches
-- **Fill**: image stretches to cell shape (default — matches existing `tileScaleX/Y` behaviour)
-
-### 5.2 Default grid count (resolved Q2)
-
-**3 × 3 = 9 cells.** Reads instantly as "a real grid"; 2×2 reads as "I broke the tile."
-
-### 5.3 Mini cell-picker widget (inline, not modal)
-
-Canvas widget similar to existing XY pad at [inspector.js:3258](src/editor/inspector.js#L3258). Single-click to select for editing. Drag-multi-select is a Phase 3.1 follow-up.
+Grid mode adds a fit toggle:
 
 ```
-┌───┬───┬───┐
-│ 1 │ 2 │ 3 │
-├───┼───┼───┤
-│ 4 │ ● │ 6 │     ← cell 5 selected
-├───┼───┼───┤
-│ 7 │ 8 │ 9 │
-└───┴───┴───┘
-
-Selected cell: 5
-  Size       ──◯──   0.85   [Reset]
-  Depth      ──◯──   0.30   [Reset]
-  Rotation   ──◯──   45°    [Reset]
-  Opacity    ──◯──   0.60   [Reset]
-  Offset X   ──◯──   0.10   [Reset]
-  Offset Y   ──◯──   0.00   [Reset]
-
-  [ Randomize all ]  [ Reset all ]
+Fit    [ Fill · Fit ]
 ```
 
-Cells with non-default overrides show a small dot or coloured border.
+- **Fill** (default): the image stretches to the cell's shape — matches today's `tileScaleX/Y` behaviour, so switching Density→Grid at Fill is visually continuous.
+- **Fit**: the image's aspect ratio is preserved; transparent padding fills any mismatch between image aspect and cell aspect.
 
-### 5.4 Storage model (resolved Q3)
+**Default grid: 3 × 3** (resolved Q2 — reads instantly as "a grid"; 2×2 reads as a broken tile).
 
-**Sparse override map**, comma-separated keys (locked for 3D / recursive forward-compat — §10).
+### 5.2 Composition with Phases 1 / 2 / 2.5
+
+Grid mode changes only *how the cell index is derived* — never what happens per cell. Today `_cellId = floor(_u + 0.5)` is produced by density tiling; in Grid mode it is produced by the explicit `Cols × Rows`. Everything downstream is untouched:
+
+- **Offset / Cell Rotate / Popcorn** (Phase 1) — each cell still hashes its own id.
+- **Size / Jitter / Opacity / Depth variance** (Phase 2) — same per-cell deviation.
+- **Scatter** (Phase 2.5) — jittered tiles still move freely + overlap; the finite grid just needs the 3×3 neighbour scan clamped to grid bounds (see §5.9.1).
+
+`_cellId` remains the single isolated foundation (§2.1) — Grid mode is simply a second way to compute it, and a 3D analogue can substitute later (§10.2).
+
+### 5.3 Grid-mode shader path
+
+Density mode divides by one uniform factor (`_u /= sizeBase`) and `fract`-wraps → an infinite repeat. Grid mode needs two changes:
+
+- **Per-axis divisor** — split the field into exactly `Cols × Rows` cells.
+- **Finite mapping** — fragments outside the `Cols × Rows` block are not drawn; the grid fills the canvas once, with no wrap.
+
+This threads through **both** render paths: `applyTileUV` (the `fract` path) and `buildScatterSample` (the scatter path). `_cellId` must be clamped to `0 .. Cols-1` × `0 .. Rows-1`. These are the audit gaps recorded in §5.9.1 — close them as part of the Phase 3 build.
+
+### 5.4 Schema additions
+
+| Field | Default | Notes |
+|---|---|---|
+| `tileMode` | `'density'` | `'density'` \| `'grid'` |
+| `tileCols` | `3` | Grid mode only, integer 1–16 |
+| `tileRows` | `3` | Grid mode only, integer 1–16 |
+| `tileFit` | `'fill'` | `'fill'` \| `'fit'` |
+| `tileGridScale` | `1.0` | Grid mode only — 0.1–3.0; overall grid scale (1 = fills canvas, <1 = centred with margin, >1 = zoom in / edge cells cropped) |
+
+All additive and optional — every read site uses `?? default`, so old presets load identically (no `tileMode` → `'density'`). `schemaVersion` does not bump. Added to the image template, the text template, and `_normalizeImageEntry` (§12.2 checklist).
+
+### 5.5 Grid-mode UI
+
+Inside the existing Tiling section, visible only when `Tile = on`:
 
 ```
-tileOverrides: {
-  "0,0": { size: 0.85, depth: 0.3 },
-  "1,2": { rotation: 45, opacity: 0.6 }
-}
+─── Tiling ───────────────────────
+  Tile   [✓]
+  Mode   [ Density · Grid ]
+
+   (Grid mode only)
+   Cols  [  3  ]
+   Rows  [  3  ]
+   Scale  ──◯──  1.00
+   Fit   [ Fill · Fit ]
+
+  Spacing, Width, Height … (existing controls)
+  Per-Cell section (Phase 1 / 2 variance)
+  Tunnel section (§5.7)
 ```
 
-Only edited cells stored. "Reset cell" deletes a key. Orphans (after grid resize) dropped at render time.
+`Cols` / `Rows` are integer steppers (1–16). **Scale** (0.1–3.0) zooms the whole grid: below 1.0 it sits smaller, centred, with transparent margin (need not touch the canvas edges); above 1.0 the grid is larger than the canvas — a zoom-in, with edge cells cropped (great for pushing into a mirrored/kaleidoscope pattern). The Density-mode Size slider is hidden in Grid mode (cell count is explicit; Scale replaces its overall-zoom role). Spacing, the Per-Cell variance section, and the Tunnel section all stay live in both modes.
 
-### 5.5 Shader path
+### 5.6 Resolved decisions for the Phase 3 build
 
-Override values bake into the shader at compile time as a `vec4` array (matches existing pattern in [inspector.js:5411](src/editor/inspector.js#L5411)):
-
-```
-const vec4 _cellOverrides[9] = vec4[9](
-  vec4(1.0, 0.0, 0.0, 1.0),    // size, depth, rot, opacity for cell 0
-  vec4(0.85, 0.3, 0.0, 1.0),   // cell 1
-  ...
-);
-int _cellIdx = int(_cellId.y) * COLS + int(_cellId.x);
-vec4 _ovr = _cellOverrides[_cellIdx];
-```
-
-**Hard cap: 8 × 8 = 64 cells.**
-
-### 5.6 "Randomize all" — bridging Phase 2 and Phase 3
-
-Populates `tileOverrides` using Phase 2 variance values as seeds.
-
-Workflow:
-1. User sets variance amounts in Phase 2 sliders
-2. Clicks "Randomize all"
-3. Override map populates with hash-derived values matching those variance amounts
-4. User edits specific cells manually from there
-5. Saves — preset stores procedural-style overrides + manual tweaks together
+- **Grid mode vs Width / Height (`tileScaleX/Y`)** → **hidden in Grid mode** (locked 2026-05-16). The grid UV path ignores `tileScaleX/Y`; the sliders are hidden when `tileMode = 'grid'`. The stored values persist (dormant) so switching back to Density restores them. Rationale: in Grid mode the **Cols:Rows ratio is the cell-shape control** (6×2 = wide cells, 2×6 = tall) — Width/Height only exist because Density mode has no explicit count to derive shape from. Each mode then tells one clear aspect story: Density = Size + Width/Height; Grid = Cols/Rows + Fit/Fill.
+- **Grid + Tunnel** → **Grid mode is inert when Tunnel is active** (locked 2026-05-16). Tunnel needs an infinite repeat to zoom through; a finite grid that fills the canvas once cannot tunnel. With `tunnelSpeed ≠ 0` the layer stays density-tiled and the Grid toggle has no effect. Documented limitation — keeps Phase 3 bounded.
+- **`_cellId` clamp + scatter bounds** — not optional; the §5.9.1 audit items are mandatory parts of the Phase 3 build.
 
 ### 5.7 Tile Tunnel extensions
 
@@ -375,68 +369,92 @@ The existing Tunnel system was designed for Tier A. For Tier B/C it's insufficie
 
 | Control | What it does | Phase |
 |---|---|---|
-| **Speed Var** (0–1) | Each cell zooms at `tunnelSpeed * (1 + hash * variance)` | 2 |
-| **Direction Var** (0–1) | Probability each cell flips zoom direction | 2 |
-| **Tunnel Phase Var** (0–1) | Per-cell phase in cycle (the dual-behaviour from §4.2) | 2 |
-| **Cascade Mode** [Off · Radial · Linear] | Tunnel wave radiates from a centre cell on beat | 3 |
-| **Cascade Centre** (cell picker) | Origin cell for radial wave | 3 |
+| **Tunnel Phase Var** (0–1) | Per-cell phase in cycle (the dual-behaviour from §4.2) | ✅ 2 (shipped) |
+| **Speed Var** (0–1) | Each cell zooms at `tunnelSpeed * (1 + hash * variance)` | 3.2 |
+| **Direction Var** (0–1) | Probability each cell flips zoom direction | 3.2 |
+| **Cascade Mode** [Off · Radial · Linear] | Tunnel wave radiates from a centre cell on beat | 3.5 |
+| **Cascade Centre** (cell picker) | Origin cell for radial wave | 3.5 |
 
-Cascade is Phase 3 because it needs the picker to pick the centre.
+Speed/Direction Var are the deferred Phase 2 differentials — now Phase 3.2 (§5.9.2). Cascade needs the cell picker, so it ships with the optional per-cell editor (Phase 3.5, §5.8).
 
-**Tunnel section UI when `Tile=on`:**
+### 5.8 Phase 3.5 — Per-cell override editor (deferred, optional)
 
-```
-─── Tunnel ──────────────────────
-  Speed          ──◯──   1.20
-  Depth (layer)  ──◯──   0.30        ← existing per-layer phase offset
+**Status:** 📋 optional. Build only on real beta-user demand for hand-authored cell control — see the §5.0 rationale. Spec preserved here so it is ready if scheduled. Requires Grid mode (Phase 3) as a prerequisite.
 
-  (Tile-gated)
-  Speed Var      ──◯──   0.00        ← Phase 2
-  Direction Var  ──◯──   0.00        ← Phase 2
-  Phase Var      ──◯──   0.00        ← Phase 2
-  Cascade        [Off · Radial · Linear]                ← Phase 3
-   ↳ Centre: cell ●        ← Phase 3 (visible when Cascade ≠ Off)
-```
-
-### 5.8 Phase 3 UI
+**5.8.1 Cell-picker widget** — an inline canvas widget (the `.xy-pad` pattern at [inspector.js:5160](src/editor/inspector.js#L5160) is the direct template: `<canvas>`, a `drawPad()` redraw, click → mutate → `refresh()`). Single-click selects a cell; drag-multi-select is a sub-follow-up within this phase. Cells with overrides show a dot. Selected-cell is editor-local UI state — **not** part of `currentState`, never saved.
 
 ```
-─── Tiling ───────────────────────
-  Tile   [✓]
-  Mode   [ Density · Grid ]
-
-   (Grid mode only)
-   Cols  [  3  ]
-   Rows  [  3  ]              ┌──────────────┐
-   Fit   [ Fit · Fill ]       │ ┌──┬──┬──┐  │
-                              │ ├──┼──┼──┤  │      ← live picker widget
-                              │ │  │● │  │  │
-                              │ └──┴──┴──┘  │
-                              └──────────────┘
-
-  Selected cell: 5
-   Size  Depth  Rotation  Opacity  Offset X  Offset Y    [Reset]
-
-  [ Randomize all ]  [ Reset all ]
-
-  Spacing, Width, Height, etc. (existing controls)
-  Per-Cell variance section (Phase 1 / 2)
-  Tunnel section (with §5.7 extensions)
+┌───┬───┬───┐     Selected cell: 5
+│ 1 │ 2 │ 3 │       Size · Depth · Rotation · Opacity · Offset X/Y   [Reset]
+├───┼───┼───┤       [ Randomize all ]   [ Reset all ]
+│ 4 │ ● │ 6 │
+├───┼───┼───┤     Picker sliders use a class OUTSIDE the sliderExclude
+│ 7 │ 8 │ 9 │     positional chain (§5.9.1 / §12.4 footgun).
+└───┴───┴───┘
 ```
+
+**5.8.2 Storage** — sparse override map, comma-keyed (locked for 3D / recursive forward-compat, §7.2):
+
+```
+tileOverrides: { "0,0": { size: 0.85, depth: 0.3 }, "1,2": { rotation: 45 } }
+```
+
+Only edited cells stored. "Reset cell" deletes a key. Orphans (after a grid resize) dropped at render time. Audit-confirmed: a plain object deep-clones safely through undo / save / export (`deepClone` is a JSON round-trip).
+
+**5.8.3 Shader path** — override values bake at compile time into a `vec4` array, indexed by the clamped `_cellId`:
+
+```
+const vec4 _cellOverrides[9] = vec4[9]( vec4(1.0,0.0,0.0,1.0), … );
+int _cellIdx = clamp(int(_cellId.y)*COLS + int(_cellId.x), 0, N-1);
+vec4 _ovr = _cellOverrides[_cellIdx];
+```
+
+**Hard cap: 8 × 8 = 64 cells.**
+
+**5.8.4 "Randomize all"** — the bridge from procedural to explicit: populates `tileOverrides` from the current Phase 2 variance-slider values, giving an editable starting point rather than a blank grid.
+
+**Composition** — overrides are additive on top of the procedural baseline; e.g. a cell's final rotation = Spin + Angle + Group Spin + Cell Rotate hash + `override.rotation` (if set).
+
+---
+
+## 5.9 Phase 2.5 scatter — composition with Phase 3, and the deferred differentials
+
+Phase 2.5 shipped the **scatter renderer** (`buildScatterSample`) after the original §5 spec was written. This section records the audit findings the Phase 3 build must close, and the deferred items now scheduled as **Phase 3.2 / 3.3**.
+
+### 5.9.1 Audit findings — spec gaps the Phase 3 build must close
+
+Code audit 2026-05-16 against the live `inspector.js`. Three real gaps in the §5 spec:
+
+1. **Grid-mode UV path.** Density mode uses a single uniform divisor `_u /= sizeBase`. Grid mode needs a per-axis `Cols`/`Rows` divisor with a *finite, non-repeating* mapping (cells fill the canvas once — no `fract` wrap). It must thread through **both** `applyTileUV` and `buildScatterSample`.
+2. **`_cellId` range clamp.** In a finite grid, `_cellId` must be clamped to `0..Cols-1` × `0..Rows-1` — both to keep per-cell hashing stable at the edges and (for Phase 3.5) so the override-array index `int(_cellId.y)*COLS + int(_cellId.x)` never reads out of range.
+3. **Scatter × Grid interaction.** `buildScatterSample` scans an *infinite* 3×3 neighbour block; Grid mode is *finite*. With jitter on in Grid mode the scan references cells outside `[0,COLS)×[0,ROWS)`. The build must clamp the neighbour scan to grid bounds.
+
+One decision to lock before the Phase 3 build: Grid mode vs `tileScaleX/Y` (Width/Height) — coexist or hide (§5.6). And a standing note for *if* Phase 3.5 is built — its per-cell picker sliders must use a class **outside** the `sliderExclude` positional chain (the #1 codebase footgun, §12.4).
+
+### 5.9.2 Phase 3.2 — Tunnel ↔ Scatter convergence
+
+Bundles the two tunnel-coupled differentials, which share one prerequisite — restructuring the tunnel crossfade so per-cell zoom factors can be computed inside `applyTileUV` / the scatter loop:
+
+- **Free-jitter in tunnel mode** — scatter currently gates off when `hasTunnel` (`useScatter` excludes tunnel). Tunnel jitter still uses the old object-space clamp, so it crops. Converging the two renderers lets jittered tiles move freely + overlap inside the tunnel too.
+- **Speed Var + Direction Var** (the Phase 2 deferral, §5.7) — per-cell `_tz` (tunnel zoom factor): each cell zooms at its own speed / can flip direction. Currently `_tz1`/`_tz2` are baked as pre-computed GLSL string expressions before the call; per-cell values require the crossfade restructured.
+
+### 5.9.3 Phase 3.3 — Scatter-mode FX parity
+
+In scatter mode the texture-resample effects — **chromatic aberration, blur, Sobel/edge, wave distort, pixelate** — are disabled (`&& !useScatter`), because they assume a single post-`fract` `_u` that scatter doesn't produce. Phase 3.3 moves these inside the scatter loop so they compose per-neighbour. Lower priority — these are exotic effect combinations.
 
 ---
 
 ## 6. Phase ordering & dependencies
 
 ```
-Phase 1 ──► Phase 2 ──► Phase 3 ──► Phase 3.1 ──► Phase 4 ──► Phase 5
-(struct)   (procedural) (replicator) (multi-sel)  (recursive) (2.5D pan)
- 1 day      2 days       ~1 week     ~3 days      deferred    deferred
+Phase 1 ─► 2 ─► 2.5 ─► 3 ─► 3.2 ─► 3.3 ─► [3.5] ─► 4 ─► 5
+(struct)  (var)(scatter)(grid)(tun↔scat)(scatFX)(editor) (recurse)(2.5D)
+ 1d       1d   1d       ~2-3d ~3d       ~2d    optional deferred deferred
 ```
 
-Each phase ships value standalone. `_cellId` from Phase 1 carries forward through every later phase — no throwaway work.
+Phase 3.2 / 3.3 are the deferred differentials from Phases 2 / 2.5 — see §5.9. Phase 3.5 (the per-cell override editor) is **optional** — build on demand only; §5.0 has the rationale. Each phase ships value standalone. `_cellId` from Phase 1 carries forward through every later phase — no throwaway work.
 
-**Likely release split:** Phase 1 + 2 in first release. Phase 3 in first release or shortly after. Phase 3.1, 4, 5 post-first-release.
+**Likely release split:** Phase 1 + 2 + 2.5 in first release. Phase 3 (Grid mode) in first release or shortly after. Phase 3.2 / 3.3 / 4 / 5 post-first-release. Phase 3.5 only if requested.
 
 ---
 
@@ -460,15 +478,16 @@ All new fields default to off / 0 / `'none'`. Existing presets re-hydrate with t
 | 2 | `tileOpacityVariance` | `0` |
 | 2 | `tileVarianceSeed` | `0` |
 | 2 | `tileVarianceSeedLocked` | `true` |
-| 2.5 | `tileTunnelSpeedVariance` | `0` *(deferred — needs tunnel arch change)* |
-| 2.5 | `tileTunnelDirectionVariance` | `0` *(deferred — needs tunnel arch change)* |
+| 3.2 | `tileTunnelSpeedVariance` | `0` *(deferred differential — needs tunnel crossfade restructure; §5.9.2)* |
+| 3.2 | `tileTunnelDirectionVariance` | `0` *(deferred differential — needs tunnel crossfade restructure; §5.9.2)* |
 | 3 | `tileMode` | `'density'` |
 | 3 | `tileCols` | `3` |
 | 3 | `tileRows` | `3` |
 | 3 | `tileFit` | `'fill'` |
-| 3 | `tileOverrides` | `{}` |
-| 3 | `tileCascadeMode` | `'off'` |
-| 3 | `tileCascadeCentre` | `null` |
+| 3 | `tileGridScale` | `1.0` |
+| 3.5 | `tileOverrides` | `{}` *(optional per-cell editor — §5.8)* |
+| 3.5 | `tileCascadeMode` | `'off'` *(optional — ships with the editor)* |
+| 3.5 | `tileCascadeCentre` | `null` *(optional — ships with the editor)* |
 | 5 | `parallaxDepth` | `0` |
 | 5 | `parallaxAmount` | `0` |
 
@@ -497,11 +516,11 @@ Separate future docs:
 
 **Q1. Depth variance — Tunnel-gated or standalone?** → **Both.** Slider behaviour adapts to Tunnel state. Never dead. §4.2.
 
-**Q2. Phase 3 default grid count?** → **3 × 3.** Better first-impression than 2×2. §5.2.
+**Q2. Phase 3 default grid count?** → **3 × 3.** Better first-impression than 2×2. §5.1.
 
-**Q3. Override map vs per-cell layers?** → **Sparse override map**, comma-keyed. §5.4, §7.2.
+**Q3. Override map vs per-cell layers?** → **Sparse override map**, comma-keyed. Now part of the optional Phase 3.5 editor — §5.8, §7.2.
 
-**Q4. Drag-across multi-select in picker?** → **Phase 3.1 follow-up.** Single-click in v1.
+**Q4. Drag-across multi-select in picker?** → folded into **Phase 3.5** (the optional per-cell editor); single-click first, drag-multi-select as a sub-follow-up. §5.8.1.
 
 **Q5. Seed scope?** → **Per-layer.** Each layer has independent randomness. §4.3.
 
@@ -590,13 +609,16 @@ Combined with recursive grids: small camera pans reveal the nested-grid structur
 
 ## 11. Build order summary
 
-1. **Phase 1** — `_cellId` + brick offset + rotation variance + popcorn (1 day)
-2. **Phase 2** — Variance suite + per-layer seed + tunnel-variance trio (2 days)
-3. **Phase 3** — Density/Grid mode + picker + override map + Cascade (~1 week)
-4. **Phase 3.1** — Drag-multi-select in picker (~3 days, post-Phase-3 validation)
-5. **Phase 4** — Recursive grids (deferred; possibly before or after 3D layers ship)
-6. **Phase 5** — 2.5D parallax camera (deferred; pairs with Phase 4)
-7. **Out-of-thread future** — 3D layers, hex / polar topology, multi-image deck, beat shuffle
+1. **Phase 1** — `_cellId` + brick offset + rotation variance + popcorn (1 day) ✅
+2. **Phase 2** — Variance suite + per-layer seed (Speed/Dir Var deferred → 3.2) (1 day) ✅
+3. **Phase 2.5** — Scatter sampling — free jitter + tile overlap (1 day) ✅
+4. **Phase 3** — Explicit Grid mode: Density/Grid toggle + Cols×Rows + Fit/Fill (~2–3 days; §5.1–5.6)
+5. **Phase 3.2** — Tunnel ↔ Scatter convergence: free-jitter in tunnel + Speed/Direction Var, the deferred Phase 2/2.5 differentials (~3 days; §5.9.2)
+6. **Phase 3.3** — Scatter-mode FX parity: chromatic / blur / sobel / wave / pixelate compose inside the scatter loop (~2 days; §5.9.3)
+7. **Phase 3.5** — Per-cell override editor: picker widget + override map + Cascade + drag-multi-select. **Optional** — build on real user demand only (~4–5 days; §5.8)
+8. **Phase 4** — Recursive grids (deferred; possibly before or after 3D layers ship)
+9. **Phase 5** — 2.5D parallax camera (deferred; pairs with Phase 4)
+10. **Out-of-thread future** — 3D layers, hex / polar topology, multi-image deck, beat shuffle
 
 ---
 
@@ -608,17 +630,17 @@ This section is for the developer implementing any phase, including a future con
 
 | Concern | File | Line | Notes |
 |---|---|---|---|
-| Comp shader builder (per-layer) | [src/editor/inspector.js](src/editor/inspector.js) | `_buildCompShader` 5319 | Rebuilds shader from `currentState`. Called on every change to images/sat/hue/solidColor/sceneMirror/paletteOpacity |
-| Image block builder | [src/editor/inspector.js](src/editor/inspector.js) | `_buildImageBlock` 5450 | The big function — generates GLSL per layer. All new Phase 1–3 shader code goes here |
-| Tile UV helper | [src/editor/inspector.js](src/editor/inspector.js) | `applyTileUV` 5684 | Where `_cellId = floor(_u)` foundation lands in Phase 1 |
-| Image layer defaults (new layer) | [src/editor/inspector.js](src/editor/inspector.js) | image template ~2331–2358 | Add every new tile field here |
-| Default normalizer (old preset compat) | [src/editor/inspector.js](src/editor/inspector.js) | `_normalizeImageEntry` 6263 | **CRITICAL**: add every new field to default dict here |
-| Generic slider handler | [src/editor/inspector.js](src/editor/inspector.js) | `sliderExclude` 3882 | **CRITICAL**: every new `.layer-slider-row` slider class MUST be added to this `:not()` chain |
-| Layer card HTML render | [src/editor/inspector.js](src/editor/inspector.js) | `_layerCardHtml` ~3070–3500 | The HTML template for each card. New control rows go here |
-| Layer card event bindings | [src/editor/inspector.js](src/editor/inspector.js) | `_bindLayerCard` ~3650–4000 | Wire up new sliders / toggles here |
-| Save (custom preset) | [src/editor/inspector.js](src/editor/inspector.js) | `saveCurrent` 6234 | Auto-serializes `currentState` — new fields work automatically as long as they live in `currentState` |
-| Load (custom preset) | [src/editor/inspector.js](src/editor/inspector.js) | `loadPresetData` 6345 | Restores `currentState`. Calls `_normalizeImageEntry` per image; relies on it for backwards compat |
-| Undo / redo | [src/editor/inspector.js](src/editor/inspector.js) | `_pushUndoBefore`/`_postSnap` 1380 | Every state-mutating handler must call `_pushUndoBefore()` *and then* `_postSnap()`. 50-deep |
+| Comp shader builder (per-layer) | [src/editor/inspector.js](src/editor/inspector.js) | `_buildCompShader` 5564 | Rebuilds shader from `currentState`. Called on every change to images/sat/hue/solidColor/sceneMirror/paletteOpacity |
+| Image block builder | [src/editor/inspector.js](src/editor/inspector.js) | `_buildImageBlock` 5695 | The big function — generates GLSL per layer. All new Phase 1–3 shader code goes here |
+| Tile UV helper (density `fract` path) | [src/editor/inspector.js](src/editor/inspector.js) | `applyTileUV` 5979 | Where `_cellId = floor(_u + 0.5)` lands. Modifies one `_u` in place |
+| Scatter renderer (Phase 2.5) | [src/editor/inspector.js](src/editor/inspector.js) | `buildScatterSample` 6191 | 3×3 neighbour-accumulation loop; owns its texture sample. Grid mode (Phase 3) must compose with this — §5.9.1 |
+| Image layer defaults (new layer) | [src/editor/inspector.js](src/editor/inspector.js) | image template ~2370–2395 | Add every new tile field here. Text template ~2855–2877 needs the same fields |
+| Default normalizer (old preset compat) | [src/editor/inspector.js](src/editor/inspector.js) | `_normalizeImageEntry` 6800 | **CRITICAL**: add every new field to default dict here |
+| Generic slider handler | [src/editor/inspector.js](src/editor/inspector.js) | `sliderExclude` 4112 | **CRITICAL**: every new `.layer-slider-row` slider class MUST be added to this `:not()` chain. The Phase 3.5 per-cell picker sliders must instead use a class OUTSIDE this chain |
+| Layer card render + event bindings | [src/editor/inspector.js](src/editor/inspector.js) | `_mountLayerCard` 2901 | One method — builds the card HTML template literal AND wires all bindings (~2901–5369). New control rows + listeners go here. (The old `_layerCardHtml`/`_bindLayerCard` split never existed.) |
+| Save (custom preset) | [src/editor/inspector.js](src/editor/inspector.js) | `saveCurrent` 6763 | Auto-serializes `currentState` — new fields (incl. plain-object maps like `tileOverrides`) work automatically as long as they live in `currentState` |
+| Load (custom preset) | [src/editor/inspector.js](src/editor/inspector.js) | `loadPresetData` 6890 | Restores `currentState`. Calls `_normalizeImageEntry` per image; relies on it for backwards compat |
+| Undo / redo | [src/editor/inspector.js](src/editor/inspector.js) | `_snap` 1377 · `_postSnap` 1380 · `_undo` 1402 | Snapshots via `deepClone` (JSON round-trip) — nested objects clone safely. 50-deep |
 | Preset export (bundle) | [src/customPresets.js](src/customPresets.js) | `exportPreset` 236 | Serialises + inlines images as base64. Should "just work" for new fields |
 | Preset import | [src/customPresets.js](src/customPresets.js) | `importPreset` 264 | Re-hydrates. Normalisation happens at load via `_normalizeImageEntry` |
 

@@ -2399,6 +2399,12 @@ export class EditorInspector {
             tileDepthVariance: 0.00,    // per-cell depth scale (tunnel: parallax depth field; no tunnel: static zoom)
             tileVarianceSeed: 0,        // int 0–9999 — shifts all per-cell hash patterns
             tileVarianceSeedLocked: true, // true=seed frozen; false=save bumps seed by 1
+            // Phase 3: Grid mode
+            tileMode: 'density',        // 'density' (Size-driven count) | 'grid' (explicit Cols×Rows)
+            tileCols: 3,                // grid mode: columns (integer ≥ 1)
+            tileRows: 3,                // grid mode: rows (integer ≥ 1)
+            tileFit: 'fill',            // grid mode: 'fill' (stretch to cell) | 'fit' (aspect-preserve + transparent pad)
+            tileGridScale: 1.0,         // grid mode: overall grid scale (1=fills canvas, <1=centered with margin)
         };
         this.currentState.images.push(entry);
 
@@ -2883,6 +2889,12 @@ export class EditorInspector {
             tileDepthVariance: 0.00,
             tileVarianceSeed: 0,
             tileVarianceSeedLocked: true,
+            // Phase 3: Grid mode
+            tileMode: 'density',
+            tileCols: 3,
+            tileRows: 3,
+            tileFit: 'fill',
+            tileGridScale: 1.0,
         };
         this.currentState.images.push(entry);
 
@@ -3153,12 +3165,39 @@ export class EditorInspector {
                 value="${entry.opacity}" style="--pct:${pct(entry.opacity, 0, 1)}">
               <span class="lsv">${entry.opacity.toFixed(2)}</span>
             </div>
-            <div class="layer-slider-row">
+            <div class="layer-slider-row layer-size-row"${entry.tile && entry.type !== 'video' && (entry.tileMode || 'density') === 'grid' ? ' style="display:none"' : ''}>
               <span class="layer-ctrl-label">${entry.type === 'video' ? 'Scale' : 'Size'}</span>
               <input type="range" class="slider layer-size-sl" min="0" max="1" step="0.01"
                 value="${entry.type === 'video' ? Math.sqrt((entry.scale - 0.1) / 1.9).toFixed(3) : Math.sqrt((entry.size - 0.05) / 1.45).toFixed(3)}" style="--pct:${entry.type === 'video' ? (Math.sqrt((entry.scale - 0.1) / 1.9) * 100).toFixed(1) : (Math.sqrt((entry.size - 0.05) / 1.45) * 100).toFixed(1)}%">
               <span class="lsv layer-size-val">${entry.type === 'video' ? entry.scale.toFixed(2) : entry.size.toFixed(2)}</span>
             </div>
+            ${entry.type !== 'video' ? `
+            <div class="layer-row-inline layer-tilemode-row"${entry.tile ? '' : ' style="display:none"'}>
+              <span class="layer-ctrl-label" data-tooltip="Density: Size sets the count. Grid: explicit Cols×Rows">Mode</span>
+              <div class="layer-tilemode-seg" role="group" aria-label="Tile mode">
+                <button class="lseg lseg-tilemode${(entry.tileMode || 'density') === 'density' ? ' active' : ''}" data-tile-mode="density">Density</button>
+                <button class="lseg lseg-tilemode${entry.tileMode === 'grid' ? ' active' : ''}" data-tile-mode="grid">Grid</button>
+              </div>
+            </div>
+            <div class="layer-row-inline layer-grid-row"${entry.tile && (entry.tileMode || 'density') === 'grid' ? '' : ' style="display:none"'}>
+              <span class="layer-ctrl-label">Cols</span>
+              <input type="number" class="layer-grid-cols" min="1" max="16" step="1" value="${entry.tileCols || 3}" style="width:46px">
+              <span class="layer-ctrl-label" style="margin-left:10px">Rows</span>
+              <input type="number" class="layer-grid-rows" min="1" max="16" step="1" value="${entry.tileRows || 3}" style="width:46px">
+            </div>
+            <div class="layer-slider-row layer-grid-row"${entry.tile && (entry.tileMode || 'density') === 'grid' ? '' : ' style="display:none"'}>
+              <span class="layer-ctrl-label" data-tooltip="Scale the whole grid — below 1 = centred with margin, above 1 = zoom in (edge cells cropped)">Scale</span>
+              <input type="range" class="slider layer-gridscale-sl" min="0.1" max="3" step="0.01"
+                value="${entry.tileGridScale !== undefined ? entry.tileGridScale : 1.0}" style="--pct:${pct(entry.tileGridScale !== undefined ? entry.tileGridScale : 1.0, 0.1, 3)}">
+              <span class="lsv layer-gridscale-val">${(entry.tileGridScale !== undefined ? entry.tileGridScale : 1.0).toFixed(2)}</span>
+            </div>
+            <div class="layer-row-inline layer-grid-row"${entry.tile && (entry.tileMode || 'density') === 'grid' ? '' : ' style="display:none"'}>
+              <span class="layer-ctrl-label" data-tooltip="Fill: stretch image to cell. Fit: keep aspect, transparent pad">Fit</span>
+              <div class="layer-tilefit-seg" role="group" aria-label="Fit mode">
+                <button class="lseg lseg-tilefit${(entry.tileFit || 'fill') === 'fill' ? ' active' : ''}" data-tile-fit="fill">Fill</button>
+                <button class="lseg lseg-tilefit${entry.tileFit === 'fit' ? ' active' : ''}" data-tile-fit="fit">Fit</button>
+              </div>
+            </div>` : ''}
             ${entry.type === 'video' ? `
             <div class="layer-slider-row">
               <span class="layer-ctrl-label" data-tooltip="Horizontal scale multiplier">Width</span>
@@ -3185,13 +3224,13 @@ export class EditorInspector {
                 value="${entry.spacing}" style="--pct:${pct(entry.spacing, 0, 0.8)}">
               <span class="lsv layer-spacing-val">${entry.spacing.toFixed(2)}</span>
             </div>
-            <div class="layer-slider-row layer-tile-scale-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
+            <div class="layer-slider-row layer-tile-scale-row"${entry.tile && entry.type !== 'video' && (entry.tileMode || 'density') !== 'grid' ? '' : ' style="display:none"'}>
               <span class="layer-ctrl-label">Width</span>
               <input type="range" class="slider layer-tile-sx-sl" min="0" max="1" step="0.01"
                 value="${Math.sqrt((entry.tileScaleX - 0.25) / 3.75).toFixed(3)}" style="--pct:${(Math.sqrt((entry.tileScaleX - 0.25) / 3.75) * 100).toFixed(1)}%">
               <span class="lsv layer-tile-sx-val">${entry.tileScaleX.toFixed(2)}</span>
             </div>
-            <div class="layer-slider-row layer-tile-scale-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
+            <div class="layer-slider-row layer-tile-scale-row"${entry.tile && entry.type !== 'video' && (entry.tileMode || 'density') !== 'grid' ? '' : ' style="display:none"'}>
               <span class="layer-ctrl-label">Height</span>
               <input type="range" class="slider layer-tile-sy-sl" min="0" max="1" step="0.01"
                 value="${Math.sqrt((entry.tileScaleY - 0.25) / 3.75).toFixed(3)}" style="--pct:${(Math.sqrt((entry.tileScaleY - 0.25) / 3.75) * 100).toFixed(1)}%">
@@ -3815,19 +3854,82 @@ export class EditorInspector {
             }
         };
 
+        // Phase 3: Grid-mode row visibility — Mode toggle (tile on), Cols/Rows/Fit
+        // rows (grid mode only), Size slider (hidden in grid mode — count is explicit),
+        // Width/Height (density mode only — Cols:Rows ratio is the grid's shape control).
+        const tileModeRow = card.querySelector('.layer-tilemode-row');
+        const gridDetailRows = card.querySelectorAll('.layer-grid-row');
+        const sizeRow = card.querySelector('.layer-size-row');
+        const syncGridVisibility = () => {
+            const tileOn = entry.tile && entry.type !== 'video';
+            const gridOn = tileOn && (entry.tileMode || 'density') === 'grid';
+            if (tileModeRow) tileModeRow.style.display = tileOn ? '' : 'none';
+            gridDetailRows.forEach(r => { r.style.display = gridOn ? '' : 'none'; });
+            if (sizeRow) sizeRow.style.display = gridOn ? 'none' : '';
+            tileScaleRows.forEach(r => { r.style.display = (tileOn && !gridOn) ? '' : 'none'; });
+        };
+
         if (tileCb) tileCb.addEventListener('change', () => {
             entry.tile = tileCb.checked;
             if (tunnelRow) tunnelRow.style.display = entry.tile ? '' : 'none';
             if (spacingRow) spacingRow.style.display = entry.tile ? '' : 'none';
             if (groupSpinWrap) groupSpinWrap.style.display = entry.tile ? '' : 'none';
             if (mirrorScopeRow) mirrorScopeRow.style.display = (entry.mirror !== 'none') ? '' : 'none';
-            tileScaleRows.forEach(r => { r.style.display = entry.tile ? '' : 'none'; });
+            syncGridVisibility();
             syncPerCellVisibility();
             if (entry.type === 'text') this.engine._loadTextTexture(entry.texName, entry);
             refresh();
         });
         if (pulseInvCb) pulseInvCb.addEventListener('change', () => { entry.pulseInvert = pulseInvCb.checked; refresh(); });
         if (groupSpinCb) groupSpinCb.addEventListener('change', () => { entry.groupSpin = groupSpinCb.checked; refresh(); });
+
+        // ─── Phase 3: Grid mode ───────────────────────────────────────────────
+        // Density/Grid segmented toggle
+        card.querySelectorAll('.layer-tilemode-seg .lseg-tilemode').forEach(btn => {
+            btn.addEventListener('click', () => {
+                card.querySelectorAll('.layer-tilemode-seg .lseg-tilemode').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                entry.tileMode = btn.dataset.tileMode;
+                syncGridVisibility();
+                refresh();
+            });
+        });
+        // Fill/Fit segmented toggle
+        card.querySelectorAll('.layer-tilefit-seg .lseg-tilefit').forEach(btn => {
+            btn.addEventListener('click', () => {
+                card.querySelectorAll('.layer-tilefit-seg .lseg-tilefit').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                entry.tileFit = btn.dataset.tileFit;
+                refresh();
+            });
+        });
+        // Cols / Rows integer steppers (clamped 1–16). stopPropagation so typing
+        // in the field never bubbles to the card-header collapse toggle.
+        const gridColsInput = card.querySelector('.layer-grid-cols');
+        const gridRowsInput = card.querySelector('.layer-grid-rows');
+        const bindGridStepper = (inputEl, key) => {
+            if (!inputEl) return;
+            inputEl.addEventListener('click', (e) => e.stopPropagation());
+            inputEl.addEventListener('keydown', (e) => e.stopPropagation());
+            inputEl.addEventListener('change', () => {
+                const v = Math.max(1, Math.min(16, Math.round(parseFloat(inputEl.value) || 1)));
+                inputEl.value = v;
+                entry[key] = v;
+                refresh();
+            });
+        };
+        bindGridStepper(gridColsInput, 'tileCols');
+        bindGridStepper(gridRowsInput, 'tileRows');
+        // Grid Scale slider — scales the whole grid (1 = fills canvas, <1 = margin)
+        const gridScaleSl = card.querySelector('.layer-gridscale-sl');
+        const gridScaleVal = card.querySelector('.layer-gridscale-val');
+        if (gridScaleSl && gridScaleVal) gridScaleSl.addEventListener('input', () => {
+            const v = parseFloat(gridScaleSl.value);
+            entry.tileGridScale = v;
+            gridScaleVal.textContent = v.toFixed(2);
+            gridScaleSl.style.setProperty('--pct', `${((v - 0.1) / 2.9 * 100).toFixed(1)}%`);
+            refresh();
+        });
 
         // ─── Phase 1: Per-Cell controls ───────────────────────────────────────
         // Offset axis segmented (Off / Row / Col)
@@ -4127,6 +4229,8 @@ export class EditorInspector {
             // Phase 2: Variance suite — own dedicated handlers below
             'layer-sizevar-sl','layer-jitterx-sl','layer-jittery-sl',
             'layer-opacityvar-sl','layer-depthvar-sl',
+            // Phase 3: Grid mode — own dedicated handler below
+            'layer-gridscale-sl',
             // Color FX — own dedicated handler below
             'layer-solarize-sl',
         ].map(c => `:not(.${c})`).join('');
@@ -5858,6 +5962,18 @@ export class EditorInspector {
         // non-tunnel, real tile layers — every other preset keeps the fract() path.
         const useScatter = (hasJitterX || hasJitterY) && img.tile && !isVideo && !hasTunnel;
 
+        // Phase 3: Grid mode — an explicit COLS×ROWS grid as an alternative to
+        // density-driven tiling. Inert when tunnel is active (a finite grid cannot
+        // tunnel — §5.6 of tile-custom.md). Density mode is byte-for-byte unchanged.
+        const tileModeVal = img.tileMode || 'density';
+        const gridCols = Math.max(1, Math.round(img.tileCols || 3));
+        const gridRows = Math.max(1, Math.round(img.tileRows || 3));
+        const tileFitMode = img.tileFit || 'fill';
+        // Grid scale: 1 = grid fills the canvas; < 1 = grid sits smaller, centred,
+        // with transparent margin. Clamped ≥ 0.1 to keep the divisor safe.
+        const gridScale = Math.max(0.1, img.tileGridScale !== undefined ? img.tileGridScale : 1.0).toFixed(4);
+        const useGrid = !isVideo && img.tile && tileModeVal === 'grid' && !hasTunnel;
+
         let blendLine;
         switch (img.blendMode) {
             case 'normal':   blendLine = `col = mix(col, _src, _t.w * _op);`; break;
@@ -5978,28 +6094,64 @@ export class EditorInspector {
         //   name so tunnel mode (two applyTileUV calls) doesn't collide.
         const applyTileUV = (varName, sizeExpr, maskVar = null, dxVar = null, dyVar = null, cellIdVar = '_cellId') => {
             let s = '';
-            s += `    ${varName}.x *= aspect.y;\n`;
-            s += `    ${varName} /= ${sizeExpr};\n`;
-            s += `    ${varName}.x /= aspect.y;\n`;
-            // Capture smooth derivatives BEFORE fract so textureGrad picks the right mip level.
-            // Without this, the UV jump at each tile edge (0.999→0.001) makes dFdx/dFdy huge
-            // and the GPU samples the lowest mipmap, producing a visible seam line.
-            if (dxVar && dyVar) {
-                s += `    vec2 ${dxVar} = dFdx(${varName}); vec2 ${dyVar} = dFdy(${varName});\n`;
-            }
-            // Phase 1: brick / half-drop offset. Computed BEFORE cell-id so the
-            // cell hash reflects the staggered visible position (shifted-row cells
-            // get unique IDs from non-shifted-row cells).
-            if (hasOffset) {
-                if (offsetAxis === 'row') {
-                    s += `    ${varName}.x += mod(floor(${varName}.y + 0.5), 2.0) * ${offsetAmount};\n`;
-                } else if (offsetAxis === 'col') {
-                    s += `    ${varName}.y += mod(floor(${varName}.x + 0.5), 2.0) * ${offsetAmount};\n`;
+            if (useGrid) {
+                // Phase 3: Grid mode — an explicit COLS×ROWS grid fills the canvas once.
+                // _gu ∈ [0,COLS]×[0,ROWS]; the cell index is floor(_gu); per-cell UV is
+                // fract(_gu). No infinite fract-wrap — fragments outside the grid (e.g.
+                // rotated-out corners under Group Spin) are masked transparent.
+                s += `    vec2 _gu = (${varName} / max(${gridScale} * ${pulseFactor}, 0.05) + 0.5) * vec2(${gridCols}.0, ${gridRows}.0);\n`;
+                if (hasOffset) {
+                    if (offsetAxis === 'row') {
+                        s += `    _gu.x += mod(floor(_gu.y), 2.0) * ${offsetAmount};\n`;
+                    } else if (offsetAxis === 'col') {
+                        s += `    _gu.y += mod(floor(_gu.x), 2.0) * ${offsetAmount};\n`;
+                    }
                 }
+                if (dxVar && dyVar) {
+                    s += `    vec2 ${dxVar} = dFdx(_gu); vec2 ${dyVar} = dFdy(_gu);\n`;
+                }
+                s += `    vec2 ${cellIdVar} = clamp(floor(_gu), vec2(0.0), vec2(${gridCols}.0 - 1.0, ${gridRows}.0 - 1.0));\n`;
+                if (maskVar) {
+                    s += `    ${maskVar} *= step(0.0, _gu.x) * step(_gu.x, ${gridCols}.0)\n`;
+                    s += `                * step(0.0, _gu.y) * step(_gu.y, ${gridRows}.0);\n`;
+                }
+                s += `    ${varName} = fract(_gu);\n`;
+                // Fit mode: preserve the image aspect inside each cell, transparent pad.
+                if (tileFitMode === 'fit') {
+                    s += `    { float _cellAR = aspect.y * ${gridRows}.0 / ${gridCols}.0;\n`;
+                    s += `      float _sf = ${imgAsp} / _cellAR;\n`;
+                    s += `      ${varName}.x = (${varName}.x - 0.5) * max(1.0 / _sf, 1.0) + 0.5;\n`;
+                    s += `      ${varName}.y = (${varName}.y - 0.5) * max(_sf, 1.0) + 0.5;\n`;
+                    if (maskVar) {
+                        s += `      ${maskVar} *= step(0.0, ${varName}.x) * step(${varName}.x, 1.0)\n`;
+                        s += `                  * step(0.0, ${varName}.y) * step(${varName}.y, 1.0);\n`;
+                    }
+                    s += `      ${varName} = clamp(${varName}, 0.0, 1.0); }\n`;
+                }
+            } else {
+                s += `    ${varName}.x *= aspect.y;\n`;
+                s += `    ${varName} /= ${sizeExpr};\n`;
+                s += `    ${varName}.x /= aspect.y;\n`;
+                // Capture smooth derivatives BEFORE fract so textureGrad picks the right mip level.
+                // Without this, the UV jump at each tile edge (0.999→0.001) makes dFdx/dFdy huge
+                // and the GPU samples the lowest mipmap, producing a visible seam line.
+                if (dxVar && dyVar) {
+                    s += `    vec2 ${dxVar} = dFdx(${varName}); vec2 ${dyVar} = dFdy(${varName});\n`;
+                }
+                // Phase 1: brick / half-drop offset. Computed BEFORE cell-id so the
+                // cell hash reflects the staggered visible position (shifted-row cells
+                // get unique IDs from non-shifted-row cells).
+                if (hasOffset) {
+                    if (offsetAxis === 'row') {
+                        s += `    ${varName}.x += mod(floor(${varName}.y + 0.5), 2.0) * ${offsetAmount};\n`;
+                    } else if (offsetAxis === 'col') {
+                        s += `    ${varName}.y += mod(floor(${varName}.x + 0.5), 2.0) * ${offsetAmount};\n`;
+                    }
+                }
+                // Phase 1: cell id captured BEFORE fract so per-cell hashes are stable.
+                s += `    vec2 ${cellIdVar} = floor(${varName} + 0.5);\n`;
+                s += `    ${varName} = fract(${varName} + 0.5);\n`;
             }
-            // Phase 1: cell id captured BEFORE fract so per-cell hashes are stable.
-            s += `    vec2 ${cellIdVar} = floor(${varName} + 0.5);\n`;
-            s += `    ${varName} = fract(${varName} + 0.5);\n`;
             // Per-tile / per-cell rotation block — emits whenever EITHER a base
             // per-tile spin is active OR per-cell rotation variance is set.
             // This way Group Spin (which makes perTileSpin=false) does NOT silently
@@ -6144,6 +6296,13 @@ export class EditorInspector {
         const sizeBase = hasStrobe
             ? `${sz} * (1.0 ${pulseSign} _r * ${pu}) * mix(1.0, _strobeWave, ${stbAmp})`
             : `${sz} * (1.0 ${pulseSign} _r * ${pu})`;
+        // Phase 3: audio size-modulation factor (Pulse + Strobe), extracted from
+        // sizeBase without the base `sz`. Density divides _u by sizeBase; Grid mode
+        // has no such divisor, so it folds this factor into the grid scale instead.
+        // pu = 0 and no strobe → 1.0 → no-op (backward compatible).
+        const pulseFactor = hasStrobe
+            ? `((1.0 ${pulseSign} _r * ${pu}) * mix(1.0, _strobeWave, ${stbAmp}))`
+            : `(1.0 ${pulseSign} _r * ${pu})`;
 
         // Mirror UV fold helper — generates GLSL to fold a vec2 variable in-place.
         // Only emits for the per-tile scope; whole-group scope already folded _uvf upstream.
@@ -6190,10 +6349,16 @@ export class EditorInspector {
         // applied inside the loop keyed to the neighbour's cell id. Produces vec4 _t.
         const buildScatterSample = () => {
             let s = '';
-            // Field UV → continuous grid coordinates
-            s += `    _u.x *= aspect.y;\n`;
-            s += `    _u /= ${sizeBase};\n`;
-            s += `    _u.x /= aspect.y;\n`;
+            // Field UV → continuous grid coordinates (1 unit = 1 cell, integers = cell centres)
+            if (useGrid) {
+                // Phase 3: Grid mode — explicit COLS×ROWS. Shift by -0.5 so cell
+                // centres land on integers, matching the density convention below.
+                s += `    _u = (_u / max(${gridScale} * ${pulseFactor}, 0.05) + 0.5) * vec2(${gridCols}.0, ${gridRows}.0) - 0.5;\n`;
+            } else {
+                s += `    _u.x *= aspect.y;\n`;
+                s += `    _u /= ${sizeBase};\n`;
+                s += `    _u.x /= aspect.y;\n`;
+            }
             // Brick / half-drop offset — shifts which cell a fragment falls in
             if (hasOffset) {
                 if (offsetAxis === 'row') {
@@ -6245,6 +6410,14 @@ export class EditorInspector {
                 s += `        _lc.x /= aspect.y; }\n`;
             }
             s += `      vec2 _luv = _lc + 0.5;\n`;
+            // Phase 3: Grid Fit — preserve image aspect inside the cell. Padding
+            // pixels land outside [0,1] and are dropped by the coverage test below.
+            if (useGrid && tileFitMode === 'fit') {
+                s += `      { float _cellAR = aspect.y * ${gridRows}.0 / ${gridCols}.0;\n`;
+                s += `        float _sf = ${imgAsp} / _cellAR;\n`;
+                s += `        _luv.x = (_luv.x - 0.5) * max(1.0 / _sf, 1.0) + 0.5;\n`;
+                s += `        _luv.y = (_luv.y - 0.5) * max(_sf, 1.0) + 0.5; }\n`;
+            }
             // Per-tile mirror fold
             s += applyMirrorUV('_luv');
             // Coverage: is this fragment inside the tile's [0,1] footprint?
@@ -6265,6 +6438,11 @@ export class EditorInspector {
             s += `      vec4 _sc = textureGrad(${tex}, clamp(_luv, 0.0, 1.0), _sdx * _szF, _sdy * _szF);\n`;
             s += `      vec3 _scol = _sc.xyz;\n`;
             s += `      float _a = _sc.w * _cov;\n`;
+            // Phase 3: Grid mode is finite — drop neighbour cells outside the grid.
+            if (useGrid) {
+                s += `      _a *= step(0.0, _C.x) * step(_C.x, ${gridCols}.0 - 1.0)\n`;
+                s += `          * step(0.0, _C.y) * step(_C.y, ${gridRows}.0 - 1.0);\n`;
+            }
             // Per-cell popcorn — hashed audio brightness pulse
             if (hasPopcorn) {
                 s += `      { float _pcH = fract(sin(dot(_C, vec2(269.5, 183.3))) * 43758.5);\n`;
@@ -6323,7 +6501,7 @@ export class EditorInspector {
                 applySkew('_u') +
                 applyPersp('_u') +
                 `    float _gapMask = 1.0;\n` +
-                aspectPreScale('_u') +
+                (useGrid ? '' : aspectPreScale('_u')) +
                 buildScatterSample();
             sampleLine = '';
         } else if (!isVideo && img.tile) {
@@ -6333,7 +6511,7 @@ export class EditorInspector {
                 applySkew('_u') +
                 applyPersp('_u') +
                 `    float _gapMask = 1.0;\n` +
-                aspectPreScale('_u') +
+                (useGrid ? '' : aspectPreScale('_u')) +
                 applyTileUV('_u', sizeBase, '_gapMask', '_dx', '_dy') +
                 applyMirrorUV('_u') +
                 applyRadius('_u', '_gapMask');
@@ -6826,6 +7004,8 @@ export class EditorInspector {
             tileSizeVariance: 0.00, tileJitterX: 0.00, tileJitterY: 0.00,
             tileOpacityVariance: 0.00, tileDepthVariance: 0.00,
             tileVarianceSeed: 0, tileVarianceSeedLocked: true,
+            // Phase 3: Grid mode — 'density' default → old presets unchanged
+            tileMode: 'density', tileCols: 3, tileRows: 3, tileFit: 'fill', tileGridScale: 1.0,
         };
         return { ...D, ...entry };
     }

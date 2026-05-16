@@ -1075,6 +1075,23 @@ html, body {
 .lseg:hover { border-color: var(--border-hi); color: var(--text); }
 .lseg.active { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.4); color: #fff; }
 
+/* Phase 3: Grid mode — Cols/Rows integer steppers */
+.layer-grid-cols,
+.layer-grid-rows {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-s);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 11px;
+  padding: 3px 4px;
+  text-align: center;
+}
+.layer-grid-cols:hover,
+.layer-grid-rows:hover { border-color: var(--border-hi); }
+.layer-grid-cols:focus,
+.layer-grid-rows:focus { outline: none; border-color: rgba(255,255,255,0.4); }
+
 /* ── Text layer controls ───────────────────────────────────────────────── */
 .layer-text-input {
   width: 100%;
