@@ -1,8 +1,71 @@
 # Timeline Editor — Design & Planning Doc
 
-**Status:** Phases 1–4.3 complete ✅, Phase 4.8 (Palette Opacity) shipped ✅, Phase 4.4-A + 4.5 shipped ✅, Phase 4.10-A (Real-time Live Editing) shipped ✅, Phase 4.4-B (Menu Icon UX) shipped ✅ — Next: Loop/Loop Solo transport toggles → 4.6 (Overlap Crossfade) → 4.7 (Undo/Redo) → 4.9 (Zone Stack) → 4.11 (Staging Mode) → 4.12 (Timeline Sets Switching). Phase 5 in research (Multi-monitor output). Performance Panel deferred until video processing controls are built out.  
-**Last updated:** 2026-05-12 — Deep doc audit: fixed 4.4-A/4.4-B interaction model description, removed duplicate Phase 4.5 section, renumbered 4.4 remaining sub-phases to C/D/E, updated Current State to include 4.4-B and 4.10-A, fixed Phase 4.10-A sub-headers to correct level, removed stale "Upcoming Phase 4.x" divider, noted Backlog Timeline Library → Phase 4.12-B, annotated Save & Naming section as legacy labels pending 4.12-C rename. Added Timeline Sets concept, Phase 4.11 (Staging), 4.12 (Timeline Sets Switching), 4.13 (Export/Import).  
 **Architecture:** Standalone page (`/timeline.html`) — self-contained MPA entry in Vite.
+**Completed-phase detail:** lives in **[timeline-editor-archive.md](timeline-editor-archive.md)** — this doc keeps only a one-line index of shipped work.
+**Last updated:** 2026-05-15 — Restructured: split shipped-phase implementation detail into the archive file; added the Status Dashboard; separated Roadmap (planned) from the Completed index so reading order matches build order.
+
+---
+
+## 📊 Status Dashboard
+
+*Read this section and nothing else to know where the project stands.*
+
+### Legend
+
+| Mark | Meaning |
+|------|---------|
+| ✅ | Shipped — full detail in the archive |
+| 🚧 | Partially shipped — some sub-phases still open |
+| ⬜ | Planned — not started |
+| 🔬 | Research |
+
+### Recently Shipped
+
+| Phase | What | Date |
+|-------|------|------|
+| 4.10-A | Real-time Live Editing (mutation reschedule) | 2026-05-12 |
+| 4.5 | Double-click to Cue | 2026-05-12 |
+| 4.4-B | Block Menu Icon | 2026-05-12 |
+| 4.4-A | Block Action Modal | 2026-05-12 |
+| 4.8 | Preset Palette Opacity | 2026-05-12 |
+
+### 🎯 Up Next — Priority Order
+
+> **To re-prioritize, reorder the rows in this table.** The top unbuilt row is what gets built next. Full spec for each is in the Roadmap section below (same numbers).
+
+| # | Phase | What it adds |
+|---|-------|--------------|
+| 1 | Loop & Loop Solo toggles | Sticky transport toggles — all zones (or one) loop in sync; release resumes the timeline |
+| 2 | 4.6 — Overlap Crossfade | Overlap width between blocks drives the crossfade duration directly |
+| 3 | 4.7 — Undo/Redo | `Ctrl+Z` for the 3 destructive gestures: drag, delete, resize |
+| 4 | 4.9 — Zone Stack | Layered compositing — zone opacity + blend-mode popover, overlay layout |
+| 5 | 4.11 — Staging Mode | Safe overlay editing; changes commit on the next block boundary |
+| 6 | 4.12 — Timeline Sets Switching | Queued set switching + My Sets panel (replaces the topbar dropdown) |
+| 7 | 4.13 — Set Export / Import | Portable `.dcset.json` bundles — full show + presets + images |
+| 8 | 4.4-C/D/E — Block menu remainder | Full Edit deep-link, block color picker, per-zone preset controls |
+| 9 | Phase 5 — Multi-monitor output 🔬 | Route each zone to a separate physical display (research phase) |
+
+### 🚧 Partially Complete — looks done, isn't
+
+| Phase | Shipped portion | Still open |
+|-------|-----------------|-----------|
+| 3.5 — Active Playhead | Playhead, click-to-seek, automated crossfades | Loop/Loop Solo buttons → **Roadmap #1** |
+| 4.4 — Block Settings Menu | A (action modal), B (menu icon) | C/D/E → **Roadmap #8** |
+| 4.10 — Live Editing | A (core mutation reschedule) | B (loop state preservation) → ships with **Roadmap #1** |
+
+---
+
+## 📖 How to Use This Doc
+
+- **What's next** is the *Up Next* table above — the single source of priority. Reorder its rows to change priority; nothing else needs editing.
+- **Completed phases** are summarized in the *Completed Phases — Index* table. Implementation detail is in **[timeline-editor-archive.md](timeline-editor-archive.md)**.
+- **Before touching playback / fade / scrub code**, read *⚠️ CRITICAL: Playback & Cover System* — it exists because of a past regression.
+- **When a phase ships:**
+  1. Move its detail into the archive file.
+  2. Add a row to *Recently Shipped* and to *Completed Phases — Index*.
+  3. Remove its row from *Up Next* (and from *Partially Complete* if fully done).
+  4. Update *Current State — What's Built*.
+- **After every code change**, update this doc (project rule — see CLAUDE.md).
 
 ---
 
@@ -76,68 +139,21 @@ The block boundary is the only transition point. This is the default for all ope
 
 **In practice:**
 - Staging changes applied → queued, takes effect after current block ends
-- Switch to another set → queued, takes effect after current block ends  
+- Switch to another set → queued, takes effect after current block ends
 - Loop release → current loop cycle finishes, then timeline resumes
 - The one deliberate exception: **double-click to cue** overrides immediately because the VJ explicitly chose that moment
 
 ---
 
-## Phased Rollout
+## 🎯 Roadmap — Planned Phases
 
-### Phase 1 — Single-zone editor ✅ COMPLETE
+Built in the order of the *Up Next* table. Each entry below carries the same number.
 
-- `timeline.html`, `src/timeline/main.js`, `src/timelineStorage.js` — full CRUD, export/import
-- Full-screen single canvas (VisualizerEngine on Full zone)
-- Timeline strip: DOM blocks, drag-to-reorder, resize right edge
-- Preset picker modal with search + All/Favorites/My Presets tabs
-- Quick-edit popover (Duration, Blend, Label)
-- Right-click context menu (Duplicate, Delete)
-- Transport: Play/Stop toggle, Loop, time display, Zoom, Snap
-- Playhead advancing during playback
-- Save / Load / Delete timelines; timeline switcher dropdown
-- JSON Copy / Paste export-import; block auto-color from preset name hash
-- `vite.config.js` third entry; `L` key in `src/controls.js`
-- Custom presets via `engine.refreshCustomPresets()` on boot
-- `?preset=<name>` query param pre-adds to new timeline
+---
 
-**Post-ship bug fixes:**
-- Delete modal on boot — CSS `display:flex` beat `[hidden]` — fixed with global `[hidden] { display:none !important }`
-- Play/Stop confusion — replaced with single `#tl-btn-playstop` toggle (`is-playing` class)
-- Ruler `+` cursor confusion — changed to `cursor: pointer`
-- Quick-edit overflow — widened to 260px, `min-width:0` on flex inputs
+### 1 · Loop & Loop Solo Transport Toggles ⬜
 
-### Phase 2 — Multi-zone compositor ✅ COMPLETE
-
-- `initSlave(canvas, primaryEngine)` added to `src/visualizer.js` — shared audio graph, `_isSlaveEngine` guards render loop
-- 6 predefined zone layouts with SVG previews (`ZONE_LAYOUTS` constant)
-- Zone Manager modal (`#tl-zone-mgr` / `#tl-zone-layouts`) opened by **⊞ Zones** button
-- `_syncZoneCanvases()` — diffed canvas/engine lifecycle tied to `_tl.zones`
-- Multi-row strip — `_renderZoneRows()` builds one `.tl-zone-row` per zone
-- Each zone label row has a `+` button (`tl-zone-add-btn`) to add directly to that zone
-- Preset picker tracks `_pickerZoneId` — adds to the correct zone row
-- `_updateStripHeight()` — `--strip-h` CSS var + transport `bottom` updated dynamically
-- `resizeAllZones()` — public, called on window resize from `main.js`
-- Playback: `_playZone(zoneId, fromTime)` schedules per-zone, all zones start in `play()`
-- Ruler seek: `_scrubTo(t)` calls `_playZone(id, t)` for all zones
-
-### Phase 3 — UX polish ✅ COMPLETE
-
-- **Position-based dragging** — blocks drag freely to any time position. `entry.startTime` is now stored (not computed). Dragging the block body updates `entry.startTime` directly on drop. `_migrateEntryStartTimes()` auto-converts old sequential timelines on load.
-- **Inline block actions** — hover a block to reveal Edit / Duplicate / Delete icon buttons. Clicking them does not trigger drag. Right-click context menu preserved as secondary path.
-- **Controls always visible** — auto-hide timer removed entirely. Controls are permanently visible unless fullscreen is active.
-- **`#tl-fullscreen-btn`** — always-visible fullscreen icon in top-right corner (replaced the old `≡` pin toggle). Click or press `F` to enter fullscreen and hide all controls. Click again, press `F`, or press `Escape` to exit fullscreen and restore controls. Web uses native browser fullscreen API; macOS app uses Tauri `appWindow.setFullscreen()`.
-
-### Phase 3.5 — Active Playhead ✅ COMPLETE
-
-A classic NLE playhead: click-to-seek, persistent position, play-from-here. This is the foundation for all future transport features (loop ranges, markers, live queue override).
-
-- **Active Playhead State**: Introduced `_currentTime` to `TimelineEditor` to persist timeline position, allowing "play-from-here" functionality and persistent parking when stopped.
-- **Play/Pause Toggle Semantics**: Stop button now merely pauses the playhead. Clicking ruler at 0:00 rewinds. Reaching the end of the timeline auto-rewinds to 0:00 naturally.
-- **Visuals on Stop**: Stopped timelines show a clean black canvas (covers shown), with the playhead remaining persistently visible to indicate position.
-- **Transition / Fade System**: Replaced `display: none/block` cover toggling with an extensible opacity-based `_fadeZoneCover` helper.
-- **Automated Crossfades**: Zones automatically fade in from black after gaps, and fade out to black before gaps (based on `blendTime`). Scrubbing instantly snaps without visual lag.
-
-#### Planned addition — Loop & Loop Solo transport toggle buttons
+*(specced under Phase 3.5; ships together with Phase 4.10-B — loop state preservation)*
 
 Two sticky toggle buttons in the transport bar. Press to activate, press again to release. Think of them as hold buttons on a DJ mixer — press and forget, release when done. Neither is a hard lock; any deliberate gesture overrides cleanly.
 
@@ -162,106 +178,11 @@ The loop repeat handle must be:
 
 Design the cancel path before writing the repeat logic. Do not patch this after the fact.
 
----
-
-### Phase 4 — Advanced show features 🔧 IN PROGRESS
-
-**Phase 4.1 — VJ Markers (= Settable Cue Points)** ✅ COMPLETE
-
-Markers on the ruler ARE the cue point system. The 1–9 keyboard shortcuts are hot cues — press a number to jump immediately to that marker and continue playing from there. This is the DJ/VJ hot-cue model, already fully working.
-
-- **Data Model**: `Timeline` object stores an array of `markers` (`id`, `time`, `label`, `color`, `action`).
-- **Interactive Ruler**: Double-click ruler to drop a marker. Click the flag to open the edit popover. Drag to reposition with snap support.
-- **Edit Popover**: Label, Color, Action (`none` / `stop` / `loop`). Smart positioning prevents off-screen drop.
-- **Playback Execution**: Playhead engine scans markers in the rAF tick loop.
-  - `none` action: playhead passes through — marker is a visual label / manual jump target only.
-  - `stop` action: halts timeline progression and parks the playhead exactly on the marker. Visuals keep playing (VJ mode — show never stops).
-  - `loop` action: halts timeline, wraps playhead back to `0:00`, and resumes seamlessly.
-- **Hot Cue Keys (`1`–`9`)**: Press a number to jump to marker N (sorted by time). Calls `jumpToMarker(index)` → `_scrubTo(m.time)`. Works during playback and while stopped.
-- **Click marker flag**: Also calls `jumpToMarker(markerId)` → seeks to that time immediately.
-- **Live Scrubbing**: Seeking to a marker while stopped immediately loads presets and lifts covers for a live preview.
-
-**Naming note:** The code and UI call these "markers." In VJ/DJ terminology these are "cue points." Both terms are accurate — markers are the data structure, cue points are the performance concept.
-
-**Phase 4.2 — Transport & Seeking (VJ Mode)** ✅ COMPLETE
-
-- **Go-to-start button** — `⏮` in transport bar jumps playhead to 0:00 (pauses timeline, keeps visuals)
-- **Skip-to-next-block button** — `⏵` jumps to next block start (wraps to 0:00 at end)
-- **Play/Stop button** — Stop pauses timeline progression but **keeps preset animations running** (no black screen)
-- **Keyboard shortcuts** — `Home` for start
-- **Ruler hint** — hover ruler shows "Double-click to add marker" cue
-
-*VJ Mode Philosophy:* The show never stops. Timeline controls (playhead, scheduling) pause, but visuals continue playing. Press Play to resume timeline progression.
-
-**Phase 4.3 — Quick Wins** ✅ COMPLETE
-
-- **Keyboard nudge** — `↑`/`↓` nudge playhead ±1s, `Shift+↑`/`Shift+↓` nudge ±5s
-- **Drag-scrub on ruler** — click-hold-drag on ruler for smooth playhead control
-- **Keyboard shortcuts for markers** — `1`-`9` jump to markers 1-9 by index
-- **Block navigation** — `←`/`→` jump to prev/next preset block start
-
-*Rationale:* Horizontal arrows for timeline navigation (block-to-block), vertical arrows for fine-tuning (time nudge). More intuitive for VJ workflow.
-
-*Rationale:* Standard DAW/NLE transport uses 3 buttons: Go-to-Start, Play/Stop, Skip-Next. Skip-Prev is rarely used and was confusing when both left buttons went to 0:00. Simplified to match industry standard.
+**Phase 4.10-B (pairs with this):** refactor `_scrubTo` to accept `{ preserveLoopState }` so a mutation/reschedule during an active loop does not break the loop. See the archived Phase 4.10-A "Interaction with Loop / Loop Solo" section for the full design.
 
 ---
 
-
-**✅ Phase 4.4-A — Block Action Modal (Consolidate)** *(shipped 2026-05-12, interaction model revised in 4.4-B)*
-
-- **Single-click block body** → opened `#tl-quick-edit` modal directly *(this behavior was superseded by Phase 4.4-B — single-click is now select-only)*
-- **Duplicate + Delete** moved into the modal as a utility row below the fields, separated by a hairline
-- **Hover icon row** (`.tl-block-actions`) removed from block DOM and CSS entirely
-- **Right-click context menu** removed from block (`contextmenu` listener deleted)
-- **Click vs. drag** distinguished in `_startMoveDrag`: drag only activates after > 4px movement; clean click on `pointerup` routes to `_handleBlockClick`
-- **Double-click detection** in `_handleBlockClick`: second click within 300ms on same block → `_cueEntry` (Phase 4.5) *(timing-based detection later replaced by native `dblclick` in 4.4-B)*
-- **Files:** `timelineEditor.js`, `timeline.html`, `src/timeline/style.css`
-
-**✅ Phase 4.4-B — Block Menu Icon** *(shipped 2026-05-12)*
-
-Single-click on the block body was conflicting with double-click-to-cue and causing accidental modal opens. Root cause: modal and cue shared the same hit surface with a 300ms timing hack to distinguish them.
-
-- **Removed** timing-based double-click detection (`_handleBlockClick`, `_lastClickedId`, `_lastClickTime`)
-- **`.tl-block-menu-btn`** hamburger icon added to the LEFT of each block (absolutely positioned, 28px wide)
-- **Single-click block body** → visual select only (no modal)
-- **Double-click block body** → `_cueEntry` (native browser `dblclick` event — no timing logic)
-- **Click menu icon** → opens/closes `#tl-quick-edit` for that block (sole toggle — no other dismiss path)
-- **Click-outside-to-dismiss REMOVED** — `#tl-quick-edit` is intentionally NOT auto-dismissed on outside click; only the icon, Apply, Cancel, and Escape close it
-- **Icon state**: `rgba(255,255,255,0.5)` at rest; hover lifts slightly; **active = bright white icon + `rgba(255,255,255,0.22)` background pill** — unmistakably open
-- **`_openQuickEdit`** sets `.is-active` on the triggering block's menu button (removes from all others first)
-- **`_closeQuickEdit`** removes `.is-active` from all menu buttons
-- **Files:** `timelineEditor.js`, `src/timeline/style.css`
-
-**Design rule (added to this session):** Modal popovers in the timeline strip must have an explicit, visible close affordance. Auto-dismiss on outside click is banned — too easy to fire during live performance.
-
-**✅ Phase 4.5 — Double-click to Cue** *(shipped 2026-05-12)*
-
-- **Double-click any block** → crossfades from currently-playing preset into the cued preset, seeks the entire timeline to that block's `startTime`, then continues forward
-- `_cueEntry(id)`: loads preset with `entry.blendTime`, fades cover, then calls `_scrubTo(entry.startTime)`
-- `_cueZoneId` guard prevents `_playZone` and `_scrubTo`'s not-playing path from double-loading the cued zone with blend 0 (which would reset the crossfade)
-- All active loops are released on Cue (once Loop/Loop Solo buttons are built, `_cueEntry` will clear `_loopTimer` and `_loopZoneId` here)
-- **Files:** `timelineEditor.js`
-
-**⚡ Phase 4.4 — Block Settings Menu (remaining sub-phases)**
-
-4.4-A and 4.4-B are complete. Remaining sub-phases:
-
-| Phase | What's added |
-|-------|-------------|
-| **C — Full Edit** | "Full Edit →" deep-link into Preset Studio for this preset |
-| **D — Utilities** | Block color picker |
-| **E — Preset Controls** | Full `controls.js` panel as a new section below the fields, re-targeted to this zone's engine; live during playback |
-
-**Styling (prerequisite for Phase A):** Size and padding are correct — controls must stay easy to see and hit. Fix is visual hierarchy and anchoring:
-- "s" unit labels feel orphaned — should be anchored to their input (suffix inside the field, or a pill flush alongside it)
-- Field labels and values have similar visual weight — labels should read as secondary so the value is what draws the eye
-- Apply/Cancel button bar stays — clear affordance — but should match the app's glassmorphic language rather than reading as a generic HTML form
-
-**Technical note (for Phase D):** `src/controls.js` currently targets the primary engine. For timeline zones, each zone has its own slave `VisualizerEngine` at `_zoneMap.get(zoneId).engine`. The modal re-targets controls to the correct engine on open, then restores the original target on close. No new slider widgets — just a target-swap.
-
----
-
-**⚡ Phase 4.6 — Overlap-driven Crossfade Timing**
+### 2 · Phase 4.6 — Overlap-driven Crossfade Timing ⬜
 
 Overlap between blocks is already visual and functional. The gap: the crossfade fires on the stored `blendTime` value regardless of how long the overlap actually is. The fix is to use the overlap duration as the fade duration instead.
 
@@ -273,7 +194,7 @@ Overlap between blocks is already visual and functional. The gap: the crossfade 
 
 ---
 
-**⚡ Phase 4.7 — Undo/Redo**
+### 3 · Phase 4.7 — Undo/Redo ⬜
 
 Accidentally dragging a block, deleting it, or resizing it has no recovery today. Minimum viable scope: a command stack for the three most destructive gestures.
 
@@ -289,28 +210,9 @@ Accidentally dragging a block, deleting it, or resizing it has no recovery today
 
 ---
 
-**✅ Phase 4.8 — Preset Palette Opacity** *(shipped 2026-05-12)*
+### 4 · Phase 4.9 — Zone Stack System ⬜
 
-Adds an opacity control for the MilkDrop background layer inside a preset. Image, video, and GIF layers are unaffected — they composite on top at their own opacity. This is the prerequisite for the Zone Stack System (4.9).
-
-- `paletteOpacity` (0–1, default 1.0) added to `currentState` BLANK defaults
-- Opacity slider added at the top of the Palette tab in `editor.html` — first control visible on the tab
-- `_buildCompShader` multiplies `sampler_main` by `paletteOpacity` when < 1.0; early-exit to BLANK_COMP is guarded so it rebuilds correctly when opacity is reduced
-- At 0: palette goes black, image/video/gif layers still render on top. At 1: current behavior unchanged.
-- Old presets without `paletteOpacity` fall back to 1.0 via BLANK merge in `loadPresetData` — no migration needed.
-- Beat-reactive controls not added here — Motion tab already covers palette reactivity (Zoom Pulse, Warp Pulse, Echo Opacity, etc.)
-
-**Files touched:** `editor.html`, `src/editor/inspector.js`
-
----
-
-**The road from here → timeline compositing (Phase 4.9):**
-
-Palette Opacity = 0 makes the MilkDrop background black inside the comp shader. Image/video/gif layers render on top of that black. When this preset plays in a timeline zone with `blendMode: screen`, the black pixels pass through (screen blend of black = passthrough) and the zone below shows through — so image layers appear to float above another zone's active preset. Phase 4.9 builds the zone-level controls (opacity slider, blend mode selector) that complete this workflow.
-
----
-
-**⚡ Phase 4.9 — Zone Stack System**
+> **Why this comes after 4.8 (Palette Opacity, shipped):** Palette Opacity = 0 makes the MilkDrop background black inside the comp shader. Image/video/gif layers render on top of that black. When this preset plays in a timeline zone with `blendMode: screen`, the black pixels pass through (screen blend of black = passthrough) and the zone below shows through — so image layers appear to float above another zone's active preset. Phase 4.9 builds the zone-level controls (opacity slider, blend mode selector) that complete this workflow.
 
 Makes the multi-zone compositor a proper layered compositing system. Zones can now be full-screen overlays stacked on top of each other — not just side-by-side screen regions. A preset with `paletteOpacity=0` on a screen-blend zone places its image/video/gif objects floating above whatever zone is beneath it.
 
@@ -343,231 +245,29 @@ Black palette in B → screen blend → those pixels pass through → Zone A sho
 
 ---
 
-**✅ Phase 4.10-A — Real-time Live Editing (Mutation Reschedule)** *(shipped 2026-05-12)*
-
-> *"This really is what makes the software a step up."*
-
-The timeline should feel like a live mixing desk, not a static playlist. Block positions, durations, and blend times edited during playback must take effect instantly — no stop-and-restart required.
-
----
-
-#### Root Cause — The Stale Timer Problem
-
-When `play()` is called, `_playZone(zoneId)` schedules every future entry as a `setTimeout` handle. These handles are stored in `_zoneTimers = Map<zoneId, timerHandle[]>`. The scheduler is a snapshot taken once at play time.
-
-Any mutation after that point — drag, resize, quick-edit apply, duplicate, delete — updates the data model (`_tl.entries`) immediately, but the already-queued `setTimeout` handles have already captured their fire-times. They will fire based on the OLD data regardless.
-
-**Observed symptoms:**
-- Drag a block left → block appears to snap back; stale timer fires and loads the old preset at the old time
-- Drag a block right → block plays before the playhead reaches the new position
-- Resize a block shorter → fade-out fires too late; preset plays into the gap
-- Delete a block → the timer fires anyway and loads the deleted preset's name
-- Add a block while playing → never scheduled (play() already ran; new entry has no timer)
-- Change blend time in quick-edit → next transition uses the old value
-
-The engine runs the original plan. It has no knowledge that the score changed.
-
----
-
-#### The Fix — `_rescheduleIfPlaying()`
-
-```js
-_rescheduleIfPlaying() {
-    if (!this._playing) return;
-    const tNow = (performance.now() - this._playStartWall) / 1000;
-    this._scrubTo(tNow);
-}
-```
-
-`_scrubTo(t)` already does exactly what's needed:
-1. Cancels every timer in every `_zoneTimers` array — all stale handles gone
-2. Resets `_playStartWall = performance.now() - t * 1000` — wall clock re-anchored to `t`
-3. Calls `_playZone(id, t)` for every zone — fresh timers scheduled from the current playhead position against the current data model
-
-After `_rescheduleIfPlaying()`, the scheduler is a perfect snapshot of the data model as of the call moment. The visible playhead does not jump — the rAF tick reads `(performance.now() - _playStartWall) / 1000`, which is unchanged because we re-anchored the wall clock to `tNow`.
-
----
-
-#### The Currently-Playing Preset Problem (Most Critical Edge Case)
-
-`_playZone` finds the active entry at `fromTime` and calls:
-```js
-zd.engine.loadPreset(activeEntry.presetName, 0);
-this._fadeZoneCover(zoneId, 0, 0);
-```
-
-If the zone is ALREADY showing that preset (because it was loaded by the timer that fired 10 seconds ago), this causes a visible flash: the cover briefly returns to 1 (black) and the engine reloads a preset it's already running. In a live performance, this is unacceptable.
-
-**Required solution — preset tracking map:**
-
-Add to constructor:
-```js
-this._currentZonePreset = new Map(); // Map<zoneId, presetName>
-```
-
-Set it whenever `loadPreset` fires in `_playZone` (both the immediate-entry path and the future-entry timer path):
-```js
-this._currentZonePreset.set(zoneId, entry.presetName);
-zd.engine.loadPreset(entry.presetName, blendTime).catch(() => {});
-```
-
-In `_playZone`'s immediate-entry path, before the reload:
-```js
-if (this._currentZonePreset.get(zoneId) !== activeEntry.presetName) {
-    zd.engine.loadPreset(activeEntry.presetName, 0).catch(() => {});
-    this._fadeZoneCover(zoneId, 0, 0);
-    this._currentZonePreset.set(zoneId, activeEntry.presetName);
-}
-// else: engine already showing this preset — skip the reload; cover is already down
-```
-
-This makes reschedule during playback seamless: future timers are rebuilt; the currently-visible content is untouched.
-
-Clear `_currentZonePreset` in `stop()` so a fresh `play()` always loads correctly.
-
----
-
-#### The 6 Mutation Call Sites
-
-Every place that modifies `_tl.entries` must call `_rescheduleIfPlaying()` after the data model update:
-
-| # | Mutation | Where | Data changed |
-|---|----------|-------|-------------|
-| 1 | **Drag drop** | `_startMoveDrag → onUp` commit path (where `moved === true`) | `entry.startTime` |
-| 2 | **Resize drop** | Resize `pointerup` handler, after duration commit | `entry.duration` |
-| 3 | **Quick-edit apply** | `#qe-apply` click handler, after field writes | `entry.blendTime`, `entry.label` |
-| 4 | **Duplicate** | `#qe-dupe` click handler, after `_tl.entries.push(newEntry)` | new entry added |
-| 5 | **Delete** | `#qe-del` click handler, after entry splice | entry removed |
-
-Call `_rescheduleIfPlaying()` AFTER the model write, BEFORE `_renderStrip()`. Strip render is cosmetic; reschedule is functional.
-
-**Drag note:** fire reschedule only on DROP (pointer-up), not on each pointer-move tick. During the drag, the block's visual position moves in CSS — timer reschedule happens once at commit. This avoids 60 reschedules/second with no benefit.
-
----
-
-#### Delete While Playing — Zone Blackout Edge Case
-
-If the deleted entry is the currently-playing one in its zone:
-- `_rescheduleIfPlaying()` calls `_playZone(zoneId, tNow)`
-- `_playZone` finds no active entry at `tNow` (entry was deleted)
-- It must raise the cover to black for this zone
-
-Verify `_playZone` actually does this. From the state machine: *"Timeline start / gap at fromTime → cover = 1 (black)"*. Confirm the immediate-entry path has an `else` branch that calls `_fadeZoneCover(zoneId, 1, 0)` when `activeEntry === null`. If it does not, this is a one-liner fix to add there.
-
-Also clear `_currentZonePreset.delete(zoneId)` for the zone when the playing entry is deleted.
-
----
-
-#### Add Block While Playing — Needs Reschedule Too
-
-The `addEntry()` / preset picker `_addEntry()` path currently does not call `_rescheduleIfPlaying()`. A block added while playing is never scheduled. Add the call to the end of `addEntry()` (called from both the `+` button and the preset picker confirm path).
-
-This is mutation call site #6, not listed in the Phase 4.4 quick-edit scope because it's a different code path. Include it in 4.10-A.
-
----
-
-#### Wall-clock Accuracy
-
-`_scrubTo(tNow)` sets:
-```js
-this._playStartWall = performance.now() - tNow * 1000;
-```
-
-This re-anchors the wall clock so that `(performance.now() - _playStartWall) / 1000 === tNow` at the moment of the call. The playhead rAF tick reads this formula continuously — it sees no discontinuity. Future timers are scheduled as `delay = (entry.startTime - tNow) * 1000`, which resolves correctly.
-
-`performance.now()` resolution: ≥ 0.1ms in site-isolated contexts (standard Chrome/Safari). Even at the reduced 5ms resolution some browsers apply, this is imperceptible for AV scheduling. No platform concern.
-
----
-
-#### Interaction with Loop / Loop Solo (Future)
-
-When Loop or Loop Solo is active, a `_loopTimer` is running a recursive cycle. `_rescheduleIfPlaying()` calls `_scrubTo`, which must decide whether to break the loop.
-
-**Design decision for Phase 4.10-A:** `_rescheduleIfPlaying()` calls `_scrubTo` directly. Since Loop/Loop Solo are not yet built, no conflict exists. When Phase 3.5 loop buttons are built, add an option:
-
-```js
-_rescheduleIfPlaying() {
-    if (!this._playing) return;
-    const tNow = (performance.now() - this._playStartWall) / 1000;
-    this._scrubTo(tNow, { preserveLoopState: true });
-}
-```
-
-`_scrubTo(t, { preserveLoopState })` skips the loop-clearing block when the flag is set. This way, a VJ can drag a block to a new position WHILE a loop is running and the loop continues after the reschedule. The alternative (breaking the loop on any drag) would be frustrating in a live context.
-
----
-
-#### Sub-phases
-
-**4.10-A — Core (ship first, self-contained)**
-- Add `_currentZonePreset = new Map()` to constructor and `stop()` clear
-- Add preset-match guard to the immediate-entry path in `_playZone`
-- Add `_currentZonePreset.set(zoneId, name)` wherever `engine.loadPreset()` is called
-- Add `_rescheduleIfPlaying()` method
-- Wire to 6 mutation call sites: drag drop, resize drop, qe-apply, qe-dupe, qe-del, addEntry
-- Verify delete-while-playing zone blackout works (add `else` cover raise if missing)
-
-**4.10-B — Loop state preservation**
-- Refactor `_scrubTo` to accept `{ preserveLoopState }` flag
-- Build alongside Phase 3.5 Loop/Loop Solo buttons
-
----
-
-#### Testing Matrix
-
-Run each scenario WHILE the timeline is playing:
-
-| Mutation | Block state at edit time | Expected outcome |
-|----------|--------------------------|-----------------|
-| Drag block to later time | Block NOT yet playing | Timer fires at new time; no interruption |
-| Drag block to later time | Block IS currently playing | Continues playing; future exit timer fires at new (later) end |
-| Drag block to earlier time | Block NOT yet playing | Timer fires at new (earlier) time |
-| Resize block shorter | Block IS currently playing | Fade-out fires at the new (earlier) end — no wait |
-| Resize block longer | Block IS currently playing | Fade-out deferred to new (later) end |
-| Resize block longer | Block NOT yet playing | Next timer fires at correct new end |
-| Quick-edit: change blend time | Block NOT yet playing | Next transition uses the new blend value |
-| Quick-edit: change blend time | Block IS currently playing | No visual effect (already faded in) — correct |
-| Duplicate block | Any | New block appears; timer scheduled if it falls after current playhead |
-| Delete block (not playing) | Any | Timer cancelled; no visual effect |
-| Delete block (currently playing) | Block IS currently playing | Zone goes black immediately; next block's timer takes over |
-| Add new block via preset picker | Any | New block scheduled if after current playhead |
-| Rapid consecutive mutations | Any | No orphan timers; last reschedule wins |
-
-**Cross-platform checklist:** test on web (Chrome), then macOS app (Tauri/WKWebView). The fix is pure JS + `setTimeout` — no platform-specific behavior expected. Confirm `performance.now()` is monotonic in WKWebView (it is, but verify no offset drift over 10+ minutes of playback).
-
----
-
-**⚡ Phase 4.11 — Staging Mode**
+### 5 · Phase 4.11 — Staging Mode ⬜
 
 A safe editing environment that overlays the live timeline strip. The VJ makes multiple changes — add, remove, reorder blocks — then commits them all at once. The live playback is never interrupted during staging. Changes take effect on the next block boundary after Apply is pressed.
-
----
 
 #### The Problem it Solves
 
 Real-time editing (Phase 4.10-A) is powerful but exposes a risk: a misclick or accidental drag while playing changes the live show immediately. For a VJ mid-set, a safe scratch space where you can plan the next few blocks without touching what's playing is essential.
 
----
-
 #### What Staging Is — and Is Not
 
 **It is an overlay on the exact same strip interface.** The live canvas keeps playing behind it. The timeline strip looks identical to the live strip — same blocks, same ruler, same zone rows. The only differences are the amber tint, the STAGING pill, and the passive playhead. The VJ is not taken to a new page or a separate view. They are editing the strip they already know, with the live output visible behind them.
-
----
 
 #### What Loads into Staging
 
 Two paths — both land in the same overlay:
 
-**Default — copy of the live Set:**  
+**Default — copy of the live Set:**
 Staging opens with an exact copy of the currently-playing Timeline Set. The VJ tweaks what's already scheduled — move a block, add one, remove one — then applies.
 
-**Load a different Timeline Set into Staging:**  
+**Load a different Timeline Set into Staging:**
 A **Load Set →** option in the Staging overlay lets the VJ pull any saved Timeline Set into staging instead. They can edit it or push it straight to live as-is. This is the full set-switching workflow: pick a set, optionally edit it, apply on the boundary.
 
 Both paths use the same staging overlay. The difference is just what's in `_stagedTl` when the overlay opens.
-
----
 
 #### UX Flow
 
@@ -605,8 +305,6 @@ On Cancel:
 **Why the playhead is shown in staging (but passive):**
 The dashed playhead is not just visual context — it is the anchor for "Match Cue Point." The VJ can see exactly where the live set is and make an informed decision: start fresh from 0, or pick up seamlessly from here. Without seeing the live cue position, that choice would be blind.
 
----
-
 #### What Changes in Staging Mode
 
 | Interaction | Live mode | Staging mode |
@@ -619,8 +317,6 @@ The dashed playhead is not just visual context — it is the anchor for "Match C
 | Load Set → | — | Replaces staged copy with a saved Set |
 | Apply | — | Queues staged copy; commits on next block boundary |
 | Cancel | — | Discards staged copy; overlay closes |
-
----
 
 #### Architecture
 
@@ -665,15 +361,11 @@ this._stagingMode = false;
 // render strip from this._tl — unchanged
 ```
 
----
-
 #### Preset Picker in Staging Mode
 
 The existing preset picker works unchanged. In Staging mode, the confirm action writes to `this._stagedTl` instead of `this._tl`. No new UI needed — the picker is already a deliberate gesture.
 
 Default to the **Favorites tab** when opening the picker from Staging mode. The VJ's curated list is the right starting point for live add decisions. Full All/Search tabs remain available.
-
----
 
 #### Visual Language
 
@@ -685,21 +377,17 @@ Three signals make Staging unmistakable:
 
 Getting these three wrong is the worst failure mode. A VJ who thinks they're live when they're in staging (or vice versa) will have a bad night.
 
----
-
 #### Files
 
-`src/timeline/timelineEditor.js` — staging state, mutation routing, boundary swap  
-`src/timeline/style.css` — amber tint, staging pill, dashed playhead  
+`src/timeline/timelineEditor.js` — staging state, mutation routing, boundary swap
+`src/timeline/style.css` — amber tint, staging pill, dashed playhead
 `timeline.html` — Apply / Cancel button additions to transport DOM
 
 ---
 
-**⚡ Phase 4.12 — Timeline Sets Switching**
+### 6 · Phase 4.12 — Timeline Sets Switching ⬜
 
 Applies the Boundary Rule to switching between Timeline Sets. The current topbar `<select>` dropdown swaps instantly — this replaces that with a queued switch. The current block plays to its natural end, then the queued Set starts from its beginning with a clean fade.
-
----
 
 #### UX Flow
 
@@ -718,8 +406,6 @@ Change your mind before the boundary:
   → "Up next" clears immediately
 ```
 
----
-
 #### Transition at the Boundary
 
 When the current block's timer fires and the pending Set slot is filled:
@@ -736,8 +422,6 @@ if (this._pendingSetTl) {
 
 The new Set always starts from time 0. The cover system handles the visual: the outgoing preset fades to black (cover up), the first block of the new Set fades in (cover down). Same path as a normal gap-to-block transition — no new fade code.
 
----
-
 #### 4.12-A — Queue Mechanism (Engine)
 
 - `_pendingSetTl` slot on `TimelineEditor` — holds a full timeline data object
@@ -747,8 +431,6 @@ The new Set always starts from time 0. The cover system handles the visual: the 
 - "Up next: [name]" transport indicator tied to whether `_pendingSetTl` is set
 
 **Files:** `src/timeline/timelineEditor.js`
-
----
 
 #### 4.12-B — My Sets Panel
 
@@ -770,8 +452,6 @@ Replaces the topbar `<select>` dropdown with a proper Sets panel. The dropdown w
 
 **Files:** `src/timeline/timelineEditor.js`, `timeline.html`, `src/timeline/style.css`
 
----
-
 #### 4.12-C — Save Set Flow
 
 Current save flow: clicking Save writes the current `_tl` to localStorage under the current timeline's id. This is unchanged. The rename is purely UI:
@@ -785,8 +465,6 @@ Current save flow: clicking Save writes the current `_tl` to localStorage under 
 
 No storage migration. `timelineStorage.js` key format, CRUD, and schema are unchanged.
 
----
-
 #### The One Implementation, Two Features Pattern
 
 Staging (4.11) and Timeline Sets switching (4.12) are the same boundary-swap mechanism:
@@ -798,26 +476,20 @@ Staging (4.11) and Timeline Sets switching (4.12) are the same boundary-swap mec
 
 `_onBlockBoundary()` checks both slots in order. If Staging is pending, it resolves first. Set switch resolves after. Only one can be pending at a time in normal use — if a VJ queues a Set while in Staging mode, the Staging changes are discarded (with a one-tap confirm: "Switch sets? Your staged changes will be lost.").
 
----
-
 #### Files
 
-`src/timeline/timelineEditor.js` — `_pendingSetTl`, `_onBlockBoundary()`, Sets panel logic  
-`timeline.html` — My Sets button, Sets panel DOM, "Up next" indicator  
-`src/timeline/style.css` — panel card styles, NOW/UP NEXT chips, indicator  
+`src/timeline/timelineEditor.js` — `_pendingSetTl`, `_onBlockBoundary()`, Sets panel logic
+`timeline.html` — My Sets button, Sets panel DOM, "Up next" indicator
+`src/timeline/style.css` — panel card styles, NOW/UP NEXT chips, indicator
 `src/timelineStorage.js` — no changes (schema unchanged)
 
 ---
 
----
-
-**⚡ Phase 4.13 — Timeline Set Export / Import**
+### 7 · Phase 4.13 — Timeline Set Export / Import ⬜
 
 Portable Timeline Sets — a `.dcset.json` bundle that contains everything needed to run the set on any machine: the full timeline arrangement, all custom presets referenced by the set, and all embedded images/layers. Hand the file to another VJ and they get an identical show.
 
 Builds directly on the existing `.dcshow.json` export/import architecture. The addition is a metadata envelope and a proper export modal with title, description, and cover image. The import flow reuses the existing `importResultModal.js` pattern.
-
----
 
 #### The Bundle Format — `.dcset.json`
 
@@ -853,8 +525,6 @@ A metadata wrapper around the existing show bundle:
 
 `.dcset.json` is the new extension — more specific than `.dcshow.json` which already exists. Both formats remain supported on import. Old `.dcshow.json` files import as a Timeline Set with no metadata (title defaults to the filename).
 
----
-
 #### Export Flow
 
 ```
@@ -879,8 +549,6 @@ Or from the transport bar when a Set is loaded: **Export Set** button.
 
 Cover image is optional in v1 — the field is present but "No image" is a valid state. The infrastructure is there to add auto-screenshot capture later.
 
----
-
 #### Import Flow
 
 ```
@@ -898,22 +566,18 @@ My Sets panel → [Import Set] button
   → New Set available immediately in My Sets panel
 ```
 
-On name collision for the Set itself (a Set with the same name already exists):  
+On name collision for the Set itself (a Set with the same name already exists):
 → imported Set gets " (imported)" suffix automatically. No prompt — clean and fast.
-
----
 
 #### Architecture
 
-**Export:**  
+**Export:**
 Reuse `exportPreset(id)` from `customPresets.js` for each custom preset referenced by the set. Collect all results into the `presets` block. Serialize the Set data into `set`. Wrap with `meta`. Use `downloadFile()` from `fileUtils.js` (already handles both web and Tauri native Save As).
 
-**Import:**  
+**Import:**
 Parse the outer `meta` + `set` + `presets` structure. Feed `presets` through the existing `importFromFile()` path in `customPresets.js` — ID remapping, IndexedDB image storage, localStorage writes all handled already. Then call `timelineStorage.saveTimeline(set)` with a new ID to register the Set. Show `importResultModal` for preset results.
 
 No new storage primitives needed. The existing preset export/import and timeline save infrastructure covers everything — this phase is plumbing and UI only.
-
----
 
 #### Future Extensions (out of scope for v1)
 
@@ -922,49 +586,38 @@ No new storage primitives needed. The existing preset export/import and timeline
 - **Export All Sets** — bulk bundle of every saved Timeline Set
 - **Share link** — upload to a hosted service, share a URL (far future)
 
----
-
 #### Files
 
-`src/timeline/timelineEditor.js` — export/import trigger, modal wiring  
-`timeline.html` — export modal DOM, import button in My Sets panel  
-`src/timeline/style.css` — export modal, import preview card  
-`src/timelineStorage.js` — no changes  
-`src/customPresets.js` — no changes (reused as-is)  
-`src/fileUtils.js` — no changes (reused as-is)  
+`src/timeline/timelineEditor.js` — export/import trigger, modal wiring
+`timeline.html` — export modal DOM, import button in My Sets panel
+`src/timeline/style.css` — export modal, import preview card
+`src/timelineStorage.js` — no changes
+`src/customPresets.js` — no changes (reused as-is)
+`src/fileUtils.js` — no changes (reused as-is)
 `src/importResultModal.js` — reused as-is
 
 ---
 
-*Backlog — Loop & Regions*
-- **Loop section range on ruler** — drag a range on the ruler to set loop bounds. Playback bounces between in and out points.
-- **Advanced Loop logic** — marker action `loop` jumps to previous loop start rather than `0:00`.
+### 8 · Phase 4.4-C/D/E — Block Settings Menu (remaining) ⬜
 
-*Backlog — Live Performance*
-- **Per-entry crossfade style** — Cut / White Flash / Black Dip — stored as `transitionStyle` on entry.
-- **Live queue override** — during playback, click a future block to force it to play *next*, overriding the timeline's strict chronological order.
-- **Hold/freeze preset** — while playing, press `H` to freeze the current preset indefinitely, ignoring upcoming block transitions. Press again to release.
-- **Speed control** — 0.5×, 1×, 2× playback speed. Affects wall-clock calculation.
-- **Entry label canvas overlay** — text overlay during playback (label field already in data model and quick-edit).
+Phases 4.4-A and 4.4-B shipped (see archive). Remaining sub-phases:
 
-*Backlog — Audio Sync*
-- **Timeline ↔ Audio lock** — when using "Load Track" mode, sync the timeline playhead with the audio file's `currentTime`. Scrubbing one scrubs both. Playback of one drives both.
-- **BPM grid on ruler** — enter a BPM; ruler shows beat markers. Blocks snap to beat boundaries on drag/resize. Playhead shows current beat count.
-- **Beat-triggered transitions** — instead of hard time-based transitions, trigger the next preset on the next beat boundary after the block's duration expires.
+| Phase | What's added |
+|-------|-------------|
+| **C — Full Edit** | "Full Edit →" deep-link into Preset Studio for this preset |
+| **D — Utilities** | Block color picker |
+| **E — Preset Controls** | Full `controls.js` panel as a new section below the fields, re-targeted to this zone's engine; live during playback |
 
-*Backlog — Workflow & UX*
-- **Auto-fill from Favorites** — button in transport to quickly fill a zone.
-- **Multi-select (Shift-click)** — bulk duration stamping and movement.
-- **Setlist text export** — plain-text or HTML table.
-- ~~**Timeline Library modal**~~ → now specced as **Phase 4.12-B — My Sets Panel**. The `<select>` dropdown will be replaced by a card-based My Sets panel with NOW/UP NEXT chips, queued switching, + New Set, Save Set, Import Set, Export Set. See Phase 4.12-B for full spec.
-- **Auto-save behavior** — debounced "draft" slot rather than spawning a new entry per page load.
+**Styling (prerequisite for Phase C):** Size and padding are correct — controls must stay easy to see and hit. Fix is visual hierarchy and anchoring:
+- "s" unit labels feel orphaned — should be anchored to their input (suffix inside the field, or a pill flush alongside it)
+- Field labels and values have similar visual weight — labels should read as secondary so the value is what draws the eye
+- Apply/Cancel button bar stays — clear affordance — but should match the app's glassmorphic language rather than reading as a generic HTML form
 
-*Deferred — After Video Processing*
-- **Performance Panel** — a full-width overlay showing every active zone as a flex column, each with its full `controls.js` panel re-targeted to that zone's engine. On a large screen or broadcast rig this becomes a complete mixing desk — every zone, every parameter, all live at once. Columns flex to fill available width; smaller screens scroll horizontally. **Blocked on:** video processing controls being built out first — the panel's value comes from having rich controls to surface. Once those are in place, the panel shell is straightforward (see UX Philosophy Layer 2).
+**Technical note (for Phase E):** `src/controls.js` currently targets the primary engine. For timeline zones, each zone has its own slave `VisualizerEngine` at `_zoneMap.get(zoneId).engine`. The modal re-targets controls to the correct engine on open, then restores the original target on close. No new slider widgets — just a target-swap.
 
 ---
 
-### Phase 5 — Timeline Output to External Displays 🔬 RESEARCH PHASE
+### 9 · Phase 5 — Timeline Output to External Displays 🔬
 
 **Status**: Research in progress — see `visualizer-output-dev.md` for detailed findings.
 
@@ -973,6 +626,7 @@ No new storage primitives needed. The existing preset export/import and timeline
 **Architecture**: This is built on the **Output System** — a modular subsystem shared between the timeline editor and main app player. The core handles display enumeration, window positioning, and streaming; the timeline editor adds per-zone output assignment UI.
 
 **Platform Targets**:
+
 | Platform | Status | Notes |
 |----------|--------|-------|
 | **Web** | 🔬 Research | `getScreenDetails()` + `window.open()` positioning needs testing |
@@ -997,25 +651,77 @@ No new storage primitives needed. The existing preset export/import and timeline
 
 ---
 
+## ✅ Completed Phases — Index
+
+One line each. Full implementation detail, post-ship fixes, and edge-case notes are in **[timeline-editor-archive.md](timeline-editor-archive.md)**.
+
+| Phase | Summary |
+|-------|---------|
+| 1 | Single-zone editor — CRUD, DOM strip, preset picker, transport, advancing playhead |
+| 2 | Multi-zone compositor — slave engines, 6 zone layouts, per-zone strip rows |
+| 3 | UX polish — position-based dragging, inline block actions, always-visible controls, fullscreen button |
+| 3.5 | Active Playhead — click-to-seek, persistent position, automated gap crossfades *(Loop buttons → Roadmap #1)* |
+| 4.1 | VJ Markers — ruler cue points + 1–9 hot-cue keys, `stop`/`loop` marker actions |
+| 4.2 | Transport & Seeking — go-to-start, skip-to-next, VJ-mode stop (visuals keep running) |
+| 4.3 | Quick Wins — keyboard nudge, drag-scrub on ruler, block navigation arrows |
+| 4.4-A | Block Action Modal — Duplicate/Delete consolidated into `#tl-quick-edit`, hover row removed |
+| 4.4-B | Block Menu Icon — hamburger toggle, single-click select, double-click cue, no auto-dismiss |
+| 4.5 | Double-click to Cue — crossfade into the cued preset + seek timeline to its `startTime` |
+| 4.8 | Preset Palette Opacity — MilkDrop background-layer opacity slider (prereq for Zone Stack) |
+| 4.10-A | Real-time Live Editing — `_rescheduleIfPlaying()` rebuilds timers after any mutation |
+
+---
+
+## Backlog
+
+Unscheduled ideas. Promote to the Roadmap and the *Up Next* table when ready to commit.
+
+*Loop & Regions*
+- **Loop section range on ruler** — drag a range on the ruler to set loop bounds. Playback bounces between in and out points.
+- **Advanced Loop logic** — marker action `loop` jumps to previous loop start rather than `0:00`.
+
+*Live Performance*
+- **Per-entry crossfade style** — Cut / White Flash / Black Dip — stored as `transitionStyle` on entry.
+- **Live queue override** — during playback, click a future block to force it to play *next*, overriding the timeline's strict chronological order.
+- **Hold/freeze preset** — while playing, press `H` to freeze the current preset indefinitely, ignoring upcoming block transitions. Press again to release.
+- **Speed control** — 0.5×, 1×, 2× playback speed. Affects wall-clock calculation.
+- **Entry label canvas overlay** — text overlay during playback (label field already in data model and quick-edit).
+
+*Audio Sync*
+- **Timeline ↔ Audio lock** — when using "Load Track" mode, sync the timeline playhead with the audio file's `currentTime`. Scrubbing one scrubs both. Playback of one drives both.
+- **BPM grid on ruler** — enter a BPM; ruler shows beat markers. Blocks snap to beat boundaries on drag/resize. Playhead shows current beat count.
+- **Beat-triggered transitions** — instead of hard time-based transitions, trigger the next preset on the next beat boundary after the block's duration expires.
+
+*Workflow & UX*
+- **Auto-fill from Favorites** — button in transport to quickly fill a zone.
+- **Multi-select (Shift-click)** — bulk duration stamping and movement.
+- **Setlist text export** — plain-text or HTML table.
+- **Auto-save behavior** — debounced "draft" slot rather than spawning a new entry per page load.
+
+*Deferred — After Video Processing*
+- **Performance Panel** — a full-width overlay showing every active zone as a flex column, each with its full `controls.js` panel re-targeted to that zone's engine. On a large screen or broadcast rig this becomes a complete mixing desk — every zone, every parameter, all live at once. Columns flex to fill available width; smaller screens scroll horizontally. **Blocked on:** video processing controls being built out first — the panel's value comes from having rich controls to surface. Once those are in place, the panel shell is straightforward (see UX Philosophy Layer 2).
+
+---
+
 ## What This Is
 
 A **Timeline** is a positional playlist of presets where each entry has a fixed display duration, blend-in transition, and an absolute start time within a zone. Multiple zones (screen regions) run simultaneously — different presets play in different areas of the canvas, composited live via CSS `mix-blend-mode`. The Timeline Editor is where you build and play them.
 
 Same design language as the rest of the app: full-screen canvas, glassmorphic overlays, controls permanently visible unless fullscreen is active.
 
-**No changes to the main app or Preset Studio are required** beyond two one-liners (navigation links, already shipped — see Modified Files).
+**No changes to the main app or Preset Studio are required** beyond two one-liners (navigation links, already shipped — see File Map).
 
 ---
 
 ## Open Bugs / Known Gaps
 
-- **Overlaps are intentional (crossfades)**: blocks can overlap within a zone — this is the crossfade mechanism (Phase 4.6), not a bug. The old spec note `startTime + duration <= next.startTime` is superseded. No overlap prevention should be added.
+- **Overlaps are intentional (crossfades)**: blocks can overlap within a zone — this is the crossfade mechanism (Roadmap Phase 4.6), not a bug. The old spec note `startTime + duration <= next.startTime` is superseded. No overlap prevention should be added.
 - ~~**Gap behavior not visualized**~~: ✅ Fixed in Phase 3.5 — `_playZone()` now schedules blackout timers when entries end. `gapBehavior: 'black'` re-shows the zone cover; `'hold'` lets the last frame persist. Visual crosshatch/ghost-block strip rendering still not built (cosmetic only).
 - ~~**Previous preset bleeds through cover during gap-to-next-entry fade**~~: ✅ Fixed 2026-05-12 — confirmed working on web. Cover fade and `loadPreset` were firing simultaneously; old preset was visible through the fading cover. Fix: `loadPreset(name, 0)` fires first (instant GPU write), then `requestAnimationFrame` delays the cover fade until the new preset has rendered one frame. Presets now fade out cleanly, gaps show nothing, next preset fades in with no bleed. Cross-platform compatible (rAF is standard in WKWebView/WebView2). See Rule 7 in the Critical section.
-- **Zone settings popover not built**: clicking the zone label chip does nothing yet. It should open a popover for name, opacity, blend mode, gap behavior. *(Addressed in Phase 4.9-A)*
+- **Zone settings popover not built**: clicking the zone label chip does nothing yet. It should open a popover for name, opacity, blend mode, gap behavior. *(Addressed in Roadmap Phase 4.9-A)*
 - **Entry label overlay not rendered**: `entry.label` is stored and editable in quick-edit but not rendered on the canvas during playback.
-- ~~**`#tl-quick-edit` styling needs visual polish**~~: ✅ Partially addressed in Phase 4.4-A — Duplicate/Delete consolidated into modal with utility row. Full styling pass (B–D) still pending.
-- **Undo/Redo not yet implemented** — scheduled for Phase 4.7. Until then, delete and drag are irreversible.
+- ~~**`#tl-quick-edit` styling needs visual polish**~~: ✅ Partially addressed in Phase 4.4-A — Duplicate/Delete consolidated into modal with utility row. Full styling pass (Roadmap 4.4-C/D/E) still pending.
+- **Undo/Redo not yet implemented** — scheduled for Roadmap Phase 4.7. Until then, delete and drag are irreversible.
 
 ---
 
@@ -1187,8 +893,8 @@ The VJ mode rewrite in `707be41` removed gap blackouts ("VJ MODE: No fade-to-bla
 `initSlave(canvas, primaryEngine)` was added. It creates a new Butterchurn visualizer on `canvas` sharing the primary engine's audio graph (no new `AudioContext`). Sets `this._isSlaveEngine = true` which guards the render loop from running `updateAGC()`/gain management (primary handles it — slaves must not fight over the shared `GainNode`).
 
 ### `entry.startTime` is the source of truth for position
-Old behavior (Phase 1–2): `startTime: 0` on all entries, positions were computed cumulatively from array order.  
-Current behavior (Phase 3+): `startTime` is stored and is the actual seconds-from-zero position. Blocks can have gaps or overlaps. Overlaps are intentional — they define the crossfade duration (Phase 4.6).
+Old behavior (Phase 1–2): `startTime: 0` on all entries, positions were computed cumulatively from array order.
+Current behavior (Phase 3+): `startTime` is stored and is the actual seconds-from-zero position. Blocks can have gaps or overlaps. Overlaps are intentional — they define the crossfade duration (Roadmap Phase 4.6).
 
 **Backward compatibility**: `_migrateEntryStartTimes(tl)` is called on every timeline load. It detects old timelines (all entries have `startTime === 0`) and assigns cumulative start times so they don't stack at t=0.
 
@@ -1405,11 +1111,11 @@ Defined in `src/timeline/style.css` `:root`:
 
 ## Save & Naming UX Design
 
-> **Note:** The labels in this section use legacy "timeline" language. The shipped UI uses these labels — the rename to "Timeline Set" language (`Save Set`, `My Sets`, etc.) is part of Phase 4.12-C. This section documents the current running code.
+> **Note:** The labels in this section use legacy "timeline" language. The shipped UI uses these labels — the rename to "Timeline Set" language (`Save Set`, `My Sets`, etc.) is part of Roadmap Phase 4.12-C. This section documents the current running code.
 
 ### The Problem
 Three distinct concerns were visually flattened into one topbar with no state differentiation:
-1. **Navigate** between Timeline Sets — the `<select>` dropdown *(to be replaced by My Sets panel in Phase 4.12-B)*
+1. **Navigate** between Timeline Sets — the `<select>` dropdown *(to be replaced by My Sets panel in Roadmap Phase 4.12-B)*
 2. **Name** the current set — the text input (same text, same size, visually parallel)
 3. **Persist** the current state — Save button (fires immediately, no feedback on *what* it's doing)
 
@@ -1426,7 +1132,7 @@ Every Timeline Set is in one of three states. The UI makes the current state leg
 
 `_isNew()` checks `!this._timelines[this._tl?.id]` — a set is new if its ID is not in the in-memory map (which mirrors localStorage).
 
-### Save Button — Three Behaviors *(current labels — will become "Save Set" in Phase 4.12-C)*
+### Save Button — Three Behaviors *(current labels — will become "Save Set" in Roadmap Phase 4.12-C)*
 | State | Button Label | Click Behavior |
 |---|---|---|
 | **New** | `Save…` (ellipsis = step follows) | Opens naming dialog |
