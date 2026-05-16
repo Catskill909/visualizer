@@ -479,6 +479,7 @@ These are the entry points. Each one references its focused subdocs in `docs/`.
 | [`storage-audit-dev.md`](storage-audit-dev.md) | ✅ All fixes shipped & deployed May 11, 2026 | Storage hardening — QuotaExceededError guard, export size warning, blob cleanup bugs fixed, Tauri native FS (eviction-proof blob storage for macOS + Windows). Deployed to web + macOS DMG. Cross-platform import/export verified (video presets web ↔ macOS). |
 | [`noise-gate-dev.md`](noise-gate-dev.md) | ✅ Built | Noise gate for live/mic — silence threshold, AGC interaction, VU meter states. |
 | [`live-input-dev.md`](live-input-dev.md) | ✅ Built | Live audio input dev notes. |
+| [`docs/spectral-flux-dev.md`](docs/spectral-flux-dev.md) | ✅ Shipped 2026-05-15 | Spectral Flux audio source — DIY onset detection from existing AnalyserNode, q31 bridge to GLSL, all three source dropdowns. |
 | [`midi-dev.md`](midi-dev.md) | 📋 Planning | MIDI controller integration — action registry, MIDI learn UX, phased plan. |
 | [`docs/user-guide-redesign.md`](docs/user-guide-redesign.md) | 📋 Planning | In-app user guide redesign — searchable help centre, contextual `?` deep links. |
 

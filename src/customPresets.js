@@ -428,7 +428,7 @@ export async function importFromFile(json) {
  */
 export function buildMotionReactFrameEqs(mr) {
     const conf = mr || {};
-    const srcMap = { bass: 'a.bass', mid: 'a.mid', treb: 'a.treb', vol: 'a.vol' };
+    const srcMap = { bass: 'a.bass', mid: 'a.mid', treb: 'a.treb', vol: 'a.vol', flux: 'a.q31' };
     const src = srcMap[conf.source] || 'a.bass';
     const curve = conf.curve || 'linear';
 

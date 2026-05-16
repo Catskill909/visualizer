@@ -82,6 +82,11 @@ export class VisualizerEngine {
     this.lastPeak = 0.5;
     this.hypeLevel = 0; // 0-1 value for UI feedback
 
+    // Spectral flux — onset detection (pre-allocated, populated in init())
+    this._fluxFftBuf = null;
+    this._fluxPrevFrame = null;
+    this._spectralFlux = 0;
+
     // GIF animation state: texName → { frames, delays, uploadCanvas, uploadCtx, frameIndex, nextFrameAt, width, height }
     this._gifAnimations = new Map();
     // Video animation state: texName → { videoElement, uploadCanvas, uploadCtx, width, height }
@@ -101,6 +106,10 @@ export class VisualizerEngine {
     this.analyser = this.audioContext.createAnalyser();
     this.analyser.fftSize = 1024; // Better resolution for peak detection
     this.agcDataArray = new Uint8Array(this.analyser.fftSize);
+
+    // Spectral flux buffers — frequencyBinCount = fftSize/2 = 512
+    this._fluxFftBuf = new Uint8Array(this.analyser.frequencyBinCount);
+    this._fluxPrevFrame = new Uint8Array(this.analyser.frequencyBinCount);
 
     // 2. Kick Lock Filter (Lowpass)
     this.kickFilter = this.audioContext.createBiquadFilter();
@@ -605,6 +614,19 @@ export class VisualizerEngine {
           // Map 0-1 to a more visible 0-1 range for the UI meter
           this.hypeLevel = Math.min((peak * targetGain) / 5.0, 1.2);
         }
+      }
+
+      // Spectral flux — onset detection from existing analyser (primary engine only)
+      if (!this._isSlaveEngine) {
+        this.analyser.getByteFrequencyData(this._fluxFftBuf);
+        let _flux = 0;
+        for (let i = 0; i < this._fluxFftBuf.length; i++) {
+          const diff = this._fluxFftBuf[i] - this._fluxPrevFrame[i];
+          if (diff > 0) _flux += diff;
+        }
+        this._spectralFlux = Math.min(1.0, _flux / (this._fluxFftBuf.length * 10));
+        this._fluxPrevFrame.set(this._fluxFftBuf);
+        window.__dcFlux = this._spectralFlux;
       }
 
       this._tickGifAnimations();

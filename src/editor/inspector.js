@@ -3659,6 +3659,7 @@ export class EditorInspector {
                 <option value="mid">Mid</option>
                 <option value="treb">Treble</option>
                 <option value="vol">Volume</option>
+                <option value="flux">Flux</option>
               </select>
             </div>
             <div class="layer-row-inline" style="gap:8px;margin-bottom:8px">
@@ -5421,9 +5422,8 @@ export class EditorInspector {
         const runtime = deepClone(state);
         const injected = buildMotionReactFrameEqs(state.motionReact);
         const baseFrame = runtime.frame_eqs_str || '';
-        runtime.frame_eqs_str = injected
-            ? `${baseFrame}\n${injected}`.trim()
-            : baseFrame;
+        const fluxLine = 'a.q31=(typeof __dcFlux!=="undefined"?__dcFlux:0);';
+        runtime.frame_eqs_str = [baseFrame, injected, fluxLine].filter(Boolean).join('\n').trim();
         return runtime;
     }
 
@@ -5510,7 +5510,7 @@ export class EditorInspector {
             const pulse = Number(this.currentState.solidPulse || 0).toFixed(4);
             const breath = Number(this.currentState.solidBreath || 0).toFixed(4);
             const shift = Number(this.currentState.solidShift || 0).toFixed(4);
-            const reactSrc = { bass: 'bass', mid: 'mid', treb: 'treb', vol: 'vol' }[this.currentState.solidReactSource || 'bass'] || 'bass';
+            const reactSrc = { bass: 'bass', mid: 'mid', treb: 'treb', vol: 'vol', flux: 'q31' }[this.currentState.solidReactSource || 'bass'] || 'bass';
             const solidCurve = this.currentState.solidReactCurve || 'linear';
             let solidCurveExpr;
             switch (solidCurve) {
@@ -5661,7 +5661,7 @@ export class EditorInspector {
         const tex = `sampler_${img.texName}`;
         const imgAsp = (img.texW && img.texH) ? (img.texW / img.texH).toFixed(4) : '1.0000';
 
-        const reactSrc = { bass: 'bass', mid: 'mid', treb: 'treb', vol: 'vol' }[img.reactSource || 'bass'] || 'bass';
+        const reactSrc = { bass: 'bass', mid: 'mid', treb: 'treb', vol: 'vol', flux: 'q31' }[img.reactSource || 'bass'] || 'bass';
         const curve = img.reactCurve || 'linear';
         let curveExpr;
         switch (curve) {
