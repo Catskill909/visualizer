@@ -33,12 +33,22 @@
         <p class="promo-modal-subtitle">What's new:</p>
         <ul class="promo-modal-list">
 
-          <li><strong>Per-Cell tile controls ✨ NEW</strong> — On any tiled image, GIF, or text layer: <strong>Offset</strong> staggers alternating rows or columns for a brick / half-drop pattern, <strong>Cell Rotate</strong> gives each tile its own random rotation (with optional 90° snap for a Truchet-style mosaic), and <strong>Popcorn</strong> drives a per-cell audio pulse so individual tiles dance on different beat phases. Composes with the existing Spin, Group, and Angle.</li>
+          <li><strong>Per-Cell tile controls ✨ NEW</strong> — On any tiled image, GIF, or text layer:
+            <strong>Offset</strong> staggers alternating rows or columns for a brick / half-drop pattern, <strong>Cell
+              Rotate</strong> gives each tile its own random rotation (with optional 90° snap for a Truchet-style
+            mosaic), and <strong>Popcorn</strong> drives a per-cell audio pulse so individual tiles dance on different
+            beat phases. New <strong>Variance</strong> sliders — <strong>Size Var</strong>, <strong>Jitter</strong>, and
+            <strong>Opacity Var</strong> — give every tile its own size, position, and opacity; with <strong>scatter
+              sampling</strong>, jittered tiles break free of the grid, drifting past their cell boundaries and
+            overlapping each other for organic, scattered layouts. A <strong>Seed</strong> control reshuffles the
+            random pattern. Composes with the existing Spin, Group, and Angle.</li>
           <li><strong>Video Layers</strong> — Drop MP4/WebM files into presets with full playback controls (play/pause,
             loop, speed, scrub), independent Width &amp; Height scaling, colored Border ring (width, color, feather),
-            full color grading (12 controls: Brightness, Contrast, Gamma, Fade, Color Temperature, Sepia, Blur, Shadows, Highlights, Lift, Gain, Tint M/G). Auto conversion to 720p on upload.</li>
+            full color grading (12 controls: Brightness, Contrast, Gamma, Fade, Color Temperature, Sepia, Blur, Shadows,
+            Highlights, Lift, Gain, Tint M/G). Auto conversion to 720p on upload.</li>
           <li><strong>Transparent Video Layers ✨ NEW</strong> — Drop a WebM with an alpha channel (e.g. an AI-rotoscoped
-            subject from <a href="https://sammieroto.com" target="_blank" rel="noopener">Sammie Roto</a>) and the subject
+            subject from <a href="https://sammieroto.com" target="_blank" rel="noopener">Sammie Roto</a>) and the
+            subject
             floats over the visualizer with full transparency. Works on web, Windows, and macOS (Mac auto-converts on
             first import). All VJ effects, audio reactivity, and motion controls apply to every frame.</li>
           <li><strong>Timeline Editor (Beta)</strong> — Full-screen show sequencer with multi-zone compositor, transport
@@ -46,17 +56,16 @@
             — drag, resize, or delete blocks while playing with no interruption; <strong>double-click any block to cue
               it</strong> instantly with a crossfade; and a per-block <strong>hamburger menu</strong> for settings —
             click the icon to open, click again to close.</li>
-          <li><strong>Animated GIF layers</strong> with speed control, Alpha Mode, timing smoothing, and GIF Optimizer.
-          </li>
-          <li><strong>Text Layers</strong> — Add live text to any preset. Choose font (Inter, Roboto, Oswald), size,
-            weight, letter spacing, line height, alignment, color, shadow, and outline. All image layer transforms
-            (tile, spin, mirror, orbit, audio reactivity) apply to text.</li>
-          <li><strong>Spectral Flux audio source</strong> — a fifth reactivity source in the Preset Studio. Flux detects transients (snare hits, claps, plucks) by measuring frame-to-frame change in the frequency spectrum. It fires on the sharp edge of each attack and stays quiet during sustained notes — useful when Bass smears across the beat and you want only the precise hit.</li>
+
+          <li><strong>Spectral Flux audio source</strong> — a fifth reactivity source in the Preset Studio. Flux detects
+            transients (snare hits, claps, plucks) by measuring frame-to-frame change in the frequency spectrum. It
+            fires on the sharp edge of each attack and stays quiet during sustained notes — useful when Bass smears
+            across the beat and you want only the precise hit.</li>
           <li><strong>Various bug fixes</strong></li>
         </ul>
 
         <p>Send feedback to <a href="mailto:paul@rarefunk.com">paul@rarefunk.com</a>.</p>
-        <p>Current release is <span id="app-version">Beta May 15, 2026</span>. Send me your email if you want notice of
+        <p>Current release is <span id="app-version">Beta May 16, 2026</span>. Send me your email if you want notice of
           app updates.</p>
         <p class="promo-modal-note">Your feedback helps shape the public release.</p>
       </div>
@@ -92,6 +101,7 @@
         <p class="hero-subtitle">
           DiscoCast Visualizer is a live visual performance studio for macOS and Windows. Featuring 1,144 reactive and
           editable MilkDrop presets, a no-code visual builder where you can mix custom visualizations, images, video,
+          transparent video layers, animated
           GIFs, and text — all with audio reactivity — plus a scripted show sequencer, all in one app.
         </p>
         <div class="hero-actions">
@@ -267,7 +277,9 @@
               <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              Video layers — play/pause, loop, speed (0.25×–4×), scrub bar, 12-control color grading (Brightness, Contrast, Gamma, Fade, Temp, Sepia, Blur, Shadows, Highlights, Lift, Gain, Tint M/G); the entire VJ effects suite applies to every frame
+              Video layers — play/pause, loop, speed (0.25×–4×), scrub bar, 12-control color grading (Brightness,
+              Contrast, Gamma, Fade, Temp, Sepia, Blur, Shadows, Highlights, Lift, Gain, Tint M/G); the entire VJ
+              effects suite applies to every frame
             </li>
             <li>
               <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -306,7 +318,8 @@
                 auto-converts on first import</div>
               <div class="il-item"><span class="il-dot"></span>Playback — play/pause, loop toggle, speed (0.25×–4×),
                 scrub bar</div>
-              <div class="il-item"><span class="il-dot"></span>Color grading — 12 controls: Brightness, Contrast, Gamma, Fade, Color Temperature, Sepia, Blur, Shadows, Highlights, Lift, Gain, Tint M/G</div>
+              <div class="il-item"><span class="il-dot"></span>Color grading — 12 controls: Brightness, Contrast, Gamma,
+                Fade, Color Temperature, Sepia, Blur, Shadows, Highlights, Lift, Gain, Tint M/G</div>
               <div class="il-item"><span class="il-dot"></span>Scale 10%–200% coverage · Mirror (H / V / Quad /
                 Kaleidoscope)</div>
               <div class="il-item"><span class="il-dot"></span>Width &amp; Height — independent non-uniform scaling
@@ -350,9 +363,20 @@
               <div class="il-item"><span class="il-dot"></span>Aspect-correct tiling — portrait/square/landscape without
                 distortion</div>
               <div class="il-item"><span class="il-dot"></span>Radius — SDF rounded-corner blend on tile edges</div>
-              <div class="il-item"><span class="il-dot"></span><strong>Per-Cell Offset ✨</strong> — stagger alternating rows or columns (classic brick / half-drop pattern)</div>
-              <div class="il-item"><span class="il-dot"></span><strong>Cell Rotate ✨</strong> — random rotation per tile, with optional 90° snap for a Truchet-style mosaic</div>
-              <div class="il-item"><span class="il-dot"></span><strong>Popcorn ✨</strong> — per-cell audio pulse; individual tiles dance on different beat phases</div>
+              <div class="il-item"><span class="il-dot"></span><strong>Per-Cell Offset ✨</strong> — stagger alternating
+                rows or columns (classic brick / half-drop pattern)</div>
+              <div class="il-item"><span class="il-dot"></span><strong>Cell Rotate ✨</strong> — random rotation per
+                tile, with optional 90° snap for a Truchet-style mosaic</div>
+              <div class="il-item"><span class="il-dot"></span><strong>Popcorn ✨</strong> — per-cell audio pulse;
+                individual tiles dance on different beat phases</div>
+              <div class="il-item"><span class="il-dot"></span><strong>Size Var ✨</strong> — procedural per-cell size
+                variance; every tile a slightly different scale</div>
+              <div class="il-item"><span class="il-dot"></span><strong>Jitter X / Y ✨</strong> — per-cell position
+                scatter; tiles break free of the grid, drifting past their cells and overlapping each other</div>
+              <div class="il-item"><span class="il-dot"></span><strong>Opacity Var ✨</strong> — per-cell opacity
+                variance; each tile fades to its own level</div>
+              <div class="il-item"><span class="il-dot"></span><strong>Seed ✨</strong> — reshuffle or lock the
+                procedural per-cell random pattern</div>
             </div>
           </div>
 
@@ -361,15 +385,22 @@
             <div class="image-layers-grid">
               <div class="il-item"><span class="il-dot"></span>Chromatic aberration — animated RGB channel split</div>
               <div class="il-item"><span class="il-dot"></span>Tint + Hue Spin — color wheel animation</div>
-              <div class="il-item"><span class="il-dot"></span>Saturation — 0 = greyscale → 1 = original → 2 = hyper-vivid</div>
-              <div class="il-item"><span class="il-dot"></span>Hue Rotate — shift image hue independently of the palette (0–360°)</div>
-              <div class="il-item"><span class="il-dot"></span>Brightness / Contrast / Gamma — exposure, punch, midtone curve</div>
+              <div class="il-item"><span class="il-dot"></span>Saturation — 0 = greyscale → 1 = original → 2 =
+                hyper-vivid</div>
+              <div class="il-item"><span class="il-dot"></span>Hue Rotate — shift image hue independently of the palette
+                (0–360°)</div>
+              <div class="il-item"><span class="il-dot"></span>Brightness / Contrast / Gamma — exposure, punch, midtone
+                curve</div>
               <div class="il-item"><span class="il-dot"></span>Fade — lift black point for a faded film look</div>
-              <div class="il-item"><span class="il-dot"></span>Color Temperature — warm/cool shift (−15% per channel)</div>
+              <div class="il-item"><span class="il-dot"></span>Color Temperature — warm/cool shift (−15% per channel)
+              </div>
               <div class="il-item"><span class="il-dot"></span>Sepia — blend toward classic warm sepia tone</div>
-              <div class="il-item"><span class="il-dot"></span>Blur — 5-tap soft blur (pairs with Additive blend for glow)</div>
-              <div class="il-item"><span class="il-dot"></span>Shadows / Highlights — luma-weighted dark &amp; bright area control</div>
-              <div class="il-item"><span class="il-dot"></span>Lift / Gain — shadow bias &amp; highlight boost (professional grading)</div>
+              <div class="il-item"><span class="il-dot"></span>Blur — 5-tap soft blur (pairs with Additive blend for
+                glow)</div>
+              <div class="il-item"><span class="il-dot"></span>Shadows / Highlights — luma-weighted dark &amp; bright
+                area control</div>
+              <div class="il-item"><span class="il-dot"></span>Lift / Gain — shadow bias &amp; highlight boost
+                (professional grading)</div>
               <div class="il-item"><span class="il-dot"></span>Tint M/G — magenta/green color balance axis</div>
               <div class="il-item"><span class="il-dot"></span>Mirror — H / V / Quad / Kaleidoscope (per-tile or whole)
               </div>
@@ -399,7 +430,8 @@
           <div class="il-category">
             <div class="il-category-title">Audio Reactivity</div>
             <div class="image-layers-grid">
-              <div class="il-item"><span class="il-dot"></span>Source — Bass, Mid, Treble, Volume, or Flux per layer</div>
+              <div class="il-item"><span class="il-dot"></span>Source — Bass, Mid, Treble, Volume, or Flux per layer
+              </div>
               <div class="il-item"><span class="il-dot"></span>Curve — Linear, Squared, Cubed, or Gate shaping</div>
               <div class="il-item"><span class="il-dot"></span>Opacity Pulse — audio-reactive fade independent of base
                 opacity</div>

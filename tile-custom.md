@@ -1,6 +1,6 @@
 # Tile Custom — Tiling Enhancement Audit & Phased Dev Plan
 
-**Last updated:** 2026-05-15 — Phase 1 ✅ shipped + verified in browser
+**Last updated:** 2026-05-16 — Phase 2.5 ✅ scatter sampling (free jitter + tile overlap)
 **Scope:** Image and GIF layers in Preset Studio. Videos stay single-instance.
 **Audience:** Anyone implementing this — including a future developer joining cold. §12 is the handoff reference.
 
@@ -8,15 +8,16 @@
 
 ## 🎯 Status Dashboard
 
-**Current state:** Phase 1 ✅ Shipped 2026-05-15. Per-Cell section live in the layer card (Offset / Cell Rotate / Popcorn). Two same-day bugfixes (Group Spin composition, corner-wrap mask) and a tooltip-length pass also landed.
-**Next action:** Phase 2 green-light when ready — Variance Suite (Size / Jitter X / Jitter Y / Opacity), Tunnel-Var trio (Speed Var / Direction Var / Phase Var), per-layer Seed + Lock. Spec at §4.
+**Current state:** Phase 2 ✅ + Phase 2.5 ✅ Shipped 2026-05-16. Variance Suite live: Size Var / Jitter X / Jitter Y / Opacity Var / Phase Var (Tunnel section) / Seed + Lock. Phase 2.5 added scatter sampling — jitter now moves tiles freely with overlap (no cropping container). Speed Var + Direction Var deferred (tunnel architecture work needed — see §4 notes).
+**Next action:** Phase 3 — Density/Grid mode + cell picker + override map + Cascade. Spec at §5. Open follow-ups from Phase 2.5: tunnel + free-jitter, and texture-resample FX (chromatic/blur/sobel/wave/pixelate) composing with scatter.
 
 ### Phase status
 
 | Phase | What | Status | Shipped | Effort |
 |---|---|---|---|---|
 | [1](#3-phase-1--structural-per-cell-wins) | Brick offset · cell rotate · popcorn | ✅ Shipped | 2026-05-15 | 1 day |
-| [2](#4-phase-2--procedural-variance-suite) | Variance suite + tunnel-var trio + per-layer seed | 📋 Planned | — | 2 days |
+| [2](#4-phase-2--procedural-variance-suite) | Variance suite + per-layer seed (Speed/Dir Var deferred) | ✅ Shipped | 2026-05-16 | 1 day |
+| 2.5 | Scatter sampling — free jitter + tile overlap (3×3 neighbour accumulation) | ✅ Shipped | 2026-05-16 | 1 day |
 | [3](#5-phase-3--explicit-grid--per-cell-editor-the-replicator) | Density/Grid mode + cell picker + override map + Cascade | 📋 Planned | — | ~1 week |
 | [3.1](#11-build-order-summary) | Drag-multi-select in picker | 📋 Future | — | ~3 days |
 | [4](#103-recursive--nested-grids--phase-4-placeholder) | Recursive / nested grids (pure 2D) | 📋 Deferred | — | TBD |
@@ -25,6 +26,18 @@
 Legend: 📋 Planned · 🔨 In progress · ✅ Shipped · 🛑 Blocked · 🐛 Bug
 
 ### Most recent change
+
+`2026-05-16` — **Phase 2.5: scatter sampling — the architectural fix for jitter cropping.** Every prior jitter fix failed because the bug was architectural, not UV math. `applyTileUV` does `_u = fract(_u + 0.5)`, which collapses each pixel into its own cell's `[0,1]` box; the texture is sampled exactly once, from that cell only. A tile physically *cannot* draw into a neighbour's pixels — so jitter could only ever slide a crop around inside the box (the "container" the user kept hitting). **Fix:** a new `buildScatterSample()` renderer. Each fragment scans the 3×3 block of cells around it; for every neighbour it computes that cell's jittered/scaled/rotated placement and composites the tile where the fragment lands inside it. Tiles now move freely past cell edges and **overlap** each other — true replicator behaviour, no cropping container. Gated by `useScatter` = jitter active + tile layer + non-video + non-tunnel; every other preset keeps the untouched `fract()` path (zero regression). All per-cell effects (size/depth/rotation/popcorn/opacity/spacing/radius/mirror) compose inside the loop. **v1 deferrals (documented, not silent):** tunnel + free-jitter, and texture-resample FX (chromatic/blur/sobel/wave/pixelate) are disabled when scatter is active — they assume a single `_u`. Depth Var is zoom-out-only in scatter mode (keeps every footprint ≤ 1 cell so 3×3 always suffices).
+
+`2026-05-16` — **Phase 2 fix: jitter + size var object-space bug.** When Size Var and Jitter X/Y were used together, jitter shifted the already-clamped texture UV rather than repositioning the image object within its cell — producing a scroll/crop of the texture instead of a positional offset. Root cause: sequential UV transforms clamp between steps, so the second transform operates in a different coordinate frame. Fix: merged Size Var and Jitter X/Y into one unified object-transform block. The combined formula is `texUV = (_u - jitterOffset - 0.5) * szF + 0.5` — jitter moves the image center within the cell, size var zooms it, both applied before the single step-mask + clamp. Each active axis still uses a distinct hash constant so the patterns are independent.
+
+`2026-05-16` — **Phase 2 fix: size var cropping.** Size Var formula changed from `1 ± 0.5×var` (zoom in/out = cropping on one side) to `1 + hash×var` (zoom out only = image always shows fully within slot, just at different sizes). No cell ever overflows its boundary. Transparent gap around smaller cells is masked the same way as Phase 1 Cell Rotate corners.
+
+`2026-05-16` — **Phase 2 fix: double image artifact on all scaling ops.** Size Var, Depth Var were pushing UV outside `[0,1]` post-fract; WebGL REPEAT wrap sampled the opposite texture edge → ghost duplicate. Fixed with the same `step()` mask + `clamp()` used by Phase 1 Cell Rotate. Jitter switched from `fract()` to `clamp()` for the same reason (fract was wrapping content at cell edge → seam artifact).
+
+`2026-05-16` — **Phase 2 seed UI cleanup.** Removed editable number input (too cluttered). Seed now shown as a read-only value display (`.lsv` span, same as all other value readouts in the card). `[Rand]` button (styled `.lseg`) picks a random 0–9999 seed and rebuilds the shader. Lock toggle (default: on) freezes the seed so saves don't bump it — unlock to get a new random layout on each save. **How to use:** with variance sliders above zero, click `[Rand]` repeatedly to audition different per-cell layouts; when you find one you like, lock it. The seed number is displayed so you can note it — but it can't be typed manually (use Rand to change it).
+
+`2026-05-16` — **Phase 2 shipped.** Variance suite live: Size Var, Jitter X, Jitter Y, Opacity Var (all in Per-Cell section), Phase Var (Tunnel section). Seed + Lock control. All 7 new state fields added to image template, text template, and `_normalizeImageEntry`. Seed threads through all per-cell hashes via `+ seedVec` offset (seed=0 → output identical to Phase 1 — full backward compat). Size/Jitter/Depth variance emitted inside `applyTileUV` post-fract; Opacity Var emitted post-sample using the popcorn `pcCell` pattern. Speed Var and Direction Var deferred — require per-cell `_tz` computation inside `applyTileUV`, which is a tunnel architecture change.
 
 `2026-05-15` — **Phase 1 polish: tooltip length pass.** User flagged that the original `Cell Rotate` tooltip ("Hashed rotation per tile — composes with Spin, Angle, and Group. 0=aligned, 1=full random per cell.") was JARRING and created more confusion than it solved. Cut all four Phase 1 tooltips to 2–5 words: Offset = "Stagger alternating rows or columns", Amount = "Stagger amount", Cell Rotate = "Random rotation per cell", Snap = "Snap to 90° increments", Popcorn = "Per-cell audio pulse". Saved a `feedback_slider_discovery_ux` memory: tooltips answer "what does this do", not "what happens with X" — slider play IS the experience.
 
@@ -38,9 +51,15 @@ Legend: 📋 Planned · 🔨 In progress · ✅ Shipped · 🛑 Blocked · 🐛 
 
 ### Bugs / blockers
 
-_None tracked — surface area is doc-only at this stage._
+| Phase | Symptom | Status |
+|---|---|---|
+| 2 | Double image — scaling ops (Size Var, Depth Var) pushed UV outside `[0,1]`; REPEAT wrap sampled opposite texture edge | ✅ Fixed 2026-05-16 — step mask + clamp, same pattern as Phase 1 Cell Rotate |
+| 2 | Jitter seam artifact — `fract()` on shifted UV wrapped content at cell boundary | ✅ Fixed 2026-05-16 — changed to `clamp()` |
+| 2 | Size Var cropping — formula allowed zoom-in (`_szF < 1`), image overflowed cell and clipped | ✅ Fixed 2026-05-16 — formula changed to zoom-out only |
+| 2 | Jitter + Size Var combined — sequential UV transforms caused jitter to scroll the texture crop rather than move the image object; edge-stretching persisted | ✅ Fixed 2026-05-16 — unified into one object-space block: `texUV = (_u - jOffset - 0.5) * szF + 0.5` |
+| 2.5 | Jitter STILL cropped at a cell-box "container"; tiles could not overlap — architectural: `fract()` locks each pixel to its own cell, one sample per pixel | ✅ Fixed 2026-05-16 — `buildScatterSample()` 3×3 neighbour-accumulation renderer; tiles move freely + overlap, no container |
 
-When bugs appear during/after implementation, log them here with: phase number, one-line symptom, status (open/fixed), and a link to the fix commit or PR if shipped.
+When new bugs appear, log them here with: phase number, one-line symptom, status, fix date.
 
 ### Related files
 
@@ -435,14 +454,14 @@ All new fields default to off / 0 / `'none'`. Existing presets re-hydrate with t
 | 1 | `tileRotateSnap` | `false` |
 | 1 | `tilePopcornAmount` | `0` |
 | 2 | `tileSizeVariance` | `0` |
-| 2 | `tileDepthVariance` | `0` *(UI: "Tunnel Phase Var")* |
+| 2 | `tileDepthVariance` | `0` *(UI: "Phase Var" in Tunnel section)* |
 | 2 | `tileJitterX` | `0` |
 | 2 | `tileJitterY` | `0` |
 | 2 | `tileOpacityVariance` | `0` |
-| 2 | `tileTunnelSpeedVariance` | `0` |
-| 2 | `tileTunnelDirectionVariance` | `0` |
 | 2 | `tileVarianceSeed` | `0` |
 | 2 | `tileVarianceSeedLocked` | `true` |
+| 2.5 | `tileTunnelSpeedVariance` | `0` *(deferred — needs tunnel arch change)* |
+| 2.5 | `tileTunnelDirectionVariance` | `0` *(deferred — needs tunnel arch change)* |
 | 3 | `tileMode` | `'density'` |
 | 3 | `tileCols` | `3` |
 | 3 | `tileRows` | `3` |

@@ -2391,6 +2391,14 @@ export class EditorInspector {
             tileRotateVariance: 0.00,   // per-cell random rotation amount (0=aligned, 1=full random)
             tileRotateSnap: false,      // snap=on: variance acts as probability of a random 90° rotation
             tilePopcornAmount: 0.00,    // per-cell audio pulse with hashed phase (0=uniform, 1=full chaos)
+            // Phase 2: Variance suite
+            tileSizeVariance: 0.00,     // per-cell scale deviation (0=uniform, 1=±50% size per cell)
+            tileJitterX: 0.00,          // per-cell horizontal content offset (0=aligned, 1=full slot width)
+            tileJitterY: 0.00,          // per-cell vertical content offset
+            tileOpacityVariance: 0.00,  // per-cell opacity deviation (0=uniform, 1=full range)
+            tileDepthVariance: 0.00,    // per-cell depth scale (tunnel: parallax depth field; no tunnel: static zoom)
+            tileVarianceSeed: 0,        // int 0–9999 — shifts all per-cell hash patterns
+            tileVarianceSeedLocked: true, // true=seed frozen; false=save bumps seed by 1
         };
         this.currentState.images.push(entry);
 
@@ -2867,6 +2875,14 @@ export class EditorInspector {
             tileRotateVariance: 0.00,
             tileRotateSnap: false,
             tilePopcornAmount: 0.00,
+            // Phase 2: Variance suite
+            tileSizeVariance: 0.00,
+            tileJitterX: 0.00,
+            tileJitterY: 0.00,
+            tileOpacityVariance: 0.00,
+            tileDepthVariance: 0.00,
+            tileVarianceSeed: 0,
+            tileVarianceSeedLocked: true,
         };
         this.currentState.images.push(entry);
 
@@ -3267,6 +3283,12 @@ export class EditorInspector {
                 value="${(entry.depthOffset || 0).toFixed(2)}" style="--pct:${pct(entry.depthOffset || 0, 0, 1)}">
               <span class="lsv layer-depth-val">${(entry.depthOffset || 0).toFixed(2)}</span>
             </div>
+            <div class="layer-slider-row layer-tunnel-row layer-percell-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
+              <span class="layer-ctrl-label" data-tooltip="Per-cell depth scale — parallax depth field with tunnel, static zoom depth without">Phase Var</span>
+              <input type="range" class="slider layer-depthvar-sl" min="0" max="1" step="0.01"
+                value="${(entry.tileDepthVariance || 0).toFixed(2)}" style="--pct:${pct(entry.tileDepthVariance || 0, 0, 1)}">
+              <span class="lsv layer-depthvar-val">${(entry.tileDepthVariance || 0).toFixed(2)}</span>
+            </div>
             <div class="layer-section-divider layer-percell-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}></div>
             <p class="layer-section-label layer-percell-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>Per-Cell</p>
             <div class="layer-row-inline layer-percell-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
@@ -3299,6 +3321,40 @@ export class EditorInspector {
               <input type="range" class="slider layer-popcorn-sl" min="0" max="1" step="0.01"
                 value="${(entry.tilePopcornAmount || 0).toFixed(2)}" style="--pct:${pct(entry.tilePopcornAmount || 0, 0, 1)}">
               <span class="lsv layer-popcorn-val">${(entry.tilePopcornAmount || 0).toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row layer-percell-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
+              <span class="layer-ctrl-label" data-tooltip="Random size per cell">Size Var</span>
+              <input type="range" class="slider layer-sizevar-sl" min="0" max="1" step="0.01"
+                value="${(entry.tileSizeVariance || 0).toFixed(2)}" style="--pct:${pct(entry.tileSizeVariance || 0, 0, 1)}">
+              <span class="lsv layer-sizevar-val">${(entry.tileSizeVariance || 0).toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row layer-percell-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
+              <span class="layer-ctrl-label" data-tooltip="Random horizontal offset per cell">Jitter X</span>
+              <input type="range" class="slider layer-jitterx-sl" min="0" max="1" step="0.01"
+                value="${(entry.tileJitterX || 0).toFixed(2)}" style="--pct:${pct(entry.tileJitterX || 0, 0, 1)}">
+              <span class="lsv layer-jitterx-val">${(entry.tileJitterX || 0).toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row layer-percell-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
+              <span class="layer-ctrl-label" data-tooltip="Random vertical offset per cell">Jitter Y</span>
+              <input type="range" class="slider layer-jittery-sl" min="0" max="1" step="0.01"
+                value="${(entry.tileJitterY || 0).toFixed(2)}" style="--pct:${pct(entry.tileJitterY || 0, 0, 1)}">
+              <span class="lsv layer-jittery-val">${(entry.tileJitterY || 0).toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row layer-percell-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
+              <span class="layer-ctrl-label" data-tooltip="Random opacity per cell">Opacity Var</span>
+              <input type="range" class="slider layer-opacityvar-sl" min="0" max="1" step="0.01"
+                value="${(entry.tileOpacityVariance || 0).toFixed(2)}" style="--pct:${pct(entry.tileOpacityVariance || 0, 0, 1)}">
+              <span class="lsv layer-opacityvar-val">${(entry.tileOpacityVariance || 0).toFixed(2)}</span>
+            </div>
+            <div class="layer-row-inline layer-percell-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
+              <span class="layer-ctrl-label" data-tooltip="Shift the randomization pattern — each value gives a different layout">Seed</span>
+              <span class="lsv layer-seed-display" style="min-width:36px;text-align:right;margin-right:6px">${entry.tileVarianceSeed || 0}</span>
+              <button class="lseg layer-seed-rand" style="padding:0 8px" data-tooltip="Pick a random seed">Rand</button>
+              <label class="toggle-switch toggle-switch--sm" style="margin-left:8px" data-tooltip="Lock seed so saves don't bump it">
+                <input type="checkbox" class="layer-seed-lock" ${(entry.tileVarianceSeedLocked !== false) ? 'checked' : ''} />
+                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+              </label>
+              <span class="layer-ctrl-label" style="width:auto;margin-left:4px">Lock</span>
             </div>
             <div class="layer-center-row">
               <span class="layer-ctrl-label" style="margin-bottom:5px">Center</span>
@@ -3817,6 +3873,64 @@ export class EditorInspector {
             refresh();
         });
 
+        // ─── Phase 2: Variance suite controls ────────────────────────────────
+        const sizeVarSl = card.querySelector('.layer-sizevar-sl');
+        const sizeVarVal = card.querySelector('.layer-sizevar-val');
+        if (sizeVarSl && sizeVarVal) sizeVarSl.addEventListener('input', () => {
+            const v = parseFloat(sizeVarSl.value);
+            entry.tileSizeVariance = v;
+            sizeVarVal.textContent = v.toFixed(2);
+            sizeVarSl.style.setProperty('--pct', `${(v * 100).toFixed(1)}%`);
+            refresh();
+        });
+        const jitterXSl = card.querySelector('.layer-jitterx-sl');
+        const jitterXVal = card.querySelector('.layer-jitterx-val');
+        if (jitterXSl && jitterXVal) jitterXSl.addEventListener('input', () => {
+            const v = parseFloat(jitterXSl.value);
+            entry.tileJitterX = v;
+            jitterXVal.textContent = v.toFixed(2);
+            jitterXSl.style.setProperty('--pct', `${(v * 100).toFixed(1)}%`);
+            refresh();
+        });
+        const jitterYSl = card.querySelector('.layer-jittery-sl');
+        const jitterYVal = card.querySelector('.layer-jittery-val');
+        if (jitterYSl && jitterYVal) jitterYSl.addEventListener('input', () => {
+            const v = parseFloat(jitterYSl.value);
+            entry.tileJitterY = v;
+            jitterYVal.textContent = v.toFixed(2);
+            jitterYSl.style.setProperty('--pct', `${(v * 100).toFixed(1)}%`);
+            refresh();
+        });
+        const opacityVarSl = card.querySelector('.layer-opacityvar-sl');
+        const opacityVarVal = card.querySelector('.layer-opacityvar-val');
+        if (opacityVarSl && opacityVarVal) opacityVarSl.addEventListener('input', () => {
+            const v = parseFloat(opacityVarSl.value);
+            entry.tileOpacityVariance = v;
+            opacityVarVal.textContent = v.toFixed(2);
+            opacityVarSl.style.setProperty('--pct', `${(v * 100).toFixed(1)}%`);
+            refresh();
+        });
+        const depthVarSl = card.querySelector('.layer-depthvar-sl');
+        const depthVarVal = card.querySelector('.layer-depthvar-val');
+        if (depthVarSl && depthVarVal) depthVarSl.addEventListener('input', () => {
+            const v = parseFloat(depthVarSl.value);
+            entry.tileDepthVariance = v;
+            depthVarVal.textContent = v.toFixed(2);
+            depthVarSl.style.setProperty('--pct', `${(v * 100).toFixed(1)}%`);
+            refresh();
+        });
+        const seedDisplay = card.querySelector('.layer-seed-display');
+        const seedRandBtn = card.querySelector('.layer-seed-rand');
+        const seedLockCb = card.querySelector('.layer-seed-lock');
+        if (seedRandBtn) seedRandBtn.addEventListener('click', () => {
+            entry.tileVarianceSeed = Math.floor(Math.random() * 10000);
+            if (seedDisplay) seedDisplay.textContent = entry.tileVarianceSeed;
+            refresh();
+        });
+        if (seedLockCb) seedLockCb.addEventListener('change', () => {
+            entry.tileVarianceSeedLocked = seedLockCb.checked;
+        });
+
         // Spin inline slider
         const spinSlider = card.querySelector('.layer-spin-sl');
         const spinVal = card.querySelector('.layer-spin-val');
@@ -4010,6 +4124,9 @@ export class EditorInspector {
             'layer-shadows-sl','layer-highlights-sl','layer-lift-sl','layer-gain-sl','layer-tintmg-sl',
             // Phase 1: Per-Cell sliders — own dedicated handlers below
             'layer-offset-amt-sl','layer-rotvar-sl','layer-popcorn-sl',
+            // Phase 2: Variance suite — own dedicated handlers below
+            'layer-sizevar-sl','layer-jitterx-sl','layer-jittery-sl',
+            'layer-opacityvar-sl','layer-depthvar-sl',
             // Color FX — own dedicated handler below
             'layer-solarize-sl',
         ].map(c => `:not(.${c})`).join('');
@@ -5694,6 +5811,20 @@ export class EditorInspector {
         // Per-cell audio popcorn — each cell pulses on different beat phases.
         const popcornAmt = (img.tilePopcornAmount || 0).toFixed(4);
         const hasPopcorn = !isVideo && img.tile && parseFloat(popcornAmt) > 0.001;
+        // Phase 2: Variance suite flags
+        const sizeVar = (img.tileSizeVariance || 0).toFixed(4);
+        const hasSizeVar = !isVideo && img.tile && parseFloat(sizeVar) > 0.001;
+        const jitterX = (img.tileJitterX || 0).toFixed(4);
+        const hasJitterX = !isVideo && img.tile && parseFloat(jitterX) > 0.001;
+        const jitterY = (img.tileJitterY || 0).toFixed(4);
+        const hasJitterY = !isVideo && img.tile && parseFloat(jitterY) > 0.001;
+        const opacityVar = (img.tileOpacityVariance || 0).toFixed(4);
+        const hasOpacityVar = !isVideo && img.tile && parseFloat(opacityVar) > 0.001;
+        const depthVar = (img.tileDepthVariance || 0).toFixed(4);
+        const hasDepthVar = !isVideo && img.tile && parseFloat(depthVar) > 0.001;
+        const varSeed = (img.tileVarianceSeed || 0);
+        // Seed threads through all per-cell hashes. seed=0 → vec2(0,0) added → identical to Phase 1.
+        const seedVec = `vec2(${varSeed}.0, ${varSeed}.0)`;
 
         // hasSpin includes hasRotVar so the per-tile spin block emits even when
         // base spin/angle are zero (rotation variance alone needs the block).
@@ -5718,6 +5849,14 @@ export class EditorInspector {
         // perTileSpin emits when any rotation source exists and groupSpin is off.
         const perTileSpin = !isVideo && img.tile && hasSpin && !img.groupSpin;
         const fwd = (img.tunnelSpeed || 0) >= 0;
+
+        // Phase 2.5: Scatter sampling — free per-cell jitter + tile overlap via
+        // 3×3 neighbour accumulation. The plain fract() path locks each tile into
+        // its own [0,1] cell box; jitter there can only slide a crop around. The
+        // scatter path lets a fragment sample neighbouring cells' images, so tiles
+        // move freely past cell edges and overlap. Gated to jitter-active,
+        // non-tunnel, real tile layers — every other preset keeps the fract() path.
+        const useScatter = (hasJitterX || hasJitterY) && img.tile && !isVideo && !hasTunnel;
 
         let blendLine;
         switch (img.blendMode) {
@@ -5874,7 +6013,8 @@ export class EditorInspector {
                     // Per-cell rotation: hash the cell id, add an angle.
                     // snap=on: variance is the *probability* a cell gets a random 90° quarter-turn.
                     // snap=off: variance scales a continuous 0..360° rotation per cell.
-                    s += `      float _ch = fract(sin(dot(${cellIdVar}, vec2(127.1, 311.7))) * 43758.5);\n`;
+                    // seedVec offsets all hashes — seed=0 → vec2(0,0) → identical to pre-seed output.
+                    s += `      float _ch = fract(sin(dot(${cellIdVar} + ${seedVec}, vec2(127.1, 311.7))) * 43758.5);\n`;
                     if (rotSnap) {
                         s += `      float _doRot = step(1.0 - ${rotVar}, fract(_ch * 7.17));\n`;
                         s += `      _localAng += floor(_ch * 4.0) * 1.5708 * _doRot;\n`;
@@ -5896,6 +6036,56 @@ export class EditorInspector {
                 s += `    { float _rotMask = step(0.0, ${varName}.x) * step(${varName}.x, 1.0)\n`;
                 s += `                     * step(0.0, ${varName}.y) * step(${varName}.y, 1.0);\n`;
                 s += `      ${maskVar} *= _rotMask;\n`;
+                s += `      ${varName} = clamp(${varName}, 0.0, 1.0); }\n`;
+            }
+            // Phase 2: Size Var + Jitter X/Y — unified object-space transform.
+            // Both are applied in one pass so they compose correctly:
+            //   texUV = (_u - jitterOffset - 0.5) * szF + 0.5
+            // Applying them sequentially caused jitter to scroll the texture crop
+            // rather than reposition the image object within the cell.
+            if (hasSizeVar || hasJitterX || hasJitterY) {
+                s += `    {\n`;
+                // Size factor: 1.0 (no size var) → 1.0 + hash * variance (zoom-out only)
+                if (hasSizeVar) {
+                    s += `      float _szH = fract(sin(dot(${cellIdVar} + ${seedVec}, vec2(317.1, 227.7))) * 37158.5);\n`;
+                    s += `      float _szF = 1.0 + _szH * ${sizeVar};\n`;
+                } else {
+                    s += `      float _szF = 1.0;\n`;
+                }
+                // Jitter offset in cell space (0.0 on unused axes)
+                if (hasJitterX) {
+                    s += `      float _jxH = fract(sin(dot(${cellIdVar} + ${seedVec}, vec2(419.2, 371.9))) * 28731.5);\n`;
+                    s += `      float _jOx = (_jxH - 0.5) * ${jitterX};\n`;
+                } else {
+                    s += `      float _jOx = 0.0;\n`;
+                }
+                if (hasJitterY) {
+                    s += `      float _jyH = fract(sin(dot(${cellIdVar} + ${seedVec}, vec2(153.7, 479.3))) * 52631.5);\n`;
+                    s += `      float _jOy = (_jyH - 0.5) * ${jitterY};\n`;
+                } else {
+                    s += `      float _jOy = 0.0;\n`;
+                }
+                // Combined transform: shift to image-object space
+                s += `      ${varName} = (${varName} - vec2(_jOx, _jOy) - 0.5) * _szF + 0.5;\n`;
+                if (maskVar) {
+                    s += `      float _objMask = step(0.0, ${varName}.x) * step(${varName}.x, 1.0)\n`;
+                    s += `                     * step(0.0, ${varName}.y) * step(${varName}.y, 1.0);\n`;
+                    s += `      ${maskVar} *= _objMask;\n`;
+                }
+                s += `      ${varName} = clamp(${varName}, 0.0, 1.0);\n`;
+                s += `    }\n`;
+            }
+            // Phase 2: Depth variance — per-cell additional zoom factor.
+            // Same mask fix as Size Var — out-of-bounds goes transparent, not wrapped.
+            if (hasDepthVar) {
+                s += `    { float _dvH = fract(sin(dot(${cellIdVar} + ${seedVec}, vec2(91.3, 137.1))) * 21943.5);\n`;
+                s += `      float _dvF = 1.0 + (_dvH * 2.0 - 1.0) * ${depthVar} * 0.5;\n`;
+                s += `      ${varName} = (${varName} - 0.5) * _dvF + 0.5;\n`;
+                if (maskVar) {
+                    s += `      float _dvMask = step(0.0, ${varName}.x) * step(${varName}.x, 1.0)\n`;
+                    s += `                    * step(0.0, ${varName}.y) * step(${varName}.y, 1.0);\n`;
+                    s += `      ${maskVar} *= _dvMask;\n`;
+                }
                 s += `      ${varName} = clamp(${varName}, 0.0, 1.0); }\n`;
             }
             if (parseFloat(spc) > 0 && maskVar) {
@@ -5989,6 +6179,111 @@ export class EditorInspector {
             );
         };
 
+        // Phase 2.5: Scatter sample — neighbour-accumulation tile renderer.
+        // Replaces the single-cell fract() sample. `_u` arrives in field UV; this
+        // converts it to continuous grid coordinates (1 unit = 1 cell), then every
+        // fragment scans the 3×3 block of cells around it. For each neighbour cell
+        // it computes that cell's jittered/scaled/rotated placement and, where the
+        // fragment lands inside that tile, composites it. Tiles therefore move
+        // freely past cell edges and overlap — no clipping container. All per-cell
+        // effects (size/depth/rotation/popcorn/opacity/spacing/radius/mirror) are
+        // applied inside the loop keyed to the neighbour's cell id. Produces vec4 _t.
+        const buildScatterSample = () => {
+            let s = '';
+            // Field UV → continuous grid coordinates
+            s += `    _u.x *= aspect.y;\n`;
+            s += `    _u /= ${sizeBase};\n`;
+            s += `    _u.x /= aspect.y;\n`;
+            // Brick / half-drop offset — shifts which cell a fragment falls in
+            if (hasOffset) {
+                if (offsetAxis === 'row') {
+                    s += `    _u.x += mod(floor(_u.y + 0.5), 2.0) * ${offsetAmount};\n`;
+                } else if (offsetAxis === 'col') {
+                    s += `    _u.y += mod(floor(_u.x + 0.5), 2.0) * ${offsetAmount};\n`;
+                }
+            }
+            s += `    vec2 _homeCell = floor(_u + 0.5);\n`;
+            // Derivatives captured OUTSIDE the loop (dFdx is illegal in non-uniform flow)
+            s += `    vec2 _sdx = dFdx(_u); vec2 _sdy = dFdy(_u);\n`;
+            s += `    vec4 _scAccum = vec4(0.0);\n`;
+            s += `    for (int _ny = -1; _ny <= 1; _ny++) {\n`;
+            s += `    for (int _nx = -1; _nx <= 1; _nx++) {\n`;
+            s += `      vec2 _C = _homeCell + vec2(float(_nx), float(_ny));\n`;
+            // Per-cell jitter offset (0 on an inactive axis)
+            s += `      float _jxH = fract(sin(dot(_C + ${seedVec}, vec2(419.2, 371.9))) * 28731.5);\n`;
+            s += `      float _jyH = fract(sin(dot(_C + ${seedVec}, vec2(153.7, 479.3))) * 52631.5);\n`;
+            s += `      vec2 _jOff = vec2((_jxH - 0.5) * ${hasJitterX ? jitterX : '0.0'}, (_jyH - 0.5) * ${hasJitterY ? jitterY : '0.0'});\n`;
+            // Per-cell scale factor: size variance (zoom-out only) × depth variance (±)
+            s += `      float _szF = 1.0;\n`;
+            if (hasSizeVar) {
+                s += `      { float _szH = fract(sin(dot(_C + ${seedVec}, vec2(317.1, 227.7))) * 37158.5);\n`;
+                s += `        _szF *= 1.0 + _szH * ${sizeVar}; }\n`;
+            }
+            if (hasDepthVar) {
+                // Zoom-out only in scatter mode: keeps every tile's footprint ≤ 1 cell
+                // so the 3×3 neighbour scan always covers it (jitter ≤ 1 + szF ≥ 1).
+                s += `      { float _dvH = fract(sin(dot(_C + ${seedVec}, vec2(91.3, 137.1))) * 21943.5);\n`;
+                s += `        _szF *= 1.0 + _dvH * ${depthVar}; }\n`;
+            }
+            // Fragment position relative to this cell's centre, scaled
+            s += `      vec2 _lc = (_u - _C - _jOff) * _szF;\n`;
+            // Per-cell rotation (uniform per-tile spin + hashed variance)
+            if (perTileSpin || hasRotVar) {
+                s += `      { _lc.x *= aspect.y;\n`;
+                s += `        float _localAng = ${perTileSpin ? '_spinAng' : '0.0'};\n`;
+                if (hasRotVar) {
+                    s += `        float _ch = fract(sin(dot(_C + ${seedVec}, vec2(127.1, 311.7))) * 43758.5);\n`;
+                    if (rotSnap) {
+                        s += `        float _doRot = step(1.0 - ${rotVar}, fract(_ch * 7.17));\n`;
+                        s += `        _localAng += floor(_ch * 4.0) * 1.5708 * _doRot;\n`;
+                    } else {
+                        s += `        _localAng += _ch * 6.28318 * ${rotVar};\n`;
+                    }
+                }
+                s += `        float _ca = cos(_localAng); float _sa = sin(_localAng);\n`;
+                s += `        _lc = vec2(_ca * _lc.x - _sa * _lc.y, _sa * _lc.x + _ca * _lc.y);\n`;
+                s += `        _lc.x /= aspect.y; }\n`;
+            }
+            s += `      vec2 _luv = _lc + 0.5;\n`;
+            // Per-tile mirror fold
+            s += applyMirrorUV('_luv');
+            // Coverage: is this fragment inside the tile's [0,1] footprint?
+            s += `      float _cov = step(0.0, _luv.x) * step(_luv.x, 1.0) * step(0.0, _luv.y) * step(_luv.y, 1.0);\n`;
+            // Spacing gap — mask the border, rescale so the image fills the inner area
+            if (parseFloat(spc) > 0) {
+                s += `      { float _sg = ${spc} * 0.5;\n`;
+                s += `        _cov *= step(_sg, _luv.x) * step(_sg, 1.0 - _luv.x) * step(_sg, _luv.y) * step(_sg, 1.0 - _luv.y);\n`;
+                s += `        if (1.0 - 2.0 * _sg > 0.001) _luv = clamp((_luv - _sg) / (1.0 - 2.0 * _sg), 0.0, 1.0); }\n`;
+            }
+            // Per-tile rounded-corner radius
+            if (hasRadius) {
+                s += `      { vec2 _rq = abs(_luv - 0.5) - (0.5 - ${rad});\n`;
+                s += `        float _rd2 = length(max(_rq, 0.0)) + min(max(_rq.x, _rq.y), 0.0) - ${rad};\n`;
+                s += `        _cov *= 1.0 - smoothstep(-0.004, 0.004, _rd2); }\n`;
+            }
+            // Sample — mip derivatives scaled by this cell's zoom factor
+            s += `      vec4 _sc = textureGrad(${tex}, clamp(_luv, 0.0, 1.0), _sdx * _szF, _sdy * _szF);\n`;
+            s += `      vec3 _scol = _sc.xyz;\n`;
+            s += `      float _a = _sc.w * _cov;\n`;
+            // Per-cell popcorn — hashed audio brightness pulse
+            if (hasPopcorn) {
+                s += `      { float _pcH = fract(sin(dot(_C, vec2(269.5, 183.3))) * 43758.5);\n`;
+                s += `        float _pcM = 0.5 + 0.5 * sin(time * 6.0 + _pcH * 6.28318);\n`;
+                s += `        _scol *= 1.0 + _r * 1.8 * ${popcornAmt} * _pcM; }\n`;
+            }
+            // Per-cell opacity variance — applied to coverage alpha (true transparency)
+            if (hasOpacityVar) {
+                s += `      { float _ovH = fract(sin(dot(_C + ${seedVec}, vec2(421.7, 183.1))) * 31415.9);\n`;
+                s += `        _a *= 1.0 - _ovH * ${opacityVar}; }\n`;
+            }
+            // Composite "over" — later neighbour wins where tiles overlap
+            s += `      _scAccum.xyz = _scAccum.xyz * (1.0 - _a) + _scol * _a;\n`;
+            s += `      _scAccum.w = _scAccum.w * (1.0 - _a) + _a;\n`;
+            s += `    }}\n`;
+            s += `    vec4 _t = _scAccum;\n`;
+            return s;
+        };
+
         let pipeline = '';
         let sampleLine = '';
 
@@ -6020,6 +6315,17 @@ export class EditorInspector {
                 `    vec4 _tB = textureGrad(${tex}, _uB, _dxB, _dyB);\n` +
                 `    vec4 _t = mix(_tA, _tB, _tf);\n` +
                 `    float _gapMask = mix(_gapMaskA, _gapMaskB, _tf);\n`;
+        } else if (useScatter) {
+            // Phase 2.5: Scatter path — free per-cell jitter + tile overlap.
+            // buildScatterSample owns the texture sample (3×3 neighbour loop), so
+            // it declares vec4 _t itself; sampleLine stays empty.
+            pipeline = groupSpinLines +
+                applySkew('_u') +
+                applyPersp('_u') +
+                `    float _gapMask = 1.0;\n` +
+                aspectPreScale('_u') +
+                buildScatterSample();
+            sampleLine = '';
         } else if (!isVideo && img.tile) {
             // Plain tiled — group spin rotates field first, then tile (with optional per-tile spin)
             // Videos skip this path entirely (always single instance)
@@ -6063,7 +6369,9 @@ export class EditorInspector {
         }
 
         // Chromatic aberration: generate offset UV sampling based on which mode we're in
-        const chromaticLines = hasChromatic
+        // Scatter mode owns the texture sample inside its loop; these post-/pre-sample
+        // resample effects assume a single `_u` UV and are deferred when scatter is on.
+        const chromaticLines = (hasChromatic && !useScatter)
             ? (() => {
                 const chromOffset = `${chromAmt} * 0.08`; // increased for more visible effect at low slider values
                 const chromPhase = `time * ${chromSpd}`;
@@ -6102,7 +6410,7 @@ export class EditorInspector {
             : '';
 
         // Wave distort: sinusoidal UV warp applied just before texture sample
-        const waveLines = hasWave
+        const waveLines = (hasWave && !useScatter)
             ? (() => {
                 // Warp both axes with slightly different freq/phase for organic look.
                 // Amplitude is modulated by _r (audio signal) for beat-reactive waves.
@@ -6129,7 +6437,7 @@ export class EditorInspector {
             : '';
 
         // Pixelate: quantize UV into blocks before texture sample
-        const pixelateLines = hasPixelate
+        const pixelateLines = (hasPixelate && !useScatter)
             ? (() => {
                 // Map 0–1 slider to 4–128 blocks (low slider = subtle, high = chunky)
                 const blocks = `mix(128.0, 4.0, ${pixelateAmt})`;
@@ -6158,7 +6466,7 @@ export class EditorInspector {
             // Phase 1: Per-cell popcorn — modulate this cell's brightness with a
             // hashed phase so cells dance on different beats. Uses _cellIdA in
             // tunnel mode (the closer of the two zoom layers), _cellId otherwise.
-            (hasPopcorn ? (() => {
+            (hasPopcorn && !useScatter ? (() => {
                 const pcCell = hasTunnel ? '_cellIdA' : '_cellId';
                 return (
                     `    { float _pcH = fract(sin(dot(${pcCell}, vec2(269.5, 183.3))) * 43758.5);\n` +
@@ -6166,8 +6474,18 @@ export class EditorInspector {
                     `      _src *= 1.0 + _r * 1.8 * ${popcornAmt} * _pcM; }\n`
                 );
             })() : '') +
+            // Phase 2: Per-cell opacity variance — each cell fades to a different opacity.
+            // Uses _cellIdA in tunnel mode (closer zoom layer), _cellId otherwise.
+            // Multiplies _src directly so it composes cleanly with popcorn above.
+            (hasOpacityVar && !useScatter ? (() => {
+                const opCell = hasTunnel ? '_cellIdA' : '_cellId';
+                return (
+                    `    { float _ovH = fract(sin(dot(${opCell} + ${seedVec}, vec2(421.7, 183.1))) * 31415.9);\n` +
+                    `      _src *= 1.0 - _ovH * ${opacityVar}; }\n`
+                );
+            })() : '') +
             // Blur: 5-tap cross re-sample using texture-space pixel step baked at build time
-            (hasBlur ? (() => {
+            (hasBlur && !useScatter ? (() => {
                 const bsuv = hasTunnel ? `mix(_uA, _uB, _tf)` : `_u`;
                 const bscale = `${blurAmt} * 15.0`;
                 return (
@@ -6179,7 +6497,7 @@ export class EditorInspector {
                     `             + texture(${tex}, clamp(_bluv+vec2(0.,-_by),0.,1.)).xyz) * 0.2; }\n`
                 );
             })() : '') +
-            (hasEdge ? (() => {
+            (hasEdge && !useScatter ? (() => {
                 // Sobel edge detect — sample 3x3 neighbourhood in texture space,
                 // compute luminance gradient, replace _src with edge magnitude.
                 // _suv is the UV used for the primary sample (already in scope from pipeline).
@@ -6446,6 +6764,14 @@ export class EditorInspector {
         const presetNameInput = document.getElementById('preset-name-input');
         if (presetNameInput) presetNameInput.value = name;
 
+        // Phase 2: bump tileVarianceSeed for any unlocked layers on each save.
+        // Locked layers (default) keep their seed frozen for deterministic Timeline playback.
+        this.currentState.images.forEach(img => {
+            if (img.tileVarianceSeed !== undefined && !img.tileVarianceSeedLocked) {
+                img.tileVarianceSeed = (img.tileVarianceSeed + 1) % 10000;
+            }
+        });
+
         const data = {
             name,
             ...this.currentState,
@@ -6496,6 +6822,10 @@ export class EditorInspector {
             tileOffsetAxis: 'none', tileOffsetAmount: 0.00,
             tileRotateVariance: 0.00, tileRotateSnap: false,
             tilePopcornAmount: 0.00,
+            // Phase 2: Variance suite — all 0/true → identical output for old presets
+            tileSizeVariance: 0.00, tileJitterX: 0.00, tileJitterY: 0.00,
+            tileOpacityVariance: 0.00, tileDepthVariance: 0.00,
+            tileVarianceSeed: 0, tileVarianceSeedLocked: true,
         };
         return { ...D, ...entry };
     }
