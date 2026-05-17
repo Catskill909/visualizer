@@ -1,6 +1,6 @@
 # Tile Custom — Tiling Enhancement Audit & Phased Dev Plan
 
-**Last updated:** 2026-05-16 — Phase 3 ✅ shipped & verified — explicit Grid mode (Cols×Rows, Fit/Fill, Grid Scale)
+**Last updated:** 2026-05-17 — doc audited handoff-ready; Phase 4 (recursive grids) full buildable spec written at §13
 **Scope:** Image and GIF layers in Preset Studio. Videos stay single-instance.
 **Audience:** Anyone implementing this — including a future developer joining cold. §12 is the handoff reference.
 
@@ -8,8 +8,8 @@
 
 ## 🎯 Status Dashboard
 
-**Current state:** Phases 1 / 2 / 2.5 / 3 ✅ all shipped 2026-05-16. Variance Suite: Size Var / Jitter X/Y / Opacity Var / Phase Var / Seed + Lock. Scatter sampling: jitter moves tiles freely with overlap. **Grid mode: Density/Grid toggle, explicit Cols×Rows, Fill/Fit, Grid Scale (0.1–3×); Pulse/Strobe react in Grid mode. All verified in browser.** Speed Var + Direction Var deferred (tunnel architecture work — Phase 3.2).
-**Next action:** Phase 3.2 — Tunnel ↔ Scatter convergence (free-jitter in tunnel + Speed/Direction Var) and Phase 3.3 — Scatter-mode FX parity — both §5.9. Phase 3.5 (per-cell override editor) optional, build on demand only.
+**Current state:** Phases 1 / 2 / 2.5 / 3 / 4 ✅ all shipped — 1–3 on 2026-05-16, Phase 4 on 2026-05-17. Variance Suite: Size Var / Jitter X/Y / Opacity Var / Phase Var / Seed + Lock. Scatter sampling: jitter moves tiles freely with overlap. **Grid mode: Density/Grid toggle, explicit Cols×Rows, Fill/Fit, Grid Scale (0.1–3×); Pulse/Strobe react in Grid mode. Recursive grids: Subdivide (1–6) + Outer Gap (0–0.5). All verified in browser, export + DMG build confirmed.** Speed Var + Direction Var deferred (tunnel architecture work — Phase 3.2).
+**Next action:** Phases 1–4 are a complete, shippable tile feature set. **Next phase = Phase 5 — 2.5D parallax camera** (§10.5). Spec now fleshed out: per-layer `parallaxDepth` + `parallaxAmount`, a new global Camera section, the 2D-pan-only camera model (§10.1), and a full UI/UX section (naming collision, two-scope homes, dead-slider trap). It is the next *tile-doc* phase — the wider v1 priority is still Timeline → 3D layers, but Phase 5 is the next thing to build within tiles. Phase 3.2 / 3.3 ⬇ backlog (§5.9); Phase 3.5 ❌ cut (§5.8).
 
 ### Phase status
 
@@ -19,15 +19,25 @@
 | [2](#4-phase-2--procedural-variance-suite) | Variance suite + per-layer seed (Speed/Dir Var deferred) | ✅ Shipped | 2026-05-16 | 1 day |
 | 2.5 | Scatter sampling — free jitter + tile overlap (3×3 neighbour accumulation) | ✅ Shipped | 2026-05-16 | 1 day |
 | [3](#5-phase-3--explicit-grid-mode) | Explicit Grid mode — Density/Grid toggle, Cols×Rows, Fit/Fill, Grid Scale | ✅ Shipped | 2026-05-16 | 1 day |
-| [3.2](#59-phase-25-scatter--composition-with-phase-3-and-the-deferred-differentials) | Tunnel ↔ Scatter convergence — free-jitter in tunnel + Speed/Direction Var (per-cell `_tz`) | 📋 Planned | — | ~3 days |
-| [3.3](#59-phase-25-scatter--composition-with-phase-3-and-the-deferred-differentials) | Scatter-mode FX parity — chromatic / blur / sobel / wave / pixelate compose inside the scatter loop | 📋 Planned | — | ~2 days |
-| [3.5](#58-phase-35--per-cell-override-editor-deferred-optional) | Per-cell override editor — picker widget + override map + Cascade (includes drag-multi-select) | 📋 Optional | — | ~4–5 days |
-| [4](#103-recursive--nested-grids--phase-4-placeholder) | Recursive / nested grids (pure 2D) | 📋 Deferred | — | TBD |
-| [5](#105-phase-5--25d-parallax-camera-pure-2d) | 2.5D parallax camera (pure 2D) | 📋 Deferred | — | ~5 days |
+| [4](#13-phase-4--recursive-grids-full-spec) | Recursive / nested grids (pure 2D) — Subdivide + Outer Gap | ✅ Shipped | 2026-05-17 | ~1 day |
+| 3.2 | Tunnel ↔ Scatter convergence — free-jitter in tunnel + Speed/Direction Var | ⬇ Backlog | — | ~3 days |
+| 3.3 | Scatter-mode FX parity — chromatic / blur / sobel / wave / pixelate inside the scatter loop | ⬇ Backlog | — | ~2 days |
+| ~~3.5~~ | ~~Per-cell override editor~~ | ❌ Cut 2026-05-16 — see §5.8 | — | — |
+| [5](#105-phase-5--25d-parallax-camera-pure-2d) | 2.5D parallax camera (pure 2D) — per-layer depth + parallax camera | 📋 Planned (next) | — | ~5 days |
 
-Legend: 📋 Planned · 🔨 In progress · ✅ Shipped · 🛑 Blocked · 🐛 Bug
+Legend: 📋 Planned · 🔨 In progress · ✅ Shipped · ⬇ Backlog · ❌ Cut · 🛑 Blocked · 🐛 Bug
 
 ### Most recent change
+
+`2026-05-17` — **Phase 5 spec fleshed out + §10 camera model reconciled.** §10.1: resolved the pan-vs-tilt inconsistency — **2D layers get pan only** (a flat card has no geometry; a tilt forces billboard/shear math and costs CPU/GPU for no gain), **3D object layers get pan + small tilt** (free on real geometry, a genuine depth cue). §10.2: new resolved decision — the **volumetric X×Y×Z grid is 3D-object-only**; 2D layers stop at recursion (§13) and get depth from Phase 5 pan parallax, never a 3D grid (a flat billboard can't rotate convincingly). §10.5: added the **UI/UX section** — the "Pan" naming collision (the camera must not reuse the per-layer Pan name), the two-scopes/two-homes split (per-layer depth sliders in Motion vs a new global Camera panel), and the dead-slider trap (`parallaxDepth` is invisible until the camera moves → ship auto-drift on by default). Phase 5 promoted to 📋 Planned (next).
+
+`2026-05-17` — **Phase 4 ✅ shipped & verified — Recursive grids.** Verified in browser; a custom-preset export from the local server loaded cleanly in a freshly generated DMG build. Subdivide + Outer Gap confirmed working with the Phase 1–3 per-cell stack. Tile feature set is now complete for v1 beta — propagated to image-layer-effects.md, the in-app help modal (index.html), and the promo page (beta modal + features list).
+
+`2026-05-17` — **Phase 4 code in — Recursive grids (verifying in browser).** Built straight off the §13 spec. Two fields — `tileSubdivide` (integer 1–6) and `tileOuterGap` (0–0.5) — added to the image template, text template, and `_normalizeImageEntry`; defaults (1 / 0) are no-ops → old presets byte-identical. Shader: a new `useRecursion` gate (`useGrid && (subdivide>1 || outerGap>0)`) adds a recursion branch inside `applyTileUV`'s Grid path — `_outerId`/`_outerUV` from `_gu`, the outer gap masks the outer-cell border + rescales the inner region, then `_innerGu = _outerUV·S`, `_cellId = _outerId·S + floor(_innerGu)`, `_u = fract(_innerGu)`. Mip derivatives taken from the smooth `_gu` scaled `S/(1−2·gap)` (no seam at outer boundaries). The plain Grid path is left untouched when recursion is off → zero regression. `buildScatterSample`: scatter + recursion = flat fine grid `Cols·S × Rows·S`, `tileOuterGap` ignored under jitter (§13.5 — the open §13.7 decision, taken as recommended). UI: a `Subdivide` integer stepper (1–6, `type="number"` → exempt from `sliderExclude`) + an `Outer Gap` range slider (`layer-outergap-sl` added to `sliderExclude`), both class `.layer-grid-row`. `node --check` clean; **pending in-browser GLSL verification (test matrix §13.8) before propagating to user-facing docs.** image-layer-effects.md gained a new Grid mode section covering Phases 3 + 4.
+
+`2026-05-17` — **Doc audited handoff-ready + Phase 4 spec written.** Pre-pickup pass: §12.2 new-field checklist refreshed (stale line numbers + the non-existent `_layerCardHtml`/`_bindLayerCard` corrected to `_mountLayerCard`; non-range inputs noted exempt from `sliderExclude`); §1 Tier C updated — the click-a-cell "replicator" it described was cut (§5.8), Tier C now ends at the explicit grid (shipped as Grid mode). **New §13 — full Phase 4 (recursive grids) spec**, buildable cold: the key insight that a *uniform* subdivision is identical to a flat finer grid (so Phase 4 must add a per-level treatment — the `tileOuterGap` that makes inner tiles cluster), schema, shader sketch, scatter handling, UI, one open decision, build checklist. Phase table / build order / §10.3 repointed to §13. README: Meyda dropped from "Planned" (never adopted — Flux source covers it DIY).
+
+`2026-05-16` — **Consolidation + roadmap cleanup.** Phases 1–3 verified by the user in-browser (save, cross-browser export, old-preset + old-tile-preset load — all clean, no console errors). Roadmap decisions locked: **Phase 3.5 (per-cell click-a-cell editor) ❌ cut** — compositional, not live-performance; the procedural variance already covers per-cell variety. **Phase 3.2 / 3.3 → ⬇ backlog** — gap-filling for edge-case combos (tunnel+jitter, FX+scatter), low value-per-risk. **Phase 4 (recursive grids) is the next creative feature** — builds on the Grid foundation, sets up for the future 3D layer work. Doc reconciled: phase table, build order, §6 diagram, §7.1 schema, §9 Q3/Q4, §5.8. See §12.7 for the code-audit findings from this consolidation pass.
 
 `2026-05-16` — **Phase 3 ✅ shipped & verified.** Grid mode confirmed working in-browser across the slider suite — Density/Grid toggle, Cols×Rows steppers, Fill/Fit, Grid Scale (0.1–3× — margin below 1, zoom-in above), Pulse/Strobe reacting, per-cell effects + jitter/scatter composing. Propagated to README, the in-app help modal, and the promo page. Phase 3 closed; next is the deferred-differential phases 3.2 / 3.3.
 
@@ -93,16 +103,18 @@ Every cell mathematically identical. One density slider; every cell follows the 
 **Tier B — Procedural per-cell variance**
 Every cell hashes its grid index `(col, row)` to produce a per-cell deviation. One slider per axis controls deviation magnitude. Defaults to 0 → existing behaviour preserved. Cheap shader-side; huge visual jump.
 
-**Tier C — Explicit per-cell control (the replicator)**
-User declares an explicit grid (e.g. 2×4 = 8 cells). Each cell becomes individually addressable: click in the picker, override size / depth / rotation / opacity / offset. The replicator pattern from After Effects, TouchDesigner, Cavalry. "Compose this image 8 times in a layout I designed" rather than "tile this image."
+**Tier C — Explicit grid layout**
+User declares an explicit grid (e.g. 2×4 = 8 cells) instead of a density count. ✅ **Shipped as Grid mode (Phase 3)** — `Cols × Rows`, Fit/Fill, Grid Scale.
 
-Tiers stack: Tier C's "Randomize all" seeds the override array using Tier B variance values.
+> **Historical note:** Tier C was originally specced to go further — a click-a-cell *replicator* (hand-author each cell's size/rotation/opacity, the After Effects / TouchDesigner pattern). That per-cell override editor was **evaluated and cut** 2026-05-16 (§5.8): it is a compositional tool, wrong for a live performance app, and the procedural variance of Tier B already delivers per-cell variety the generative way. Tier C therefore ends at the explicit grid.
 
 **Design principle locked at the top:** every depth-related feature uses a **constrained camera** model — small pan/tilt only, never full rotation. See §10.
 
 ---
 
 ## 2. Audit of current state
+
+> **Note:** §2 is the *pre-Phase-1 baseline* — it captures the tile pipeline as it was before any phase shipped, and explains the `_cellId` foundation everything builds on. For what's shipped now (Phases 1–3), see the Status Dashboard and §3–§5. The `_cellId` design described here is still the live load-bearing primitive.
 
 ### 2.1 Shader math (the tile pipeline)
 
@@ -377,43 +389,15 @@ The existing Tunnel system was designed for Tier A. For Tier B/C it's insufficie
 
 Speed/Direction Var are the deferred Phase 2 differentials — now Phase 3.2 (§5.9.2). Cascade needs the cell picker, so it ships with the optional per-cell editor (Phase 3.5, §5.8).
 
-### 5.8 Phase 3.5 — Per-cell override editor (deferred, optional)
+### 5.8 Phase 3.5 — Per-cell override editor — ❌ CUT (2026-05-16)
 
-**Status:** 📋 optional. Build only on real beta-user demand for hand-authored cell control — see the §5.0 rationale. Spec preserved here so it is ready if scheduled. Requires Grid mode (Phase 3) as a prerequisite.
+**Decision: cut, do not build.** A click-a-cell picker for hand-authoring individual cells (size/rotation/opacity per cell, sparse `tileOverrides` map, vec4 bake, "Randomize all") was specced here. It is **removed from the roadmap**:
 
-**5.8.1 Cell-picker widget** — an inline canvas widget (the `.xy-pad` pattern at [inspector.js:5160](src/editor/inspector.js#L5160) is the direct template: `<canvas>`, a `drawPad()` redraw, click → mutate → `refresh()`). Single-click selects a cell; drag-multi-select is a sub-follow-up within this phase. Cells with overrides show a dot. Selected-cell is editor-local UI state — **not** part of `currentState`, never saved.
+- It is a *compositional* tool (hand-place each cell) bolted onto a *live performance* tool — clicking through dozens of cells one at a time is the opposite of how this app is used.
+- The procedural variance shipped in Phases 1/2/2.5 (Size/Jitter/Rotate/Opacity Var + Seed) already delivers per-cell variety the fast, generative way it should be delivered.
+- It was the single heaviest, most bloat-prone item on the roadmap.
 
-```
-┌───┬───┬───┐     Selected cell: 5
-│ 1 │ 2 │ 3 │       Size · Depth · Rotation · Opacity · Offset X/Y   [Reset]
-├───┼───┼───┤       [ Randomize all ]   [ Reset all ]
-│ 4 │ ● │ 6 │
-├───┼───┼───┤     Picker sliders use a class OUTSIDE the sliderExclude
-│ 7 │ 8 │ 9 │     positional chain (§5.9.1 / §12.4 footgun).
-└───┴───┴───┘
-```
-
-**5.8.2 Storage** — sparse override map, comma-keyed (locked for 3D / recursive forward-compat, §7.2):
-
-```
-tileOverrides: { "0,0": { size: 0.85, depth: 0.3 }, "1,2": { rotation: 45 } }
-```
-
-Only edited cells stored. "Reset cell" deletes a key. Orphans (after a grid resize) dropped at render time. Audit-confirmed: a plain object deep-clones safely through undo / save / export (`deepClone` is a JSON round-trip).
-
-**5.8.3 Shader path** — override values bake at compile time into a `vec4` array, indexed by the clamped `_cellId`:
-
-```
-const vec4 _cellOverrides[9] = vec4[9]( vec4(1.0,0.0,0.0,1.0), … );
-int _cellIdx = clamp(int(_cellId.y)*COLS + int(_cellId.x), 0, N-1);
-vec4 _ovr = _cellOverrides[_cellIdx];
-```
-
-**Hard cap: 8 × 8 = 64 cells.**
-
-**5.8.4 "Randomize all"** — the bridge from procedural to explicit: populates `tileOverrides` from the current Phase 2 variance-slider values, giving an editable starting point rather than a blank grid.
-
-**Composition** — overrides are additive on top of the procedural baseline; e.g. a cell's final rotation = Spin + Angle + Group Spin + Cell Rotate hash + `override.rotation` (if set).
+**Do not re-propose** without a concrete, repeated user request for hand-authored cell layouts. The schema fields it would have used (`tileOverrides`, `tileCascadeMode`, `tileCascadeCentre`) are **not implemented** — see §7.1. Cascade (a beat-driven tunnel wave) went with it; if ever revived it belongs in a tunnel phase, not a per-cell editor.
 
 ---
 
@@ -447,14 +431,14 @@ In scatter mode the texture-resample effects — **chromatic aberration, blur, S
 ## 6. Phase ordering & dependencies
 
 ```
-Phase 1 ─► 2 ─► 2.5 ─► 3 ─► 3.2 ─► 3.3 ─► [3.5] ─► 4 ─► 5
-(struct)  (var)(scatter)(grid)(tun↔scat)(scatFX)(editor) (recurse)(2.5D)
- 1d       1d   1d       ~2-3d ~3d       ~2d    optional deferred deferred
+Phase 1 ─► 2 ─► 2.5 ─► 3 ─► 4 ─► 5          ⬇ backlog: 3.2, 3.3
+(struct)  (var)(scatter)(grid)(recurse)(2.5D)   ❌ cut: 3.5
+ ✅       ✅   ✅       ✅   next    deferred
 ```
 
-Phase 3.2 / 3.3 are the deferred differentials from Phases 2 / 2.5 — see §5.9. Phase 3.5 (the per-cell override editor) is **optional** — build on demand only; §5.0 has the rationale. Each phase ships value standalone. `_cellId` from Phase 1 carries forward through every later phase — no throwaway work.
+Phases 1–3 ✅ shipped. **Phase 4 (recursive grids) is next** — it builds straight on the Grid foundation. Phase 3.2 / 3.3 are ⬇ backlog (edge-case gap-filling; §5.9). Phase 3.5 ❌ cut (§5.8). Each phase ships value standalone. `_cellId` from Phase 1 carries forward through every later phase — including a future 3D analogue (§10.2) — no throwaway work.
 
-**Likely release split:** Phase 1 + 2 + 2.5 in first release. Phase 3 (Grid mode) in first release or shortly after. Phase 3.2 / 3.3 / 4 / 5 post-first-release. Phase 3.5 only if requested.
+**Likely release split:** Phases 1 / 2 / 2.5 / 3 are in the current build. Phase 4 / 5 post-first-release.
 
 ---
 
@@ -478,16 +462,14 @@ All new fields default to off / 0 / `'none'`. Existing presets re-hydrate with t
 | 2 | `tileOpacityVariance` | `0` |
 | 2 | `tileVarianceSeed` | `0` |
 | 2 | `tileVarianceSeedLocked` | `true` |
-| 3.2 | `tileTunnelSpeedVariance` | `0` *(deferred differential — needs tunnel crossfade restructure; §5.9.2)* |
-| 3.2 | `tileTunnelDirectionVariance` | `0` *(deferred differential — needs tunnel crossfade restructure; §5.9.2)* |
 | 3 | `tileMode` | `'density'` |
 | 3 | `tileCols` | `3` |
 | 3 | `tileRows` | `3` |
 | 3 | `tileFit` | `'fill'` |
 | 3 | `tileGridScale` | `1.0` |
-| 3.5 | `tileOverrides` | `{}` *(optional per-cell editor — §5.8)* |
-| 3.5 | `tileCascadeMode` | `'off'` *(optional — ships with the editor)* |
-| 3.5 | `tileCascadeCentre` | `null` *(optional — ships with the editor)* |
+| 3.2 ⬇ | `tileTunnelSpeedVariance` | `0` *(backlog — not implemented; needs tunnel crossfade restructure; §5.9.2)* |
+| 3.2 ⬇ | `tileTunnelDirectionVariance` | `0` *(backlog — not implemented; §5.9.2)* |
+| ~~3.5~~ ❌ | ~~`tileOverrides` / `tileCascadeMode` / `tileCascadeCentre`~~ | **cut — not implemented** (§5.8) |
 | 5 | `parallaxDepth` | `0` |
 | 5 | `parallaxAmount` | `0` |
 
@@ -518,9 +500,9 @@ Separate future docs:
 
 **Q2. Phase 3 default grid count?** → **3 × 3.** Better first-impression than 2×2. §5.1.
 
-**Q3. Override map vs per-cell layers?** → **Sparse override map**, comma-keyed. Now part of the optional Phase 3.5 editor — §5.8, §7.2.
+**Q3. Override map vs per-cell layers?** → moot — the per-cell override editor (Phase 3.5) was ❌ cut 2026-05-16 (§5.8). The procedural variance suite covers per-cell variety.
 
-**Q4. Drag-across multi-select in picker?** → folded into **Phase 3.5** (the optional per-cell editor); single-click first, drag-multi-select as a sub-follow-up. §5.8.1.
+**Q4. Drag-across multi-select in picker?** → moot — picker cut with Phase 3.5 (§5.8).
 
 **Q5. Seed scope?** → **Per-layer.** Each layer has independent randomness. §4.3.
 
@@ -532,7 +514,7 @@ Separate future docs:
 
 ### 10.1 Constrained camera — the design principle for any future depth work
 
-When depth-related features ship (3D layers OR 2.5D parallax OR anything in between), they use a **constrained camera** model: small pan/tilt only, never full rotation. The user moves a virtual camera left/right and up/down a little — they never fly behind objects.
+When depth-related features ship (3D layers OR 2.5D parallax OR anything in between), they use a **constrained camera** model: never full rotation, never flying behind objects. The user moves a virtual camera left/right and up/down a little. The exact freedom depends on the layer type — see the 2D-vs-3D split below.
 
 Why this is the right call, both creatively and technically:
 
@@ -543,7 +525,12 @@ Why this is the right call, both creatively and technically:
 | **Parallax sells depth** | A 50px camera shift on a bassline feels more 3D than a 360° orbit, because human perception reads parallax as depth long before rotation |
 | **Performance shortcuts** | No backface concerns, no complex depth sort, no occlusion edge cases |
 
-This principle constrains both the eventual 3D layer system *and* the near-term 2.5D parallax phase (§10.5). Both expose XY pan only.
+**2D vs 3D — the camera split (resolved 2026-05-17):**
+
+- **2D layers (Phase 5 parallax) — pan only.** A flat card has no geometry; a camera *tilt* would force per-layer billboard-or-shear math and muddy the look. Pure XY translation is both cheaper (a `vec2` UV offset — no matrix, no new geometry, trivial CPU + GPU) and cleaner. Phase 5 exposes **XY pan only**.
+- **3D object layers — pan + small tilt.** A tilt is effectively free on a real mesh (the GPU vertex shader handles it) and the geometry catches light correctly, so a small tilt is a genuine *extra* depth cue rather than a cost. Still never a full orbit.
+
+This principle constrains both the eventual 3D layer system *and* the near-term 2.5D parallax phase (§10.5).
 
 ### 10.2 3D layers — what carries forward, what diverges
 
@@ -559,8 +546,10 @@ When 3D model layers ship (loading .glb / .obj, rendered via WebGL with depth + 
 
 **Diverges (separate doc when 3D ships):**
 - Rendering pipeline (shader-comp for 2D, full WebGL pass for 3D)
-- Lighting, depth buffer, camera transforms (still XY-pan-only)
+- Lighting, depth buffer, camera transforms (pan + small tilt — §10.1)
 - Mesh loading + asset storage
+
+**Resolved 2026-05-17 — the volumetric grid is 3D-object-only.** A true X×Y×Z grid of cells (e.g. 6×6×6 = 216) is a natural three.js feature — `InstancedMesh` on a 3D lattice, one draw call — but it belongs to the **3D object layer, not the 2D tile system**. The 2D tile grid (Phases 1–4) stops at recursion (§13); 2D image/GIF/text layers get their sense of depth from Phase 5's pan parallax, **never** from a volumetric grid. Rationale: a flat billboard in a volumetric grid cannot rotate convincingly — it either auto-faces the camera (no rotation cue, looks pasted-on) or goes edge-on to a sliver. Real per-cell rotation needs geometry. So: **pan parallax = the 2D depth story; volumetric grid + rotation = the 3D depth story.** Don't build a 3D grid for 2D layers — it would just be Phase 5 with worse rotation. The per-cell *vocabulary* (variance, seed, recursive subdivide, Cols×Rows×Depth steppers) ports cleanly to the 3D grid; the *code* does not — different pipeline.
 
 ### 10.3 Recursive / nested grids — Phase 4 placeholder
 
@@ -578,7 +567,7 @@ vec2 _innerUV = fract(_outerUV * vec2(innerCols, innerRows));
 
 Combined with the constrained-camera parallax (§10.5), small camera pans reveal the recursive structure as depth — without ever moving behind anything.
 
-**Status:** Phase 4 placeholder. The key-convention lock in §7.2 keeps it possible. Might land before 3D layers if 3D takes longer.
+**Status:** Phase 4 — **full buildable spec now at §13** (this §10.3 sketch is superseded). The key-convention lock in §7.2 keeps it possible. Might land before 3D layers if 3D takes longer.
 
 ### 10.4 Things to NOT do now
 
@@ -603,6 +592,18 @@ A near-term depth phase that pairs with recursive grids and ships *before* any r
 
 Combined with recursive grids: small camera pans reveal the nested-grid structure as depth. The full creative payoff of "3D" without the 3D pipeline cost.
 
+**UI / UX — the parts that bite during the build.** Phase 5 is two features at two scopes, with three traps:
+
+1. **Naming collision — do NOT call it "Pan."** Image layers already have a per-layer **Pan** control (Off / Drift / Bounce — the layer's *content* scrolls). The Phase 5 camera is a different scope entirely (the *viewpoint* moves; layers parallax by depth). Two things called "pan" is a guaranteed support question. Name the camera feature **Camera**, **Viewpoint**, or **Parallax** — leave the existing layer Pan untouched.
+
+2. **Two scopes → two homes.**
+   - *Per-layer* — `parallaxDepth` + `parallaxAmount`, 2 sliders. The layer card is already at its visual ceiling (§2.2). They need one tight "Depth" row inside the existing Motion section, not loose extra rows.
+   - *Per-preset* — the camera itself (XY pad, bass bob, auto-drift). This is **not** a layer control. It needs a new global section, peer to Palette / Motion / Wave / Images.
+
+3. **The dead-slider trap.** `parallaxDepth` produces *nothing visible* until the camera moves. A user drags it, sees nothing, reports it broken. Mitigation: **ship the camera with a gentle auto-drift on by default** (small non-zero Auto-Drift), so depth is always slightly in motion and the depth sliders show their effect the instant they're touched.
+
+**Composition note (dev docs, not a tooltip — per `feedback_slider_discovery_ux`):** camera parallax is a final per-layer UV offset applied *after* all object motion (Spin / Orbit / Wander / Sway / Tunnel) — so nothing conflicts; a spinning, wandering layer simply parallax-shifts as a unit. But stack parallax on top of five layers all already wandering and the depth cue gets lost in the noise — the feature reads best on calmer compositions.
+
 **Build estimate:** ~3 days for layer-side fields + ~2 days for the camera controls. Could be split across two PRs.
 
 ---
@@ -610,15 +611,14 @@ Combined with recursive grids: small camera pans reveal the nested-grid structur
 ## 11. Build order summary
 
 1. **Phase 1** — `_cellId` + brick offset + rotation variance + popcorn (1 day) ✅
-2. **Phase 2** — Variance suite + per-layer seed (Speed/Dir Var deferred → 3.2) (1 day) ✅
+2. **Phase 2** — Variance suite + per-layer seed (1 day) ✅
 3. **Phase 2.5** — Scatter sampling — free jitter + tile overlap (1 day) ✅
-4. **Phase 3** — Explicit Grid mode: Density/Grid toggle + Cols×Rows + Fit/Fill (~2–3 days; §5.1–5.6)
-5. **Phase 3.2** — Tunnel ↔ Scatter convergence: free-jitter in tunnel + Speed/Direction Var, the deferred Phase 2/2.5 differentials (~3 days; §5.9.2)
-6. **Phase 3.3** — Scatter-mode FX parity: chromatic / blur / sobel / wave / pixelate compose inside the scatter loop (~2 days; §5.9.3)
-7. **Phase 3.5** — Per-cell override editor: picker widget + override map + Cascade + drag-multi-select. **Optional** — build on real user demand only (~4–5 days; §5.8)
-8. **Phase 4** — Recursive grids (deferred; possibly before or after 3D layers ship)
-9. **Phase 5** — 2.5D parallax camera (deferred; pairs with Phase 4)
-10. **Out-of-thread future** — 3D layers, hex / polar topology, multi-image deck, beat shuffle
+4. **Phase 3** — Explicit Grid mode: Density/Grid toggle + Cols×Rows + Fit/Fill + Grid Scale (1 day) ✅
+5. **Phase 4** — Recursive / nested grids — **next**; builds on the Grid foundation. Full spec: §13
+6. **Phase 5** — 2.5D parallax camera (deferred; pairs with Phase 4)
+7. **⬇ Backlog** — Phase 3.2 (tunnel ↔ scatter convergence; Speed/Direction Var) · Phase 3.3 (scatter-mode FX parity). Gap-filling for edge-case combos — low value-per-risk; §5.9
+8. **❌ Cut** — Phase 3.5 (per-cell override editor) — too compositional for a live tool; §5.8
+9. **Out-of-thread future** — 3D layers, hex / polar topology, multi-image deck, beat shuffle
 
 ---
 
@@ -646,18 +646,17 @@ This section is for the developer implementing any phase, including a future con
 
 ### 12.2 Mandatory checklist for every new field
 
-For each field added to `currentState.images[i]`:
+For each field added to `currentState.images[i]` (line numbers current as of the 2026-05-16 audit — see §12.1; they drift, re-grep if stale):
 
-1. ☐ Default value added to the new-image template (~line 2331–2358)
-2. ☐ Default value added to `_normalizeImageEntry` (line 6263) — **omitting this breaks old presets with `.toFixed() of undefined`**
-3. ☐ HTML control row added to `_layerCardHtml`
-4. ☐ Event listener wired in `_bindLayerCard`
-5. ☐ If it's a `.layer-slider-row` slider, class added to `sliderExclude` (line 3882) — **omitting this index-shifts every other slider on the card** (logged incident; see memory `feedback_image_layer_slider_pattern`)
-6. ☐ Handler calls `_pushUndoBefore()` before mutation, `_postSnap()` after
-7. ☐ Handler calls `this._buildCompShader()` after mutation if it affects rendering
-8. ☐ Save/load round-trip verified (open preset, edit field, save, reload, value persists)
-9. ☐ Old-preset compatibility verified (load a pre-feature preset, no console errors)
-10. ☐ Export/import round-trip verified (export to JSON, re-import on a fresh browser, field intact)
+1. ☐ Default value added to the new-image template (~line 2370–2400) **and** the text template (~2855–2890) — both, or text layers break
+2. ☐ Default value added to `_normalizeImageEntry` (~line 6800) — **omitting this breaks old presets with `.toFixed() of undefined`**
+3. ☐ HTML control row added inside `_mountLayerCard` (the card template literal, ~2901–3500)
+4. ☐ Event listener wired in `_mountLayerCard` (the bindings half, ~3800–5360)
+5. ☐ If it's a `.layer-slider-row` `input[type=range]`, class added to `sliderExclude` (~line 4112) — **omitting this index-shifts every other slider on the card** (logged incident; see memory `feedback_image_layer_slider_pattern`). Non-range inputs (`type="number"`, segmented `.lseg` buttons) are exempt — the positional handler only sees range sliders.
+6. ☐ Handler triggers a render rebuild via `refresh()` (the debounced `_buildCompShader`); undo snapshots through the card's `_snap` / `_postSnap` mechanism (most card sliders snapshot on pointerup)
+7. ☐ Save/load round-trip verified (open preset, edit field, save, reload, value persists)
+8. ☐ Old-preset compatibility verified (load a pre-feature preset, no console errors)
+9. ☐ Export/import round-trip verified (export to JSON, re-import on a fresh browser, field intact)
 
 ### 12.3 Performance considerations
 
@@ -710,3 +709,125 @@ For each phase:
 - **Tooltip text** — write per-control during implementation, not in this doc.
 - **Exact slider min/max/step** — left to implementer; the variance sliders follow the 0–1 convention, but UI feel may suggest tweaks.
 - **Phase 4–5 detailed design** — placeholders only. Full design happens when those phases are scheduled.
+
+### 12.7 Consolidation audit — Phases 1–3 (2026-05-16)
+
+Code review of all tile work shipped today, run as the pre-Phase-4 hardening pass. **No bugs found.** `node --check` clean; user verified save / cross-browser export / old-preset + old-tile-preset load with zero console errors.
+
+**Verified clean:**
+- **Field completeness** — all 12 Phase 2/3 fields present in the image template, the text template, and `_normalizeImageEntry`. Old presets re-hydrate to defaults (`tileMode → 'density'`) → identical output.
+- **`sliderExclude` integrity** — `layer-gridscale-sl` and every Phase 2 variance slider are in the `:not()` chain. Grid `Cols`/`Rows` are `type="number"` (not `input[type=range]`) so the positional slider handler never sees them — no index-shift risk.
+- **GLSL scoping** — the Grid branch declares `_gu` / `_dx` / `_dy` / `_cellId` at the helper's emit scope so the caller's `sampleLine` can use them; `useGrid` is false under Tunnel, so the Grid branch never co-exists with the tunnel path's two `applyTileUV` calls — no double-declaration.
+- **Backward compatibility** — `useGrid` and `pulseFactor` both no-op at defaults (density mode, Pulse 0 → factor `1.0`).
+- **Safety guards** — grid divisor clamped `max(gridScale·pulseFactor, 0.05)` (no div-by-zero from inverted Pulse); `_cellId` clamped to grid bounds; the scatter neighbour scan drops out-of-grid cells.
+- **`_cellId` is still the single isolated cell-identity primitive** — computed two ways (density `floor`, grid `floor(_gu)`), both clamped, both feeding the same per-cell hash vocabulary. This is the clean substitution point a future 3D analogue needs (§10.2).
+
+**Fixed during the audit:**
+- **Per-cell rotation aspect in Grid mode** — the rotation block aspect-corrected with `aspect.y` (canvas AR), so on a non-square grid (e.g. 6×2) Cell Rotate visibly *sheared* tiles as they turned. Fixed: `cellAspectExpr` = `aspect.y × Rows/Cols` in Grid mode, plain `aspect.y` otherwise — applied in both `applyTileUV` and `buildScatterSample` rotation blocks. Byte-identical output in density/tunnel; correct rigid rotation in Grid.
+
+**Minor / accepted (noted, not worth fixing):**
+1. **Fit-mode mip derivatives** — `_dx`/`_dy` captured from `_gu` before the Fit aspect-scale, so mip selection inside fitted cells is slightly off. Genuinely invisible (Fit padding is masked, scale is mild) — left as-is; the fix adds fiddly gradient code for zero visible gain.
+2. **Performance** — scatter is 9× `textureGrad` per fragment; grid + scatter + variance stack. Inherent to the neighbour-accumulation design, not a bug. Fine per the manage-at-beta stance (§12.3) — worth a spot-check with multiple grid+scatter layers before 1.0.
+3. **Tunnel + Grid** — Grid is inert under Tunnel by design (§5.6); the Mode toggle still shows "Grid" active while Tunnel overrides it — a tiny UX wart, accepted (a live fix needs the toggle wired to the tunnel slider — disproportionate plumbing).
+
+**Verdict:** Phases 1–3 are a solid foundation. Cleared to build Phase 4 (recursive grids) on top.
+
+---
+
+## 13. Phase 4 — Recursive grids (full spec)
+
+**Status:** ✅ Shipped 2026-05-17 — verified in browser + DMG build. Spec below was built as written; the §13.7 open decision was taken as recommended (outer gap ignored in scatter mode for v1).
+
+**Goal:** one level of nesting on a Grid-mode layer — each outer cell holds an inner sub-grid — so a single layer reads as a grid-within-a-grid.
+**Build estimate:** ~1–2 days.
+**Prerequisite:** Phase 3 Grid mode (✅ shipped). Recursion is **Grid-mode only** — Density mode has no explicit outer count to nest within.
+**Reality check before starting:** the tile system is already a complete, shippable feature set at Phase 3. Phase 4 is genuine polish, **not a beta blocker** — if beta timing is tight it can ship post-1.0. Build it because the nested look is wanted, not because the roadmap lists it.
+
+### 13.1 The critical design insight — read this first
+
+A *uniform* S×S subdivision with no per-level treatment is **mathematically identical to a flat `Cols·S × Rows·S` grid**. The combined cell index and final UV both collapse:
+
+```
+_cellId = _outerId·S + _innerId   ≡   floor(_gu·S)
+_u      = fract(fract(_gu)·S)     ≡   fract(_gu·S)
+```
+
+So "subdivide each cell into 2×2" *and nothing else* = exactly what typing `6×6` into Cols/Rows already gives. **That is not a feature.** Phase 4 only earns a phase if it adds something a flat grid cannot do — a **per-level treatment**. The minimum that does: an **outer-level gap**.
+
+### 13.2 What makes it a real feature — the outer gap
+
+`tileOuterGap` puts space *between the outer cells*. The inner sub-grid fills only the non-gap region of each outer cell, so the inner tiles read as **clusters** separated by wide channels — a look a flat grid genuinely cannot produce (its one `spacing` gap is uniform across every cell).
+
+Recursion then gives **two independent gap scales**:
+- `spacing` (existing) — gap between inner tiles, *within* a cluster
+- `tileOuterGap` (new) — gap *between* clusters
+
+```
+flat 6×6          recursive 3×3 of 2×2, outerGap > 0
+■■■■■■            ■■  ■■  ■■
+■■■■■■            ■■  ■■  ■■
+■■■■■■
+■■■■■■            ■■  ■■  ■■
+■■■■■■            ■■  ■■  ■■
+■■■■■■
+                  ■■  ■■  ■■
+                  ■■  ■■  ■■
+```
+
+### 13.3 Schema additions
+
+| Field | Default | Notes |
+|---|---|---|
+| `tileSubdivide` | `1` | integer 1–6; `1` = off (plain Grid). Each Grid cell → S×S inner cells |
+| `tileOuterGap` | `0` | 0–0.5; gap between outer cells. At `0`, recursion collapses to a flat grid (§13.1) |
+
+Both Grid-mode only, additive, default = no-op → old presets unaffected. Add to image template, text template, `_normalizeImageEntry` (§12.2 checklist).
+
+### 13.4 Shader — `applyTileUV` Grid path
+
+Slots into the existing `useGrid` branch, right after `_gu` is computed, replacing the current `_cellId` / `_u` lines:
+
+```glsl
+vec2 _outerId = floor(_gu);
+vec2 _outerUV = fract(_gu);
+// outer gap — mask the outer-cell border, rescale the inner region to fill
+{ float _og = tileOuterGap * 0.5;
+  _gapMask *= step(_og,_outerUV.x)*step(_og,1.0-_outerUV.x)
+            * step(_og,_outerUV.y)*step(_og,1.0-_outerUV.y);
+  if (1.0-2.0*_og > 0.001) _outerUV = clamp((_outerUV-_og)/(1.0-2.0*_og),0.0,1.0); }
+// subdivide
+vec2 _innerGu = _outerUV * S;                        // S = float(tileSubdivide)
+_cellId = clamp(_outerId, 0, Cols-1/Rows-1) * S + floor(_innerGu);
+_u      = fract(_innerGu);
+```
+
+`_cellId` is the **combined fine-grid index** — unique per effective cell. Every per-cell effect (rotation, popcorn, Size/Jitter/Opacity/Depth variance) already hashes `_cellId`, so all of them vary across every effective cell **for free**. Recursion, exactly like Grid mode itself, is just "another way to compute `_cellId`" (§2.1, §10.2 — keeps the future 3D-analogue substitution clean).
+
+When `tileSubdivide = 1`: `S = 1`, `_innerGu = _outerUV`, `_cellId = _outerId` → byte-identical to current Grid mode. Fit mode and the `cellAspectExpr` rotation correction are unaffected — an S×S subdivision preserves the outer cell's aspect, so the inner cell AR equals the outer cell AR.
+
+### 13.5 Scatter interaction (jitter on)
+
+`buildScatterSample` v1: scatter + recursion → treat it as a **flat fine grid** `Cols·S × Rows·S` (multiply the grid-setup `vec2(Cols,Rows)` by `S`). `tileOuterGap` is **ignored when jitter is active** — documented limitation, same spirit as Grid+Tunnel (§5.6). Jitter already moves tiles freely past cell edges, so the cluster channels would be visually swamped anyway; the flat-fine-grid behaviour is correct enough.
+
+### 13.6 UI
+
+Two controls in the Grid section of `_mountLayerCard` (visible only when `Mode = Grid`, class `.layer-grid-row`):
+
+```
+   (Grid mode only)
+   Cols  [ 3 ]   Rows  [ 3 ]
+   Subdivide  [ 1 ]            ← integer stepper, modelled on Cols/Rows
+   Outer Gap  ──◯──  0.00      ← slider
+   Scale  ──◯──  1.00
+   Fit   [ Fill · Fit ]
+```
+
+`Subdivide` is a `type="number"` stepper → exempt from `sliderExclude`. **`Outer Gap` is a `.layer-slider-row` range slider → it MUST be added to `sliderExclude`** (the §12.4 #1 footgun — the most common bug in this codebase).
+
+### 13.7 Open decision — lock at build start
+
+Only one: does `tileOuterGap` apply in scatter mode, or is the flat-fine-grid fallback (§13.5) accepted for v1? **Recommendation: fallback for v1** — keeps the build near ~1 day; revisit on demand.
+
+### 13.8 Build checklist
+
+Follow §12.2 for both new fields. Test matrix: Subdivide 1 (= unchanged Grid) → Subdivide 2–4 with Outer Gap 0 (= flat fine grid) → Outer Gap > 0 (clusters appear) → recursion × variance (every effect varies per inner cell) → recursion × scatter (flat fine grid) → recursion × tunnel (grid inert, as Phase 3) → old-preset load → save / export round-trip → console clean at every step.

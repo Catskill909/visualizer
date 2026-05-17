@@ -57,6 +57,25 @@ Shipped Phase 1, 2026-05-15. See [`tile-custom.md`](../../tile-custom.md) for fu
 
 **Corner-wrap mask:** when `tileRotateVariance > 0`, an in-bounds step mask multiplies `_gapMask` after rotation and `_u` is clamped to `[0,1]`. Prevents the WebGL REPEAT-wrap "duplicate sliver" artifact at rotated corners — they go fully transparent instead, letting MilkDrop background show through. Gated by `hasRotVar` only, so uniform Spin without variance keeps its existing wrap behaviour (no regression).
 
+### Per-layer Controls — Grid mode (Tile-mode only)
+
+Shipped Phase 3 (2026-05-16) and Phase 4 (2026-05-17). See [`tile-custom.md`](../../tile-custom.md) §5 and §13 for full design context.
+
+| Control | Range | Notes |
+|---|---|---|
+| **Mode** | Density / Grid | Density (default): the Size slider drives cell count. Grid: an explicit `Cols × Rows` grid fills the canvas once. Old presets stay in Density. |
+| **Cols / Rows** | 1–16 integers | Grid-mode cell count. The Cols:Rows ratio is the cell-shape control — Width/Height are hidden in Grid mode. |
+| **Scale** | 0.1–3.0 | Grid-mode overall scale. <1 = grid sits smaller, centred, transparent margin; >1 = zoom in, edge cells cropped. |
+| **Fit** | Fill / Fit | Fill: stretch image to cell shape. Fit: preserve image aspect, transparent pad. |
+| **Subdivide** | 1–6 integer | Phase 4. Splits each grid cell into an S×S inner sub-grid. 1 = off. `_cellId` becomes the combined fine-grid index, so every Per-Cell effect varies per inner cell automatically. |
+| **Outer Gap** | 0–0.5 | Phase 4. Gap *between* the outer cells, separating the sub-grids into clusters. 0 = recursion collapses to a flat grid (a uniform subdivision alone equals a finer flat grid — the outer gap is what makes recursion a distinct look). Pairs with `spacing`, which is the gap *within* a cluster. |
+
+**Grid-mode shader path:** `_gu = (uv / scale + 0.5) × vec2(Cols, Rows)`; `_cellId = floor(_gu)` clamped to grid bounds; `_u = fract(_gu)` — no infinite `fract`-wrap, fragments outside the grid are masked transparent. Threads through both `applyTileUV` and `buildScatterSample`.
+
+**Recursion shader path** (`useRecursion` = Grid mode and `Subdivide > 1 OR Outer Gap > 0`): `_outerId`/`_outerUV` from `_gu`; the outer gap masks the outer-cell border and rescales the inner region; `_innerGu = _outerUV × S`; `_cellId = _outerId × S + floor(_innerGu)`; `_u = fract(_innerGu)`. At `Subdivide = 1, Outer Gap = 0` the path is byte-identical to plain Grid mode. Mip derivatives are taken from the smooth `_gu` scaled by `S / (1 − 2·gap)` to avoid seams at outer boundaries.
+
+**Limitations** (documented, not bugs): Grid mode is inert when Tunnel is active (a finite grid cannot tunnel). In scatter mode (jitter active) recursion is treated as a flat fine grid `Cols·S × Rows·S` and `Outer Gap` is ignored.
+
 ### Per-layer Controls — Motion
 
 | Control | Range | Notes |

@@ -2405,6 +2405,9 @@ export class EditorInspector {
             tileRows: 3,                // grid mode: rows (integer ≥ 1)
             tileFit: 'fill',            // grid mode: 'fill' (stretch to cell) | 'fit' (aspect-preserve + transparent pad)
             tileGridScale: 1.0,         // grid mode: overall grid scale (1=fills canvas, <1=centered with margin)
+            // Phase 4: Recursive grids (grid mode only)
+            tileSubdivide: 1,           // each grid cell → S×S inner cells (1=off, integer 1–6)
+            tileOuterGap: 0,            // gap between outer cells, 0–0.5 (0=collapses to flat grid)
         };
         this.currentState.images.push(entry);
 
@@ -2895,6 +2898,9 @@ export class EditorInspector {
             tileRows: 3,
             tileFit: 'fill',
             tileGridScale: 1.0,
+            // Phase 4: Recursive grids
+            tileSubdivide: 1,
+            tileOuterGap: 0,
         };
         this.currentState.images.push(entry);
 
@@ -3184,6 +3190,16 @@ export class EditorInspector {
               <input type="number" class="layer-grid-cols" min="1" max="16" step="1" value="${entry.tileCols || 3}" style="width:46px">
               <span class="layer-ctrl-label" style="margin-left:10px">Rows</span>
               <input type="number" class="layer-grid-rows" min="1" max="16" step="1" value="${entry.tileRows || 3}" style="width:46px">
+            </div>
+            <div class="layer-row-inline layer-grid-row"${entry.tile && (entry.tileMode || 'density') === 'grid' ? '' : ' style="display:none"'}>
+              <span class="layer-ctrl-label" data-tooltip="Split each cell into an S×S inner sub-grid">Subdivide</span>
+              <input type="number" class="layer-grid-subdiv" min="1" max="6" step="1" value="${entry.tileSubdivide || 1}" style="width:46px">
+            </div>
+            <div class="layer-slider-row layer-grid-row"${entry.tile && (entry.tileMode || 'density') === 'grid' ? '' : ' style="display:none"'}>
+              <span class="layer-ctrl-label" data-tooltip="Gap between the outer cells — separates the sub-grids into clusters">Outer Gap</span>
+              <input type="range" class="slider layer-outergap-sl" min="0" max="0.5" step="0.01"
+                value="${entry.tileOuterGap !== undefined ? entry.tileOuterGap : 0}" style="--pct:${pct(entry.tileOuterGap !== undefined ? entry.tileOuterGap : 0, 0, 0.5)}">
+              <span class="lsv layer-outergap-val">${(entry.tileOuterGap !== undefined ? entry.tileOuterGap : 0).toFixed(2)}</span>
             </div>
             <div class="layer-slider-row layer-grid-row"${entry.tile && (entry.tileMode || 'density') === 'grid' ? '' : ' style="display:none"'}>
               <span class="layer-ctrl-label" data-tooltip="Scale the whole grid — below 1 = centred with margin, above 1 = zoom in (edge cells cropped)">Scale</span>
@@ -3907,12 +3923,12 @@ export class EditorInspector {
         // in the field never bubbles to the card-header collapse toggle.
         const gridColsInput = card.querySelector('.layer-grid-cols');
         const gridRowsInput = card.querySelector('.layer-grid-rows');
-        const bindGridStepper = (inputEl, key) => {
+        const bindGridStepper = (inputEl, key, max = 16) => {
             if (!inputEl) return;
             inputEl.addEventListener('click', (e) => e.stopPropagation());
             inputEl.addEventListener('keydown', (e) => e.stopPropagation());
             inputEl.addEventListener('change', () => {
-                const v = Math.max(1, Math.min(16, Math.round(parseFloat(inputEl.value) || 1)));
+                const v = Math.max(1, Math.min(max, Math.round(parseFloat(inputEl.value) || 1)));
                 inputEl.value = v;
                 entry[key] = v;
                 refresh();
@@ -3920,6 +3936,8 @@ export class EditorInspector {
         };
         bindGridStepper(gridColsInput, 'tileCols');
         bindGridStepper(gridRowsInput, 'tileRows');
+        // Phase 4: Subdivide stepper (1–6) — each grid cell → S×S inner cells
+        bindGridStepper(card.querySelector('.layer-grid-subdiv'), 'tileSubdivide', 6);
         // Grid Scale slider — scales the whole grid (1 = fills canvas, <1 = margin)
         const gridScaleSl = card.querySelector('.layer-gridscale-sl');
         const gridScaleVal = card.querySelector('.layer-gridscale-val');
@@ -3928,6 +3946,16 @@ export class EditorInspector {
             entry.tileGridScale = v;
             gridScaleVal.textContent = v.toFixed(2);
             gridScaleSl.style.setProperty('--pct', `${((v - 0.1) / 2.9 * 100).toFixed(1)}%`);
+            refresh();
+        });
+        // Phase 4: Outer Gap slider — gap between outer cells (0–0.5)
+        const outerGapSl = card.querySelector('.layer-outergap-sl');
+        const outerGapVal = card.querySelector('.layer-outergap-val');
+        if (outerGapSl && outerGapVal) outerGapSl.addEventListener('input', () => {
+            const v = parseFloat(outerGapSl.value);
+            entry.tileOuterGap = v;
+            outerGapVal.textContent = v.toFixed(2);
+            outerGapSl.style.setProperty('--pct', `${(v / 0.5 * 100).toFixed(1)}%`);
             refresh();
         });
 
@@ -4231,6 +4259,8 @@ export class EditorInspector {
             'layer-opacityvar-sl','layer-depthvar-sl',
             // Phase 3: Grid mode — own dedicated handler below
             'layer-gridscale-sl',
+            // Phase 4: Recursive grids — own dedicated handler below
+            'layer-outergap-sl',
             // Color FX — own dedicated handler below
             'layer-solarize-sl',
         ].map(c => `:not(.${c})`).join('');
@@ -5973,6 +6003,21 @@ export class EditorInspector {
         // with transparent margin. Clamped ≥ 0.1 to keep the divisor safe.
         const gridScale = Math.max(0.1, img.tileGridScale !== undefined ? img.tileGridScale : 1.0).toFixed(4);
         const useGrid = !isVideo && img.tile && tileModeVal === 'grid' && !hasTunnel;
+        // Phase 4: Recursive grids — each grid cell → S×S inner cells, with a
+        // separate gap BETWEEN the outer cells (clusters). Grid-mode only.
+        // useRecursion only when it changes the output: S>1 OR an outer gap is set
+        // (at S=1, gap=0 the recursion path is byte-identical to plain Grid mode).
+        const tileSubdivide = Math.max(1, Math.min(6, Math.round(img.tileSubdivide || 1)));
+        const tileOuterGap = Math.max(0, Math.min(0.5, img.tileOuterGap !== undefined ? img.tileOuterGap : 0));
+        const useRecursion = useGrid && (tileSubdivide > 1 || tileOuterGap > 0);
+        // Derivative rescale so textureGrad picks the right mip on the S× finer,
+        // gap-rescaled inner grid (dFdx of the smooth _gu, not the fract-jumping _innerGu).
+        const recurDxScale = (tileSubdivide / Math.max(1 - 2 * tileOuterGap, 0.001)).toFixed(4);
+        const outerGapHalf = (tileOuterGap * 0.5).toFixed(4);
+        // Cell aspect ratio for per-cell rotation. Density cells are aspect-pre-scaled
+        // square, so `aspect.y` is right; a Grid cell is canvasAR × Rows/Cols, so
+        // rotation must correct by that or non-square grids shear as they rotate.
+        const cellAspectExpr = useGrid ? `(aspect.y * ${gridRows}.0 / ${gridCols}.0)` : 'aspect.y';
 
         let blendLine;
         switch (img.blendMode) {
@@ -6107,15 +6152,43 @@ export class EditorInspector {
                         s += `    _gu.y += mod(floor(_gu.x), 2.0) * ${offsetAmount};\n`;
                     }
                 }
-                if (dxVar && dyVar) {
-                    s += `    vec2 ${dxVar} = dFdx(_gu); vec2 ${dyVar} = dFdy(_gu);\n`;
+                if (useRecursion) {
+                    // Phase 4: Recursive grid — each outer cell holds an S×S inner
+                    // sub-grid; tileOuterGap channels the outer cells into clusters.
+                    // _cellId is the combined fine-grid index, so every per-cell
+                    // effect varies per inner cell for free (§13.4 of tile-custom.md).
+                    s += `    vec2 _outerId = clamp(floor(_gu), vec2(0.0), vec2(${gridCols}.0 - 1.0, ${gridRows}.0 - 1.0));\n`;
+                    s += `    vec2 _outerUV = fract(_gu);\n`;
+                    if (maskVar) {
+                        s += `    ${maskVar} *= step(0.0, _gu.x) * step(_gu.x, ${gridCols}.0)\n`;
+                        s += `                * step(0.0, _gu.y) * step(_gu.y, ${gridRows}.0);\n`;
+                    }
+                    if (tileOuterGap > 0) {
+                        // Mask the outer-cell border; rescale the inner region to fill it.
+                        s += `    { float _og = ${outerGapHalf};\n`;
+                        if (maskVar) {
+                            s += `      ${maskVar} *= step(_og, _outerUV.x) * step(_og, 1.0 - _outerUV.x)\n`;
+                            s += `                  * step(_og, _outerUV.y) * step(_og, 1.0 - _outerUV.y);\n`;
+                        }
+                        s += `      if (1.0 - 2.0 * _og > 0.001) _outerUV = clamp((_outerUV - _og) / (1.0 - 2.0 * _og), 0.0, 1.0); }\n`;
+                    }
+                    s += `    vec2 _innerGu = _outerUV * ${tileSubdivide}.0;\n`;
+                    if (dxVar && dyVar) {
+                        s += `    vec2 ${dxVar} = dFdx(_gu) * ${recurDxScale}; vec2 ${dyVar} = dFdy(_gu) * ${recurDxScale};\n`;
+                    }
+                    s += `    vec2 ${cellIdVar} = _outerId * ${tileSubdivide}.0 + clamp(floor(_innerGu), 0.0, ${tileSubdivide}.0 - 1.0);\n`;
+                    s += `    ${varName} = fract(_innerGu);\n`;
+                } else {
+                    if (dxVar && dyVar) {
+                        s += `    vec2 ${dxVar} = dFdx(_gu); vec2 ${dyVar} = dFdy(_gu);\n`;
+                    }
+                    s += `    vec2 ${cellIdVar} = clamp(floor(_gu), vec2(0.0), vec2(${gridCols}.0 - 1.0, ${gridRows}.0 - 1.0));\n`;
+                    if (maskVar) {
+                        s += `    ${maskVar} *= step(0.0, _gu.x) * step(_gu.x, ${gridCols}.0)\n`;
+                        s += `                * step(0.0, _gu.y) * step(_gu.y, ${gridRows}.0);\n`;
+                    }
+                    s += `    ${varName} = fract(_gu);\n`;
                 }
-                s += `    vec2 ${cellIdVar} = clamp(floor(_gu), vec2(0.0), vec2(${gridCols}.0 - 1.0, ${gridRows}.0 - 1.0));\n`;
-                if (maskVar) {
-                    s += `    ${maskVar} *= step(0.0, _gu.x) * step(_gu.x, ${gridCols}.0)\n`;
-                    s += `                * step(0.0, _gu.y) * step(_gu.y, ${gridRows}.0);\n`;
-                }
-                s += `    ${varName} = fract(_gu);\n`;
                 // Fit mode: preserve the image aspect inside each cell, transparent pad.
                 if (tileFitMode === 'fit') {
                     s += `    { float _cellAR = aspect.y * ${gridRows}.0 / ${gridCols}.0;\n`;
@@ -6159,7 +6232,7 @@ export class EditorInspector {
             //   Group Spin = whole grid layout rotates
             //   Cell Rotate = each tile's contents rotates independently
             if (perTileSpin || hasRotVar) {
-                s += `    { vec2 _tl = ${varName} - 0.5; _tl.x *= aspect.y;\n`;
+                s += `    { vec2 _tl = ${varName} - 0.5; _tl.x *= ${cellAspectExpr};\n`;
                 s += `      float _localAng = ${perTileSpin ? '_spinAng' : '0.0'};\n`;
                 if (hasRotVar) {
                     // Per-cell rotation: hash the cell id, add an angle.
@@ -6176,7 +6249,7 @@ export class EditorInspector {
                 }
                 s += `      float _ca = cos(_localAng); float _sa = sin(_localAng);\n`;
                 s += `      _tl = vec2(_ca*_tl.x - _sa*_tl.y, _sa*_tl.x + _ca*_tl.y);\n`;
-                s += `      _tl.x /= aspect.y; ${varName} = _tl + 0.5; }\n`;
+                s += `      _tl.x /= ${cellAspectExpr}; ${varName} = _tl + 0.5; }\n`;
             }
             // Phase 1 fix: when per-cell rotation is active, mask the rotated-out
             // corners. The rotated square's corners extend beyond [0,1] of the cell;
@@ -6353,7 +6426,10 @@ export class EditorInspector {
             if (useGrid) {
                 // Phase 3: Grid mode — explicit COLS×ROWS. Shift by -0.5 so cell
                 // centres land on integers, matching the density convention below.
-                s += `    _u = (_u / max(${gridScale} * ${pulseFactor}, 0.05) + 0.5) * vec2(${gridCols}.0, ${gridRows}.0) - 0.5;\n`;
+                // Phase 4: scatter + recursion → treat as a flat fine grid
+                // Cols·S × Rows·S; tileOuterGap is ignored when jitter is active
+                // (documented limitation — §13.5 of tile-custom.md).
+                s += `    _u = (_u / max(${gridScale} * ${pulseFactor}, 0.05) + 0.5) * vec2(${gridCols * tileSubdivide}.0, ${gridRows * tileSubdivide}.0) - 0.5;\n`;
             } else {
                 s += `    _u.x *= aspect.y;\n`;
                 s += `    _u /= ${sizeBase};\n`;
@@ -6394,7 +6470,7 @@ export class EditorInspector {
             s += `      vec2 _lc = (_u - _C - _jOff) * _szF;\n`;
             // Per-cell rotation (uniform per-tile spin + hashed variance)
             if (perTileSpin || hasRotVar) {
-                s += `      { _lc.x *= aspect.y;\n`;
+                s += `      { _lc.x *= ${cellAspectExpr};\n`;
                 s += `        float _localAng = ${perTileSpin ? '_spinAng' : '0.0'};\n`;
                 if (hasRotVar) {
                     s += `        float _ch = fract(sin(dot(_C + ${seedVec}, vec2(127.1, 311.7))) * 43758.5);\n`;
@@ -6407,7 +6483,7 @@ export class EditorInspector {
                 }
                 s += `        float _ca = cos(_localAng); float _sa = sin(_localAng);\n`;
                 s += `        _lc = vec2(_ca * _lc.x - _sa * _lc.y, _sa * _lc.x + _ca * _lc.y);\n`;
-                s += `        _lc.x /= aspect.y; }\n`;
+                s += `        _lc.x /= ${cellAspectExpr}; }\n`;
             }
             s += `      vec2 _luv = _lc + 0.5;\n`;
             // Phase 3: Grid Fit — preserve image aspect inside the cell. Padding
@@ -6440,8 +6516,8 @@ export class EditorInspector {
             s += `      float _a = _sc.w * _cov;\n`;
             // Phase 3: Grid mode is finite — drop neighbour cells outside the grid.
             if (useGrid) {
-                s += `      _a *= step(0.0, _C.x) * step(_C.x, ${gridCols}.0 - 1.0)\n`;
-                s += `          * step(0.0, _C.y) * step(_C.y, ${gridRows}.0 - 1.0);\n`;
+                s += `      _a *= step(0.0, _C.x) * step(_C.x, ${gridCols * tileSubdivide}.0 - 1.0)\n`;
+                s += `          * step(0.0, _C.y) * step(_C.y, ${gridRows * tileSubdivide}.0 - 1.0);\n`;
             }
             // Per-cell popcorn — hashed audio brightness pulse
             if (hasPopcorn) {
@@ -7006,6 +7082,8 @@ export class EditorInspector {
             tileVarianceSeed: 0, tileVarianceSeedLocked: true,
             // Phase 3: Grid mode — 'density' default → old presets unchanged
             tileMode: 'density', tileCols: 3, tileRows: 3, tileFit: 'fill', tileGridScale: 1.0,
+            // Phase 4: Recursive grids — defaults are no-ops → old presets unchanged
+            tileSubdivide: 1, tileOuterGap: 0,
         };
         return { ...D, ...entry };
     }
