@@ -5,6 +5,8 @@ The goal is to allow a single 3D object to be uploaded and manipulated as a laye
 
 This means the 3D object instantly inherits all of our existing VJ effects (Chromatic Aberration, Hue Spin, Luma Key, Blur, Scanlines, etc.) for "free" on the GPU, without having to write custom 3D shaders.
 
+**Two modes, one layer.** A 3D layer renders either a **single object** or a **volumetric grid** — an X×Y×Z lattice of stacked cells, each holding a flat image/GIF plane or a mesh (see [Volumetric Grid](#volumetric-grid-stacked-layout)). Both use the *same* offscreen-canvas-as-texture integration; the grid is just what the Three.js scene happens to contain. It still counts as **one** 3D layer regardless of how many cells it draws.
+
 ## The Pipeline
 
 1. **Upload & Validation**: 
@@ -43,13 +45,64 @@ Three.js gives us access to incredible built-in features that are perfect for au
 2. **Ecosystem**: Three.js has massive community support. If we want to add particle emitters (to explode the 3D model) or simple physics later, the libraries already exist.
 3. **Consistency**: The user experience remains the same. The 3D object behaves like an image layer that just happens to have real depth and lighting.
 
+## Volumetric Grid (Stacked Layout)
+
+A 3D layer can arrange its content as a **stacked grid** — an X×Y×Z lattice of cells, the 3D analogue of 2D Grid mode (`tile-custom.md` §5). Picture a Rubik's cube: 4×4×4 cells stacked in real space, lit and occluding, so the volume reads as a solid object.
+
+This is the feature that makes the 3D layer worth building. A flat 2D image stack **cannot** do it — flat cards have no depth, so a "stack" of them just hides the back rows behind the front. (This is exactly why the 2.5D parallax attempt — `tile-custom.md` §10.5 — was built and reverted.) Real perspective + lighting + a camera that can tilt is what makes a stack read as a stack.
+
+### What a cell can hold
+
+| Cell content | In the Three.js scene |
+|---|---|
+| Image / GIF | a flat **textured plane** at the cell's lattice position |
+| `.glb` / `.gltf` mesh | the **real mesh**, instanced into every cell |
+| Built-in primitive (cube, …) | a primitive mesh — the literal Rubik's-cube look, no upload needed |
+
+A textured plane is just a flat mesh, so Three.js draws image cells and mesh cells with the *same* scene, camera, and light. **One renderer for every cell type** — which is *why* image-cell stacking must live here and not in the 2D tile shader (the 2D shader has no Z axis and cannot draw a `.glb` at all).
+
+### v1 scope — one source, tiled
+
+The grid tiles **one** uploaded image (or one mesh / primitive) across every cell — exactly as 2D Grid mode tiles one image. Per-cell *different* content (cell 5 = logo A, cell 8 = logo B) is **out of scope**: that is the hand-authored compositional editor already cut for 2D (`tile-custom.md` §5.8), and the same reasoning holds. Variety comes from procedural per-cell variance, not hand-authoring.
+
+### Controls (in the 3D layer card)
+
+- **Grid X / Y / Z** — integer steppers; the lattice size. Z is the new axis vs 2D's Cols×Rows.
+- **Spacing** — gap between cells (per-axis or uniform).
+- **Per-cell variance** — Size / Rotation / Opacity variance + **Seed + Lock**.
+- **Cell content** — image / GIF / uploaded mesh / built-in primitive.
+
+### Carries over from the 2D tile work — do not redesign
+
+The per-cell vocabulary from 2D Phases 1–2 ports directly (`tile-custom.md` §10.2): variance sliders, Seed semantics, the `Cols × Rows` stepper UX → `X × Y × Z`. Rotation variance simply gains the extra two axes. Recursive subdivision (2D Phase 4) *could* extend to 3D later — note only, not v1.
+
+### Performance
+
+`InstancedMesh` — one geometry, N instances, **one draw call**. A 4×4×4 = 64-cell grid is trivial; 8×8×8 = 512 is still fine. The real cost ceiling is the uploaded mesh's polycount × instance count — keep the 5 MB model limit and spot-check dense grids before 1.0.
+
+## Entry Point & UI Placement
+
+The 3D layer is **just another layer** — added from the **Layers tab via a button**, the same way text layers are added today (the `✏️ Text` button → a sibling `🧊 3D` button). It then appears as a card in the layer stack alongside images / GIFs / videos / text, with solo / mute / reorder / rename like any layer.
+
+- **No dedicated tab.** A 5th tab was considered and rejected: tabs are *scene-level* (Palette, Layers, Motion, Wave); a 3D object is *per-layer*, so its controls belong in its layer card — consistent with every other layer type.
+- **Its own card layout.** The 3D card shows only 3D-relevant controls (rotation X/Y/Z, material, grid X/Y/Z, per-cell variance, camera). It is *not* the 2D image card with rows hidden — 2D-only controls (2D tile mode, skew / perspective, the 2D per-tile mirror) never appear.
+- **Max one 3D layer per preset** still holds — a volumetric grid is internal to that one layer, not N layers.
+
+### Camera — constrained (cross-ref `tile-custom.md` §10.1)
+
+The camera is **pan + small tilt only — never a free orbit.** The slight tilt is what reveals the grid's volumetric depth. Keep two things distinct:
+
+- **Object / grid spin** — *free* and audio-reactive (Beat Spin X/Y/Z, below). The object itself rotates; this is a creative feature.
+- **Camera** — *constrained*. The viewpoint only nudges; the user never flies behind the stack.
+
+Constraining the camera is also the performance win (`tile-custom.md` §10.1): a roughly stable viewpoint keeps depth-sort and culling predictable.
+
 ## Recommended Libraries & Ecosystem Upgrades
 
 To make the 3D integration as polished as possible, we should consider these lightweight libraries:
 
 - **GSAP (GreenSock)**: Used for "easing" and interpolation. When audio spikes, instead of the 3D object jittering wildly, GSAP smoothly interpolates the scale/rotation (e.g., `gsap.to(mesh.scale, {x: audio, duration: 0.1})`), turning a glitchy pulse into a buttery-smooth, heavy breathing effect.
-- **Meyda (Advanced Audio Analysis)**: Right now, the app uses raw FFT (Fast Fourier Transform) data for Bass/Mid/Treble. Meyda extracts advanced acoustic features like **Spectral Flux** (which is vastly superior for detecting sharp snare/clap hits) and **Perceptual Spread**. 
-  - *Note:* Meyda wouldn't just be for 3D! If we integrate it, we could expose Spectral Flux to the entire Preset Studio, allowing 2D image layers, shapes, and GIF playbacks to react to much tighter, more accurate beat detection.
+- ~~**Meyda (Advanced Audio Analysis)**~~ — **evaluated and not adopted.** Meyda's headline feature, Spectral Flux transient detection, already shipped DIY as the **Flux** audio source in the Preset Studio — and it is already available to every reactive control (2D layers, shapes, GIFs, and the 3D layer alike). Do **not** add the Meyda dependency; the win is already banked. (See the v1 scope notes in `tile-custom.md` / README.)
 - **Procedural Shader Materials**: Instead of loading heavy image textures for 3D objects, we can ship 4-5 built-in procedural materials (e.g., melting rainbow glass, digital matrix wireframe). These are generated entirely by math on the GPU, meaning they take up virtually 0 KB of storage and look incredibly premium.
 
 ## Implementation Steps (Roadmap)
@@ -67,10 +120,21 @@ To make the 3D integration as polished as possible, we should consider these lig
   - Ensure the Three.js canvas texture is passed to the WebGL compositor.
 
 - [ ] **Phase 4: Controls & UI**
+  - Add the 3D layer entry point — a `🧊 3D` button in the Layers tab, next to `✏️ Text`.
+  - Give the 3D layer its own card layout (3D-only controls — see [Entry Point & UI](#entry-point--ui-placement)).
   - Add X/Y/Z continuous rotation sliders.
   - Add a dropdown for "Material Style" (Original, Wireframe, Normal Map).
   - Plumb the audio-reactive data into the Three.js mesh transforms.
 
+- [ ] **Phase 5: Volumetric Grid**
+  - X/Y/Z lattice via `InstancedMesh`; one source tiled across all cells.
+  - Per-cell variance (Size / Rotation / Opacity + Seed) ported from 2D Phases 1–2.
+  - Image-plane cells and mesh cells; optional built-in primitives (cube first).
+  - Constrained camera (pan + small tilt) so the stacked depth reads.
+
 ## Open Questions for Prototyping
-1. **Camera Setup**: Should we use an Orthographic camera (flat, 2D-style projection) or Perspective (true depth)? Perspective probably looks better for spinning objects.
-2. **Lighting**: Do we bake a simple HDRI / ambient light into the scene, or just stick to unlit materials to save GPU cycles? (Wireframe and Normal materials don't require lighting, which makes them very cheap).
+1. **Camera Setup**: Use a **Perspective** camera — Orthographic would flatten the volumetric grid and kill the depth read. The camera is **constrained** to pan + small tilt, never a free orbit (`tile-custom.md` §10.1).
+2. **Lighting**: Do we bake a simple HDRI / ambient light into the scene, or just stick to unlit materials to save GPU cycles? (Wireframe and Normal materials don't require lighting, which makes them very cheap — but a *grid* needs real lighting for the stack to read as solid; unlit cells look flat.)
+3. **Grid primitives**: Which built-in primitives ship for grid cells? Cube is the minimum (the Rubik's-cube look with no upload); sphere / plane likely follow.
+4. **Grid spacing**: Per-axis spacing (independent X/Y/Z gaps) or a single uniform gap? Uniform is simpler; per-axis enables flatter "wall" vs deep "tunnel" stacks.
+5. **Grid source**: How is the single tiled source chosen — reuse the existing image-upload UX for image cells, plus a primitive picker for mesh cells?

@@ -9,7 +9,7 @@
 ## 🎯 Status Dashboard
 
 **Current state:** Phases 1 / 2 / 2.5 / 3 / 4 ✅ all shipped — 1–3 on 2026-05-16, Phase 4 on 2026-05-17. Variance Suite: Size Var / Jitter X/Y / Opacity Var / Phase Var / Seed + Lock. Scatter sampling: jitter moves tiles freely with overlap. **Grid mode: Density/Grid toggle, explicit Cols×Rows, Fill/Fit, Grid Scale (0.1–3×); Pulse/Strobe react in Grid mode. Recursive grids: Subdivide (1–6) + Outer Gap (0–0.5). All verified in browser, export + DMG build confirmed.** Speed Var + Direction Var deferred (tunnel architecture work — Phase 3.2).
-**Next action:** Phases 1–4 are a complete, shippable tile feature set. **Next phase = Phase 5 — 2.5D parallax camera** (§10.5). Spec now fleshed out: per-layer `parallaxDepth` + `parallaxAmount`, a new global Camera section, the 2D-pan-only camera model (§10.1), and a full UI/UX section (naming collision, two-scope homes, dead-slider trap). It is the next *tile-doc* phase — the wider v1 priority is still Timeline → 3D layers, but Phase 5 is the next thing to build within tiles. Phase 3.2 / 3.3 ⬇ backlog (§5.9); Phase 3.5 ❌ cut (§5.8).
+**Next action:** Phase 5 (2.5D parallax camera) was built and **reverted the same day** — the editor is back at the verified Phase 4 state. The §10.5 spec as built failed on UX (see §10.5 status + the most-recent-change note); it needs a redesign before any retry. Awaiting a fresh direction from the user. Phase 3.2 / 3.3 ⬇ backlog (§5.9); Phase 3.5 ❌ cut (§5.8). Tile feature set shippable at Phase 4.
 
 ### Phase status
 
@@ -23,11 +23,13 @@
 | 3.2 | Tunnel ↔ Scatter convergence — free-jitter in tunnel + Speed/Direction Var | ⬇ Backlog | — | ~3 days |
 | 3.3 | Scatter-mode FX parity — chromatic / blur / sobel / wave / pixelate inside the scatter loop | ⬇ Backlog | — | ~2 days |
 | ~~3.5~~ | ~~Per-cell override editor~~ | ❌ Cut 2026-05-16 — see §5.8 | — | — |
-| [5](#105-phase-5--25d-parallax-camera-pure-2d) | 2.5D parallax camera (pure 2D) — per-layer depth + parallax camera | 📋 Planned (next) | — | ~5 days |
+| [5](#105-phase-5--25d-parallax-camera-pure-2d) | 2.5D parallax camera (pure 2D) | ⏸ Built 2026-05-17, reverted same day — needs a redesign (§10.5) | — | — |
 
 Legend: 📋 Planned · 🔨 In progress · ✅ Shipped · ⬇ Backlog · ❌ Cut · 🛑 Blocked · 🐛 Bug
 
 ### Most recent change
+
+`2026-05-17` — **Phase 5 built, then reverted the same day.** The §10.5 parallax-camera spec was implemented in full (scene `cameraPanX/Y/Drift/Bob`, per-layer `parallaxDepth`, baked `_camPos` in `_buildCompShader`, Camera section in the Layers tab) and **fully reverted on user feedback** — the editor is back at the verified Phase 4 state, `node --check` clean. It was a mess to use: nothing happened without configuring two disconnected places (a per-layer slider AND the global camera) with no feedback, and parallax is pointless on the 1–2-layer presets that are typical. See the §10.5 status block for the full failure analysis. The spec needs a redesigned interaction model before any retry; the schema/shader approach was fine, the UX was not.
 
 `2026-05-17` — **Phase 5 spec fleshed out + §10 camera model reconciled.** §10.1: resolved the pan-vs-tilt inconsistency — **2D layers get pan only** (a flat card has no geometry; a tilt forces billboard/shear math and costs CPU/GPU for no gain), **3D object layers get pan + small tilt** (free on real geometry, a genuine depth cue). §10.2: new resolved decision — the **volumetric X×Y×Z grid is 3D-object-only**; 2D layers stop at recursion (§13) and get depth from Phase 5 pan parallax, never a 3D grid (a flat billboard can't rotate convincingly). §10.5: added the **UI/UX section** — the "Pan" naming collision (the camera must not reuse the per-layer Pan name), the two-scopes/two-homes split (per-layer depth sliders in Motion vs a new global Camera panel), and the dead-slider trap (`parallaxDepth` is invisible until the camera moves → ship auto-drift on by default). Phase 5 promoted to 📋 Planned (next).
 
@@ -577,9 +579,19 @@ Combined with the constrained-camera parallax (§10.5), small camera pans reveal
 
 ### 10.5 Phase 5 — 2.5D parallax camera (pure 2D)
 
+**Status:** ⏸ **Built 2026-05-17, reverted the same day.** The §10.5 design below was implemented (single per-layer `parallaxDepth` + a global Camera section) and reverted on user feedback — it was a mess to use. **Failure analysis (read before any retry):**
+
+1. **Two-place setup with an invisible dependency.** Nothing happens unless the user sets BOTH a per-layer `parallaxDepth` slider AND moves the global camera. Either alone = no effect, with zero feedback explaining why. The global Camera section sits there looking broken.
+2. **Parallax is meaningless with < 2 layers.** It is relative motion between depth-staggered layers; most presets have 1–2 layers, and a single layer just "drifts" — which Wander/Pan already do.
+3. **Dead weight otherwise.** The Camera section occupies the Layers tab looking inert for every preset that doesn't opt in (i.e. nearly all).
+
+The §10.5 UI/UX section *predicted* problems 1 and 3 and the build proceeded anyway, betting a default drift would mask them. It didn't. **Do not rebuild from this spec as-is** — it needs a genuinely different interaction model (one place, self-demonstrating) or it should stay cut. The schema/shader approach (baked `_camPos`, no uniform, gated → zero regression) was sound; the *UX* was the failure.
+
 A near-term depth phase that pairs with recursive grids and ships *before* any real 3D layer system.
 
-**Concept:** each image layer gets `parallaxDepth` (0 = front, 1 = far back) and `parallaxAmount` (how much it responds to camera). The comp shader offsets each layer's UV by `cameraPos * depth * parallax`. Result: layers shift at different rates as the camera pans → felt depth without rotation.
+**Concept:** **every 2D texture layer — image, GIF, video, and text** — gets `parallaxDepth` (0 = front, 1 = far back) and `parallaxAmount` (how much it responds to camera). The parallax is a `vec2` UV offset in the comp shader (`cameraPos * depth * parallax`), so it is layer-type-agnostic — all four types run through the same per-layer pipeline. Result: layers shift at different rates as the camera pans → felt depth without rotation. Wire the two fields to **every** entry in `currentState.images[]`, not just `type === 'image'`.
+
+**The future 3D layer opts out.** A 3D object layer renders with its own real camera; you would not UV-shift its flat output. When 3D ships, the global Camera section drives the 3D layer's *actual* camera in sync — same camera input, different mechanism (3D-doc territory, not Phase 5).
 
 **Controls (per layer):**
 - `parallaxDepth: 0..1` (slider, default 0)
