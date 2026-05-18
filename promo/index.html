@@ -32,10 +32,19 @@
 
         <p class="promo-modal-subtitle">What's new:</p>
         <ul class="promo-modal-list">
-
+          <li><strong>Timeline Editor — Loop Regions ✨ NEW</strong> — Markers are now real loopers. Press
+            <strong>M</strong> (or click the new dedicated <strong>marker lane</strong>) to drop a marker, set its
+            action to <strong>Loop</strong>, and it becomes a draggable <strong>loop region</strong>: drag the band's
+            handles to size it and playback loops that span, easing across the wrap with a 1-second crossfade. The
+            per-block menu is now a clean action menu with a <strong>16-colour block colour picker</strong>, and a
+            playhead fix means adding a preset no longer jumps the canvas — the playhead is the single source of
+            truth. Still in active development alongside multi-zone compositing, transport, and VJ mode.
+          </li>
           <li><strong>Recursive grids ✨ NEW</strong> — A Grid-mode layer can now nest. <strong>Subdivide</strong>
-            splits every grid cell into an inner sub-grid, and <strong>Outer Gap</strong> opens wide channels between the
-            outer cells so the sub-grids read as separate clusters — a grid-within-a-grid from a single layer. Pairs with
+            splits every grid cell into an inner sub-grid, and <strong>Outer Gap</strong> opens wide channels between
+            the
+            outer cells so the sub-grids read as separate clusters — a grid-within-a-grid from a single layer. Pairs
+            with
             Spacing for two independent gap scales, and every per-cell effect varies across every inner cell
             automatically.</li>
           <li><strong>Grid mode for tiled layers ✨ NEW</strong> — Switch any tiled image, GIF, or text layer from
@@ -43,7 +52,8 @@
             <strong>Fill</strong> (stretch the image to each cell) or <strong>Fit</strong> (keep its aspect, transparent
             pad), and a <strong>Scale</strong> control zooms the whole grid — pull it in with a margin, or push it past
             the canvas edge for tight, kaleidoscope-style compositions. Every per-cell effect and audio reaction carries
-            over.</li>
+            over.
+          </li>
           <li><strong>Per-Cell tile controls ✨ NEW</strong> — On any tiled image, GIF, or text layer:
             <strong>Offset</strong> staggers alternating rows or columns for a brick / half-drop pattern, <strong>Cell
               Rotate</strong> gives each tile its own random rotation (with optional 90° snap for a Truchet-style
@@ -52,7 +62,8 @@
             <strong>Opacity Var</strong> — give every tile its own size, position, and opacity; with <strong>scatter
               sampling</strong>, jittered tiles break free of the grid, drifting past their cell boundaries and
             overlapping each other for organic, scattered layouts. A <strong>Seed</strong> control reshuffles the
-            random pattern. Composes with the existing Spin, Group, and Angle.</li>
+            random pattern. Composes with the existing Spin, Group, and Angle.
+          </li>
           <li><strong>Video Layers</strong> — Drop MP4/WebM files into presets with full playback controls (play/pause,
             loop, speed, scrub), independent Width &amp; Height scaling, colored Border ring (width, color, feather),
             full color grading (12 controls: Brightness, Contrast, Gamma, Fade, Color Temperature, Sepia, Blur, Shadows,
@@ -62,13 +73,7 @@
             subject
             floats over the visualizer with full transparency. Works on web, Windows, and macOS (Mac auto-converts on
             first import). All VJ effects, audio reactivity, and motion controls apply to every frame.</li>
-          <li><strong>Timeline Editor — Loop Regions ✨ NEW</strong> — Markers are now real loopers. Press
-            <strong>M</strong> (or click the new dedicated <strong>marker lane</strong>) to drop a marker, set its
-            action to <strong>Loop</strong>, and it becomes a draggable <strong>loop region</strong>: drag the band's
-            handles to size it and playback loops that span, easing across the wrap with a 1-second crossfade. The
-            per-block menu is now a clean action menu with a <strong>16-colour block colour picker</strong>, and a
-            playhead fix means adding a preset no longer jumps the canvas — the playhead is the single source of
-            truth. Still in active development alongside multi-zone compositing, transport, and VJ mode.</li>
+
 
           <li><strong>Spectral Flux audio source</strong> — a fifth reactivity source in the Preset Studio. Flux detects
             transients (snare hits, claps, plucks) by measuring frame-to-frame change in the frequency spectrum. It
@@ -542,8 +547,8 @@
               <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              <strong>Markers &amp; loop regions</strong> — press <code
-                style="font-size:0.85em;opacity:0.8">M</code> or click the dedicated marker lane to drop a marker; set
+              <strong>Markers &amp; loop regions</strong> — press <code style="font-size:0.85em;opacity:0.8">M</code> or
+              click the dedicated marker lane to drop a marker; set
               one to Loop and it becomes a draggable loop region that wraps playback with a 1-second crossfade
             </li>
             <li>
