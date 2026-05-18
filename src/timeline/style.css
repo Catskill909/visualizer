@@ -26,9 +26,10 @@
   --topbar-h:   52px;
   --transport-h: 50px;
   --ruler-h:    26px;
+  --marker-lane-h: 20px;
   --track-h:    68px;
   --zone-col-w: 120px;
-  --strip-h: calc(var(--ruler-h) + var(--track-h) + 2px);
+  --strip-h: calc(var(--ruler-h) + var(--marker-lane-h) + var(--track-h) + 2px);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -432,6 +433,18 @@ body.tl-fullscreen #tl-canvas-container { cursor: pointer; }
   border-bottom: 1px solid var(--border);
   cursor: pointer;
   user-select: none;
+  touch-action: none;   /* scrub drags are ours — don't let the browser steal them as scroll */
+}
+
+/* Marker lane — dedicated row for marker flags, below the time ruler */
+#tl-marker-lane {
+  height: var(--marker-lane-h);
+  position: relative;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,0.06);
+  cursor: pointer;
+  user-select: none;
+  touch-action: none;
 }
 #tl-ruler::after {
   content: 'Double-click to add marker';
@@ -490,8 +503,10 @@ body.tl-fullscreen #tl-canvas-container { cursor: pointer; }
   border-radius: 0 0 4px 0;
   white-space: nowrap;
   pointer-events: auto;
+  touch-action: none;   /* marker drags are ours — don't let the browser steal them */
   cursor: pointer;
   box-shadow: 1px 1px 4px rgba(0,0,0,0.5);
+  z-index: 3;           /* above the loop band */
 }
 .tl-marker-flag:hover { filter: brightness(1.2); }
 .tl-marker-line {
@@ -504,6 +519,52 @@ body.tl-fullscreen #tl-canvas-container { cursor: pointer; }
   opacity: 0.6;
   pointer-events: none;
   z-index: 9;
+}
+
+/* ─── Loop region — band in the marker lane, end handle, tinted span over tracks ─── */
+.tl-loop-band {
+  position: absolute;
+  top: 3px; bottom: 3px;
+  left: 0;
+  background: var(--marker-color, #ffffff);
+  opacity: 0.32;
+  border-radius: 3px;
+  cursor: grab;
+  touch-action: none;
+  z-index: 1;
+}
+.tl-loop-band:active { cursor: grabbing; }
+.tl-loop-handle {
+  position: absolute;
+  top: 0; bottom: 0;
+  left: 0;
+  width: 22px;             /* wide invisible grab target — easy to hit */
+  margin-left: -11px;      /* centre the grab zone on the loop end */
+  background: transparent;
+  cursor: ew-resize;
+  touch-action: none;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tl-loop-handle::before {  /* the visible grip — slim; the hit area around it is wider */
+  content: '';
+  width: 6px;
+  height: calc(100% - 6px);
+  background: var(--marker-color, #ffffff);
+  border-radius: 2px;
+}
+.tl-loop-handle:hover::before { filter: brightness(1.3); }
+.tl-loop-tint {
+  position: absolute;
+  left: 0;
+  top: calc(var(--ruler-h) + var(--marker-lane-h));
+  /* width + height driven by JS */
+  background: var(--marker-color, #ffffff);
+  opacity: 0.08;
+  pointer-events: none;
+  z-index: 6;
 }
 
 /* Zone rows — stacked vertically, height driven by JS via --strip-h */
@@ -649,11 +710,6 @@ body.tl-fullscreen #tl-canvas-container { cursor: pointer; }
 }
 
 /* ─── Quick-edit modal utility section (Duplicate / Delete) ─── */
-.qe-sep {
-  height: 1px;
-  background: var(--border);
-  margin: 12px -16px 10px;
-}
 .qe-utility {
   display: flex;
   gap: 6px;
@@ -834,7 +890,8 @@ body.tl-fullscreen #tl-canvas-container { cursor: pointer; }
   box-shadow: 0 12px 40px rgba(0,0,0,0.7);
   overflow: hidden;
 }
-#tl-quick-edit .qe-title, #tl-marker-edit .qe-title {
+/* Marker-edit keeps the simple block title */
+#tl-marker-edit .qe-title {
   font: 600 12.5px var(--font);
   color: var(--text);
   margin-bottom: 12px;
@@ -845,6 +902,67 @@ body.tl-fullscreen #tl-canvas-container { cursor: pointer; }
   max-width: 100%;
   display: block;
 }
+
+/* ─── Quick-edit — authoring popover (Phase 4.4-C) ─── */
+.qe-header {
+  display: flex; align-items: center; gap: 8px;
+  padding-bottom: 11px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+/* Header swatch — shows the block colour, opens the colour picker on click */
+.qe-swatch {
+  width: 20px; height: 20px;
+  flex-shrink: 0;
+  padding: 0;
+  border-radius: var(--r-s);
+  border: 1px solid rgba(255,255,255,0.22);
+  background: var(--text-3);
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+.qe-swatch:hover    { transform: scale(1.08); }
+.qe-swatch.is-active {
+  box-shadow: 0 0 0 2px var(--bg-3), 0 0 0 3.5px var(--border-hi);
+}
+#tl-quick-edit .qe-title {
+  font: 600 13px var(--font);
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1; min-width: 0;
+}
+
+/* ─── Block colour picker — 4×4 swatch popover ─── */
+#tl-color-picker {
+  position: fixed;
+  z-index: 95;
+  background: var(--bg-3);
+  border: 1px solid var(--border-hi);
+  border-radius: var(--r-l);
+  padding: 12px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.7);
+}
+.tl-color-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 28px);
+  gap: 8px;
+}
+.tl-color-sw {
+  width: 28px; height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-s);
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.tl-color-sw:hover { transform: scale(1.14); }
+.tl-color-sw.selected {
+  box-shadow: 0 0 0 2px var(--bg-3), 0 0 0 4px var(--text-2);
+}
+/* The block menu is a pure action menu — header + Duplicate/Delete. No settings,
+   no Apply/Cancel (Phase 4.4-C revised 2026-05-17). Looping lives on markers. */
 .qe-row {
   display: flex; align-items: center;
   margin-bottom: 10px;

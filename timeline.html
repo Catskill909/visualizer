@@ -197,6 +197,7 @@
         <div id="tl-scroll">
             <div id="tl-inner">
                 <div id="tl-ruler"></div>
+                <div id="tl-marker-lane"></div>
                 <div id="tl-tracks"></div>
                 <div id="tl-playhead" style="left:0; display:none;"></div>
             </div>
@@ -227,27 +228,11 @@
     </div>
 
     <!-- ─── QUICK EDIT POPOVER ─── -->
-    <div id="tl-quick-edit" hidden role="dialog" aria-label="Edit entry">
-        <div class="qe-title" id="qe-title">Preset Name</div>
-        <div class="qe-row">
-            <span class="qe-label">Duration</span>
-            <input id="qe-dur" class="qe-input" type="number" min="5" max="600" step="1" />
-            <span class="qe-suffix">s</span>
+    <div id="tl-quick-edit" hidden role="dialog" aria-label="Block actions">
+        <div class="qe-header">
+            <button class="qe-swatch" id="qe-swatch" type="button" title="Block colour" aria-label="Block colour"></button>
+            <span class="qe-title" id="qe-title">Preset Name</span>
         </div>
-        <div class="qe-row">
-            <span class="qe-label">Blend</span>
-            <input id="qe-blend" class="qe-input" type="number" min="0" max="10" step="0.5" />
-            <span class="qe-suffix">s</span>
-        </div>
-        <div class="qe-row">
-            <span class="qe-label">Label</span>
-            <input id="qe-label" class="qe-input" type="text" placeholder="Optional…" maxlength="40" />
-        </div>
-        <div class="qe-actions">
-            <button id="qe-apply" class="tl-btn tl-btn--primary" type="button">Apply</button>
-            <button id="qe-cancel" class="tl-btn" type="button">Cancel</button>
-        </div>
-        <div class="qe-sep"></div>
         <div class="qe-utility">
             <button id="qe-dupe" class="tl-btn qe-util-btn" type="button">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
@@ -258,6 +243,11 @@
                 Delete
             </button>
         </div>
+    </div>
+
+    <!-- ─── BLOCK COLOUR PICKER ─── -->
+    <div id="tl-color-picker" hidden role="dialog" aria-label="Block colour">
+        <div id="tl-color-grid" class="tl-color-grid"></div>
     </div>
 
     <!-- ─── MARKER EDIT POPOVER ─── -->
@@ -334,6 +324,9 @@
                 <div class="tl-guide-col" style="display: flex; flex-direction: column; gap: 20px;">
                     <div class="tl-guide-section">
                         <h4 style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255,255,255,0.4); margin: 0 0 12px 0; font-weight: 600;">Markers</h4>
+                        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 0.85rem; color: rgba(255,255,255,0.7);">
+                            <kbd style="padding: 2px 6px; font-family: monospace; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px;">M</kbd> <span>Drop Marker at Playhead</span>
+                        </div>
                         <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 0.85rem; color: rgba(255,255,255,0.7);">
                             <span><kbd style="padding: 2px 6px; font-family: monospace; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px;">1</kbd> - <kbd style="padding: 2px 6px; font-family: monospace; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px;">9</kbd></span> <span>Jump to Marker by Index</span>
                         </div>

@@ -131,13 +131,14 @@ export function createEntry({ presetName, duration, blendTime = 2, zoneId = 'ful
 /**
  * Create a marker object.
  */
-export function createMarker({ time, label = 'Marker', color = '#ffffff', action = 'none' }) {
+export function createMarker({ time, label = 'Marker', color = '#ffffff', action = 'none', loopEnd = null }) {
     return {
         id: generateId(),
         time,
         label,
         color,
-        action, // 'none', 'stop', 'loop'
+        action,  // 'none', 'stop', 'loop'
+        loopEnd, // loop region end in seconds — set when action === 'loop'
     };
 }
 

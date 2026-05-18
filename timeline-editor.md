@@ -2,7 +2,7 @@
 
 **Architecture:** Standalone page (`/timeline.html`) — self-contained MPA entry in Vite.
 **Completed-phase detail:** lives in **[timeline-editor-archive.md](timeline-editor-archive.md)** — this doc keeps only a one-line index of shipped work.
-**Last updated:** 2026-05-15 — Restructured: split shipped-phase implementation detail into the archive file; added the Status Dashboard; separated Roadmap (planned) from the Completed index so reading order matches build order. Roadmap #1 (Loop) refined this session — presets and markers kept distinct: preset Loop / Solo in the block menu loops a single preset; markers do all group / region looping.
+**Last updated:** 2026-05-18 — Block colour picker shipped (16-colour palette, 4×4 popover off the menu swatch — Phase 4.4-D). Block menu is a pure action menu (Phase 4.4-C — Duration/Blend/Label removed; header + Duplicate/Delete). Roadmap #1 revised — **markers are the only looper**; the per-block Loop toggle is cut. "Playhead is the truth" bug fixed. See the Status Dashboard.
 
 ---
 
@@ -23,6 +23,11 @@
 
 | Phase | What | Date |
 |-------|------|------|
+| 1 | Loop — Marker Region Looping **complete** — draggable loop regions (band + end handle + track tint), region-aware playback, 1s crossfade on the loop wrap | 2026-05-18 |
+| 1 Stage 2 | Loop regions — set a marker to Loop → draggable loop region (band + end handle + track tint); playback wraps the region (no longer restarts from 0:00) | 2026-05-18 |
+| 1 Stage 1 | Marker hygiene — `M`-key placement (ruler is playhead-only), dedicated marker lane, playhead-scrub bug fixed, `stop`-action crash fixed, duplicate hot-cue handler removed | 2026-05-18 |
+| 4.4-D | Block colour picker — 16-colour palette, 4×4 popover off the menu swatch | 2026-05-18 |
+| 4.4-C | Block Menu Redesign — pure action menu (Duration/Blend/Label all removed; header + Duplicate/Delete) | 2026-05-17 |
 | 4.10-A | Real-time Live Editing (mutation reschedule) | 2026-05-12 |
 | 4.5 | Double-click to Cue | 2026-05-12 |
 | 4.4-B | Block Menu Icon | 2026-05-12 |
@@ -35,14 +40,13 @@
 
 | # | Phase | What it adds |
 |---|-------|--------------|
-| 1 | Loop — preset & marker looping | Preset Loop (loops a preset's span) / Loop Solo + marker region looping + loop signs (1-B) + relaxed jumps (1-C) |
 | 2 | 4.6 — Overlap Crossfade | Overlap width between blocks drives the crossfade duration directly |
 | 3 | 4.7 — Undo/Redo | `Ctrl+Z` for the 3 destructive gestures: drag, delete, resize |
 | 4 | 4.9 — Zone Stack | Layered compositing — zone opacity + blend-mode popover, overlay layout |
 | 5 | 4.11 — Staging Mode | Safe overlay editing; changes commit on the next block boundary |
 | 6 | 4.12 — Timeline Sets Switching | Queued set switching + My Sets panel (replaces the topbar dropdown) |
 | 7 | 4.13 — Set Export / Import | Portable `.dcset.json` bundles — full show + presets + images |
-| 8 | 4.4-C/D — Block menu authoring redesign | Remove Duration, Blend stepper, zoned layout + restyle (C — pairs with #1 Loop); Full Edit deep-link + block color picker (D) |
+| 8 | 4.4-D — Block menu utilities | Full Edit → deep-link into Preset Studio *(4.4-C menu redesign + the block colour picker both shipped)* |
 | 9 | Phase 5 — Multi-monitor output 🔬 | Route each zone to a separate physical display (research phase) |
 
 ### 🚧 Partially Complete — looks done, isn't
@@ -50,7 +54,7 @@
 | Phase | Shipped portion | Still open |
 |-------|-----------------|-----------|
 | 3.5 — Active Playhead | Playhead, click-to-seek, automated crossfades | Loop/Loop Solo buttons → **Roadmap #1** |
-| 4.4 — Block Settings Menu | A (action modal), B (menu icon) | C/D (authoring redesign) → **Roadmap #8**; live-mixing controls → **Backlog: Performance Panel** |
+| 4.4 — Block Settings Menu | A (action modal), B (menu icon), C (redesign), D-colour (picker) | D — Full Edit deep-link → **Roadmap #8**; live-mixing controls → **Backlog: Performance Panel** |
 | 4.10 — Live Editing | A (core mutation reschedule) | B (loop state preservation) → ships with **Roadmap #1** |
 
 ---
@@ -75,7 +79,7 @@
 
 The timeline editor splits cleanly into two modes, and every feature belongs to exactly one of them:
 
-- **Authoring** — you *configure* an entry. **Block menus are authoring surfaces:** open one, set the entry's settings (blend, label, loop, color…), hit **Apply**, it closes. One menu open at a time. Menus never stay open during a show.
+- **Authoring** — you *manage* an entry through its **block menu**: a small popover for block actions (Duplicate, Delete; later a color picker and a Full Edit → deep-link). It opens on the block's menu icon and closes cleanly — one open at a time, never during a show. It holds no settings to commit and no live-mixing controls. *(The entry's duration is set by dragging the block; blend by overlapping blocks — Phase 4.6; looping by markers — Roadmap #1. None of that is in the menu.)*
 - **Performance** — you *trigger* what you authored, using gestures on the strip itself: **double-click a block** to crossfade into it with its stored settings; **click the timeline** to drive the playhead. No menus, no popovers — just the clean strip and direct clicks.
 
 This separation is the core principle. The menu holds the intent; the strip gesture is the trigger. Setup and execution are never the same gesture, and performing never means hunting through open UI.
@@ -163,15 +167,21 @@ Built in the order of the *Up Next* table. Each entry below carries the same num
 
 ---
 
-### 1 · Loop — Preset & Marker Looping ⬜
+### 1 · Loop — Marker Region Looping ✅
 
 *(specced under Phase 3.5; ships with Phase 4.10-B — loop state preservation)*
 
-**Decided 2026-05-15:** preset looping lives in the **block menu** as a Loop toggle — there are **no transport-bar Loop buttons** (the original transport-toggle design is cancelled). A loop always loops a *section*: a preset's Loop loops its own one-preset span, markers bound a larger multi-preset section. This phase has three parts: the control and its rules (**1-A**), its at-a-glance visibility on the strip (**1-B**), and the relaxed jump crossfade that makes loop release — and every timeline jump — feel smooth (**1-C**).
+**Revised 2026-05-17 — markers are the only looper.** Earlier plans had *two* loop mechanisms: a per-block Loop toggle in the block menu plus marker region looping. Cut to one. **Markers are the loopers** — they already carry a `loop` action (Phase 4.1), they can be dropped and removed live on the ruler, and they bound a loop region of any width. A per-block Loop toggle would be the same capability built twice, and would put a setting back in the block menu we deliberately emptied. So: **no Loop toggle, no transport-bar Loop buttons.** Looping is a marker region, full stop — the block menu stays a pure action menu (Duplicate / Delete).
 
-**Refined 2026-05-17:** Loop is a *stored, armed setting* in the block menu — set it, hit Apply; the loop fires when the block is triggered (double-click). It is authoring, not live mixing. **Solo/Mute are NOT block-menu controls** — they are live performance controls and belong in the deferred Performance Panel (see UX Philosophy + Backlog).
+This phase has three parts: tightening marker looping with live add/remove (**1-A**), its at-a-glance visibility on the strip (**1-B**), and the relaxed jump crossfade that makes loop release — and every timeline jump — feel smooth (**1-C**).
 
-> **Prerequisite — Phase 4.4-C (block menu authoring redesign, Roadmap #8).** Loop's toggle drops into the block menu, so the menu's redesign — remove Duration, Blend stepper, zoned layout, restyle — should be built first or alongside this phase, giving Loop a clean shell to land in.
+> **Stage 1 shipped 2026-05-18 — marker hygiene + placement.** Markers now drop at the playhead with the **`M` key** — instant, no popover. The ruler is playhead-only; it never places markers (the universal DAW convention — placement is a command, not a spatial click). Editing stays a click-the-flag gesture, so placement / positioning / editing are three distinct actions. Flags now live in a **dedicated marker lane** (`#tl-marker-lane`) — a thin row below the ruler, off the time ticks. **Click anywhere in the lane to drop a marker there**; click an existing flag to edit it, drag to move. Two strips, two jobs: the ruler places the playhead, the marker lane places markers. Also fixed: the **playhead-scrub bug** (drags got stuck "on" via a swallowed `pointercancel` → playhead followed the mouse — see Open Bugs), the `stop` marker action crash (undefined `_clearAllTimers`), and a duplicate `1`–`9` hot-cue handler.
+>
+> **Stage 2 shipped 2026-05-18 — region looping.** Set a marker's action to **Loop** and it becomes a loop region: the marker `time` is the loop start, a new `loopEnd` field (defaults to `time + 16s`) is the end. In the marker lane it draws a **loop band** with the flag as the start handle and a separate **end handle**; a translucent **tint** spans the looped region across the tracks. Drag the end handle to resize, the flag to move the start, the band body to slide the whole region — all snap-aware, no number entry. Playback (`_tickPlayhead`) wraps: crossing `loopEnd` seeks back to `time` via `_scrubTo` and continues. The old "restart from 0:00" placeholder is gone.
+>
+> **1-C shipped 2026-05-18 — relaxed loop wrap.** The loop wrap crossfades instead of hard-cutting: `_scrubTo` / `_playZone` take an optional `blend`, and the loop branch passes `1.0` so Butterchurn crossfades the loop-end visual into the loop-start visual over 1 second. All other seeks (ruler, cue, hot-cues) still pass `blend = 0` — instant. **Roadmap #1 is now complete.**
+
+> 📜 **Historical — design exploration only.** The `#### 1-A / 1-B / 1-C` detail below is the original planning, kept for reference. It predates the final design and describes ideas that were **cut** — a per-block Loop toggle, Loop Solo, and loop-precedence rules; none of those shipped. What actually shipped is the three Stage notes above: markers are the only looper, looping is a draggable marker region, and the wrap crossfades. Treat the Stage notes as authoritative.
 
 #### 1-A — Loop control & precedence
 
@@ -253,7 +263,7 @@ Every timeline *jump* — loop release, double-click Cue, hot-cue key, Set switc
 
 Distinct from Phase 4.6 (overlap crossfade between consecutive blocks) — 1-C is about discontinuous seeks, not adjacent-block blends.
 
-**Relationship to the block menu and the Performance Panel (Backlog):** 1-A adds just the Loop toggle to the block menu (`#tl-quick-edit`, shipped in Phase 4.4-B; redesigned in Roadmap #8) as a stored, armed setting. Solo / Mute are *not* block-menu controls — they are live mixing and belong in the deferred Performance Panel. 1-B's strip-visibility language for loop state is independent of that panel. Loop ships independently as an addition to the menu that already exists.
+**Relationship to the block menu:** none. Looping is a marker mechanism (revision note above) — it adds nothing to the block menu, which stays a pure action menu (Duplicate / Delete). Marker looping is edited on the ruler / in the marker popover (`#tl-marker-edit`), live. Solo / Mute are also not block-menu controls — they are live mixing on the zone-row header (see Backlog).
 
 ---
 
@@ -673,30 +683,18 @@ No new storage primitives needed. The existing preset export/import and timeline
 
 ---
 
-### 8 · Phase 4.4-C/D — Block Menu Authoring Redesign ⬜
+### 8 · Phase 4.4-D — Block Menu Utilities ⬜
 
-Phases 4.4-A and 4.4-B shipped (see archive). The block menu (`#tl-quick-edit`) is now defined as an **authoring surface** (see UX Philosophy — Authoring vs Performance): it configures one entry and commits on **Apply**. It never holds live-mixing controls and never stays open during a show. Remaining sub-phases:
+Phases 4.4-A, 4.4-B, 4.4-C, and the colour picker shipped (see archive). The block menu (`#tl-quick-edit`) is a **pure action menu** — a glassmorphic header (`qe-swatch` + preset name) and a Duplicate/Delete utility row. It has no settings and no Apply/Cancel, opens one at a time, and never stays open during a show.
 
-| Phase | What's added |
-|-------|-------------|
-| **C — Authoring redesign** | The structural + visual pass. See below. |
-| **D — Full Edit + color** | "Full Edit →" deep-link into Preset Studio for this preset; block color picker. |
+**Remaining — Phase D:**
+- **"Full Edit →"** deep-link into Preset Studio for this preset.
 
-**Phase C — the redesign in detail.** The current menu reads as a raw HTML form (native number spinners, orphaned "s" units). Rebuild it as a clean authoring popover:
+**Block colour picker — shipped 2026-05-18.** The header dot is now a clickable **`qe-swatch`**; clicking it opens `#tl-color-picker`, a 4×4 popover of 16 vibrant palette colours (`BLOCK_COLORS`, also used by `colorFor` auto-assignment). Picking applies instantly — `_pickColor` → `_updateEntry({ color })`, re-renders the strip, updates the swatch, closes the popover. No Apply (consistent with the action menu). Closes on Escape / outside click; the current colour shows a selection ring.
 
-1. **Remove the Duration field.** Block length is set by dragging the block's edges and is shown directly on the strip — a number field for it is redundant.
-2. **Replace native number inputs with steppers.** Blend becomes `[−] 2 s [+]` — coarse values, no typing. The "s" unit anchors to the stepper, not floating beside it.
-3. **Zone the layout** so it scales as later controls land:
-   - Header — preset name + color dot
-   - Settings — Loop arm (Roadmap #1), Blend stepper, Label
-   - **Apply / Cancel** — commits the settings; this is an authoring form
-   - Utility footer — Full Edit →, Duplicate, Delete
-4. **Restyle** to the app's glassmorphic language — labels read as secondary, the value draws the eye, buttons stop looking like generic HTML form controls.
-5. Keep hit targets generous — this is a performance tool used in a dark venue. A taller popover beats cramped controls.
+**Phase 4.4-C — shipped 2026-05-17.** Built first as an authoring redesign (Duration removed, Blend stepper, zoned layout), then revised the same day: Blend removed (overlap drives blend — Phase 4.6) and Label removed (`entry.label` was never rendered). With no settings left, Apply/Cancel and the settings zone were dropped — the menu is now a pure action menu. Looping is not here either: markers are the only looper (Roadmap #1).
 
-**Pairs with Roadmap #1 (Loop).** Loop's toggle is a *stored, armed setting* that drops into this redesigned menu. Build Phase C first or alongside #1 so Loop has a clean shell.
-
-**Moved out of this phase — the old Phase 4.4-E.** Re-targeting the full `controls.js` panel to a zone's slave engine is *live mixing*, not authoring. It moves to the deferred **Performance Panel** (see Backlog). The block menu never holds live-mixing controls.
+**Moved out — the old Phase 4.4-E.** Re-targeting the full `controls.js` panel to a zone's slave engine is *live mixing*, not authoring. It lives in the deferred **Performance Panel** (see Backlog). The block menu never holds live-mixing controls.
 
 ---
 
@@ -749,9 +747,11 @@ One line each. Full implementation detail, post-ship fixes, and edge-case notes 
 | 4.3 | Quick Wins — keyboard nudge, drag-scrub on ruler, block navigation arrows |
 | 4.4-A | Block Action Modal — Duplicate/Delete consolidated into `#tl-quick-edit`, hover row removed |
 | 4.4-B | Block Menu Icon — hamburger toggle, single-click select, double-click cue, no auto-dismiss |
+| 4.4-C | Block Menu Redesign — reduced to a pure action menu: glassmorphic header (color dot + preset name) + Duplicate/Delete. Duration removed (drag-only), Blend removed (overlap drives it — Phase 4.6), Label removed (never rendered). No settings, no Apply/Cancel |
 | 4.5 | Double-click to Cue — crossfade into the cued preset + seek timeline to its `startTime` |
 | 4.8 | Preset Palette Opacity — MilkDrop background-layer opacity slider (prereq for Zone Stack) |
 | 4.10-A | Real-time Live Editing — `_rescheduleIfPlaying()` rebuilds timers after any mutation |
+| 1 (Roadmap) | Loop — Marker Region Looping — `M`-key marker placement, dedicated marker lane, draggable loop regions (band + end handle + tint), region-aware playback with a 1s wrap crossfade. Markers are the only looper. |
 
 ---
 
@@ -795,7 +795,7 @@ A deferred overlay holding the *full* `controls.js` panel per zone — deep live
 - **Live queue override** — during playback, click a future block to force it to play *next*, overriding the timeline's strict chronological order.
 - **Hold/freeze preset** — while playing, press `H` to freeze the current preset indefinitely, ignoring upcoming block transitions. Press again to release.
 - **Speed control** — 0.5×, 1×, 2× playback speed. Affects wall-clock calculation.
-- **Entry label canvas overlay** — text overlay during playback (label field already in data model and quick-edit).
+- ~~Entry label canvas overlay~~ — *cut 2026-05-17. The Label field was removed from the block menu; burning captions onto the show runs against "the timeline stays simple." The block already shows the preset name.*
 
 *Audio Sync*
 - **Timeline ↔ Audio lock** — when using "Load Track" mode, sync the timeline playhead with the audio file's `currentTime`. Scrubbing one scrubs both. Playback of one drives both.
@@ -828,9 +828,10 @@ Same design language as the rest of the app: full-screen canvas, glassmorphic ov
 - ~~**Gap behavior not visualized**~~: ✅ Fixed in Phase 3.5 — `_playZone()` now schedules blackout timers when entries end. `gapBehavior: 'black'` re-shows the zone cover; `'hold'` lets the last frame persist. Visual crosshatch/ghost-block strip rendering still not built (cosmetic only).
 - ~~**Previous preset bleeds through cover during gap-to-next-entry fade**~~: ✅ Fixed 2026-05-12 — confirmed working on web. Cover fade and `loadPreset` were firing simultaneously; old preset was visible through the fading cover. Fix: `loadPreset(name, 0)` fires first (instant GPU write), then `requestAnimationFrame` delays the cover fade until the new preset has rendered one frame. Presets now fade out cleanly, gaps show nothing, next preset fades in with no bleed. Cross-platform compatible (rAF is standard in WKWebView/WebView2). See Rule 7 in the Critical section.
 - **Zone settings popover not built**: clicking the zone label chip does nothing yet. It should open a popover for name, opacity, blend mode, gap behavior. *(Addressed in Roadmap Phase 4.9-A)*
-- **Entry label overlay not rendered**: `entry.label` is stored and editable in quick-edit but not rendered on the canvas during playback.
+- ~~**Entry label overlay not rendered**~~: ✅ Resolved 2026-05-17 by removal — the Label field is gone from the block menu (it controlled `entry.label`, which nothing ever rendered). The "label canvas overlay" idea is cut: the timeline stays simple, the block already shows the preset name. The `entry.label` data field is left in the model (harmless; avoids touching the Set export/import schema).
 - ~~**`#tl-quick-edit` styling needs visual polish**~~: ✅ Partially addressed in Phase 4.4-A — Duplicate/Delete consolidated into modal with utility row. Full styling pass (Roadmap 4.4-C/D) still pending.
 - ~~**Added presets force-load onto the canvas regardless of playhead**~~: ✅ Fixed 2026-05-17 — the picker click handler used to call `loadPreset` + `_fadeZoneCover` after `addEntry`, so any block you added (or at any start time) jumped straight onto the canvas. Fix: the picker now only mutates the data model; `addEntry` / `_removeEntry` re-derive the canvas from the playhead — `_rescheduleIfPlaying()` while playing, `_scrubTo(this._currentTime)` while stopped. The playhead is the single source of truth; the canvas only ever shows what is under it, and the playhead never moves on add/remove.
+- ~~**Playhead follows the mouse with no button held**~~: ✅ Fixed 2026-05-18 — the ruler scrub set an `isScrubbing` flag cleared only on `pointerup`; when the browser swallowed the release as a `pointercancel` (gesture reinterpreted as a scroll), the flag stuck and every mouse-move scrubbed the playhead. Three-part fix across all four drag handlers (ruler scrub, marker drag, block move, block resize): (1) an `e.buttons === 0` self-heal guard ends the drag the instant no button is held; (2) `pointercancel` now runs the same cleanup as `pointerup`, with a re-entry guard; (3) `touch-action: none` on `#tl-ruler` and `.tl-marker-flag` stops the browser stealing the gesture at the source.
 - **Undo/Redo not yet implemented** — scheduled for Roadmap Phase 4.7. Until then, delete and drag are irreversible.
 
 ---

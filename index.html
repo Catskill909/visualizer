@@ -1247,8 +1247,7 @@
                 <li><strong>Single-click</strong> a block body — selects it; hold and drag to move</li>
                 <li><strong>Double-click</strong> a block body — crossfades into that preset and seeks the playhead to its start time</li>
                 <li><strong>Drag the right edge</strong> of a block — resize its duration</li>
-                <li><strong>Click the ☰ icon</strong> (left of block) — opens that block's settings panel (label, duration, fade-in); click again to close</li>
-                <li>The settings panel stays open until you close it — it does not dismiss if you click elsewhere</li>
+                <li><strong>Click the ☰ icon</strong> (left of block) — opens that block's menu: a colour picker, Duplicate, and Delete; click again to close</li>
               </ul>
             </div>
 
@@ -1260,11 +1259,16 @@
             </div>
 
             <div class="welcome-feature">
-              <div class="welcome-feature-title">Markers & Cues</div>
-              <p>Double-click the timeline ruler to drop markers. Right-click a flag to change its action:
-                <strong>Stop</strong> pauses playback (great for talk breaks), <strong>Loop</strong> jumps back to
-                the previous loop-start marker. Jump to markers instantly with <kbd>1</kbd>–<kbd>9</kbd>.
-                Use markers to create interactive cue points during live shows.</p>
+              <div class="welcome-feature-title">Markers & Loop Regions</div>
+              <p>Markers live in their own lane just below the ruler. Press <kbd>M</kbd> to drop one at the
+                playhead, or click anywhere in the marker lane to drop one there. Click a flag to edit its
+                label, colour, and action. Jump to markers instantly with <kbd>1</kbd>–<kbd>9</kbd>.
+                (The ruler itself is playhead-only — click it to seek.)</p>
+              <p>Set a marker's action to <strong>Auto-Stop</strong> and the playhead parks there when it
+                arrives — visuals keep running, great for talk breaks. Set it to <strong>Loop</strong> and the
+                marker becomes a <strong>loop region</strong>: a band appears with a draggable end handle.
+                Drag the handle to size the loop, the flag to move its start, the band to slide the whole
+                region — playback loops that span, easing across the wrap with a 1-second crossfade.</p>
             </div>
 
             <div class="welcome-feature">
@@ -1288,8 +1292,7 @@
                 <li>Overlap presets for smooth crossfades — no black gaps</li>
                 <li>Double-click any block during playback to cue it instantly — great for live improvisation</li>
                 <li>Edit block durations and positions while playing — the timeline adjusts in real time</li>
-                <li>Use the ☰ icon to open one block's settings while playback continues uninterrupted</li>
-                <li>Use markers to create loop sections or stop points for live cues</li>
+                <li>Press <kbd>M</kbd> on the beat to drop markers live, then set one to Loop and drag its handles to loop a section</li>
                 <li>Scrub the ruler to audition any moment before going live</li>
                 <li>Multi-zone setups let you run different visuals on different screens</li>
               </ul>
@@ -1442,6 +1445,7 @@
                 </div>
                 <div class="welcome-shortcut-col">
                   <h5>Navigation</h5>
+                  <div class="guide-row"><kbd>M</kbd><span>Drop marker at playhead</span></div>
                   <div class="guide-row"><kbd>1</kbd> - <kbd>9</kbd><span>Jump to marker</span></div>
                   <div class="guide-row"><kbd>?</kbd><span>Keyboard shortcuts</span></div>
                   <div class="guide-row"><kbd>F</kbd><span>Fullscreen</span></div>

@@ -62,11 +62,13 @@
             subject
             floats over the visualizer with full transparency. Works on web, Windows, and macOS (Mac auto-converts on
             first import). All VJ effects, audio reactivity, and motion controls apply to every frame.</li>
-          <li><strong>Timeline Editor (Beta)</strong> — Full-screen show sequencer with multi-zone compositor, transport
-            controls, markers, and VJ mode (visuals never stop). New this build: <strong>real-time live editing</strong>
-            — drag, resize, or delete blocks while playing with no interruption; <strong>double-click any block to cue
-              it</strong> instantly with a crossfade; and a per-block <strong>hamburger menu</strong> for settings —
-            click the icon to open, click again to close.</li>
+          <li><strong>Timeline Editor — Loop Regions ✨ NEW</strong> — Markers are now real loopers. Press
+            <strong>M</strong> (or click the new dedicated <strong>marker lane</strong>) to drop a marker, set its
+            action to <strong>Loop</strong>, and it becomes a draggable <strong>loop region</strong>: drag the band's
+            handles to size it and playback loops that span, easing across the wrap with a 1-second crossfade. The
+            per-block menu is now a clean action menu with a <strong>16-colour block colour picker</strong>, and a
+            playhead fix means adding a preset no longer jumps the canvas — the playhead is the single source of
+            truth. Still in active development alongside multi-zone compositing, transport, and VJ mode.</li>
 
           <li><strong>Spectral Flux audio source</strong> — a fifth reactivity source in the Preset Studio. Flux detects
             transients (snare hits, claps, plucks) by measuring frame-to-frame change in the frequency spectrum. It
@@ -76,7 +78,7 @@
         </ul>
 
         <p>Send feedback to <a href="mailto:paul@rarefunk.com">paul@rarefunk.com</a>.</p>
-        <p>Current release is <span id="app-version">Beta May 17, 2026</span>. Send me your email if you want notice of
+        <p>Current release is <span id="app-version">Beta May 18, 2026</span>. Send me your email if you want notice of
           app updates.</p>
         <p class="promo-modal-note">Your feedback helps shape the public release.</p>
       </div>
@@ -510,7 +512,7 @@
           <div class="section-label">Timeline Editor</div>
           <h2 class="section-title">Plan a whole show</h2>
           <p class="section-desc">
-            Arrange presets on a multi-track strip, set durations and blend times, then hit play.
+            Arrange presets on a multi-track strip, size each block by dragging, then hit play.
             The Zone Compositor lets you run multiple presets in different screen regions simultaneously —
             each with its own opacity and blend mode.
           </p>
@@ -533,8 +535,16 @@
               <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              <strong>Block settings menu</strong> — hamburger icon on each block opens its settings popover; click icon
-              again to close; glows in block color when active
+              <strong>Per-block menu</strong> — a hamburger icon opens a compact action menu: a 16-colour block colour
+              picker, Duplicate, and Delete
+            </li>
+            <li>
+              <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              <strong>Markers &amp; loop regions</strong> — press <code
+                style="font-size:0.85em;opacity:0.8">M</code> or click the dedicated marker lane to drop a marker; set
+              one to Loop and it becomes a draggable loop region that wraps playback with a 1-second crossfade
             </li>
             <li>
               <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

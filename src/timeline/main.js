@@ -262,11 +262,6 @@ async function boot(connectAudioFn) {
             e.preventDefault();
             editor.toggleKeyboardGuide();
         }
-        // 1-9 — jump to marker
-        if (!ctrl && !inInput && e.key >= '1' && e.key <= '9') {
-            const num = parseInt(e.key, 10);
-            editor.jumpToMarker(num - 1);
-        }
         // Home — reset to start and stop
         if (e.key === 'Home' && !inInput) {
             e.preventDefault();
@@ -292,6 +287,11 @@ async function boot(connectAudioFn) {
             e.preventDefault();
             const num = parseInt(e.key, 10);
             editor.jumpToMarker(num - 1);
+        }
+        // M — drop a marker at the playhead
+        if (!ctrl && !inInput && (e.key === 'm' || e.key === 'M')) {
+            e.preventDefault();
+            editor.dropMarkerAtPlayhead();
         }
     });
 

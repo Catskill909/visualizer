@@ -29,15 +29,22 @@ function displayName(name) {
     return name || '';
 }
 
+// 16-colour block palette — wide hue + lightness spread so every swatch reads
+// distinctly. Drives both auto-assignment (colorFor) and the block colour picker.
 const BLOCK_COLORS = [
-    '#5c5fa8','#7c6fcd','#5a8a7c','#7a5a8a','#5a7a8a',
-    '#8a6a5a','#5a8a6a','#6a5a8a','#7a7a5a','#5a6a8a',
+    '#ef4444','#f97316','#d97706','#facc15',  // red · orange · gold · yellow
+    '#a3e635','#16a34a','#0d9488','#22d3ee',  // lime · green · teal · cyan
+    '#0284c7','#2563eb','#4338ca','#7c3aed',  // sky · blue · indigo · violet
+    '#a855f7','#d946ef','#f472b6','#e11d48',  // purple · magenta · pink · rose
 ];
 function colorFor(name) {
     let h = 0;
     for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0;
     return BLOCK_COLORS[Math.abs(h) % BLOCK_COLORS.length];
 }
+
+// Width of the fixed zone-label column at the left of the strip (px).
+const ZONE_COL_W = 120;
 
 function fmtTime(totalSec) {
     const s = Math.floor(totalSec);
@@ -201,6 +208,7 @@ export class TimelineEditor {
         this._scrollEl      = document.getElementById('tl-scroll');
         this._innerEl       = document.getElementById('tl-inner');
         this._rulerEl       = document.getElementById('tl-ruler');
+        this._markerLaneEl  = document.getElementById('tl-marker-lane');
         this._tracksEl      = document.getElementById('tl-tracks');
         this._playheadEl    = document.getElementById('tl-playhead');
 
@@ -219,11 +227,9 @@ export class TimelineEditor {
 
         this._quickEditEl   = document.getElementById('tl-quick-edit');
         this._qeTitle       = document.getElementById('qe-title');
-        this._qeDur         = document.getElementById('qe-dur');
-        this._qeBlend       = document.getElementById('qe-blend');
-        this._qeLabel       = document.getElementById('qe-label');
-        this._qeApply       = document.getElementById('qe-apply');
-        this._qeCancel      = document.getElementById('qe-cancel');
+        this._qeSwatch      = document.getElementById('qe-swatch');
+        this._colorPickerEl = document.getElementById('tl-color-picker');
+        this._colorGridEl   = document.getElementById('tl-color-grid');
 
         this._markerEditEl  = document.getElementById('tl-marker-edit');
         this._meTitle       = document.getElementById('me-title');
@@ -346,10 +352,7 @@ export class TimelineEditor {
             this._filterPicker(this._pickerSearch.value);
         });
 
-        // Quick edit
-        this._qeApply.addEventListener('click',  () => this._applyQuickEdit());
-        this._qeCancel.addEventListener('click', () => this._closeQuickEdit());
-
+        // Block action menu
         document.getElementById('qe-dupe').addEventListener('click', () => {
             if (!this._qeEntryId) return;
             const id = this._qeEntryId;
@@ -362,6 +365,7 @@ export class TimelineEditor {
             this._closeQuickEdit();
             this._confirmRemoveEntry(id);
         });
+        this._qeSwatch.addEventListener('click', () => this._toggleColorPicker());
 
         this._meApply.addEventListener('click', () => this._applyMarkerEdit());
         this._meCancel.addEventListener('click', () => this._closeMarkerEdit());
@@ -373,11 +377,6 @@ export class TimelineEditor {
             }
             this._closeMarkerEdit();
         });
-        this._quickEditEl.addEventListener('keydown', e => {
-            if (e.key === 'Enter') this._applyQuickEdit();
-            if (e.key === 'Escape') this._closeQuickEdit();
-        });
-
         // Context menu
         this._ctxMenu.addEventListener('click', e => {
             const action = e.target.closest('[data-action]')?.dataset.action;
@@ -417,39 +416,43 @@ export class TimelineEditor {
                 return;
             }
             const rect = this._rulerEl.getBoundingClientRect();
-            const t = Math.max(0, (e.clientX - rect.left - 120) / this._pxPerSec);
+            const t = Math.max(0, (e.clientX - rect.left - ZONE_COL_W) / this._pxPerSec);
             this._scrubTo(t);
-        });
-
-        // Ruler double-click → add marker
-        this._rulerEl.addEventListener('dblclick', e => {
-            if (e.target.closest('.tl-marker-flag')) return;
-            const rect = this._rulerEl.getBoundingClientRect();
-            const t = Math.max(0, (e.clientX - rect.left - 120) / this._pxPerSec);
-            this._addMarkerAt(t);
         });
 
         // Ruler drag-scrub → continuous scrubbing
         let isScrubbing = false;
+        const endScrub = e => {
+            if (!isScrubbing) return;
+            isScrubbing = false;
+            try { this._rulerEl.releasePointerCapture(e.pointerId); } catch (_) {}
+        };
         this._rulerEl.addEventListener('pointerdown', e => {
             if (e.target.closest('.tl-marker-flag')) return; // Let marker drag handle it
             isScrubbing = true;
-            this._rulerEl.setPointerCapture(e.pointerId);
+            try { this._rulerEl.setPointerCapture(e.pointerId); } catch (_) {}
             const rect = this._rulerEl.getBoundingClientRect();
-            const t = Math.max(0, (e.clientX - rect.left - 120) / this._pxPerSec);
+            const t = Math.max(0, (e.clientX - rect.left - ZONE_COL_W) / this._pxPerSec);
             this._scrubTo(t);
         });
         this._rulerEl.addEventListener('pointermove', e => {
             if (!isScrubbing) return;
+            // Self-heal: if no button is actually held, the release was missed — stop.
+            if (e.buttons === 0) { isScrubbing = false; return; }
             const rect = this._rulerEl.getBoundingClientRect();
-            const t = Math.max(0, (e.clientX - rect.left - 120) / this._pxPerSec);
+            const t = Math.max(0, (e.clientX - rect.left - ZONE_COL_W) / this._pxPerSec);
             this._scrubTo(t);
         });
-        this._rulerEl.addEventListener('pointerup', e => {
-            if (isScrubbing) {
-                isScrubbing = false;
-                this._rulerEl.releasePointerCapture(e.pointerId);
-            }
+        this._rulerEl.addEventListener('pointerup',     endScrub);
+        this._rulerEl.addEventListener('pointercancel', endScrub);
+
+        // Marker lane → click empty space to drop a marker there.
+        // (Clicking an existing flag is handled by the flag itself — edit/drag.)
+        this._markerLaneEl.addEventListener('pointerdown', e => {
+            if (e.target.closest('.tl-marker-flag')) return;
+            const rect = this._markerLaneEl.getBoundingClientRect();
+            const t = Math.max(0, (e.clientX - rect.left - ZONE_COL_W) / this._pxPerSec);
+            this._addMarkerAt(t);
         });
 
         // Global pointer — close menus
@@ -460,6 +463,8 @@ export class TimelineEditor {
                 this._closeContextMenu();
             if (!this._markerEditEl.hidden && !this._markerEditEl.contains(e.target))
                 this._closeMarkerEdit();
+            if (!this._colorPickerEl.hidden && !this._colorPickerEl.contains(e.target) && !this._qeSwatch.contains(e.target))
+                this._closeColorPicker();
         }, { capture: true });
 
         // Fullscreen button — enter only; exit is via click-on-canvas or Esc
@@ -775,8 +780,9 @@ export class TimelineEditor {
     _updateStripHeight() {
         const n = this._tl?.zones?.length || 1;
         const rulerH = 26;
+        const markerLaneH = 20;
         const trackH = 68;
-        const newH   = rulerH + n * trackH + 2;
+        const newH   = rulerH + markerLaneH + n * trackH + 2;
         document.documentElement.style.setProperty('--strip-h', `${newH}px`);
         // Keep transport pinned directly above the strip
         const transport = document.getElementById('tl-transport');
@@ -977,7 +983,7 @@ export class TimelineEditor {
 
     _renderRuler(totalSec) {
         this._rulerEl.innerHTML = '';
-        const zoneColW = 120;
+        const zoneColW = ZONE_COL_W;
         const intervals = [1, 5, 10, 15, 30, 60, 120, 300, 600];
         const interval  = intervals.find(i => i * this._pxPerSec >= 50) || 600;
 
@@ -997,58 +1003,119 @@ export class TimelineEditor {
     }
 
     _renderMarkers(totalSec) {
-        this._innerEl.querySelectorAll('.tl-marker-line').forEach(el => el.remove());
-        
+        this._innerEl.querySelectorAll('.tl-marker-line, .tl-loop-tint').forEach(el => el.remove());
+        this._markerLaneEl.innerHTML = '';
+
+        const trackTint = `calc(var(--strip-h) - var(--ruler-h) - var(--marker-lane-h))`;
         const markers = this._tl?.markers || [];
         for (const m of markers) {
-            const leftPx = 120 + m.time * this._pxPerSec;
+            const color   = m.color || '#ffffff';
+            const isLoop  = m.action === 'loop' && m.loopEnd != null && m.loopEnd > m.time;
+            const startPx = ZONE_COL_W + m.time * this._pxPerSec;
 
-            // Ruler flag
+            // Flag — sits at the marker time (the loop's start point, when looping)
             const markerEl = document.createElement('div');
             markerEl.className = 'tl-marker tl-marker-flag';
             markerEl.dataset.id = m.id;
-            markerEl.style.left = `${leftPx}px`;
+            markerEl.style.left = `${startPx}px`;
             markerEl.textContent = m.label || 'Marker';
-            markerEl.style.setProperty('--marker-color', m.color || '#ffffff');
-            
-            this._rulerEl.appendChild(markerEl);
-            
-            // Drop line (spans all tracks)
-            const line = document.createElement('div');
-            line.className = 'tl-marker-line';
-            line.dataset.id = m.id;
-            line.style.left = `${leftPx}px`;
-            line.style.setProperty('--marker-color', m.color || '#ffffff');
-            line.style.height = `var(--strip-h)`; // spans from ruler down
-            this._innerEl.appendChild(line);
-
-            // Events: combine drag and click into pointerdown to handle correctly
+            markerEl.style.setProperty('--marker-color', color);
+            this._markerLaneEl.appendChild(markerEl);
             markerEl.addEventListener('pointerdown', e => {
                 e.stopPropagation();
-                this._startMarkerDrag(e, m);
+                if (isLoop) this._startLoopDrag(e, m, 'start');
+                else        this._startMarkerDrag(e, m);
             });
+
+            if (isLoop) {
+                const widthPx = (m.loopEnd - m.time) * this._pxPerSec;
+
+                // Loop band in the marker lane — drag the body to move the whole region
+                const band = document.createElement('div');
+                band.className = 'tl-loop-band';
+                band.dataset.id = m.id;
+                band.style.left  = `${startPx}px`;
+                band.style.width = `${widthPx}px`;
+                band.style.setProperty('--marker-color', color);
+                this._markerLaneEl.appendChild(band);
+                band.addEventListener('pointerdown', e => {
+                    e.stopPropagation();
+                    this._startLoopDrag(e, m, 'move');
+                });
+
+                // End handle — drag to resize the loop end
+                const handle = document.createElement('div');
+                handle.className = 'tl-loop-handle';
+                handle.dataset.id = m.id;
+                handle.style.left = `${ZONE_COL_W + m.loopEnd * this._pxPerSec}px`;
+                handle.style.setProperty('--marker-color', color);
+                this._markerLaneEl.appendChild(handle);
+                handle.addEventListener('pointerdown', e => {
+                    e.stopPropagation();
+                    this._startLoopDrag(e, m, 'end');
+                });
+
+                // Translucent tint over the tracks showing the looped span
+                const tint = document.createElement('div');
+                tint.className = 'tl-loop-tint';
+                tint.dataset.id = m.id;
+                tint.style.left   = `${startPx}px`;
+                tint.style.width  = `${widthPx}px`;
+                tint.style.height = trackTint;
+                tint.style.setProperty('--marker-color', color);
+                this._innerEl.appendChild(tint);
+            } else {
+                // Plain marker — drop line down the tracks
+                const line = document.createElement('div');
+                line.className = 'tl-marker-line';
+                line.dataset.id = m.id;
+                line.style.left = `${startPx}px`;
+                line.style.setProperty('--marker-color', color);
+                line.style.height = `var(--strip-h)`;
+                this._innerEl.appendChild(line);
+            }
         }
     }
 
+    // Live-position a loop marker's elements during a drag (no full re-render).
+    _positionLoopMarker(m) {
+        const startPx = ZONE_COL_W + m.time * this._pxPerSec;
+        const endPx   = ZONE_COL_W + m.loopEnd * this._pxPerSec;
+        const widthPx = Math.max(0, endPx - startPx);
+        const flag   = this._markerLaneEl.querySelector(`.tl-marker-flag[data-id="${m.id}"]`);
+        const band   = this._markerLaneEl.querySelector(`.tl-loop-band[data-id="${m.id}"]`);
+        const handle = this._markerLaneEl.querySelector(`.tl-loop-handle[data-id="${m.id}"]`);
+        const tint   = this._innerEl.querySelector(`.tl-loop-tint[data-id="${m.id}"]`);
+        if (flag)   flag.style.left = `${startPx}px`;
+        if (band) { band.style.left = `${startPx}px`; band.style.width = `${widthPx}px`; }
+        if (handle) handle.style.left = `${endPx}px`;
+        if (tint) { tint.style.left = `${startPx}px`; tint.style.width = `${widthPx}px`; }
+    }
+
+    // Create a marker at time t. No popover — placement and editing are separate
+    // gestures: drop with the M key, edit by clicking the flag.
     _addMarkerAt(t) {
-        if (!this._tl) return;
+        if (!this._tl) return null;
         this._tl.markers = this._tl.markers || [];
-        // Round to snap if active
         if (this._snapSec > 0) t = Math.round(t / this._snapSec) * this._snapSec;
         const m = createMarker({ time: t, label: 'Marker' });
         this._tl.markers.push(m);
+        this._tl.markers.sort((a, b) => a.time - b.time);
         this._setDirty();
         this._renderStrip();
-        
-        // Open edit popover immediately
-        const markerEl = this._rulerEl.querySelector(`.tl-marker-flag[data-id="${m.id}"]`);
-        if (markerEl) this._openMarkerEdit(m.id, markerEl);
+        return m;
+    }
+
+    // Drop a marker at the current playhead — the M-key gesture. Instant, no popover.
+    dropMarkerAtPlayhead() {
+        const m = this._addMarkerAt(this._currentTime);
+        if (m) this._toast('Marker added');
     }
 
     _startMarkerDrag(e, m) {
         if (e.button !== 0) return;
         
-        const flagEl = this._rulerEl.querySelector(`.tl-marker-flag[data-id="${m.id}"]`);
+        const flagEl = this._markerLaneEl.querySelector(`.tl-marker-flag[data-id="${m.id}"]`);
         const lineEl = this._innerEl.querySelector(`.tl-marker-line[data-id="${m.id}"]`);
         if (!flagEl || !lineEl) return;
         
@@ -1057,8 +1124,11 @@ export class TimelineEditor {
         const origTime = m.time;
         let newTime = origTime;
         let isDrag = false;
-        
+        let done   = false;
+
         const onMove = ev => {
+            // Self-heal: pointer no longer held — the release was missed.
+            if (ev.buttons === 0) { onUp(); return; }
             if (!isDrag && (Math.abs(ev.clientX - startX) > 3 || Math.abs(ev.clientY - startY) > 3)) {
                 isDrag = true;
             }
@@ -1067,14 +1137,17 @@ export class TimelineEditor {
             const dx = ev.clientX - startX;
             newTime = Math.max(0, origTime + dx / this._pxPerSec);
             if (this._snapSec > 0) newTime = Math.round(newTime / this._snapSec) * this._snapSec;
-            const leftPx = `${120 + newTime * this._pxPerSec}px`;
+            const leftPx = `${ZONE_COL_W + newTime * this._pxPerSec}px`;
             flagEl.style.left = leftPx;
             lineEl.style.left = leftPx;
         };
-        
+
         const onUp = () => {
-            document.removeEventListener('pointermove', onMove);
-            document.removeEventListener('pointerup',   onUp);
+            if (done) return;
+            done = true;
+            document.removeEventListener('pointermove',   onMove);
+            document.removeEventListener('pointerup',     onUp);
+            document.removeEventListener('pointercancel', onUp);
             if (!isDrag) {
                 // Treat as click
                 this._openMarkerEdit(m.id, flagEl);
@@ -1086,9 +1159,68 @@ export class TimelineEditor {
             this._tl.markers.sort((a, b) => a.time - b.time);
             this._renderStrip();
         };
-        
-        document.addEventListener('pointermove', onMove);
-        document.addEventListener('pointerup',   onUp);
+
+        document.addEventListener('pointermove',   onMove);
+        document.addEventListener('pointerup',     onUp);
+        document.addEventListener('pointercancel', onUp);
+        e.preventDefault();
+    }
+
+    // Drag a loop marker's region. mode: 'start' (flag), 'end' (handle), 'move' (band).
+    _startLoopDrag(e, m, mode) {
+        if (e.button !== 0) return;
+        const MIN      = 1;                       // minimum loop length, seconds
+        const startX   = e.clientX;
+        const startY   = e.clientY;
+        const origTime = m.time;
+        const origEnd  = m.loopEnd;
+        let isDrag = false;
+        let done   = false;
+
+        const snap = v => (this._snapSec > 0 ? Math.round(v / this._snapSec) * this._snapSec : v);
+
+        const onMove = ev => {
+            if (ev.buttons === 0) { onUp(); return; }   // self-heal: release missed
+            if (!isDrag && (Math.abs(ev.clientX - startX) > 3 || Math.abs(ev.clientY - startY) > 3)) {
+                isDrag = true;
+            }
+            if (!isDrag) return;
+            const dt = (ev.clientX - startX) / this._pxPerSec;
+            if (mode === 'start') {
+                m.time = Math.max(0, Math.min(snap(origTime + dt), origEnd - MIN));
+            } else if (mode === 'end') {
+                m.loopEnd = Math.max(origTime + MIN, snap(origEnd + dt));
+            } else { // move — slide the whole region
+                const nt = Math.max(0, snap(origTime + dt));
+                m.time    = nt;
+                m.loopEnd = nt + (origEnd - origTime);
+            }
+            this._positionLoopMarker(m);
+        };
+
+        const onUp = () => {
+            if (done) return;
+            done = true;
+            document.removeEventListener('pointermove',   onMove);
+            document.removeEventListener('pointerup',     onUp);
+            document.removeEventListener('pointercancel', onUp);
+            if (!isDrag) {
+                // A click (no drag): on the flag, open the editor; band/handle do nothing.
+                if (mode === 'start') {
+                    const flag = this._markerLaneEl.querySelector(`.tl-marker-flag[data-id="${m.id}"]`);
+                    if (flag) this._openMarkerEdit(m.id, flag);
+                }
+                return;
+            }
+            this._setDirty();
+            this._tl.markers.sort((a, b) => a.time - b.time);
+            this._renderStrip();
+            this._rescheduleIfPlaying();
+        };
+
+        document.addEventListener('pointermove',   onMove);
+        document.addEventListener('pointerup',     onUp);
+        document.addEventListener('pointercancel', onUp);
         e.preventDefault();
     }
 
@@ -1126,6 +1258,9 @@ export class TimelineEditor {
             m.label  = this._meLabel.value.trim() || '';
             m.color  = this._meColor.value;
             m.action = this._meAction.value;
+            if (m.action === 'loop' && (m.loopEnd == null || m.loopEnd <= m.time)) {
+                m.loopEnd = m.time + 16;   // default 16s loop — drag the handle to resize
+            }
             this._setDirty();
             this._tl.markers.sort((a, b) => a.time - b.time);
             this._renderStrip();
@@ -1308,7 +1443,9 @@ export class TimelineEditor {
         let   newStartTime  = origStartTime;
         let   moved         = false;
 
+        let done = false;
         const onMove = ev => {
+            if (ev.buttons === 0) { onUp(); return; }   // self-heal: release missed
             const dx = ev.clientX - startX;
             const dy = ev.clientY - startY;
             if (!moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
@@ -1324,8 +1461,11 @@ export class TimelineEditor {
         };
 
         const onUp = () => {
-            document.removeEventListener('pointermove', onMove);
-            document.removeEventListener('pointerup',   onUp);
+            if (done) return;
+            done = true;
+            document.removeEventListener('pointermove',   onMove);
+            document.removeEventListener('pointerup',     onUp);
+            document.removeEventListener('pointercancel', onUp);
             blockEl.style.zIndex     = '';
             blockEl.style.opacity    = '';
             blockEl.style.transition = '';
@@ -1339,8 +1479,9 @@ export class TimelineEditor {
             this._renderStrip();
         };
 
-        document.addEventListener('pointermove', onMove);
-        document.addEventListener('pointerup',   onUp);
+        document.addEventListener('pointermove',   onMove);
+        document.addEventListener('pointerup',     onUp);
+        document.addEventListener('pointercancel', onUp);
         e.preventDefault();
     }
 
@@ -1354,7 +1495,11 @@ export class TimelineEditor {
         const blockEl = trackEl.querySelector(`[data-id="${entry.id}"]`);
         const durEl   = blockEl?.querySelector('.tl-block-dur');
 
+        let done   = false;
+        let moved  = false;
         const onMove = ev => {
+            if (ev.buttons === 0) { onUp(); return; }   // self-heal: release missed
+            moved = true;
             const dx = ev.clientX - startX;
             let newDur = Math.max(5, origDur + Math.round(dx / this._pxPerSec));
             if (this._snapSec > 0) newDur = Math.round(newDur / this._snapSec) * this._snapSec;
@@ -1365,15 +1510,20 @@ export class TimelineEditor {
         };
 
         const onUp = () => {
-            document.removeEventListener('pointermove', onMove);
-            document.removeEventListener('pointerup',   onUp);
+            if (done) return;
+            done = true;
+            document.removeEventListener('pointermove',   onMove);
+            document.removeEventListener('pointerup',     onUp);
+            document.removeEventListener('pointercancel', onUp);
+            if (!moved) return;
             this._setDirty();
             this._rescheduleIfPlaying();
             this._renderStrip();
         };
 
-        document.addEventListener('pointermove', onMove);
-        document.addEventListener('pointerup',   onUp);
+        document.addEventListener('pointermove',   onMove);
+        document.addEventListener('pointerup',     onUp);
+        document.addEventListener('pointercancel', onUp);
         e.preventDefault();
     }
 
@@ -1448,6 +1598,7 @@ export class TimelineEditor {
     _openQuickEdit(id, anchorEl) {
         const entry = this._tl?.entries.find(e => e.id === id);
         if (!entry) return;
+        this._closeColorPicker();
 
         // Deactivate any previously active menu button, then activate this one
         document.querySelectorAll('.tl-block-menu-btn.is-active').forEach(el => el.classList.remove('is-active'));
@@ -1456,12 +1607,10 @@ export class TimelineEditor {
 
         this._qeEntryId        = id;
         this._qeTitle.textContent = displayName(entry.presetName);
-        this._qeDur.value   = entry.duration;
-        this._qeBlend.value = entry.blendTime;
-        this._qeLabel.value = entry.label || '';
+        this._qeSwatch.style.background = entry.color || colorFor(entry.presetName);
 
         const rect = anchorEl.getBoundingClientRect();
-        const popW = 260, popH = 220;
+        const popW = 260, popH = 110;
         let left = rect.left;
         let top  = rect.top - popH - 8;
         if (top < 10) top = rect.bottom + 8;
@@ -1470,24 +1619,67 @@ export class TimelineEditor {
         this._quickEditEl.style.left = `${left}px`;
         this._quickEditEl.style.top  = `${top}px`;
         this._quickEditEl.hidden = false;
-        this._qeDur.focus();
-        this._qeDur.select();
-    }
-
-    _applyQuickEdit() {
-        if (!this._qeEntryId) return;
-        const dur   = Math.max(5, Math.min(600, parseInt(this._qeDur.value,   10) || 30));
-        const blend = Math.max(0, Math.min(10,  parseFloat(this._qeBlend.value)   || 2));
-        const label = this._qeLabel.value.trim() || null;
-        this._updateEntry(this._qeEntryId, { duration: dur, blendTime: blend, label });
-        this._rescheduleIfPlaying();
-        this._closeQuickEdit();
     }
 
     _closeQuickEdit() {
+        this._closeColorPicker();
         this._quickEditEl.hidden = true;
         this._qeEntryId = null;
         document.querySelectorAll('.tl-block-menu-btn.is-active').forEach(el => el.classList.remove('is-active'));
+    }
+
+    // ─── Block colour picker ──────────────────────────────────────────────────
+
+    _toggleColorPicker() {
+        if (!this._colorPickerEl.hidden) { this._closeColorPicker(); return; }
+        this._openColorPicker();
+    }
+
+    _openColorPicker() {
+        const entry = this._tl?.entries.find(e => e.id === this._qeEntryId);
+        if (!entry) return;
+        const current = (entry.color || colorFor(entry.presetName)).toLowerCase();
+
+        // Build the 4×4 swatch grid
+        this._colorGridEl.innerHTML = '';
+        for (const hex of BLOCK_COLORS) {
+            const sw = document.createElement('button');
+            sw.type = 'button';
+            sw.className = 'tl-color-sw' + (hex.toLowerCase() === current ? ' selected' : '');
+            sw.style.background = hex;
+            sw.setAttribute('aria-label', hex);
+            sw.addEventListener('click', () => this._pickColor(hex));
+            this._colorGridEl.appendChild(sw);
+        }
+
+        // Anchor below the swatch, clamp to the viewport
+        const rect = this._qeSwatch.getBoundingClientRect();
+        const popW = 164, popH = 164;
+        let left = rect.left;
+        let top  = rect.bottom + 8;
+        if (top + popH > window.innerHeight - 10) top = rect.top - popH - 8;
+        if (left + popW > window.innerWidth - 10) left = window.innerWidth - popW - 10;
+        this._colorPickerEl.style.left = `${left}px`;
+        this._colorPickerEl.style.top  = `${top}px`;
+        this._colorPickerEl.hidden = false;
+        this._qeSwatch.classList.add('is-active');
+    }
+
+    _closeColorPicker() {
+        this._colorPickerEl.hidden = true;
+        this._qeSwatch.classList.remove('is-active');
+    }
+
+    _pickColor(hex) {
+        const id = this._qeEntryId;
+        if (id) {
+            this._updateEntry(id, { color: hex });        // sets colour, _setDirty, _renderStrip
+            this._qeSwatch.style.background = hex;
+            // _renderStrip rebuilt the block — re-mark its menu button active
+            const btn = this._tracksEl?.querySelector(`.tl-block[data-id="${id}"] .tl-block-menu-btn`);
+            if (btn) btn.classList.add('is-active');
+        }
+        this._closeColorPicker();
     }
 
     // ─── Cue — double-click a block to crossfade in and continue timeline ─────
@@ -1601,7 +1793,7 @@ export class TimelineEditor {
     // The entry active at fromTime is loaded immediately (instant, no blend).
     // Future entries fade in from black; entries ending before a gap fade out.
     // Transition style is extensible via the `style` param in _fadeZoneCover.
-    _playZone(zoneId, fromTime = 0) {
+    _playZone(zoneId, fromTime = 0, blend = 0) {
         const entries = this._zoneEntriesFor(zoneId);
         const zd      = this._zoneMap.get(zoneId);
         if (!zd || !entries.length) return;
@@ -1623,7 +1815,7 @@ export class TimelineEditor {
                     // Skip loadPreset if this preset is already showing (live-edit reschedule).
                     // Always lift the cover — play() may have just covered everything to black.
                     if (this._currentZonePreset.get(zoneId) !== entry.presetName) {
-                        zd.engine.loadPreset(entry.presetName, 0).catch(() => {});
+                        zd.engine.loadPreset(entry.presetName, blend).catch(() => {});
                     }
                     this._fadeZoneCover(zoneId, 0, 0);  // instant reveal (scrub/seek)
                     this._currentZonePreset.set(zoneId, entry.presetName);
@@ -1754,6 +1946,15 @@ export class TimelineEditor {
         // DO NOT stop engines - animation continues!
     }
 
+    // Cancel the master + per-zone scheduling timers; leaves the rAF render loop
+    // running — used by the `stop` marker action (timeline halts, visuals run on).
+    _clearAllTimers() {
+        clearTimeout(this._masterTimer);
+        this._masterTimer = null;
+        for (const timers of this._zoneTimers.values()) for (const t of timers) clearTimeout(t);
+        this._zoneTimers.clear();
+    }
+
     stop() {
         if (!this._playing && this._markerHoldTime === null) return;
         this._playing = false;
@@ -1809,32 +2010,26 @@ export class TimelineEditor {
 
         const tNow = (performance.now() - this._playStartWall) / 1000;
 
-        // Check for markers between last tick and now
+        // Check for markers crossed between last tick and now
         if (this._tl?.markers && this._lastTickTime !== undefined) {
-            // Sort by time just in case, though they usually are
-            const sorted = [...this._tl.markers].sort((a, b) => a.time - b.time);
-            for (const m of sorted) {
-                if (m.action !== 'none' && m.time > this._lastTickTime && m.time <= tNow) {
-                    if (m.action === 'stop') {
-                        // VJ mode: Park playhead at marker, stop timeline advancing,
-                        // but KEEP animation running (show goes on!)
-                        this._markerHoldTime = m.time;  // Freeze timeline at marker
-                        this._currentTime = m.time;
-                        this._lastTickTime = m.time;
-                        // Clear preset scheduling timers only
-                        this._clearAllTimers();
-                        // Update playhead visual
-                        this._playheadEl.style.left = `${m.time * this._pxPerSec}px`;
-                        this._updateTimeDisplay(m.time);
-                        // Keep rAF loop running so animation continues
-                        this._rafId = requestAnimationFrame(() => this._tickPlayhead());
-                        return;
-                    } else if (m.action === 'loop') {
-                        this.stop();
-                        this._scrubTo(0); // for now loop jumps back to start
-                        this.play();
-                        return;
-                    }
+            const lastT = this._lastTickTime;
+            for (const m of this._tl.markers) {
+                // Loop region — crossing the loop END wraps the playhead to the loop START.
+                if (m.action === 'loop' && m.loopEnd != null && m.loopEnd > m.time
+                    && m.loopEnd > lastT && m.loopEnd <= tNow) {
+                    this._scrubTo(m.time, 1.0);   // 1s crossfade on the loop wrap (relaxed jump)
+                    return;
+                }
+                // Stop marker — park the playhead, keep animation running (show goes on).
+                if (m.action === 'stop' && m.time > lastT && m.time <= tNow) {
+                    this._markerHoldTime = m.time;
+                    this._currentTime    = m.time;
+                    this._lastTickTime   = m.time;
+                    this._clearAllTimers();
+                    this._playheadEl.style.left = `${m.time * this._pxPerSec}px`;
+                    this._updateTimeDisplay(m.time);
+                    this._rafId = requestAnimationFrame(() => this._tickPlayhead());
+                    return;
                 }
             }
         }
@@ -1849,7 +2044,7 @@ export class TimelineEditor {
         // Auto-scroll
         const scrollLeft = this._scrollEl.scrollLeft;
         const viewW      = this._scrollEl.clientWidth;
-        const absX       = x + 120;
+        const absX       = x + ZONE_COL_W;
         if (absX < scrollLeft + 140 || absX > scrollLeft + viewW - 40) {
             this._scrollEl.scrollLeft = Math.max(0, absX - 180);
         }
@@ -1858,7 +2053,7 @@ export class TimelineEditor {
         this._rafId = requestAnimationFrame(() => this._tickPlayhead());
     }
 
-    _scrubTo(t) {
+    _scrubTo(t, blend = 0) {
         this._currentTime  = t;  // always persist the parked position
         this._lastTickTime = t;
         this._playheadEl.style.left    = `${t * this._pxPerSec}px`;
@@ -1911,7 +2106,7 @@ export class TimelineEditor {
         this._playStartWall = performance.now() - t * 1000;
 
         for (const zone of (this._tl?.zones || [])) {
-            this._playZone(zone.id, t);
+            this._playZone(zone.id, t, blend);
         }
 
         const remaining = this._totalDuration() - t;
@@ -2098,6 +2293,7 @@ export class TimelineEditor {
         if (this._guideModal && !this._guideModal.hidden) { this._guideModal.hidden = true; return; }
         if (!this._zoneMgrEl?.hidden)  { this._closeZoneMgr();     return; }
         if (!this._pickerEl.hidden)    { this._closePicker();       return; }
+        if (!this._colorPickerEl.hidden) { this._closeColorPicker(); return; }
         if (!this._quickEditEl.hidden) { this._closeQuickEdit();    return; }
         if (!this._ctxMenu.hidden)     { this._closeContextMenu();  return; }
         if (!this._entryDeleteModal.hidden) { this._pendingDeleteId = null; this._entryDeleteModal.hidden = true; return; }
