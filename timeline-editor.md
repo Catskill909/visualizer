@@ -42,7 +42,7 @@
 | 5 | 4.11 — Staging Mode | Safe overlay editing; changes commit on the next block boundary |
 | 6 | 4.12 — Timeline Sets Switching | Queued set switching + My Sets panel (replaces the topbar dropdown) |
 | 7 | 4.13 — Set Export / Import | Portable `.dcset.json` bundles — full show + presets + images |
-| 8 | 4.4-C/D/E — Block menu remainder | Full Edit deep-link, block color picker, per-zone preset controls |
+| 8 | 4.4-C/D — Block menu authoring redesign | Remove Duration, Blend stepper, zoned layout + restyle (C — pairs with #1 Loop); Full Edit deep-link + block color picker (D) |
 | 9 | Phase 5 — Multi-monitor output 🔬 | Route each zone to a separate physical display (research phase) |
 
 ### 🚧 Partially Complete — looks done, isn't
@@ -50,7 +50,7 @@
 | Phase | Shipped portion | Still open |
 |-------|-----------------|-----------|
 | 3.5 — Active Playhead | Playhead, click-to-seek, automated crossfades | Loop/Loop Solo buttons → **Roadmap #1** |
-| 4.4 — Block Settings Menu | A (action modal), B (menu icon) | C/D/E → **Roadmap #8** |
+| 4.4 — Block Settings Menu | A (action modal), B (menu icon) | C/D (authoring redesign) → **Roadmap #8**; live-mixing controls → **Backlog: Performance Panel** |
 | 4.10 — Live Editing | A (core mutation reschedule) | B (loop state preservation) → ships with **Roadmap #1** |
 
 ---
@@ -69,18 +69,29 @@
 
 ---
 
-## UX Philosophy — The Complexity Ladder
+## UX Philosophy — Authoring vs Performance
 
-The timeline editor is for setting up presets and playing them in the clearest, smartest way — with room to breathe. The timeline strip is always the clean base. No new UI appears unless the user deliberately asks for it. Each layer of depth opens on a gesture and closes cleanly back to the layer before. The strip itself never gets busier.
+*(Reframed 2026-05-17 — this supersedes the earlier "Complexity Ladder / Orchestration Console" model.)*
 
-| Layer | What you see | How you get there |
-|-------|-------------|-------------------|
-| 0 | Full-screen canvas + timeline strip | Default |
-| 1 | Block menu — controls + Loop/Solo/Mute for one preset | Click the block's menu icon |
+The timeline editor splits cleanly into two modes, and every feature belongs to exactly one of them:
 
-**There is no Layer 2.** An all-zones, all-controls Performance Panel was considered and **rejected** — too much UI at once. Multiple Layer-1 block menus can be open simultaneously; that *is* the live orchestration console. You open only the channels you're performing — the rest stay clean. See the Backlog "Block Menu Orchestration Console" entry.
+- **Authoring** — you *configure* an entry. **Block menus are authoring surfaces:** open one, set the entry's settings (blend, label, loop, color…), hit **Apply**, it closes. One menu open at a time. Menus never stay open during a show.
+- **Performance** — you *trigger* what you authored, using gestures on the strip itself: **double-click a block** to crossfade into it with its stored settings; **click the timeline** to drive the playhead. No menus, no popovers — just the clean strip and direct clicks.
 
-**Evaluation rule:** Does the idea add to the strip, or does it live behind a deliberate gesture? If it adds to the strip, the answer is no.
+This separation is the core principle. The menu holds the intent; the strip gesture is the trigger. Setup and execution are never the same gesture, and performing never means hunting through open UI.
+
+**Where the complexity lives.** All the visual artistry is *inside the preset* — built in Preset Studio, with its layers, effects, and shaders. A preset dropped on the timeline is already a finished, complex thing. The timeline's job is the opposite: stay simple and fluid. The VJ brings presets in and out, keeps the flow, stays contained. The interface leans toward simplicity by default — but it does not cap you: the headroom to switch hard and go wild is there if you want it. Every timeline control is judged against this — *does it keep the flow simple, or does it bog the VJ down?* When in doubt, fewer controls, bigger targets, faster gestures.
+
+| Layer | What you see | How you get there | Mode |
+|-------|-------------|-------------------|------|
+| 0 | Full-screen canvas + timeline strip | Default | **Performance** — double-click blocks, click the ruler |
+| 1 | Block menu — one entry's settings + Apply | Click the block's menu icon | **Authoring** — closes on Apply/Cancel |
+
+**Solo / Mute live on the zone-row header — not in a panel, not in the block menu.** Each zone row already renders a label column (color dot + name + "+"); S/M buttons sit there, mixer-style — one click, instant, no menu. This is the universal DAW convention and the *only* live-mixing control that ships near-term.
+
+**A full per-zone controls overlay (the "Performance Panel") stays down the road.** Re-targeting the whole `controls.js` panel to a zone's engine is deep live control — genuinely wanted, but deferred until the core feature set works. The preset already carries the visual complexity, so the timeline does not need it to perform a show. See the Backlog "Performance Panel" entry.
+
+**Evaluation rule:** Is this control *authoring* (set it, Apply, done) or *performance* (trigger it live)? Authoring goes in the block menu. Performance goes on the strip — a direct gesture or a zone-header button. Nothing live-mixing goes in the block menu.
 
 ---
 
@@ -156,7 +167,11 @@ Built in the order of the *Up Next* table. Each entry below carries the same num
 
 *(specced under Phase 3.5; ships with Phase 4.10-B — loop state preservation)*
 
-**Decided 2026-05-15:** preset looping lives in the **block menu** (Loop / Solo toggles) — there are **no transport-bar Loop buttons** (the original transport-toggle design is cancelled). A loop always loops a *section*: a preset's Loop loops its own one-preset span, markers bound a larger multi-preset section. This phase has three parts: the control and its rules (**1-A**), its at-a-glance visibility on the strip (**1-B**), and the relaxed jump crossfade that makes loop release — and every timeline jump — feel smooth (**1-C**).
+**Decided 2026-05-15:** preset looping lives in the **block menu** as a Loop toggle — there are **no transport-bar Loop buttons** (the original transport-toggle design is cancelled). A loop always loops a *section*: a preset's Loop loops its own one-preset span, markers bound a larger multi-preset section. This phase has three parts: the control and its rules (**1-A**), its at-a-glance visibility on the strip (**1-B**), and the relaxed jump crossfade that makes loop release — and every timeline jump — feel smooth (**1-C**).
+
+**Refined 2026-05-17:** Loop is a *stored, armed setting* in the block menu — set it, hit Apply; the loop fires when the block is triggered (double-click). It is authoring, not live mixing. **Solo/Mute are NOT block-menu controls** — they are live performance controls and belong in the deferred Performance Panel (see UX Philosophy + Backlog).
+
+> **Prerequisite — Phase 4.4-C (block menu authoring redesign, Roadmap #8).** Loop's toggle drops into the block menu, so the menu's redesign — remove Duration, Blend stepper, zoned layout, restyle — should be built first or alongside this phase, giving Loop a clean shell to land in.
 
 #### 1-A — Loop control & precedence
 
@@ -238,7 +253,7 @@ Every timeline *jump* — loop release, double-click Cue, hot-cue key, Set switc
 
 Distinct from Phase 4.6 (overlap crossfade between consecutive blocks) — 1-C is about discontinuous seeks, not adjacent-block blends.
 
-**Relationship to the Block Menu Orchestration Console (Backlog):** 1-A adds just the Loop control to the block menu (`#tl-quick-edit`, shipped in Phase 4.4-B). The broader console — menus staying open, Solo, Mute — remains a Backlog item. 1-B's visual language is shared with that console. Loop can ship independently as an addition to the menu that already exists.
+**Relationship to the block menu and the Performance Panel (Backlog):** 1-A adds just the Loop toggle to the block menu (`#tl-quick-edit`, shipped in Phase 4.4-B; redesigned in Roadmap #8) as a stored, armed setting. Solo / Mute are *not* block-menu controls — they are live mixing and belong in the deferred Performance Panel. 1-B's strip-visibility language for loop state is independent of that panel. Loop ships independently as an addition to the menu that already exists.
 
 ---
 
@@ -658,22 +673,30 @@ No new storage primitives needed. The existing preset export/import and timeline
 
 ---
 
-### 8 · Phase 4.4-C/D/E — Block Settings Menu (remaining) ⬜
+### 8 · Phase 4.4-C/D — Block Menu Authoring Redesign ⬜
 
-Phases 4.4-A and 4.4-B shipped (see archive). Remaining sub-phases:
+Phases 4.4-A and 4.4-B shipped (see archive). The block menu (`#tl-quick-edit`) is now defined as an **authoring surface** (see UX Philosophy — Authoring vs Performance): it configures one entry and commits on **Apply**. It never holds live-mixing controls and never stays open during a show. Remaining sub-phases:
 
 | Phase | What's added |
 |-------|-------------|
-| **C — Full Edit** | "Full Edit →" deep-link into Preset Studio for this preset |
-| **D — Utilities** | Block color picker |
-| **E — Preset Controls** | Full `controls.js` panel as a new section below the fields, re-targeted to this zone's engine; live during playback |
+| **C — Authoring redesign** | The structural + visual pass. See below. |
+| **D — Full Edit + color** | "Full Edit →" deep-link into Preset Studio for this preset; block color picker. |
 
-**Styling (prerequisite for Phase C):** Size and padding are correct — controls must stay easy to see and hit. Fix is visual hierarchy and anchoring:
-- "s" unit labels feel orphaned — should be anchored to their input (suffix inside the field, or a pill flush alongside it)
-- Field labels and values have similar visual weight — labels should read as secondary so the value is what draws the eye
-- Apply/Cancel button bar stays — clear affordance — but should match the app's glassmorphic language rather than reading as a generic HTML form
+**Phase C — the redesign in detail.** The current menu reads as a raw HTML form (native number spinners, orphaned "s" units). Rebuild it as a clean authoring popover:
 
-**Technical note (for Phase E):** `src/controls.js` currently targets the primary engine. For timeline zones, each zone has its own slave `VisualizerEngine` at `_zoneMap.get(zoneId).engine`. The modal re-targets controls to the correct engine on open, then restores the original target on close. No new slider widgets — just a target-swap.
+1. **Remove the Duration field.** Block length is set by dragging the block's edges and is shown directly on the strip — a number field for it is redundant.
+2. **Replace native number inputs with steppers.** Blend becomes `[−] 2 s [+]` — coarse values, no typing. The "s" unit anchors to the stepper, not floating beside it.
+3. **Zone the layout** so it scales as later controls land:
+   - Header — preset name + color dot
+   - Settings — Loop arm (Roadmap #1), Blend stepper, Label
+   - **Apply / Cancel** — commits the settings; this is an authoring form
+   - Utility footer — Full Edit →, Duplicate, Delete
+4. **Restyle** to the app's glassmorphic language — labels read as secondary, the value draws the eye, buttons stop looking like generic HTML form controls.
+5. Keep hit targets generous — this is a performance tool used in a dark venue. A taller popover beats cramped controls.
+
+**Pairs with Roadmap #1 (Loop).** Loop's toggle is a *stored, armed setting* that drops into this redesigned menu. Build Phase C first or alongside #1 so Loop has a clean shell.
+
+**Moved out of this phase — the old Phase 4.4-E.** Re-targeting the full `controls.js` panel to a zone's slave engine is *live mixing*, not authoring. It moves to the deferred **Performance Panel** (see Backlog). The block menu never holds live-mixing controls.
 
 ---
 
@@ -736,31 +759,32 @@ One line each. Full implementation detail, post-ship fixes, and edge-case notes 
 
 Unscheduled ideas. Promote to the Roadmap and the *Up Next* table when ready to commit.
 
-### ⭐ Block Menu Orchestration Console *(captured 2026-05-15)*
+### Zone Solo / Mute — zone-header buttons *(near-term, ships independently — 2026-05-17)*
 
-Reframe the per-block menu (the `#tl-quick-edit` popover opened by the left hamburger icon — Phase 4.4-B) from an "edit" popover into a **live per-preset control surface**. Small or busy blocks have no room for on-block controls; the menu is where controls belong. Kept deliberately small — there are not many controls per preset, and Solo / Loop / Mute read clearly. This is not a "crazy menu" — room to breathe is the point.
+Per-zone Solo and Mute, mixer-style. **Decided home: the zone-row label column** — `_createZoneRow` already renders `tl-zone-label` (color dot + name + "+" button) per zone row. Add S and M buttons there. One click, instant, no menu — the universal DAW/mixer convention every VJ already knows.
 
-- **Menus stay open** — reverse the Phase 4.4-B single-open rule (one menu currently closes any other). Set up several blocks' menus, then perform.
-- **Controls per menu:** Loop, Solo, Mute — alongside the existing Duration / Blend / Label fields. A small, clear set. No separate "Loop Solo" — a per-block Loop is already zone-scoped. Loop itself is specced as Roadmap #1.
-- **Color coding** signals state at a glance: muted = dimmed/desaturated block, solo = bright stroke (a *slow* pulse if any — never a strobe).
-- An explicit **close-all** affordance returns the strip to its clean base.
+- Acts on the **zone** (the channel), never a single block — soloing one block makes no sense as a live gesture.
+- Live state is **ephemeral** — never saved in the Timeline Set, consistent with "a Set does not contain the playhead position."
+- Ships **independently of the Performance Panel** — it needs no overlay, just two small buttons in a column that already exists. Promotable to the Roadmap whenever core work allows.
+- Open: interaction with the Zone Stack (Roadmap #4) compositing — Solo behavior while zones are layered.
 
-**Interaction model — set up, then fire:**
-The menu *configures* a block; double-click *executes* it (extends the Phase 4.5 Cue gesture).
-- Click the block's menu icon → menu opens → arm Solo / Loop / etc. for that block.
-- Double-click the block → plays it **with the armed settings**. Go straight to a preset and solo it; or go straight to a preset and play all zones from there.
-- The menu holds the intent; the double-click is the trigger. Setup and execution stay separate gestures.
+### ⭐ Performance Panel — per-zone controls overlay *(reframed 2026-05-17 — supersedes the "Orchestration Console")*
 
-**Decided — no separate Performance Panel.** An all-zones, all-controls overlay was considered and rejected — too much UI at once. This console *is* the performance surface: open only the block menus you're working, leave the rest clean. (UX Philosophy ladder updated — Layer 2 removed.)
+A deferred overlay holding the *full* `controls.js` panel per zone — deep live control of each zone's visualizer. **Down the road, not near-term.** The preset already carries all the visual artistry (built in Preset Studio); the timeline does not need this panel to perform a show. Built only after the core feature set works — Loop, overlap crossfade, zone stack, undo/redo, sets.
 
-**Decided — Loop is one per-block toggle.** No transport buttons, no separate "Loop Solo." Full loop design and precedence rules: see Roadmap #1.
+**Solo / Mute are NOT in this panel** — they moved to the zone-row header (above). The panel is purely the deep controls surface.
 
-**Decided — no loop-conflict prompts.** Loop conflicts are resolved silently by precedence (Roadmap #1), never by a mid-performance dialog. The one genuine overlap — a preset loop vs a marker region loop — is settled by precedence (the preset loop wins). The fix for "loops are hard" is **visibility, not prompts** — loop state is shown through the color coding (active loop = pulsing indicator; an armed-but-overridden loop = a distinct muted indicator), so the VJ always sees what won without being asked to decide.
+**Why it is NOT the block menu.** An earlier plan — the "Block Menu Orchestration Console" (2026-05-15) — proposed making block menus stay open and serve as the live console. **Reversed 2026-05-17:** block menus are *authoring* surfaces — set settings, Apply, close, one open at a time. Authoring and performance never share a surface; that split is now the core UX principle.
 
-**Open design questions — resolve before building:**
-- **Mute/Solo target** — in a real mixer these act on a *channel* (= a zone here), not a clip. Decide whether a block's Mute/Solo acts on its zone or only that block. Lean: zone-level, block menu as the access point.
-- **Multi-open layout** — floating popovers will overlap on small/close blocks. Needs a docking/tray strategy (e.g. menus drop below their zone row) rather than free-floating popovers.
-- **Persistence** — Loop/Mute/Solo are ephemeral live performance state. They must NOT be saved in the Timeline Set (consistent with "a Set does not contain the playhead position").
+**What the panel would hold:**
+- The full `controls.js` panel per zone, re-targeted to that zone's slave `VisualizerEngine` (the old Phase 4.4-E). Technical note: `src/controls.js` currently targets the primary engine; each zone has its own engine at `_zoneMap.get(zoneId).engine`. The panel re-targets controls on open and restores the original target on close — no new slider widgets, just a target-swap.
+
+**Open design question — resolve before building:**
+- Overlay layout — full-width strip vs floating panel vs docked tray. It must not bury the timeline strip ("room to breathe").
+
+**Still-valid Loop decisions** (Loop itself ships in the block menu as an armed setting — Roadmap #1, not this panel):
+- **Loop is one per-block toggle.** No transport buttons, no separate "Loop Solo." Full design + precedence: Roadmap #1.
+- **No loop-conflict prompts.** Conflicts resolve silently by precedence, never by a mid-performance dialog. A preset loop vs a marker region loop is settled by precedence (the preset loop wins). The fix for "loops are hard" is **visibility, not prompts** — loop state shows on the strip (active loop = pulsing indicator; armed-but-overridden = a distinct muted indicator).
 
 *Loop & Regions*
 - **Loop region markers** — region looping is bounded by markers (Roadmap 1-A). Possible convenience: drag a range on the ruler to drop an in/out marker pair in one gesture — not a separate system, just a faster way to place the two markers.
@@ -784,7 +808,7 @@ The menu *configures* a block; double-click *executes* it (extends the Phase 4.5
 - **Setlist text export** — plain-text or HTML table.
 - **Auto-save behavior** — debounced "draft" slot rather than spawning a new entry per page load.
 
-> *Removed 2026-05-15 — **Performance Panel.** A full-width overlay showing every zone's full `controls.js` panel at once was on the backlog. Cut: too much UI at once, against "room to breathe." Its role is filled by the Block Menu Orchestration Console (above) — progressive, one block menu at a time.*
+> *Note 2026-05-17 — the **Performance Panel** was briefly cut (2026-05-15) in favour of the "Orchestration Console" model. That reversed: see the ⭐ Performance Panel backlog entry above. The panel is the right home for live per-zone mixing controls — deferred until the core feature set works, not cut.*
 
 ---
 
@@ -805,7 +829,8 @@ Same design language as the rest of the app: full-screen canvas, glassmorphic ov
 - ~~**Previous preset bleeds through cover during gap-to-next-entry fade**~~: ✅ Fixed 2026-05-12 — confirmed working on web. Cover fade and `loadPreset` were firing simultaneously; old preset was visible through the fading cover. Fix: `loadPreset(name, 0)` fires first (instant GPU write), then `requestAnimationFrame` delays the cover fade until the new preset has rendered one frame. Presets now fade out cleanly, gaps show nothing, next preset fades in with no bleed. Cross-platform compatible (rAF is standard in WKWebView/WebView2). See Rule 7 in the Critical section.
 - **Zone settings popover not built**: clicking the zone label chip does nothing yet. It should open a popover for name, opacity, blend mode, gap behavior. *(Addressed in Roadmap Phase 4.9-A)*
 - **Entry label overlay not rendered**: `entry.label` is stored and editable in quick-edit but not rendered on the canvas during playback.
-- ~~**`#tl-quick-edit` styling needs visual polish**~~: ✅ Partially addressed in Phase 4.4-A — Duplicate/Delete consolidated into modal with utility row. Full styling pass (Roadmap 4.4-C/D/E) still pending.
+- ~~**`#tl-quick-edit` styling needs visual polish**~~: ✅ Partially addressed in Phase 4.4-A — Duplicate/Delete consolidated into modal with utility row. Full styling pass (Roadmap 4.4-C/D) still pending.
+- ~~**Added presets force-load onto the canvas regardless of playhead**~~: ✅ Fixed 2026-05-17 — the picker click handler used to call `loadPreset` + `_fadeZoneCover` after `addEntry`, so any block you added (or at any start time) jumped straight onto the canvas. Fix: the picker now only mutates the data model; `addEntry` / `_removeEntry` re-derive the canvas from the playhead — `_rescheduleIfPlaying()` while playing, `_scrubTo(this._currentTime)` while stopped. The playhead is the single source of truth; the canvas only ever shows what is under it, and the playhead never moves on add/remove.
 - **Undo/Redo not yet implemented** — scheduled for Roadmap Phase 4.7. Until then, delete and drag are irreversible.
 
 ---

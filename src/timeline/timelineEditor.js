@@ -881,7 +881,11 @@ export class TimelineEditor {
         entry.color = colorFor(presetName);
         this._tl.entries.push(entry);
         this._setDirty();
+        // Playhead is the single source of truth for the canvas. Playing: the
+        // reschedule re-derives from the live playhead. Stopped: re-derive at the
+        // parked position so the new block never jumps onto the canvas.
         this._rescheduleIfPlaying();
+        if (!this._playing) this._scrubTo(this._currentTime);
         this._renderStrip();
     }
 
@@ -896,20 +900,18 @@ export class TimelineEditor {
 
     _removeEntry(id) {
         if (!this._tl || !id) return;
-        const entry = this._tl.entries.find(e => e.id === id);
-        const zoneId = entry?.zoneId;
 
         this._tl.entries = this._tl.entries.filter(e => e.id !== id);
         if (this._selectedId === id) this._selectedId = null;
         this._setDirty();
 
+        // Playhead is the single source of truth for the canvas. Playing: the
+        // reschedule re-derives (blacks out a zone if nothing is active there now).
+        // Stopped: re-derive at the parked position.
         if (this._playing) {
-            // Reschedule: _playZone will blackout the zone if no entry is active there now
             this._rescheduleIfPlaying();
-        } else if (zoneId) {
-            const zd = this._zoneMap.get(zoneId);
-            if (zd) zd.engine.stopRenderLoop();
-            this._fadeZoneCover(zoneId, 1, 0);
+        } else {
+            this._scrubTo(this._currentTime);
         }
 
         this._renderStrip();
@@ -1423,13 +1425,10 @@ export class TimelineEditor {
             item.dataset.name = name;
             item.role = 'option';
             item.addEventListener('click', () => {
+                // Add to the data model only. The canvas reflects the playhead —
+                // addEntry re-derives it; the new preset never force-loads here.
                 this.addEntry(name, this._pickerZoneId);
                 this._closePicker();
-                const eng = this._zoneMap.get(this._pickerZoneId)?.engine || this._primaryEngine;
-                if (!eng.isRunning) eng.startRenderLoop();
-                eng.loadPreset(name, 1.0).catch(() => {});
-                // Lift only this zone's cover — other zones stay hidden
-                this._fadeZoneCover(this._pickerZoneId, 0, 0);  // instant reveal
             });
             this._pickerList.appendChild(item);
         }
