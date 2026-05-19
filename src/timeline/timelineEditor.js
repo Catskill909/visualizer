@@ -228,6 +228,7 @@ export class TimelineEditor {
         this._quickEditEl   = document.getElementById('tl-quick-edit');
         this._qeTitle       = document.getElementById('qe-title');
         this._qeSwatch      = document.getElementById('qe-swatch');
+        this._qeHardCut     = document.getElementById('qe-hardcut');
         this._colorPickerEl = document.getElementById('tl-color-picker');
         this._colorGridEl   = document.getElementById('tl-color-grid');
 
@@ -366,6 +367,20 @@ export class TimelineEditor {
             this._confirmRemoveEntry(id);
         });
         this._qeSwatch.addEventListener('click', () => this._toggleColorPicker());
+
+        // Hard-cut toggle — instant, no Apply (the menu stays a no-form action menu).
+        this._qeHardCut.addEventListener('click', () => {
+            if (!this._qeEntryId) return;
+            const entry = this._tl?.entries.find(e => e.id === this._qeEntryId);
+            if (!entry) return;
+            entry.hardCut = !entry.hardCut;
+            this._setDirty();
+            // Re-derive playback so the change takes effect at the next transition.
+            this._rescheduleIfPlaying();
+            if (!this._playing) this._scrubTo(this._currentTime);
+            this._renderStrip();
+            this._syncHardCutToggle(entry.hardCut);
+        });
 
         this._meApply.addEventListener('click', () => this._applyMarkerEdit());
         this._meCancel.addEventListener('click', () => this._closeMarkerEdit());
@@ -1331,13 +1346,17 @@ export class TimelineEditor {
 
     _renderBlocksIntoTrack(entries, trackEl) {
         const sorted = [...entries].sort((a, b) => (a.startTime ?? 0) - (b.startTime ?? 0));
+        let prevEnd = -Infinity;   // mirrors _playZone's lastEnd — overlap = prevEnd - st
         for (const entry of sorted) {
-            const block = this._createBlockEl(entry, entry.startTime ?? 0, trackEl);
+            const st = entry.startTime ?? 0;
+            const overlap = Math.max(0, prevEnd - st);
+            const block = this._createBlockEl(entry, st, trackEl, overlap);
             trackEl.appendChild(block);
+            prevEnd = Math.max(prevEnd, st + entry.duration);
         }
     }
 
-    _createBlockEl(entry, startTime, trackEl) {
+    _createBlockEl(entry, startTime, trackEl, overlap = 0) {
         const left  = startTime * this._pxPerSec;
         const width = entry.duration * this._pxPerSec;
         const color = entry.color || colorFor(entry.presetName);
@@ -1353,11 +1372,22 @@ export class TimelineEditor {
 
         if (this._selectedId === entry.id) block.classList.add('selected');
 
-        if (entry.blendTime > 0) {
-            const blend = document.createElement('div');
-            blend.className = 'tl-block-blend';
-            blend.style.width = `${Math.min(entry.blendTime * this._pxPerSec, width * 0.4)}px`;
-            block.appendChild(blend);
+        // Transition-in indicator: a hard-cut tick, or a blend wedge sized to the
+        // effective crossfade — overlap width floored at blendTime (Phase 4.6).
+        if (entry.hardCut) {
+            const cut = document.createElement('div');
+            cut.className = 'tl-block-cut';
+            cut.title = 'Hard cut — instant switch';
+            block.appendChild(cut);
+        } else {
+            const crossfade = Math.max(entry.blendTime || 0, overlap);
+            if (crossfade > 0) {
+                const blend = document.createElement('div');
+                blend.className = 'tl-block-blend';
+                if (overlap > 0) blend.classList.add('is-overlap');
+                blend.style.width = `${Math.min(crossfade * this._pxPerSec, width)}px`;
+                block.appendChild(blend);
+            }
         }
 
         // Menu icon — left side; opens/closes quick-edit modal
@@ -1608,9 +1638,10 @@ export class TimelineEditor {
         this._qeEntryId        = id;
         this._qeTitle.textContent = displayName(entry.presetName);
         this._qeSwatch.style.background = entry.color || colorFor(entry.presetName);
+        this._syncHardCutToggle(entry.hardCut);
 
         const rect = anchorEl.getBoundingClientRect();
-        const popW = 260, popH = 110;
+        const popW = 260, popH = 156;
         let left = rect.left;
         let top  = rect.top - popH - 8;
         if (top < 10) top = rect.bottom + 8;
@@ -1626,6 +1657,11 @@ export class TimelineEditor {
         this._quickEditEl.hidden = true;
         this._qeEntryId = null;
         document.querySelectorAll('.tl-block-menu-btn.is-active').forEach(el => el.classList.remove('is-active'));
+    }
+
+    _syncHardCutToggle(on) {
+        this._qeHardCut.setAttribute('aria-checked', on ? 'true' : 'false');
+        this._qeHardCut.classList.toggle('is-on', !!on);
     }
 
     // ─── Block colour picker ──────────────────────────────────────────────────
@@ -1803,38 +1839,45 @@ export class TimelineEditor {
 
         const timers = [];
 
-        // Load the entry active right now (if any) instantly, then skip it in
-        // the scheduling loop below so it isn't loaded a second time.
+        // Find the entry active right now (if any). When entries overlap, the
+        // LAST (latest-starting) one containing fromTime wins — in an overlap the
+        // incoming block is the active one, not the outgoing. It's loaded instantly
+        // here, then skipped in the scheduling loop so it isn't loaded twice.
         let immediateEntryId = null;
+        let immediateIdx     = -1;
         for (let i = 0; i < entries.length; i++) {
             const entry = entries[i];
             const st = entry.startTime ?? 0;
             if (st <= fromTime && fromTime < st + entry.duration) {
                 immediateEntryId = entry.id;
-                if (this._cueZoneId !== zoneId) {
-                    // Skip loadPreset if this preset is already showing (live-edit reschedule).
-                    // Always lift the cover — play() may have just covered everything to black.
-                    if (this._currentZonePreset.get(zoneId) !== entry.presetName) {
-                        zd.engine.loadPreset(entry.presetName, blend).catch(() => {});
-                    }
-                    this._fadeZoneCover(zoneId, 0, 0);  // instant reveal (scrub/seek)
-                    this._currentZonePreset.set(zoneId, entry.presetName);
+                immediateIdx     = i;
+            }
+        }
+        if (immediateIdx !== -1) {
+            const entry = entries[immediateIdx];
+            const st    = entry.startTime ?? 0;
+            if (this._cueZoneId !== zoneId) {
+                // Skip loadPreset if this preset is already showing (live-edit reschedule).
+                // Always lift the cover — play() may have just covered everything to black.
+                if (this._currentZonePreset.get(zoneId) !== entry.presetName) {
+                    zd.engine.loadPreset(entry.presetName, blend).catch(() => {});
                 }
+                this._fadeZoneCover(zoneId, 0, 0);  // instant reveal (scrub/seek)
+                this._currentZonePreset.set(zoneId, entry.presetName);
+            }
 
-                // Schedule fade-out at end of this entry if there's a gap after it
-                const entryEnd  = st + entry.duration;
-                const next      = entries[i + 1];
-                const nextStart = next ? (next.startTime ?? 0) : Infinity;
-                if (shouldBlackout && entryEnd < nextStart) {
-                    const fadeDur  = Math.min(entry.blendTime, entry.duration);
-                    const fadeStart = entryEnd - fadeDur;
-                    const fadeDelay = Math.max(0, (fadeStart - fromTime) * 1000);
-                    timers.push(setTimeout(() => {
-                        if (!this._playing) return;
-                        this._fadeZoneCover(zoneId, 1, fadeDur);  // fade to black
-                    }, fadeDelay));
-                }
-                break;
+            // Schedule fade-out at end of this entry if there's a gap after it
+            const entryEnd  = st + entry.duration;
+            const next      = entries[immediateIdx + 1];
+            const nextStart = next ? (next.startTime ?? 0) : Infinity;
+            if (shouldBlackout && entryEnd < nextStart) {
+                const fadeDur  = Math.min(entry.blendTime, entry.duration);
+                const fadeStart = entryEnd - fadeDur;
+                const fadeDelay = Math.max(0, (fadeStart - fromTime) * 1000);
+                timers.push(setTimeout(() => {
+                    if (!this._playing) return;
+                    this._fadeZoneCover(zoneId, 1, fadeDur);  // fade to black
+                }, fadeDelay));
             }
         }
 
@@ -1868,7 +1911,16 @@ export class TimelineEditor {
 
             // Determine if there's a gap before this entry
             const hasGapBefore = st > lastEnd + 0.01;
-            const fadeDurIn    = hasGapBefore ? entry.blendTime : 0;
+            // Crossfade INTO this block (Phase 4.6):
+            //   hardCut       → 0 (instant cut)
+            //   overlaps prev → overlap width, floored at blendTime (overlap only extends)
+            //   adjacent      → blendTime default
+            // overlap is read off the skip-safe lastEnd tracker — never entries[i-1].
+            const overlap   = Math.max(0, lastEnd - st);
+            const crossfade = entry.hardCut
+                ? 0
+                : Math.min(entry.duration, Math.max(entry.blendTime, overlap));
+            const fadeDurIn = hasGapBefore ? (entry.hardCut ? 0 : entry.blendTime) : 0;
             const fadeInDelay  = Math.max(0, (st - fadeDurIn - fromTime) * 1000);
             const delay        = (st - fromTime) * 1000;
 
@@ -1887,12 +1939,14 @@ export class TimelineEditor {
                     });
                 }, fadeInDelay));
             } else {
-                // Consecutive block — cover stays transparent, Butterchurn's internal
-                // blend handles the visual crossfade.
+                // Consecutive / overlapping block — cover stays transparent,
+                // Butterchurn's internal blend handles the visual crossfade.
+                // Duration is `crossfade`: overlap width (floored at blendTime),
+                // or 0 when this block is a hard cut.
                 timers.push(setTimeout(() => {
                     if (!this._playing) return;
                     this._fadeZoneCover(zoneId, 0, 0);
-                    zd.engine.loadPreset(entry.presetName, entry.blendTime).catch(() => {});
+                    zd.engine.loadPreset(entry.presetName, crossfade).catch(() => {});
                     this._currentZonePreset.set(zoneId, entry.presetName);
                 }, delay));
             }
@@ -2067,12 +2121,13 @@ export class TimelineEditor {
                     const entries = this._tl.entries.filter(e => e.zoneId === zone.id)
                                                     .sort((a, b) => (a.startTime || 0) - (b.startTime || 0));
                     
+                    // Last (latest-starting) entry containing t wins — in an
+                    // overlap region the incoming block is the active one.
                     let activeEntry = null;
                     for (const e of entries) {
                         const start = e.startTime || 0;
                         if (t >= start && t < start + e.duration) {
                             activeEntry = e;
-                            break;
                         }
                     }
 

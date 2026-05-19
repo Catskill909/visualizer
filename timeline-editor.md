@@ -2,7 +2,7 @@
 
 **Architecture:** Standalone page (`/timeline.html`) — self-contained MPA entry in Vite.
 **Completed-phase detail:** lives in **[timeline-editor-archive.md](timeline-editor-archive.md)** — this doc keeps only a one-line index of shipped work.
-**Last updated:** 2026-05-18 — Block colour picker shipped (16-colour palette, 4×4 popover off the menu swatch — Phase 4.4-D). Block menu is a pure action menu (Phase 4.4-C — Duration/Blend/Label removed; header + Duplicate/Delete). Roadmap #1 revised — **markers are the only looper**; the per-block Loop toggle is cut. "Playhead is the truth" bug fixed. See the Status Dashboard.
+**Last updated:** 2026-05-19 — Phase 4.6 (Overlap Crossfade) shipped. Crossfade into a block = `hardCut ? 0 : min(duration, max(blendTime, overlapWidth))`: adjacent blocks keep the 2s default, dragging an overlap extends the blend, and a per-block **Hard Cut** toggle in the block menu forces an instant switch. Follow-up fix: scrubbing into an overlap now activates the incoming block (the immediate-entry lookup picks the latest-starting match). Block colour picker shipped (Phase 4.4-D). Block menu is a pure action menu (Phase 4.4-C) plus the Hard Cut toggle. See the Status Dashboard.
 
 ---
 
@@ -15,7 +15,6 @@
 | Mark | Meaning |
 |------|---------|
 | ✅ | Shipped — full detail in the archive |
-| 🚧 | Partially shipped — some sub-phases still open |
 | ⬜ | Planned — not started |
 | 🔬 | Research |
 
@@ -23,6 +22,7 @@
 
 | Phase | What | Date |
 |-------|------|------|
+| 4.6 | Overlap Crossfade — overlap width drives the crossfade duration (floored at the 2s `blendTime` default); per-block **Hard Cut** toggle for instant switches | 2026-05-19 |
 | 1 | Loop — Marker Region Looping **complete** — draggable loop regions (band + end handle + track tint), region-aware playback, 1s crossfade on the loop wrap | 2026-05-18 |
 | 1 Stage 2 | Loop regions — set a marker to Loop → draggable loop region (band + end handle + track tint); playback wraps the region (no longer restarts from 0:00) | 2026-05-18 |
 | 1 Stage 1 | Marker hygiene — `M`-key placement (ruler is playhead-only), dedicated marker lane, playhead-scrub bug fixed, `stop`-action crash fixed, duplicate hot-cue handler removed | 2026-05-18 |
@@ -40,22 +40,13 @@
 
 | # | Phase | What it adds |
 |---|-------|--------------|
-| 2 | 4.6 — Overlap Crossfade | Overlap width between blocks drives the crossfade duration directly |
-| 3 | 4.7 — Undo/Redo | `Ctrl+Z` for the 3 destructive gestures: drag, delete, resize |
-| 4 | 4.9 — Zone Stack | Layered compositing — zone opacity + blend-mode popover, overlay layout |
-| 5 | 4.11 — Staging Mode | Safe overlay editing; changes commit on the next block boundary |
-| 6 | 4.12 — Timeline Sets Switching | Queued set switching + My Sets panel (replaces the topbar dropdown) |
-| 7 | 4.13 — Set Export / Import | Portable `.dcset.json` bundles — full show + presets + images |
-| 8 | 4.4-D — Block menu utilities | Full Edit → deep-link into Preset Studio *(4.4-C menu redesign + the block colour picker both shipped)* |
-| 9 | Phase 5 — Multi-monitor output 🔬 | Route each zone to a separate physical display (research phase) |
-
-### 🚧 Partially Complete — looks done, isn't
-
-| Phase | Shipped portion | Still open |
-|-------|-----------------|-----------|
-| 3.5 — Active Playhead | Playhead, click-to-seek, automated crossfades | Loop/Loop Solo buttons → **Roadmap #1** |
-| 4.4 — Block Settings Menu | A (action modal), B (menu icon), C (redesign), D-colour (picker) | D — Full Edit deep-link → **Roadmap #8**; live-mixing controls → **Backlog: Performance Panel** |
-| 4.10 — Live Editing | A (core mutation reschedule) | B (loop state preservation) → ships with **Roadmap #1** |
+| 2 | 4.7 — Undo/Redo | `Ctrl+Z` for the 3 destructive gestures: drag, delete, resize |
+| 3 | 4.9 — Zone Stack | Layered compositing — zone opacity + blend-mode popover, overlay layout |
+| 4 | 4.11 — Staging Mode | Safe overlay editing; changes commit on the next block boundary |
+| 5 | 4.12 — Timeline Sets Switching | Queued set switching + My Sets panel (replaces the topbar dropdown) |
+| 6 | 4.13 — Set Export / Import | Portable `.dcset.json` bundles — full show + presets + images |
+| 7 | 4.4-D — Block menu utilities | Full Edit → deep-link into Preset Studio *(4.4-C menu redesign + the block colour picker both shipped)* |
+| 8 | Phase 5 — Multi-monitor output 🔬 | Route each zone to a separate physical display (research phase) |
 
 ---
 
@@ -67,7 +58,7 @@
 - **When a phase ships:**
   1. Move its detail into the archive file.
   2. Add a row to *Recently Shipped* and to *Completed Phases — Index*.
-  3. Remove its row from *Up Next* (and from *Partially Complete* if fully done).
+  3. Remove its row from *Up Next*.
   4. Update *Current State — What's Built*.
 - **After every code change**, update this doc (project rule — see CLAUDE.md).
 
@@ -267,15 +258,26 @@ Distinct from Phase 4.6 (overlap crossfade between consecutive blocks) — 1-C i
 
 ---
 
-### 2 · Phase 4.6 — Overlap-driven Crossfade Timing ⬜
+### 2 · Phase 4.6 — Overlap-driven Crossfade Timing ✅ (shipped 2026-05-19)
 
-Overlap between blocks is already visual and functional. The gap: the crossfade fires on the stored `blendTime` value regardless of how long the overlap actually is. The fix is to use the overlap duration as the fade duration instead.
+**The crossfade into a block is now one rule:** `crossfade = hardCut ? 0 : min(duration, max(blendTime, overlapWidth))`.
 
-**Current behavior:** block B starts at its `startTime`, crossfade duration = `entry.blendTime` (fixed).
+| Placement | Crossfade into the block |
+|---|---|
+| **Hard Cut** toggled on | `0` — instant switch |
+| **Overlaps** the previous block | overlap width — floored at `blendTime` (overlap only ever *extends* the blend, never shortens it) |
+| **Adjacent** / dropped normally | `blendTime` default (2s) — no editing needed |
+| **Gap before** the block | unchanged — fade-from-black over `blendTime` (hard cut makes it an instant snap-on) |
 
-**Target behavior:** crossfade duration = actual overlap length (`prevEntry.startTime + prevEntry.duration - nextEntry.startTime`). Drag the overlap wider = longer blend. Drag narrower = snappier cut. Out of the box, intuitive — no numeric field needed for most cases. `blendTime` remains as a fine-tune override.
+**Why a floor and not raw overlap:** dropping a preset on the fly should "just blend" without editing — the 2s default covers that. Dragging an overlap is the gesture to make a blend *longer*; to make it *shorter than 2s* (a cut), use the Hard Cut toggle, not a thin overlap.
 
-**Technical path:** in `_playZone`, when scheduling a future entry, detect overlap with the previous entry and substitute overlap duration for `blendTime`. One calculation, no new data model fields.
+**Implementation:**
+- `_playZone` — the consecutive/overlap branch computes `crossfade` from `overlap = lastEnd - st` (read off the skip-safe `lastEnd` tracker, never `entries[i-1]`) and passes it to `loadPreset`. The gap branch zeroes `fadeDurIn` when `hardCut` is set.
+- `TimelineEntry` gained a `hardCut: boolean` field (default `false`). Absent on pre-4.6 entries → falsy → treated as `false`; no migration needed.
+- Block menu — a **Hard Cut** toggle (instant, no Apply; reschedules playback live). The menu stays a no-form action menu.
+- Strip render — the `.tl-block-blend` wedge is sized to the *effective* crossfade and gets an `.is-overlap` style when overlap-driven; a hard-cut block draws a red `.tl-block-cut` tick instead.
+
+**Scrubbing into an overlap (fixed 2026-05-19).** Both immediate-entry lookups (`_playZone` and the stopped-state branch of `_scrubTo`) now pick the **last** (latest-starting) entry containing the playhead, not the first. Previously the earlier block won, so the incoming block was never scheduled and the outgoing block played on forever. Now parking the playhead inside an overlap snaps to — and plays forward from — the incoming block. The crossfade itself does not *animate* from a mid-overlap park (scrub is an instant preview gesture); to watch the blend, start just before the incoming block's `startTime`.
 
 ---
 
@@ -694,6 +696,8 @@ Phases 4.4-A, 4.4-B, 4.4-C, and the colour picker shipped (see archive). The blo
 
 **Phase 4.4-C — shipped 2026-05-17.** Built first as an authoring redesign (Duration removed, Blend stepper, zoned layout), then revised the same day: Blend removed (overlap drives blend — Phase 4.6) and Label removed (`entry.label` was never rendered). With no settings left, Apply/Cancel and the settings zone were dropped — the menu is now a pure action menu. Looping is not here either: markers are the only looper (Roadmap #1).
 
+**Hard Cut toggle — shipped 2026-05-19 (Phase 4.6).** The block menu gained one control: a **Hard Cut** switch (`#qe-hardcut`). It is an *instant toggle* — flips `entry.hardCut`, reschedules playback, no Apply — so the menu stays a no-form action menu. When on, the block enters with an instant cut instead of a crossfade.
+
 **Moved out — the old Phase 4.4-E.** Re-targeting the full `controls.js` panel to a zone's slave engine is *live mixing*, not authoring. It lives in the deferred **Performance Panel** (see Backlog). The block menu never holds live-mixing controls.
 
 ---
@@ -741,7 +745,7 @@ One line each. Full implementation detail, post-ship fixes, and edge-case notes 
 | 1 | Single-zone editor — CRUD, DOM strip, preset picker, transport, advancing playhead |
 | 2 | Multi-zone compositor — slave engines, 6 zone layouts, per-zone strip rows |
 | 3 | UX polish — position-based dragging, inline block actions, always-visible controls, fullscreen button |
-| 3.5 | Active Playhead — click-to-seek, persistent position, automated gap crossfades *(Loop buttons → Roadmap #1)* |
+| 3.5 | Active Playhead — click-to-seek, persistent position, automated gap crossfades. Loop buttons were cut (markers are the only looper) — phase fully complete |
 | 4.1 | VJ Markers — ruler cue points + 1–9 hot-cue keys, `stop`/`loop` marker actions |
 | 4.2 | Transport & Seeking — go-to-start, skip-to-next, VJ-mode stop (visuals keep running) |
 | 4.3 | Quick Wins — keyboard nudge, drag-scrub on ruler, block navigation arrows |
@@ -749,8 +753,9 @@ One line each. Full implementation detail, post-ship fixes, and edge-case notes 
 | 4.4-B | Block Menu Icon — hamburger toggle, single-click select, double-click cue, no auto-dismiss |
 | 4.4-C | Block Menu Redesign — reduced to a pure action menu: glassmorphic header (color dot + preset name) + Duplicate/Delete. Duration removed (drag-only), Blend removed (overlap drives it — Phase 4.6), Label removed (never rendered). No settings, no Apply/Cancel |
 | 4.5 | Double-click to Cue — crossfade into the cued preset + seek timeline to its `startTime` |
+| 4.6 | Overlap Crossfade — `crossfade = hardCut ? 0 : min(duration, max(blendTime, overlapWidth))`; per-block Hard Cut toggle in the block menu |
 | 4.8 | Preset Palette Opacity — MilkDrop background-layer opacity slider (prereq for Zone Stack) |
-| 4.10-A | Real-time Live Editing — `_rescheduleIfPlaying()` rebuilds timers after any mutation |
+| 4.10 | Real-time Live Editing — `_rescheduleIfPlaying()` rebuilds timers after any mutation. 4.10-B (loop-state preservation) made obsolete by the marker-loop redesign — phase fully complete |
 | 1 (Roadmap) | Loop — Marker Region Looping — `M`-key marker placement, dedicated marker lane, draggable loop regions (band + end handle + tint), region-aware playback with a 1s wrap crossfade. Markers are the only looper. |
 
 ---
@@ -766,7 +771,7 @@ Per-zone Solo and Mute, mixer-style. **Decided home: the zone-row label column**
 - Acts on the **zone** (the channel), never a single block — soloing one block makes no sense as a live gesture.
 - Live state is **ephemeral** — never saved in the Timeline Set, consistent with "a Set does not contain the playhead position."
 - Ships **independently of the Performance Panel** — it needs no overlay, just two small buttons in a column that already exists. Promotable to the Roadmap whenever core work allows.
-- Open: interaction with the Zone Stack (Roadmap #4) compositing — Solo behavior while zones are layered.
+- Open: interaction with the Zone Stack (Roadmap #3) compositing — Solo behavior while zones are layered.
 
 ### ⭐ Performance Panel — per-zone controls overlay *(reframed 2026-05-17 — supersedes the "Orchestration Console")*
 
@@ -838,7 +843,7 @@ Same design language as the rest of the app: full-screen canvas, glassmorphic ov
 
 ## Current State — What's Built and Shipped
 
-Phases 1 through 4.3, 4.4-A, 4.4-B, 4.5, 4.8, and 4.10-A are fully working. Here's an accurate picture of the running code:
+Phases 1 through 4.3, 4.4-A/B/C/D, 4.5, 4.6, 4.8, 4.10-A, and Roadmap #1 (Loop) are fully working. Here's an accurate picture of the running code:
 
 ### Entry point
 `timeline.html` → `src/timeline/main.js` → `TimelineEditor` class in `src/timeline/timelineEditor.js`
@@ -867,10 +872,17 @@ Phases 1 through 4.3, 4.4-A, 4.4-B, 4.5, 4.8, and 4.10-A are fully working. Here
 - Ruler click-to-seek restarts all zone chains from the clicked time
 
 ### Strip rendering
-- Blocks positioned at `entry.startTime * pxPerSec` px — free placement, gaps allowed
+- Blocks positioned at `entry.startTime * pxPerSec` px — free placement, gaps and overlaps allowed
 - Blocks are draggable to any time position (drag body moves the block, updates `entry.startTime` on drop)
 - Drag resize right edge → updates `entry.duration`
+- Each block draws a transition-in indicator: a `.tl-block-blend` wedge sized to the effective crossfade (`.is-overlap` style when overlap-driven), or a red `.tl-block-cut` tick when `hardCut` is set
 - Zone rows stack vertically; height driven by JS setting `--strip-h` CSS var
+
+### Overlap crossfade (Phase 4.6, complete)
+- `_playZone` consecutive/overlap branch: `crossfade = hardCut ? 0 : min(duration, max(blendTime, overlap))`, where `overlap = lastEnd - startTime`
+- Passed to `loadPreset` so Butterchurn blends across exactly the overlap region; adjacent blocks fall back to the 2s `blendTime` default
+- `hardCut` (per-block boolean) — toggled in the block menu; also zeroes the gap fade-in so a post-gap hard-cut block snaps on from black
+- Immediate-entry lookup (`_playZone` + stopped `_scrubTo`) picks the **last** entry containing the playhead, so scrubbing into an overlap activates the incoming block
 
 ### Real-time live editing (Phase 4.10-A, complete)
 - Any mutation while playing — drag, resize, quick-edit apply, duplicate, delete, add — immediately rescheduled via `_rescheduleIfPlaying()` → `_scrubTo(tNow)`
@@ -883,6 +895,7 @@ Phases 1 through 4.3, 4.4-A, 4.4-B, 4.5, 4.8, and 4.10-A are fully working. Here
 - **Single-click block body** → visual select only (highlights block)
 - **Double-click block body** → `_cueEntry`: crossfades from currently-playing preset into the cued preset and seeks the timeline to that block's `startTime`. Native `dblclick` event — no timing hack.
 - **Click `.tl-block-menu-btn` (hamburger icon, left side)** → toggles `#tl-quick-edit` modal for that block. Icon glows in the block's color when open, muted when closed.
+- **Block menu contents** → header (colour swatch + name), a **Hard Cut** toggle (Phase 4.6), and Duplicate / Delete
 - **Drag** only activates after > 4px movement (`_startMoveDrag` threshold); clean click/dblclick routes through normally
 - Hover icon row removed. Right-click context menu no longer triggered from blocks. Timing-based double-click detection removed.
 
@@ -1051,7 +1064,8 @@ Current behavior (Phase 3+): `startTime` is stored and is the actual seconds-fro
   presetName: string,   // "Preset Name" or "custom:<id>:Name"
   startTime: number,    // STORED — absolute seconds from t=0 (block's left position)
   duration: number,     // whole seconds (5–600)
-  blendTime: number,    // blend-in seconds (0–10, default 2)
+  blendTime: number,    // default/floor crossfade in seconds (0–10, default 2)
+  hardCut: boolean,     // true → block enters with an instant cut, no crossfade (Phase 4.6)
   label: string | null, // optional text overlay — stored but overlay rendering not yet built
   color: string | null, // block color override; auto-assigned from preset name hash if null
 }

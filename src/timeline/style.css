@@ -632,7 +632,7 @@ body.tl-fullscreen #tl-canvas-container { cursor: pointer; }
 }
 .tl-block:hover:not(.selected) { border-color: rgba(255,255,255,0.2); }
 
-/* Blend-in hatch indicator on left edge */
+/* Blend-in hatch indicator on left edge — width = effective crossfade */
 .tl-block-blend {
   position: absolute;
   left: 0; top: 0; bottom: 0;
@@ -643,6 +643,27 @@ body.tl-fullscreen #tl-canvas-container { cursor: pointer; }
     rgba(0,0,0,0.5) 0px, rgba(0,0,0,0.5) 2px,
     transparent 2px, transparent 6px
   );
+}
+/* Overlap-driven crossfade — brighter, with a gradient ramp so it reads as a
+   crossfade region rather than a fixed default blend. */
+.tl-block-blend.is-overlap {
+  opacity: 0.4;
+  background-image:
+    linear-gradient(to right, rgba(255,255,255,0.28), transparent),
+    repeating-linear-gradient(
+      -45deg,
+      rgba(0,0,0,0.5) 0px, rgba(0,0,0,0.5) 2px,
+      transparent 2px, transparent 6px
+    );
+}
+/* Hard-cut marker — sharp tick on the left edge, no blend */
+.tl-block-cut {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  pointer-events: none;
+  background: #ff5a5a;
+  box-shadow: 0 0 5px rgba(255,90,90,0.7);
 }
 
 /* Menu icon — left edge, opens/closes quick-edit modal */
@@ -721,6 +742,44 @@ body.tl-fullscreen #tl-canvas-container { cursor: pointer; }
   font-size: 11.5px;
   padding: 6px 8px;
 }
+
+/* ─── Quick-edit hard-cut toggle ─── */
+.qe-toggle-row {
+  margin-bottom: 12px;
+}
+.qe-toggle {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%;
+  padding: 7px 9px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-s);
+  cursor: pointer;
+}
+.qe-toggle:hover { border-color: var(--border-hi); }
+.qe-toggle-label {
+  font: 600 12px var(--font);
+  color: var(--text-2);
+}
+.qe-toggle.is-on .qe-toggle-label { color: var(--text); }
+.qe-toggle-track {
+  position: relative;
+  width: 34px; height: 18px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  background: var(--bg-4, rgba(255,255,255,0.12));
+  transition: background 0.14s;
+}
+.qe-toggle.is-on .qe-toggle-track { background: #ff5a5a; }
+.qe-toggle-knob {
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.14s;
+}
+.qe-toggle.is-on .qe-toggle-knob { transform: translateX(16px); }
 
 /* Playhead */
 #tl-playhead {
