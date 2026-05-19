@@ -22,6 +22,8 @@
 
 | Phase | What | Date |
 |-------|------|------|
+| 4.14-A | Transition Styles — per-block transition picker in the block menu: **Fade** (crossfade) · **Black** · **White** · **Cut**. `entry.hardCut` boolean generalised to `entry.transition` enum; `_playZone` routes on it; `fade-black`/`fade-white` dip through colour centred on the block start. Wipes (4.14-B) still pending. | 2026-05-19 |
+| — | Drag runway + edge auto-scroll — resizing or moving a block past the visible strip now works in one continuous gesture: the strip auto-scrolls when the pointer nears either edge and the inner width grows ahead of the drag. No more drag-release-scroll-regrab to stretch a 30s block to 3:00. | 2026-05-19 |
 | 4.6 | Overlap Crossfade — overlap width drives the crossfade duration (floored at the 2s `blendTime` default); per-block **Hard Cut** toggle for instant switches | 2026-05-19 |
 | 1 | Loop — Marker Region Looping **complete** — draggable loop regions (band + end handle + track tint), region-aware playback, 1s crossfade on the loop wrap | 2026-05-18 |
 | 1 Stage 2 | Loop regions — set a marker to Loop → draggable loop region (band + end handle + track tint); playback wraps the region (no longer restarts from 0:00) | 2026-05-18 |
@@ -40,13 +42,14 @@
 
 | # | Phase | What it adds |
 |---|-------|--------------|
-| 2 | 4.7 — Undo/Redo | `Ctrl+Z` for the 3 destructive gestures: drag, delete, resize |
-| 3 | 4.9 — Zone Stack | Layered compositing — zone opacity + blend-mode popover, overlay layout |
-| 4 | 4.11 — Staging Mode | Safe overlay editing; changes commit on the next block boundary |
-| 5 | 4.12 — Timeline Sets Switching | Queued set switching + My Sets panel (replaces the topbar dropdown) |
-| 6 | 4.13 — Set Export / Import | Portable `.dcset.json` bundles — full show + presets + images |
-| 7 | 4.4-D — Block menu utilities | Full Edit → deep-link into Preset Studio *(4.4-C menu redesign + the block colour picker both shipped)* |
-| 8 | Phase 5 — Multi-monitor output 🔬 | Route each zone to a separate physical display (research phase) |
+| 3 | 4.14-B — Transition Wipes | Directional `wipe-left/right/up/down` transitions *(4.14-A — colour fades — shipped 2026-05-19)* |
+| 4 | 4.9 — Zone Stack | Layered compositing — zone opacity + blend-mode popover, overlay layout |
+| 5 | 4.11 — Staging Mode | Safe overlay editing; changes commit on the next block boundary |
+| 6 | 4.12 — Timeline Sets Switching | Queued set switching + My Sets panel (replaces the topbar dropdown) |
+| 7 | 4.13 — Set Export / Import | Portable `.dcset.json` bundles — full show + presets + images |
+| 8 | 4.4-D — Block menu utilities | Full Edit → deep-link into Preset Studio *(4.4-C menu redesign + the block colour picker both shipped)* |
+| 9 | Phase 5 — Multi-monitor output 🔬 | Route each zone to a separate physical display (research phase) |
+| 10 | 4.7 — Undo/Redo | `Ctrl+Z` for drag/delete/resize — **deferred** to the end: build it once the feature set is stable, not mid-stream |
 
 ---
 
@@ -281,19 +284,60 @@ Distinct from Phase 4.6 (overlap crossfade between consecutive blocks) — 1-C i
 
 ---
 
-### 3 · Phase 4.7 — Undo/Redo ⬜
+### 3 · Phase 4.14 — Transition Styles ⬜
 
-Accidentally dragging a block, deleting it, or resizing it has no recovery today. Minimum viable scope: a command stack for the three most destructive gestures.
+> **4.14-A shipped 2026-05-19 — colour fades.** The block menu's Hard Cut toggle is now a four-way **Transition** segmented control: Fade (crossfade) · Black · White · Cut. `entry.hardCut` (boolean) was generalised to `entry.transition` (enum); `transitionOf(entry)` falls back to the old boolean for legacy entries so unsaved old sets still play right. `_playZone` routes on the transition: `cut` snaps, `crossfade` uses Butterchurn's internal blend, `fade-black`/`fade-white` dip the zone cover through that colour centred on the block start (`_fadeZoneCover` gained a white cover variant). The strip draws a per-transition glyph (`.tl-block-cut` tick / `.tl-block-fade` wedge / `.tl-block-blend` hatch). The selected segment uses a neutral dark grey (`#4a4a4f`) — *not* an accent colour; purple clashed with the visualizer canvas behind the popover. **4.14-B (wipes) is the remaining work** — see the Up Next table.
 
-| Action | What's undone |
-|--------|--------------|
-| Drag (position change) | Restores `entry.startTime` to pre-drag value |
-| Delete block | Re-inserts entry at its original position |
-| Resize (duration change) | Restores `entry.duration` to pre-resize value |
+**The ask:** every block enters with the same transition today. The only choice is the binary **Hard Cut** toggle (cut vs. crossfade). A VJ wants to pick the *style* of each transition — crossfade, fade through black, fade through white, or a hard cut.
 
-**Not in scope (v1):** undo for timeline-level operations (delete whole timeline, change zone layout) — those have confirm dialogs already. Not in scope: multi-level redo. Single-level `Ctrl+Z` / `Cmd+Z` covers the real workflow pain.
+#### Audit — what exists today
 
-**Technical approach:** before each mutation, push a snapshot `{ type, entryId, before }` onto a stack in `TimelineEditor`. `_handleUndo()` pops the top entry and applies the inverse. No external library needed — the data model is simple enough for manual snapshots.
+| Piece | Current state |
+|---|---|
+| Data | `entry.hardCut: boolean` — the only transition control |
+| Engine | `_fadeZoneCover(zoneId, opacity, durationSec, style)` — the `style` param already exists; only `'fade-black'` and `'cut'` are implemented. The JSDoc already lists `'fade-white'`, `'flash'`, `'dip-to-black'` as "future." |
+| Scheduling | `_playZone` branches on `hardCut` + gap/overlap — gap → fade-from-black, adjacent/overlap → Butterchurn internal crossfade |
+| UI | One **Hard Cut** toggle in the block menu (`#qe-hardcut`, a `role="switch"`) |
+| Strip | `.tl-block-cut` red tick (hard cut) or `.tl-block-blend` wedge (crossfade) |
+
+The cover is a single black `<div>` per zone, opacity-animated. Everything needed for colour fades is already in place — this phase mostly *exposes* it.
+
+#### Design — replace the boolean, don't add a setting
+
+`entry.hardCut` (boolean) becomes `entry.transition` (string enum). This keeps the block menu's control **count unchanged** — no setting-creep. Cut survives as one option in the enum, so nothing is lost.
+
+**4.14-A — Colour transitions (this phase):**
+
+| `transition` | Behaviour |
+|---|---|
+| `crossfade` *(default)* | Butterchurn internal blend over `blendTime` — today's adjacent-block behaviour |
+| `cut` | Instant switch — exactly today's Hard Cut |
+| `fade-black` | Outgoing fades to black, incoming fades up from black, over `blendTime` |
+| `fade-white` | Same, through white — needs a white cover variant |
+
+**4.14-B — Wipes (follow-up, NOT this phase):** `wipe-left/right/up/down` — a directional `clip-path` reveal on the cover. Deferred because wipes need geometry plus a direction sub-control; bundling them would risk the contained colour-fade work.
+
+#### UI — the block menu
+
+The Hard Cut toggle row becomes a **Transition** segmented control: four small buttons — Crossfade · Black · White · Cut — one tap each, instant, no Apply (the same live-reschedule behaviour the toggle has now). A segmented row reads at a glance and fits the "pure action menu" philosophy better than a dropdown. Net controls in the menu: one row out, one row in — unchanged.
+
+#### Migration
+
+`hardCut:true` → `transition:'cut'`; `hardCut:false`/absent → `transition:'crossfade'`. Done in `timelineStorage.js` load-normalize; `createEntry` defaults `transition:'crossfade'`. The `hardCut` field is dropped.
+
+#### Touch points
+
+- `timelineStorage.js` — `createEntry` field + load-normalize migration; remove `hardCut`
+- `_playZone` — route on `entry.transition` instead of `hardCut`; `fade-black`/`fade-white` select the cover colour
+- `_fadeZoneCover` — implement `fade-white` (white cover variant — a CSS background swap on the cover div)
+- `timeline.html` + `style.css` — Hard Cut toggle → Transition segmented control
+- `_syncHardCutToggle` → `_syncTransitionPicker`; strip indicator gets a per-transition glyph
+
+#### Resolved — transition is placement-independent
+
+`fade-black` / `fade-white` only happen automatically across *gaps* today. **4.14 makes the transition a pure creative choice, independent of block placement** — an adjacent `fade-black` block deliberately dips to black between two touching blocks. That dip is a tool, not a glitch: it's a breath, a punctuation beat in a set. A VJ picking "Black" means "I want black here" regardless of whether a gap happens to exist.
+
+This means `_playZone` routes on `entry.transition` *first*; gap vs. adjacent only affects the default when `transition` is unset on a legacy entry. The adjacent-block branch gets wired for `fade-black`/`fade-white`, not just gaps.
 
 ---
 
@@ -736,6 +780,24 @@ Phases 4.4-A, 4.4-B, 4.4-C, and the colour picker shipped (see archive). The blo
 
 ---
 
+### 10 · Phase 4.7 — Undo/Redo ⬜
+
+> **Deprioritized 2026-05-19** — moved to the end of the roadmap. Undo/Redo is most useful once the full feature/settings surface is stable; building it mid-stream means re-touching the command stack every time a new mutating gesture lands. Build it once the feature set is in place.
+
+Accidentally dragging a block, deleting it, or resizing it has no recovery today. Minimum viable scope: a command stack for the three most destructive gestures.
+
+| Action | What's undone |
+|--------|--------------|
+| Drag (position change) | Restores `entry.startTime` to pre-drag value |
+| Delete block | Re-inserts entry at its original position |
+| Resize (duration change) | Restores `entry.duration` to pre-resize value |
+
+**Not in scope (v1):** undo for timeline-level operations (delete whole timeline, change zone layout) — those have confirm dialogs already. Not in scope: multi-level redo. Single-level `Ctrl+Z` / `Cmd+Z` covers the real workflow pain.
+
+**Technical approach:** before each mutation, push a snapshot `{ type, entryId, before }` onto a stack in `TimelineEditor`. `_handleUndo()` pops the top entry and applies the inverse. No external library needed — the data model is simple enough for manual snapshots.
+
+---
+
 ## ✅ Completed Phases — Index
 
 One line each. Full implementation detail, post-ship fixes, and edge-case notes are in **[timeline-editor-archive.md](timeline-editor-archive.md)**.
@@ -837,6 +899,7 @@ Same design language as the rest of the app: full-screen canvas, glassmorphic ov
 - ~~**`#tl-quick-edit` styling needs visual polish**~~: ✅ Partially addressed in Phase 4.4-A — Duplicate/Delete consolidated into modal with utility row. Full styling pass (Roadmap 4.4-C/D) still pending.
 - ~~**Added presets force-load onto the canvas regardless of playhead**~~: ✅ Fixed 2026-05-17 — the picker click handler used to call `loadPreset` + `_fadeZoneCover` after `addEntry`, so any block you added (or at any start time) jumped straight onto the canvas. Fix: the picker now only mutates the data model; `addEntry` / `_removeEntry` re-derive the canvas from the playhead — `_rescheduleIfPlaying()` while playing, `_scrubTo(this._currentTime)` while stopped. The playhead is the single source of truth; the canvas only ever shows what is under it, and the playhead never moves on add/remove.
 - ~~**Playhead follows the mouse with no button held**~~: ✅ Fixed 2026-05-18 — the ruler scrub set an `isScrubbing` flag cleared only on `pointerup`; when the browser swallowed the release as a `pointercancel` (gesture reinterpreted as a scroll), the flag stuck and every mouse-move scrubbed the playhead. Three-part fix across all four drag handlers (ruler scrub, marker drag, block move, block resize): (1) an `e.buttons === 0` self-heal guard ends the drag the instant no button is held; (2) `pointercancel` now runs the same cleanup as `pointerup`, with a re-entry guard; (3) `touch-action: none` on `#tl-ruler` and `.tl-marker-flag` stops the browser stealing the gesture at the source.
+- ~~**Block resize/move runs out of room past the visible strip**~~: ✅ Fixed 2026-05-19 — `_renderStrip` only gave 200px of runway past the *current* content end, and the inner width was recomputed on release, never during the drag. Stretching a 30s block to 3:00 meant drag → release → scroll → re-grab, over and over. Fix: a shared `_makeDragScroller` helper drives both block drag handlers — while the pointer nears either horizontal edge of `#tl-scroll` the strip auto-scrolls (speed scales with closeness), `_ensureRunway` grows `#tl-inner` ahead of the drag, and the drag delta is measured in *content* px (viewport movement + auto-scroll travel) so the block keeps tracking the cursor while the strip scrolls. One continuous gesture now stretches or moves a block any distance. `_renderStrip` reconciles ruler/playhead/width on release.
 - **Undo/Redo not yet implemented** — scheduled for Roadmap Phase 4.7. Until then, delete and drag are irreversible.
 
 ---

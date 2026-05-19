@@ -233,12 +233,18 @@
             <button class="qe-swatch" id="qe-swatch" type="button" title="Block colour" aria-label="Block colour"></button>
             <span class="qe-title" id="qe-title">Preset Name</span>
         </div>
-        <div class="qe-toggle-row">
-            <button id="qe-hardcut" class="qe-toggle" type="button" role="switch" aria-checked="false"
-                    title="Switch into this block with an instant cut instead of a crossfade">
-                <span class="qe-toggle-label">Hard cut</span>
-                <span class="qe-toggle-track"><span class="qe-toggle-knob"></span></span>
-            </button>
+        <div class="qe-transition-row">
+            <span class="qe-transition-label">Transition</span>
+            <div class="qe-seg" id="qe-transition" role="radiogroup" aria-label="Transition style">
+                <button type="button" class="qe-seg-btn" data-transition="crossfade" role="radio" aria-checked="true"
+                        title="Crossfade — blend the previous preset into this one">Fade</button>
+                <button type="button" class="qe-seg-btn" data-transition="fade-black" role="radio" aria-checked="false"
+                        title="Dip through black">Black</button>
+                <button type="button" class="qe-seg-btn" data-transition="fade-white" role="radio" aria-checked="false"
+                        title="Dip through white">White</button>
+                <button type="button" class="qe-seg-btn" data-transition="cut" role="radio" aria-checked="false"
+                        title="Hard cut — instant switch">Cut</button>
+            </div>
         </div>
         <div class="qe-utility">
             <button id="qe-dupe" class="tl-btn qe-util-btn" type="button">

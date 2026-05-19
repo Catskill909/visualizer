@@ -665,6 +665,19 @@ body.tl-fullscreen #tl-canvas-container { cursor: pointer; }
   background: #ff5a5a;
   box-shadow: 0 0 5px rgba(255,90,90,0.7);
 }
+/* Dip-through-colour transition — left-edge wedge, width = fade duration */
+.tl-block-fade {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  pointer-events: none;
+  opacity: 0.55;
+}
+.tl-block-fade--black {
+  background: linear-gradient(to right, rgba(0,0,0,0.9), transparent);
+}
+.tl-block-fade--white {
+  background: linear-gradient(to right, rgba(255,255,255,0.85), transparent);
+}
 
 /* Menu icon — left edge, opens/closes quick-edit modal */
 .tl-block-menu-btn {
@@ -743,43 +756,40 @@ body.tl-fullscreen #tl-canvas-container { cursor: pointer; }
   padding: 6px 8px;
 }
 
-/* ─── Quick-edit hard-cut toggle ─── */
-.qe-toggle-row {
+/* ─── Quick-edit transition picker ─── */
+.qe-transition-row {
   margin-bottom: 12px;
 }
-.qe-toggle {
-  display: flex; align-items: center; justify-content: space-between;
-  width: 100%;
-  padding: 7px 9px;
+.qe-transition-label {
+  display: block;
+  font: 600 12px var(--font);
+  color: var(--text-2);
+  margin-bottom: 6px;
+}
+.qe-seg {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
   background: var(--bg-2);
   border: 1px solid var(--border);
   border-radius: var(--r-s);
-  cursor: pointer;
 }
-.qe-toggle:hover { border-color: var(--border-hi); }
-.qe-toggle-label {
-  font: 600 12px var(--font);
+.qe-seg-btn {
+  flex: 1;
+  padding: 5px 4px;
+  font: 600 11px var(--font);
   color: var(--text-2);
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--r-s) - 2px);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
 }
-.qe-toggle.is-on .qe-toggle-label { color: var(--text); }
-.qe-toggle-track {
-  position: relative;
-  width: 34px; height: 18px;
-  flex-shrink: 0;
-  border-radius: 9px;
-  background: var(--bg-4, rgba(255,255,255,0.12));
-  transition: background 0.14s;
+.qe-seg-btn:hover { color: var(--text); }
+.qe-seg-btn.is-on {
+  background: #4a4a4f;
+  color: #fff;
 }
-.qe-toggle.is-on .qe-toggle-track { background: #ff5a5a; }
-.qe-toggle-knob {
-  position: absolute;
-  top: 2px; left: 2px;
-  width: 14px; height: 14px;
-  border-radius: 50%;
-  background: #fff;
-  transition: transform 0.14s;
-}
-.qe-toggle.is-on .qe-toggle-knob { transform: translateX(16px); }
 
 /* Playhead */
 #tl-playhead {

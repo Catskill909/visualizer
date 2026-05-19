@@ -43,6 +43,14 @@ function colorFor(name) {
     return BLOCK_COLORS[Math.abs(h) % BLOCK_COLORS.length];
 }
 
+// Transition style for an entry — how the block enters. Legacy entries (pre-4.14)
+// have no `transition` field; fall back to the old `hardCut` boolean so old sets
+// still play correctly until they are resaved.
+function transitionOf(entry) {
+    if (entry.transition) return entry.transition;
+    return entry.hardCut ? 'cut' : 'crossfade';
+}
+
 // Width of the fixed zone-label column at the left of the strip (px).
 const ZONE_COL_W = 120;
 
@@ -228,7 +236,7 @@ export class TimelineEditor {
         this._quickEditEl   = document.getElementById('tl-quick-edit');
         this._qeTitle       = document.getElementById('qe-title');
         this._qeSwatch      = document.getElementById('qe-swatch');
-        this._qeHardCut     = document.getElementById('qe-hardcut');
+        this._qeTransition  = document.getElementById('qe-transition');
         this._colorPickerEl = document.getElementById('tl-color-picker');
         this._colorGridEl   = document.getElementById('tl-color-grid');
 
@@ -368,18 +376,19 @@ export class TimelineEditor {
         });
         this._qeSwatch.addEventListener('click', () => this._toggleColorPicker());
 
-        // Hard-cut toggle — instant, no Apply (the menu stays a no-form action menu).
-        this._qeHardCut.addEventListener('click', () => {
-            if (!this._qeEntryId) return;
+        // Transition picker — instant, no Apply (the menu stays a no-form action menu).
+        this._qeTransition.addEventListener('click', ev => {
+            const btn = ev.target.closest('.qe-seg-btn');
+            if (!btn || !this._qeEntryId) return;
             const entry = this._tl?.entries.find(e => e.id === this._qeEntryId);
             if (!entry) return;
-            entry.hardCut = !entry.hardCut;
+            entry.transition = btn.dataset.transition;
             this._setDirty();
             // Re-derive playback so the change takes effect at the next transition.
             this._rescheduleIfPlaying();
             if (!this._playing) this._scrubTo(this._currentTime);
             this._renderStrip();
-            this._syncHardCutToggle(entry.hardCut);
+            this._syncTransitionPicker(entry.transition);
         });
 
         this._meApply.addEventListener('click', () => this._applyMarkerEdit());
@@ -755,16 +764,20 @@ export class TimelineEditor {
      * @param {number} opacity  — 0 (reveal canvas) or 1 (cover with black)
      * @param {number} durationSec — 0 for instant snap, >0 for animated fade
      * @param {string} style    — transition type (future extensibility hook)
-     *   'fade-black'  → default, opacity transition with black cover
+     *   'fade-black'  → default, opacity transition with a black cover
+     *   'fade-white'  → opacity transition with a white cover
      *   'cut'         → instant, ignores durationSec (always 0)
-     *   Future: 'fade-white', 'flash', 'dip-to-black', etc.
      */
     _fadeZoneCover(zoneId, opacity, durationSec = 0, style = 'fade-black') {
         const cover = this._zoneCovers.get(zoneId);
         if (!cover) return;
 
-        // Future: switch on `style` for different transition types
         if (style === 'cut') durationSec = 0;
+
+        // Cover colour follows the transition style. Safe to swap while the cover
+        // is transparent (the state between blocks) — a colour change at opacity 0
+        // is invisible; the two calls of a single transition share one style.
+        cover.style.background = style === 'fade-white' ? '#fff' : '#000';
 
         if (durationSec > 0) {
             // Set transition, force reflow, then animate
@@ -1372,13 +1385,22 @@ export class TimelineEditor {
 
         if (this._selectedId === entry.id) block.classList.add('selected');
 
-        // Transition-in indicator: a hard-cut tick, or a blend wedge sized to the
-        // effective crossfade — overlap width floored at blendTime (Phase 4.6).
-        if (entry.hardCut) {
+        // Transition-in indicator (Phase 4.14): a glyph on the block's left edge
+        // showing how it enters — hard-cut tick, dip-through-colour wedge, or a
+        // crossfade hatch sized to the effective crossfade (overlap floored at
+        // blendTime — Phase 4.6).
+        const tr = transitionOf(entry);
+        if (tr === 'cut') {
             const cut = document.createElement('div');
             cut.className = 'tl-block-cut';
             cut.title = 'Hard cut — instant switch';
             block.appendChild(cut);
+        } else if (tr === 'fade-black' || tr === 'fade-white') {
+            const fade = document.createElement('div');
+            fade.className = `tl-block-fade tl-block-fade--${tr === 'fade-white' ? 'white' : 'black'}`;
+            fade.title = tr === 'fade-white' ? 'Dip through white' : 'Dip through black';
+            fade.style.width = `${Math.min((entry.blendTime || 0) * this._pxPerSec, width)}px`;
+            block.appendChild(fade);
         } else {
             const crossfade = Math.max(entry.blendTime || 0, overlap);
             if (crossfade > 0) {
@@ -1459,6 +1481,55 @@ export class TimelineEditor {
         });
     }
 
+    // ─── Drag helper — runway growth + edge auto-scroll ─────────────────────
+
+    /**
+     * Keeps a block drag (move or resize) usable far past the visible strip in
+     * one continuous gesture. While the pointer nears either horizontal edge of
+     * the scroll viewport the strip auto-scrolls; the inner width grows to stay
+     * ahead. `apply(contentDx)` runs each frame with the pointer delta measured
+     * in *content* pixels (viewport movement + auto-scroll travel) so the block
+     * keeps tracking the cursor even while the strip scrolls underneath it.
+     *
+     * Returns { track, stop }: feed pointermove clientX to track(), call stop()
+     * on release.
+     */
+    _makeDragScroller(startClientX, apply) {
+        const EDGE      = 64;    // px from a viewport edge that triggers scroll
+        const MAX_SPEED = 26;    // px/frame at the very edge
+        const startScroll = this._scrollEl.scrollLeft;
+        let   lastX       = startClientX;
+        let   lastDx      = NaN;
+        let   rafId       = null;
+
+        const tick = () => {
+            const rect  = this._scrollEl.getBoundingClientRect();
+            const distR = rect.right - lastX;
+            const distL = lastX - rect.left;
+            if (distR < EDGE) {
+                this._scrollEl.scrollLeft += MAX_SPEED * Math.min(1, (EDGE - Math.max(0, distR)) / EDGE);
+            } else if (distL < EDGE) {
+                this._scrollEl.scrollLeft -= MAX_SPEED * Math.min(1, (EDGE - Math.max(0, distL)) / EDGE);
+            }
+            const contentDx = (lastX - startClientX) + (this._scrollEl.scrollLeft - startScroll);
+            if (contentDx !== lastDx) { lastDx = contentDx; apply(contentDx); }
+            rafId = requestAnimationFrame(tick);
+        };
+        rafId = requestAnimationFrame(tick);
+
+        return {
+            track: clientX => { lastX = clientX; },
+            stop:  ()       => { if (rafId) cancelAnimationFrame(rafId); rafId = null; },
+        };
+    }
+
+    /** Widen the strip so `endSec` of content keeps 200px of runway past it. */
+    _ensureRunway(endSec) {
+        const needW = endSec * this._pxPerSec + 200;
+        const curW  = parseFloat(this._innerEl.style.minWidth) || 0;
+        if (needW > curW) this._innerEl.style.minWidth = `${needW}px`;
+    }
+
     // ─── Drag — free positional move ─────────────────────────────────────────
 
     _startMoveDrag(e, entry, trackEl) {
@@ -1468,31 +1539,35 @@ export class TimelineEditor {
         if (!blockEl) return;
 
         const origStartTime = entry.startTime ?? 0;
-        const startX        = e.clientX;
-        const startY        = e.clientY;
         let   newStartTime  = origStartTime;
         let   moved         = false;
+        let   done          = false;
 
-        let done = false;
-        const onMove = ev => {
-            if (ev.buttons === 0) { onUp(); return; }   // self-heal: release missed
-            const dx = ev.clientX - startX;
-            const dy = ev.clientY - startY;
-            if (!moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
+        const apply = contentDx => {
+            if (!moved && Math.abs(contentDx) > 4) {
                 moved = true;
                 blockEl.style.zIndex     = '20';
                 blockEl.style.opacity    = '0.8';
                 blockEl.style.transition = 'none';
             }
             if (!moved) return;
-            newStartTime = Math.max(0, origStartTime + dx / this._pxPerSec);
+            newStartTime = Math.max(0, origStartTime + contentDx / this._pxPerSec);
             if (this._snapSec > 0) newStartTime = Math.round(newStartTime / this._snapSec) * this._snapSec;
             blockEl.style.left = `${newStartTime * this._pxPerSec}px`;
+            this._ensureRunway(newStartTime + entry.duration);
+        };
+
+        const scroller = this._makeDragScroller(e.clientX, apply);
+
+        const onMove = ev => {
+            if (ev.buttons === 0) { onUp(); return; }   // self-heal: release missed
+            scroller.track(ev.clientX);
         };
 
         const onUp = () => {
             if (done) return;
             done = true;
+            scroller.stop();
             document.removeEventListener('pointermove',   onMove);
             document.removeEventListener('pointerup',     onUp);
             document.removeEventListener('pointercancel', onUp);
@@ -1520,28 +1595,35 @@ export class TimelineEditor {
     _startResizeDrag(e, entry, trackEl) {
         if (e.button !== 0) return;
 
-        const startX  = e.clientX;
         const origDur = entry.duration;
         const blockEl = trackEl.querySelector(`[data-id="${entry.id}"]`);
         const durEl   = blockEl?.querySelector('.tl-block-dur');
+        if (!blockEl) return;
 
-        let done   = false;
-        let moved  = false;
-        const onMove = ev => {
-            if (ev.buttons === 0) { onUp(); return; }   // self-heal: release missed
-            moved = true;
-            const dx = ev.clientX - startX;
-            let newDur = Math.max(5, origDur + Math.round(dx / this._pxPerSec));
+        let done  = false;
+        let moved = false;
+
+        const apply = contentDx => {
+            if (Math.abs(contentDx) > 2) moved = true;
+            let newDur = Math.max(5, origDur + Math.round(contentDx / this._pxPerSec));
             if (this._snapSec > 0) newDur = Math.round(newDur / this._snapSec) * this._snapSec;
             entry.duration = newDur;
-            blockEl.style.left  = `${(entry.startTime ?? 0) * this._pxPerSec}px`;
             blockEl.style.width = `${newDur * this._pxPerSec}px`;
             if (durEl) durEl.textContent = `${newDur}s`;
+            this._ensureRunway((entry.startTime ?? 0) + newDur);
+        };
+
+        const scroller = this._makeDragScroller(e.clientX, apply);
+
+        const onMove = ev => {
+            if (ev.buttons === 0) { onUp(); return; }   // self-heal: release missed
+            scroller.track(ev.clientX);
         };
 
         const onUp = () => {
             if (done) return;
             done = true;
+            scroller.stop();
             document.removeEventListener('pointermove',   onMove);
             document.removeEventListener('pointerup',     onUp);
             document.removeEventListener('pointercancel', onUp);
@@ -1638,10 +1720,10 @@ export class TimelineEditor {
         this._qeEntryId        = id;
         this._qeTitle.textContent = displayName(entry.presetName);
         this._qeSwatch.style.background = entry.color || colorFor(entry.presetName);
-        this._syncHardCutToggle(entry.hardCut);
+        this._syncTransitionPicker(transitionOf(entry));
 
         const rect = anchorEl.getBoundingClientRect();
-        const popW = 260, popH = 156;
+        const popW = 260, popH = 176;
         let left = rect.left;
         let top  = rect.top - popH - 8;
         if (top < 10) top = rect.bottom + 8;
@@ -1659,9 +1741,13 @@ export class TimelineEditor {
         document.querySelectorAll('.tl-block-menu-btn.is-active').forEach(el => el.classList.remove('is-active'));
     }
 
-    _syncHardCutToggle(on) {
-        this._qeHardCut.setAttribute('aria-checked', on ? 'true' : 'false');
-        this._qeHardCut.classList.toggle('is-on', !!on);
+    _syncTransitionPicker(transition) {
+        const v = transition || 'crossfade';
+        for (const btn of this._qeTransition.querySelectorAll('.qe-seg-btn')) {
+            const on = btn.dataset.transition === v;
+            btn.classList.toggle('is-on', on);
+            btn.setAttribute('aria-checked', on ? 'true' : 'false');
+        }
     }
 
     // ─── Block colour picker ──────────────────────────────────────────────────
@@ -1911,24 +1997,26 @@ export class TimelineEditor {
 
             // Determine if there's a gap before this entry
             const hasGapBefore = st > lastEnd + 0.01;
-            // Crossfade INTO this block (Phase 4.6):
-            //   hardCut       → 0 (instant cut)
-            //   overlaps prev → overlap width, floored at blendTime (overlap only extends)
-            //   adjacent      → blendTime default
             // overlap is read off the skip-safe lastEnd tracker — never entries[i-1].
-            const overlap   = Math.max(0, lastEnd - st);
-            const crossfade = entry.hardCut
+            const overlap = Math.max(0, lastEnd - st);
+            const tr      = transitionOf(entry);   // 'crossfade' | 'cut' | 'fade-black' | 'fade-white'
+            const d       = entry.blendTime;       // transition / fade duration
+            // Crossfade duration for the `crossfade` style (Phase 4.6): overlap
+            // width floored at blendTime; 0 for a hard cut.
+            const crossfade = tr === 'cut'
                 ? 0
-                : Math.min(entry.duration, Math.max(entry.blendTime, overlap));
-            const fadeDurIn = hasGapBefore ? (entry.hardCut ? 0 : entry.blendTime) : 0;
-            const fadeInDelay  = Math.max(0, (st - fadeDurIn - fromTime) * 1000);
-            const delay        = (st - fromTime) * 1000;
+                : Math.min(entry.duration, Math.max(d, overlap));
+            // Across a gap there is nothing to crossfade from and no outgoing
+            // content to dip — the gap is already black. Only `cut` stays instant;
+            // every other style fades in from the gap's black.
+            const fadeDurIn = hasGapBefore ? (tr === 'cut' ? 0 : d) : 0;
+            const fadeInDelay = Math.max(0, (st - fadeDurIn - fromTime) * 1000);
+            const delay       = (st - fromTime) * 1000;
 
             if (hasGapBefore) {
                 // Load preset first with blend=0 (instant GPU write — previous preset
                 // is overwritten in the framebuffer on the very next frame). Then wait
-                // one rAF tick so that frame renders, then fade the cover. This prevents
-                // the previous preset bleeding through the cover during the fade-in.
+                // one rAF tick so that frame renders, then fade the cover from black.
                 timers.push(setTimeout(() => {
                     if (!this._playing) return;
                     zd.engine.loadPreset(entry.presetName, 0).catch(() => {});
@@ -1938,11 +2026,26 @@ export class TimelineEditor {
                         this._fadeZoneCover(zoneId, 0, fadeDurIn);
                     });
                 }, fadeInDelay));
+            } else if (tr === 'fade-black' || tr === 'fade-white') {
+                // Dip through a colour, centred on the block's start: fade the
+                // outgoing block out to the colour over [st-d, st], swap the preset
+                // under the cover, then fade the colour away over [st, st+d].
+                timers.push(setTimeout(() => {
+                    if (!this._playing) return;
+                    this._fadeZoneCover(zoneId, 1, d, tr);
+                }, Math.max(0, (st - d - fromTime) * 1000)));
+                timers.push(setTimeout(() => {
+                    if (!this._playing) return;
+                    zd.engine.loadPreset(entry.presetName, 0).catch(() => {});
+                    this._currentZonePreset.set(zoneId, entry.presetName);
+                    requestAnimationFrame(() => {
+                        if (!this._playing) return;
+                        this._fadeZoneCover(zoneId, 0, d, tr);
+                    });
+                }, delay));
             } else {
-                // Consecutive / overlapping block — cover stays transparent,
-                // Butterchurn's internal blend handles the visual crossfade.
-                // Duration is `crossfade`: overlap width (floored at blendTime),
-                // or 0 when this block is a hard cut.
+                // Consecutive / overlapping block — cover stays transparent.
+                // `crossfade` → Butterchurn's internal blend; `cut` → crossfade is 0.
                 timers.push(setTimeout(() => {
                     if (!this._playing) return;
                     this._fadeZoneCover(zoneId, 0, 0);

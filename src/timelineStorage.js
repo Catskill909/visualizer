@@ -115,7 +115,7 @@ export function pruneEmptyUntitled() {
 /**
  * Create a timeline entry object. zoneId defaults to the Full zone.
  */
-export function createEntry({ presetName, duration, blendTime = 2, zoneId = 'full', startTime = 0, label = null, hardCut = false }) {
+export function createEntry({ presetName, duration, blendTime = 2, zoneId = 'full', startTime = 0, label = null, transition = 'crossfade' }) {
     return {
         id: generateId(),
         zoneId,
@@ -123,7 +123,7 @@ export function createEntry({ presetName, duration, blendTime = 2, zoneId = 'ful
         startTime,      // absolute position within the zone, in seconds
         duration: Math.max(5, Math.round(duration)),
         blendTime,
-        hardCut,        // true → block enters with an instant cut (no crossfade)
+        transition,     // how the block enters: 'crossfade' | 'cut' | 'fade-black' | 'fade-white'
         label,
         color: null,    // auto-assigned by editor
     };
