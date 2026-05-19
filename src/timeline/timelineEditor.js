@@ -351,6 +351,13 @@ export class TimelineEditor {
         this._pickerEl.addEventListener('click', e => {
             if (e.target === this._pickerEl) this._closePicker();
         });
+        // Lazy-load: append the next chunk as the list nears its bottom.
+        this._pickerList.addEventListener('scroll', () => {
+            const el = this._pickerList;
+            if (el.scrollTop + el.clientHeight >= el.scrollHeight - 240) {
+                this._renderPickerChunk();
+            }
+        });
         this._pickerTabs?.addEventListener('click', e => {
             const btn = e.target.closest('[data-tab]');
             if (!btn) return;
@@ -1669,8 +1676,6 @@ export class TimelineEditor {
         }
 
         const matches = q ? pool.filter(n => displayName(n).toLowerCase().includes(q)) : pool;
-        const MAX     = 100;
-        const shown   = matches.slice(0, MAX);
 
         const tabLabel = this._pickerTab === 'favorites' ? 'favorites'
                        : this._pickerTab === 'custom'    ? 'my presets'
@@ -1679,30 +1684,36 @@ export class TimelineEditor {
             ? `${matches.length} match${matches.length !== 1 ? 'es' : ''}`
             : `${pool.length} ${tabLabel}`;
 
+        // Lazy render: show the first chunk; the scroll handler appends the rest.
+        this._pickerMatches = matches;
+        this._pickerShown   = 0;
         this._pickerList.innerHTML = '';
-        for (const name of shown) {
-            const item = document.createElement('div');
-            item.className = 'tl-picker-item' + (name.startsWith('custom:') ? ' custom-preset' : '');
-            item.textContent = displayName(name);
-            item.dataset.name = name;
-            item.role = 'option';
-            item.addEventListener('click', () => {
-                // Add to the data model only. The canvas reflects the playhead —
-                // addEntry re-derives it; the new preset never force-loads here.
-                this.addEntry(name, this._pickerZoneId);
-                this._closePicker();
-            });
-            this._pickerList.appendChild(item);
-        }
+        this._pickerList.scrollTop = 0;
+        this._renderPickerChunk();
+    }
 
-        if (matches.length > MAX) {
-            const more = document.createElement('div');
-            more.className = 'tl-picker-item';
-            more.style.color = 'var(--text-4)';
-            more.textContent = `… ${matches.length - MAX} more — type to narrow`;
-            more.style.pointerEvents = 'none';
-            this._pickerList.appendChild(more);
-        }
+    _makePickerItem(name) {
+        const item = document.createElement('div');
+        item.className = 'tl-picker-item' + (name.startsWith('custom:') ? ' custom-preset' : '');
+        item.textContent = displayName(name);
+        item.dataset.name = name;
+        item.role = 'option';
+        item.addEventListener('click', () => {
+            // Add to the data model only. The canvas reflects the playhead —
+            // addEntry re-derives it; the new preset never force-loads here.
+            this.addEntry(name, this._pickerZoneId);
+            this._closePicker();
+        });
+        return item;
+    }
+
+    _renderPickerChunk() {
+        const CHUNK   = 100;
+        const matches = this._pickerMatches || [];
+        if (this._pickerShown >= matches.length) return;
+        const next = matches.slice(this._pickerShown, this._pickerShown + CHUNK);
+        for (const name of next) this._pickerList.appendChild(this._makePickerItem(name));
+        this._pickerShown += next.length;
     }
 
     // ─── Quick edit popover ───────────────────────────────────────────────────
