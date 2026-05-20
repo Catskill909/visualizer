@@ -362,6 +362,15 @@ html, body {
 }
 .section-label + .section-label { margin-top: -4px; }
 
+/* Row variant — puts a section-label and a small action button (e.g. ↺ Reset
+   on Motion Presets) on the same line so the button doesn't push the grid
+   down. The label keeps its own margin-bottom for spacing into the grid. */
+.section-label-row {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 4px;
+}
+.section-label-row .section-label { margin: 0; }
+
 .section-note {
   font-size: 11px; color: var(--text-3);
   line-height: 1.55; margin-bottom: 14px;
@@ -515,6 +524,39 @@ html, body {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
+/* Per-channel lock — sits left of the label so the lock state reads first.
+   The closed-lock variant uses higher contrast so locked rows stand out. */
+.color-lock-btn {
+  flex-shrink: 0;
+  width: 22px; height: 22px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-xs, 4px);
+  color: var(--text-3);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.12s, border-color 0.12s, color 0.12s, background 0.12s;
+}
+.color-lock-btn:hover { opacity: 1; border-color: var(--border); }
+.color-lock-btn[aria-pressed="true"] {
+  opacity: 1;
+  color: var(--text-1, #fff);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--border-hi);
+}
+
+/* Inline ghost button — same look as .ghost-btn but tighter for in-line use
+   inside a section (e.g. "+ Save current mix" under the chip grid). */
+.ghost-btn--inline {
+  margin-top: 6px;
+  margin-bottom: 4px;
+  padding: 5px 10px;
+  font-size: 11px;
+}
+
 /* ══════════════════════════════════════════════════════════════════════
    SLIDERS
    ══════════════════════════════════════════════════════════════════════ */
@@ -532,6 +574,30 @@ html, body {
 .slider-value {
   font-size: 11px; color: var(--text-3);
   font-variant-numeric: tabular-nums; min-width: 34px; text-align: right;
+}
+
+/* React-source pill — single-char source override marker that lives in the
+   slider header. '·' = use global source; B/M/T/V/F = bass/mid/treb/vol/flux.
+   Click cycles. Override state is visually punchier so the user can scan a
+   panel and see which sliders have custom sources at a glance. */
+.react-src-pill {
+  margin-left: auto; margin-right: 6px;
+  min-width: 18px; height: 17px;
+  padding: 0 4px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--text-3);
+  font-size: 10px; font-weight: 600; line-height: 15px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+.react-src-pill:hover { color: var(--text); border-color: var(--border-hi); }
+.react-src-pill--override {
+  color: #000;
+  background: #fff;
+  border-color: #fff;
 }
 
 .slider {
@@ -645,6 +711,28 @@ html, body {
 
 .wave-mode-label {
   font-size: 9px; font-weight: 500; letter-spacing: 0.02em; line-height: 1;
+}
+
+/* Motion presets grid — pick from a few coherent motion looks at the top of
+   the Motion tab. Same visual language as wave-mode-grid, 3 columns. */
+.motion-presets-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 5px; margin-bottom: 14px;
+}
+.motion-preset-btn {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+  padding: 8px 9px;
+  background: var(--bg-3); border: 1px solid var(--border);
+  border-radius: var(--r-s); cursor: pointer;
+  color: var(--text-2); transition: all 0.15s;
+  text-align: left;
+}
+.motion-preset-btn:hover { border-color: var(--border-hi); color: var(--text); }
+.motion-preset-name {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.02em;
+}
+.motion-preset-desc {
+  font-size: 9.5px; color: var(--text-3); line-height: 1.2;
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -943,7 +1031,8 @@ html, body {
   width: 42px;
   user-select: none; cursor: default;
 }
-.layer-ctrl-label.is-resettable { cursor: pointer; border-bottom: 1px dashed rgba(255,255,255,0.12); }
+.layer-ctrl-label.is-resettable,
+.slider-label.is-resettable { cursor: pointer; border-bottom: 1px dashed rgba(255,255,255,0.12); }
 .layer-row-inline .layer-ctrl-label { width: auto; }
 
 /* Slider rows inside a card */
@@ -1246,6 +1335,13 @@ html, body {
   background: rgba(255,255,255,0.07);
 }
 .reset-btn:active { background: rgba(255,255,255,0.11); }
+
+/* Icon-only variant — tight square footprint so a glyph-only button doesn't
+   eat horizontal space when the footer is already dense (e.g. Surprise ✨). */
+.reset-btn--icon {
+  width: 30px; padding: 0;
+  font-size: 15px; line-height: 1;
+}
 
 /* ══════════════════════════════════════════════════════════════════════
    REMIX PICKER MODAL

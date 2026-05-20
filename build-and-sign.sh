@@ -94,8 +94,12 @@ rm -rf \
 # to re-optimize dependencies on next run (no cache to trust). Do NOT add
 # `--force` here — Vite v8's `vite build` rejects it (only `vite dev` and
 # `vite optimize` accept --force).
+#
+# `< /dev/null` is load-bearing: without it, npm/vite inherit the TTY and
+# any stdin prompt (npm update notice, deprecation warning, etc.) hangs the
+# build forever at 0% CPU. Do NOT remove this redirect.
 echo -e "${YELLOW}Step 1: Building web app with Vite...${NC}"
-npm run build
+npm run build < /dev/null
 
 # Step 2: Build the macOS app with Tauri
 echo -e "${YELLOW}Step 2: Building macOS app with Tauri...${NC}"

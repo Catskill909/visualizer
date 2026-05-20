@@ -13,7 +13,7 @@
  *  All three swatches can be freely overridden after applying a palette.
  */
 
-import { createCustomPreset, saveCustomPreset, getImage, storeImage, generateId, buildMotionReactFrameEqs } from '../customPresets.js';
+import { createCustomPreset, saveCustomPreset, getImage, storeImage, generateId, buildMotionReactFrameEqs, buildWaveReactFrameEqs } from '../customPresets.js';
 import {
     parseGifFile, processGifFrames, generateFrameStrip,
     shouldOptimize, getRecommendedSettings, formatBytes,
@@ -200,6 +200,18 @@ const BLANK = {
         strobeAmp: 0.00,
         shrink: 0,
     },
+    waveReact: {
+        source: 'bass',
+        curve: 'linear',
+        scaleAmt:   0.00,  // react drives wave_scale (+/-)
+        opacityAmt: 0.00,  // react drives wave_a (+/-)
+        mysteryAmt: 0.00,  // react drives wave_mystery (+/-)
+        orbitAmt:   0.00,  // react orbits wave_x/wave_y in a circle (0..1)
+        // Per-slider source override. Empty string = use the global `source`
+        // above. Otherwise one of: 'bass' | 'mid' | 'treb' | 'vol' | 'flux'.
+        // Lets a user pump wave size with bass while shape morphs with treble.
+        perSrc: { scaleAmt: '', opacityAmt: '', mysteryAmt: '', orbitAmt: '' },
+    },
     // Solid-mode fx — only applied when a variation with a `solid:` base is active.
     // All default to 0 so "Solid" out of the box is truly static (no breath, no pulse).
     solidPulse: 0,        // bass multiplier: col *= (1 + bass * pulse)
@@ -341,6 +353,38 @@ const PALETTES = [
     { name: 'Plasma', wave: [1.00, 0.00, 0.80], glow: [0.20, 0.80, 1.00], accent: [1.00, 0.40, 0.00] },
 ];
 
+// ─── Motion presets ──────────────────────────────────────────────────────────
+// One-click coherent motion configurations. Apply touches only motion-related
+// baseVals — colors / wave / palette / reactivity stay as the user has them.
+// Each entry's `bv` is shallow-merged over current state.
+
+const MOTION_PRESETS = [
+    {
+        name: 'Vortex', desc: 'Spinning tunnel',
+        bv: { zoom: 0.98, rot: 0.35, warp: 2.2, warpanimspeed: 1.8, echo_zoom: 1.6, echo_alpha: 0.35, dx: 0, dy: 0, sx: 1.0, sy: 1.0, cx: 0.5, cy: 0.5, zoomexp: 1.0, warpscale: 1.0 },
+    },
+    {
+        name: 'Calm Drift', desc: 'Slow & dreamy',
+        bv: { zoom: 0.998, rot: 0.04, warp: 0.4, warpanimspeed: 0.35, echo_zoom: 1.3, echo_alpha: 0.15, dx: 0.005, dy: 0.003, sx: 1.0, sy: 1.0, cx: 0.5, cy: 0.5, zoomexp: 1.0, warpscale: 1.5 },
+    },
+    {
+        name: 'Earthquake', desc: 'Jittery shake',
+        bv: { zoom: 1.005, rot: 0, warp: 0.6, warpanimspeed: 2.5, echo_zoom: 1.1, echo_alpha: 0.1, dx: 0.03, dy: 0.025, sx: 1.0, sy: 1.0, cx: 0.5, cy: 0.5, zoomexp: 1.0, warpscale: 0.8 },
+    },
+    {
+        name: 'Tunnel In', desc: 'Zooming into the void',
+        bv: { zoom: 0.92, rot: 0.08, warp: 0.8, warpanimspeed: 0.6, echo_zoom: 2.0, echo_alpha: 0.4, dx: 0, dy: 0, sx: 1.0, sy: 1.0, cx: 0.5, cy: 0.5, zoomexp: 1.2, warpscale: 1.0 },
+    },
+    {
+        name: 'Spin Lock', desc: 'Pure rotation',
+        bv: { zoom: 1.0, rot: 0.55, warp: 0, warpanimspeed: 0.4, echo_zoom: 1.0, echo_alpha: 0, dx: 0, dy: 0, sx: 1.0, sy: 1.0, cx: 0.5, cy: 0.5, zoomexp: 1.0, warpscale: 1.0 },
+    },
+    {
+        name: 'Hyperspace', desc: 'Streaks outward',
+        bv: { zoom: 1.12, rot: 0, warp: 0.3, warpanimspeed: 0.8, echo_zoom: 1.0, echo_alpha: 0, dx: 0, dy: 0, sx: 1.0, sy: 1.0, cx: 0.5, cy: 0.5, zoomexp: 1.5, warpscale: 1.0 },
+    },
+];
+
 // ─── Wave mode definitions ────────────────────────────────────────────────────
 
 const WAVE_MODES = [
@@ -396,9 +440,46 @@ function hexToRgb(hex) {
     ];
 }
 
+// ─── Palette UI persistence ──────────────────────────────────────────────────
+// Locks and My Mix live in localStorage, not in the preset. They're user-level
+// preferences (muscle-memory across sessions), not preset state.
+
+const PALETTE_LOCKS_KEY = 'dc.palette.locks';
+const MY_MIX_KEY = 'dc.palette.myMix';
+
+function loadPaletteLocks() {
+    try {
+        const raw = localStorage.getItem(PALETTE_LOCKS_KEY);
+        if (!raw) return { wave: false, glow: false, accent: false };
+        const v = JSON.parse(raw);
+        return { wave: !!v.wave, glow: !!v.glow, accent: !!v.accent };
+    } catch { return { wave: false, glow: false, accent: false }; }
+}
+function savePaletteLocks(locks) {
+    try { localStorage.setItem(PALETTE_LOCKS_KEY, JSON.stringify(locks)); } catch { /* quota / SSR */ }
+}
+
+function loadMyMix() {
+    try {
+        const raw = localStorage.getItem(MY_MIX_KEY);
+        if (!raw) return null;
+        const v = JSON.parse(raw);
+        if (!Array.isArray(v.wave) || !Array.isArray(v.glow) || !Array.isArray(v.accent)) return null;
+        return v;
+    } catch { return null; }
+}
+function saveMyMix(mix) {
+    try { localStorage.setItem(MY_MIX_KEY, JSON.stringify(mix)); } catch { /* quota */ }
+}
+
 /**
  * Build a labeled range slider row and append it to `container`.
  * Returns the <input type="range"> element.
+ *
+ * Double-clicking the slider's label resets it to its initial `value` (the
+ * BLANK default for most sliders). The reset is wired by dispatching a
+ * synthetic pointerdown → input → pointerup sequence on the input element, so
+ * the existing handlers' snapshot logic fires and the reset is undoable.
  */
 function makeSlider(container, { id, label, min, max, step, value, decimals = 2 }) {
     const pct = ((value - min) / (max - min)) * 100;
@@ -406,7 +487,7 @@ function makeSlider(container, { id, label, min, max, step, value, decimals = 2 
     wrap.className = 'slider-row';
     wrap.innerHTML = `
     <div class="slider-header">
-      <span class="slider-label">${label}</span>
+      <span class="slider-label is-resettable" title="Double-click to reset to ${Number(value).toFixed(decimals)}">${label}</span>
       <span class="slider-value" id="${id}-val">${Number(value).toFixed(decimals)}</span>
     </div>
     <input
@@ -416,7 +497,16 @@ function makeSlider(container, { id, label, min, max, step, value, decimals = 2 
     />
   `;
     container.appendChild(wrap);
-    return wrap.querySelector('input');
+    const input = wrap.querySelector('input');
+    const labelEl = wrap.querySelector('.slider-label');
+    labelEl.addEventListener('dblclick', () => {
+        if (parseFloat(input.value) === Number(value)) return;
+        input.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+        input.value = value;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('pointerup', { bubbles: true }));
+    });
+    return input;
 }
 
 // ─── EditorInspector class ────────────────────────────────────────────────────
@@ -437,15 +527,28 @@ export class EditorInspector {
         this._lastBuildMs = 0;        // dev monitor: last shader rebuild time
         this._baseComp = BLANK_COMP_RAW;  // pre-injection comp; re-injected when sat/hue change
 
+        // Palette UI state — session-only, persisted to localStorage. Locks
+        // gate palette-chip writes per channel; My Mix is a user-saved 13th
+        // chip; hover backup powers transient preview without polluting undo.
+        this._paletteLock = loadPaletteLocks();
+        this._myMix = loadMyMix();
+        this._palettePreviewBackup = null;
+
         this.onchange = null;   // set by main.js for dirty-state tracking
 
         this._buildBaseVariations();
         this._buildPaletteChips();
+        this._bindPaletteLocks();
+        this._bindMyMixSave();
+        this._buildPaletteStrengthSliders();
         this._buildPaletteSliders();
         this._bindPaletteOpacity();
         this._buildSolidFxPanel();
+        this._buildMotionPresetsGrid();
+        this._bindSurpriseButton();
         this._buildMotionSliders();
         this._buildMotionReactPanel();
+        this._buildWaveReactPanel();
         this._buildWaveModeGrid();
         this._buildWaveSliders();
         this._buildFeelSliders();
@@ -663,14 +766,21 @@ export class EditorInspector {
 
     _buildPaletteChips() {
         const grid = document.getElementById('palette-grid');
-        PALETTES.forEach((p, i) => {
+        grid.innerHTML = '';
+        const chipDefs = PALETTES.map((p, i) => ({ p, key: String(i) }));
+        // My Mix appears as the last chip when saved. Key 'mymix' is used to
+        // distinguish from numeric palette indices in click/hover handlers.
+        if (this._myMix) {
+            chipDefs.push({ p: { name: 'My Mix', ...this._myMix }, key: 'mymix' });
+        }
+        chipDefs.forEach(({ p, key }) => {
             const wHex = rgbToHex(...p.wave);
             const gHex = rgbToHex(...p.glow);
             const aHex = rgbToHex(...p.accent);
             const btn = document.createElement('button');
-            btn.className = 'palette-chip';
+            btn.className = 'palette-chip' + (key === 'mymix' ? ' palette-chip--mymix' : '');
             btn.setAttribute('data-tooltip', p.name);
-            btn.dataset.palette = i;
+            btn.dataset.palette = key;
             btn.innerHTML = `
         <span class="chip-dots">
           <span class="chip-dot" style="background:${wHex}"></span>
@@ -679,24 +789,38 @@ export class EditorInspector {
         </span>
         <span class="chip-name">${p.name}</span>
       `;
-            btn.addEventListener('click', () => this._applyPalette(i));
+            btn.addEventListener('mouseenter', () => this._previewPaletteEnter(p));
+            btn.addEventListener('mouseleave', () => this._previewPaletteLeave());
+            btn.addEventListener('click', () => this._applyPalette(p, key));
             grid.appendChild(btn);
         });
     }
 
-    _applyPalette(i) {
-        const p = PALETTES[i];
+    /**
+     * Apply a palette to currentState. `p` is { wave, glow, accent }; `key` is
+     * the chip's identifier ('0'..'11' for builtins, 'mymix' for the saved
+     * mix) used to highlight the active chip. Locked channels are skipped.
+     */
+    _applyPalette(p, key) {
+        // Clear the hover backup so the upcoming mouseleave doesn't restore
+        // over the colors we're about to commit.
+        this._palettePreviewBackup = null;
         this._preSnap();
         const bv = this.currentState.baseVals;
-        [bv.wave_r, bv.wave_g, bv.wave_b] = p.wave;
-        [bv.ob_r, bv.ob_g, bv.ob_b] = p.glow;
-        [bv.ib_r, bv.ib_g, bv.ib_b] = p.accent;
-        // Shift Color B = Glow for cohesive two-color blends
-        this.currentState.solidColorB = p.glow.slice();
-        bv.ob_a = 0.75;
-        bv.ob_size = 0.02;
-        if (!bv.ib_a) bv.ib_a = 0.5;
-        if (!bv.ib_size) bv.ib_size = 0.01;
+        if (!this._paletteLock.wave) {
+            [bv.wave_r, bv.wave_g, bv.wave_b] = p.wave;
+        }
+        if (!this._paletteLock.glow) {
+            [bv.ob_r, bv.ob_g, bv.ob_b] = p.glow;
+            // Shift Color B = Glow for cohesive two-color blends
+            this.currentState.solidColorB = p.glow.slice();
+        }
+        if (!this._paletteLock.accent) {
+            [bv.ib_r, bv.ib_g, bv.ib_b] = p.accent;
+        }
+        // NOTE: do not touch ob_a/ob_size/ib_a/ib_size here. Chip paints colors
+        // only; border intensity is owned by the Glow/Accent Strength sliders
+        // (Palette tab) and the matching Appearance sliders.
         this._postSnap();
         // Rebuild comp shader so solid-color base picks up the new wave_r/g/b
         this._buildCompShader();
@@ -705,8 +829,126 @@ export class EditorInspector {
         this._syncPaletteSliders();
         this._syncSolidFx(); // Update shift color swatch
         // Highlight active chip
-        document.querySelectorAll('.palette-chip').forEach((el, idx) => {
-            el.classList.toggle('active', idx === i);
+        document.querySelectorAll('.palette-chip').forEach((el) => {
+            el.classList.toggle('active', el.dataset.palette === String(key));
+        });
+    }
+
+    /**
+     * Hover preview — paint palette colors live without snapping undo. Skips
+     * locked channels so a "wave-locked + remix glow" flow shows the same wave
+     * the user has now. Backup is restored by _previewPaletteLeave.
+     */
+    _previewPaletteEnter(p) {
+        // If a preview is already active (rapid chip-to-chip mouseover), keep
+        // the original backup — only the first enter captures the true state.
+        const bv = this.currentState.baseVals;
+        if (!this._palettePreviewBackup) {
+            this._palettePreviewBackup = {
+                wave: [bv.wave_r, bv.wave_g, bv.wave_b],
+                glow: [bv.ob_r, bv.ob_g, bv.ob_b],
+                accent: [bv.ib_r, bv.ib_g, bv.ib_b],
+                solidColorB: (this.currentState.solidColorB || [0, 0, 0]).slice(),
+            };
+        }
+        if (!this._paletteLock.wave) {
+            [bv.wave_r, bv.wave_g, bv.wave_b] = p.wave;
+        }
+        if (!this._paletteLock.glow) {
+            [bv.ob_r, bv.ob_g, bv.ob_b] = p.glow;
+            this.currentState.solidColorB = p.glow.slice();
+        }
+        if (!this._paletteLock.accent) {
+            [bv.ib_r, bv.ib_g, bv.ib_b] = p.accent;
+        }
+        this._buildCompShader();
+        this._applyToEngine(true);
+    }
+
+    _previewPaletteLeave() {
+        if (!this._palettePreviewBackup) return;
+        const bv = this.currentState.baseVals;
+        const b = this._palettePreviewBackup;
+        [bv.wave_r, bv.wave_g, bv.wave_b] = b.wave;
+        [bv.ob_r, bv.ob_g, bv.ob_b] = b.glow;
+        [bv.ib_r, bv.ib_g, bv.ib_b] = b.accent;
+        this.currentState.solidColorB = b.solidColorB.slice();
+        this._palettePreviewBackup = null;
+        this._buildCompShader();
+        this._applyToEngine(true);
+    }
+
+    /** Wire the three per-channel lock buttons. Lock state persists across sessions. */
+    _bindPaletteLocks() {
+        const channels = ['wave', 'glow', 'accent'];
+        channels.forEach(ch => {
+            const btn = document.getElementById(`lock-${ch}`);
+            if (!btn) return;
+            const sync = () => {
+                const locked = !!this._paletteLock[ch];
+                btn.textContent = locked ? '🔒' : '🔓';
+                btn.setAttribute('aria-pressed', String(locked));
+            };
+            sync();
+            btn.addEventListener('click', () => {
+                this._paletteLock[ch] = !this._paletteLock[ch];
+                savePaletteLocks(this._paletteLock);
+                sync();
+            });
+        });
+    }
+
+    /** Wire the "+ Save current mix" button. Rebuilds the chip grid so the new
+     *  mix appears as the 13th chip immediately. */
+    _bindMyMixSave() {
+        const btn = document.getElementById('btn-save-mymix');
+        if (!btn) return;
+        btn.addEventListener('click', () => {
+            const bv = this.currentState.baseVals;
+            this._myMix = {
+                wave:   [bv.wave_r, bv.wave_g, bv.wave_b],
+                glow:   [bv.ob_r,   bv.ob_g,   bv.ob_b],
+                accent: [bv.ib_r,   bv.ib_g,   bv.ib_b],
+            };
+            saveMyMix(this._myMix);
+            this._buildPaletteChips();
+        });
+    }
+
+    // ─── Palette strength sliders (Glow / Accent intensity) ─────────────────
+    // Live under the Quick Palettes grid. Mirror ob_a / ib_a so users dial in
+    // border intensity right where they pick colors, instead of jumping to the
+    // Appearance section. The matching Appearance sliders stay as the deeper
+    // controls (size + alpha) and are kept in sync.
+
+    _buildPaletteStrengthSliders() {
+        const container = document.getElementById('palette-strength-sliders');
+        if (!container) return;
+        // Strength is a coupled "loudness" axis: drives BOTH alpha and size at
+        // once. Without this coupling, dragging Strength on a virgin preset
+        // (size = 0) would change alpha but render nothing. The Appearance tab
+        // still exposes separate size + alpha sliders for fine-tuning.
+        const SIZE_FROM_STRENGTH = 0.05;  // strength=1 → size=0.05 (visible glow)
+        const configs = [
+            { id: 'ps-glow-strength',   label: 'Glow Strength',   alphaKey: 'ob_a', sizeKey: 'ob_size', alphaMirror: 'ps-ob-a', sizeMirror: 'ps-ob-size' },
+            { id: 'ps-accent-strength', label: 'Accent Strength', alphaKey: 'ib_a', sizeKey: 'ib_size', alphaMirror: 'ps-ib-a', sizeMirror: 'ps-ib-size' },
+        ];
+        configs.forEach(cfg => {
+            const input = makeSlider(container, { ...cfg, min: 0, max: 1.0, step: 0.01, value: BLANK.baseVals[cfg.alphaKey] });
+            const valEl = document.getElementById(`${cfg.id}-val`);
+            input.addEventListener('pointerdown', () => this._preSnap());
+            input.addEventListener('input', () => {
+                const v = parseFloat(input.value);
+                const sizeV = v * SIZE_FROM_STRENGTH;
+                if (valEl) valEl.textContent = v.toFixed(2);
+                input.style.setProperty('--pct', `${v * 100}%`);
+                this.currentState.baseVals[cfg.alphaKey] = v;
+                this.currentState.baseVals[cfg.sizeKey] = sizeV;
+                this._syncSlider(cfg.alphaMirror, v,     0, 1.0, 2);
+                this._syncSlider(cfg.sizeMirror,  sizeV, 0, 0.1, 3);
+                this._applyToEngine(true);
+            });
+            input.addEventListener('pointerup', () => this._postSnap());
         });
     }
 
@@ -717,9 +959,9 @@ export class EditorInspector {
         const configs = [
             { id: 'ps-decay', label: 'Trail', min: 0.85, max: 0.999, step: 0.001, value: BLANK.baseVals.decay, decimals: 3, key: 'decay' },
             { id: 'ps-ob-size', label: 'Outer Border Size', min: 0, max: 0.1, step: 0.001, value: BLANK.baseVals.ob_size, decimals: 3, key: 'ob_size' },
-            { id: 'ps-ob-a', label: 'Outer Border Alpha', min: 0, max: 1.0, step: 0.01, value: BLANK.baseVals.ob_a, key: 'ob_a' },
+            { id: 'ps-ob-a', label: 'Outer Border Alpha', min: 0, max: 1.0, step: 0.01, value: BLANK.baseVals.ob_a, key: 'ob_a', mirror: 'ps-glow-strength' },
             { id: 'ps-ib-size', label: 'Inner Border Size', min: 0, max: 0.1, step: 0.001, value: BLANK.baseVals.ib_size, decimals: 3, key: 'ib_size' },
-            { id: 'ps-ib-a', label: 'Inner Border Alpha', min: 0, max: 1.0, step: 0.01, value: BLANK.baseVals.ib_a, key: 'ib_a' },
+            { id: 'ps-ib-a', label: 'Inner Border Alpha', min: 0, max: 1.0, step: 0.01, value: BLANK.baseVals.ib_a, key: 'ib_a', mirror: 'ps-accent-strength' },
             { id: 'ps-wavefade', label: 'Fade Wave in Silence', min: 0, max: 2.0, step: 0.01, value: BLANK.baseVals.modwavealphabyvolume, key: 'modwavealphabyvolume' },
             { id: 'ps-saturation', label: 'Saturation', min: 0, max: 2.0, step: 0.01, value: 1.0, key: 'studio_saturation', reInject: true },
             { id: 'ps-hue', label: 'Hue Rotate', min: 0, max: 360, step: 1, value: 0, key: 'studio_hue_rotate', reInject: true },
@@ -733,6 +975,7 @@ export class EditorInspector {
                 if (valEl) valEl.textContent = v.toFixed(cfg.decimals ?? 2);
                 input.style.setProperty('--pct', `${((v - cfg.min) / (cfg.max - cfg.min)) * 100}%`);
                 this.currentState.baseVals[cfg.key] = v;
+                if (cfg.mirror) this._syncSlider(cfg.mirror, v, cfg.min, cfg.max, 2);
                 if (cfg.reInject) this._rebuildPostFx();
                 else this._applyToEngine(true);
             });
@@ -794,12 +1037,10 @@ export class EditorInspector {
         this._bindSwatch('glow', (hex) => {
             const [r, g, b] = hexToRgb(hex);
             this.currentState.baseVals.ob_r = r; this.currentState.baseVals.ob_g = g; this.currentState.baseVals.ob_b = b;
-            if (!this.currentState.baseVals.ob_a) { this.currentState.baseVals.ob_a = 0.75; this.currentState.baseVals.ob_size = 0.02; }
         });
         this._bindSwatch('accent', (hex) => {
             const [r, g, b] = hexToRgb(hex);
             this.currentState.baseVals.ib_r = r; this.currentState.baseVals.ib_g = g; this.currentState.baseVals.ib_b = b;
-            if (!this.currentState.baseVals.ib_a) { this.currentState.baseVals.ib_a = 0.5; this.currentState.baseVals.ib_size = 0.01; }
         });
     }
 
@@ -851,6 +1092,77 @@ export class EditorInspector {
     }
 
     // ─── Motion sliders ────────────────────────────────────────────────────────
+
+    /** Wire the footer "Surprise" button. Rolls a coherent set of choices:
+     *  random variation → random palette → random motion preset → wave randomize.
+     *  Each step uses the existing apply path (which does its own snap), so the
+     *  user can step-undo the surprise back to their starting state. */
+    _bindSurpriseButton() {
+        const btn = document.getElementById('btn-surprise');
+        if (!btn) return;
+        btn.addEventListener('click', () => {
+            const vi = Math.floor(Math.random() * BASE_VARIATIONS.length);
+            this._applyVariation(vi);
+            const pi = Math.floor(Math.random() * PALETTES.length);
+            this._applyPalette(PALETTES[pi], String(pi));
+            const mi = Math.floor(Math.random() * MOTION_PRESETS.length);
+            this._applyMotionPreset(mi);
+            document.getElementById('btn-randomize-wave')?.click();
+        });
+    }
+
+    _buildMotionPresetsGrid() {
+        const grid = document.getElementById('motion-presets-grid');
+        if (!grid) return;
+        MOTION_PRESETS.forEach((mp, i) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'motion-preset-btn';
+            // No data-tooltip: name + desc are both rendered inside the button.
+            btn.innerHTML = `
+        <span class="motion-preset-name">${mp.name}</span>
+        <span class="motion-preset-desc">${mp.desc}</span>
+      `;
+            btn.addEventListener('click', () => this._applyMotionPreset(i));
+            grid.appendChild(btn);
+        });
+        // Reset button beside the section header — snaps every motion field
+        // back to BLANK defaults so the user can always "go back" after trying
+        // a preset.
+        document.getElementById('btn-motion-reset')?.addEventListener('click', () => this._resetMotion());
+    }
+
+    /** Shallow-merge a MOTION_PRESETS entry's bv over currentState.baseVals.
+     *  Touches only motion fields; wave / palette / echo orient / reactivity
+     *  stay untouched on purpose so a user can stack motion looks on top of
+     *  the colors and shape they've already dialed in. */
+    _applyMotionPreset(i) {
+        const mp = MOTION_PRESETS[i];
+        if (!mp) return;
+        this._preSnap();
+        Object.assign(this.currentState.baseVals, mp.bv);
+        this._postSnap();
+        this._applyToEngine();
+        this._syncMotionSliders();
+    }
+
+    /** Snap every motion field back to BLANK defaults. Same set of fields
+     *  MOTION_PRESETS write to, so this is the symmetric undo of any preset
+     *  click. Wave / palette / reactivity / echo orient stay untouched. */
+    _resetMotion() {
+        const defaults = {
+            zoom: BLANK.baseVals.zoom, rot: BLANK.baseVals.rot, warp: BLANK.baseVals.warp,
+            warpanimspeed: BLANK.baseVals.warpanimspeed, echo_zoom: BLANK.baseVals.echo_zoom,
+            echo_alpha: BLANK.baseVals.echo_alpha, dx: BLANK.baseVals.dx, dy: BLANK.baseVals.dy,
+            sx: BLANK.baseVals.sx, sy: BLANK.baseVals.sy, cx: BLANK.baseVals.cx, cy: BLANK.baseVals.cy,
+            zoomexp: BLANK.baseVals.zoomexp, warpscale: BLANK.baseVals.warpscale,
+        };
+        this._preSnap();
+        Object.assign(this.currentState.baseVals, defaults);
+        this._postSnap();
+        this._applyToEngine();
+        this._syncMotionSliders();
+    }
 
     _buildMotionSliders() {
         // Each entry pairs a container id with its slider configs.
@@ -968,24 +1280,44 @@ export class EditorInspector {
 
     _buildWaveModeGrid() {
         const grid = document.getElementById('wave-mode-grid');
+        // "Active" highlight follows actual rendered visibility (wave_a > 0).
+        // wave_mode is always in 0..7 (engine constraint), so highlighting it
+        // unconditionally would imply something is rendering even after Reset.
+        const initiallyActive = BLANK.baseVals.wave_a > 0.001;
         WAVE_MODES.forEach(({ mode, label, icon }) => {
             const btn = document.createElement('button');
-            btn.className = 'wave-mode-btn' + (mode === BLANK.baseVals.wave_mode ? ' active' : '');
+            const isActive = initiallyActive && mode === BLANK.baseVals.wave_mode;
+            btn.className = 'wave-mode-btn' + (isActive ? ' active' : '');
             btn.dataset.mode = mode;
-            btn.setAttribute('data-tooltip', label);
+            // No data-tooltip: the label is already rendered inside the button.
             btn.innerHTML = `
         <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">${icon}</svg>
         <span class="wave-mode-label">${label}</span>
       `;
             btn.addEventListener('click', () => {
                 this._preSnap();
-                this.currentState.baseVals.wave_mode = mode;
+                const bv = this.currentState.baseVals;
+                bv.wave_mode = mode;
+                // If wave was hidden via Reset, picking a shape should make it
+                // visible again — otherwise the click looks like a no-op.
+                if (bv.wave_a < 0.001) bv.wave_a = 0.8;
                 this._postSnap();
                 this._applyToEngine();
-                grid.querySelectorAll('.wave-mode-btn').forEach(b => b.classList.toggle('active', b === btn));
+                this._syncWaveControls();
             });
             grid.appendChild(btn);
         });
+        // Reset button — hides the wave without touching wave_mode. Symmetric
+        // partner to clicking a shape (which re-shows the wave).
+        document.getElementById('btn-wave-reset')?.addEventListener('click', () => this._resetWaveShape());
+    }
+
+    _resetWaveShape() {
+        this._preSnap();
+        this.currentState.baseVals.wave_a = 0;
+        this._postSnap();
+        this._applyToEngine();
+        this._syncWaveControls();
     }
 
     // ─── Wave style sliders ────────────────────────────────────────────────────
@@ -1058,9 +1390,12 @@ export class EditorInspector {
 
     _syncWaveControls() {
         const bv = this.currentState.baseVals;
-        // Grid buttons
+        // Grid buttons — only highlight when the wave is actually visible.
+        // wave_a == 0 means Reset was clicked (or preset has no wave); we don't
+        // want a button to look "selected" when nothing is rendering.
+        const visible = bv.wave_a > 0.001;
         document.querySelectorAll('.wave-mode-btn').forEach(btn => {
-            btn.classList.toggle('active', parseInt(btn.dataset.mode) === bv.wave_mode);
+            btn.classList.toggle('active', visible && parseInt(btn.dataset.mode) === bv.wave_mode);
         });
         // Sliders
         const map = [
@@ -1086,6 +1421,118 @@ export class EditorInspector {
         this._syncToggle('toggle-dots', 'wave_usedots');
         this._syncToggle('toggle-additive', 'additivewave');
         this._syncToggle('toggle-brighten', 'wave_brighten');
+    }
+
+    // ─── Wave reactivity (preset-only) ───────────────────────────────────────
+
+    _buildWaveReactPanel() {
+        const container = document.getElementById('wave-react-sliders');
+        if (!container) return;
+
+        const srcSel = document.getElementById('wave-react-source');
+        if (srcSel) {
+            srcSel.value = this.currentState.waveReact?.source || 'bass';
+            srcSel.addEventListener('change', () => {
+                this._preSnap();
+                this.currentState.waveReact.source = srcSel.value;
+                this._postSnap();
+                this._applyToEngine(true);
+            });
+        }
+
+        const curveBtns = document.querySelectorAll('#wave-react-curve .lseg');
+        curveBtns.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.curve === (this.currentState.waveReact?.curve || 'linear'));
+            btn.addEventListener('click', () => {
+                this._preSnap();
+                curveBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.currentState.waveReact.curve = btn.dataset.curve;
+                this._postSnap();
+                this._applyToEngine(true);
+            });
+        });
+
+        const configs = [
+            { id: 'wr-scale',   label: 'Size',     min: -1.50, max: 1.50, step: 0.01, value: 0, key: 'scaleAmt' },
+            { id: 'wr-opacity', label: 'Opacity',  min: -1.00, max: 1.00, step: 0.01, value: 0, key: 'opacityAmt' },
+            { id: 'wr-mystery', label: 'Shape',    min: -1.00, max: 1.00, step: 0.01, value: 0, key: 'mysteryAmt' },
+            { id: 'wr-orbit',   label: 'Orbit',    min:  0.00, max: 1.00, step: 0.01, value: 0, key: 'orbitAmt' },
+        ];
+        configs.forEach(cfg => {
+            const input = makeSlider(container, cfg);
+            const valEl = document.getElementById(`${cfg.id}-val`);
+            input.addEventListener('pointerdown', () => this._preSnap());
+            input.addEventListener('input', () => {
+                const v = parseFloat(input.value);
+                if (valEl) valEl.textContent = v.toFixed(2);
+                input.style.setProperty('--pct', `${((v - cfg.min) / (cfg.max - cfg.min)) * 100}%`);
+                this.currentState.waveReact[cfg.key] = v;
+                this._applyToEngine(true);
+            });
+            input.addEventListener('pointerup', () => this._postSnap());
+
+            // Per-slider source pill — click to cycle source override.
+            // '·' means use the global Source dropdown above; B/M/T/V/F override
+            // for this one slider only. Keeps the source choice per-slider so a
+            // user can drive different wave aspects from different bands.
+            const header = input.closest('.slider-row')?.querySelector('.slider-header');
+            if (header) {
+                const pill = document.createElement('button');
+                pill.type = 'button';
+                pill.className = 'react-src-pill';
+                pill.id = `${cfg.id}-src`;
+                pill.setAttribute('data-tooltip', 'Audio source for this slider — click to cycle (· = global, B = Bass, M = Mid, T = Treble, V = Volume, F = Flux)');
+                header.insertBefore(pill, valEl);
+                pill.addEventListener('click', () => {
+                    this._preSnap();
+                    const wr = this.currentState.waveReact;
+                    wr.perSrc = wr.perSrc || {};
+                    const cycle = ['', 'bass', 'mid', 'treb', 'vol', 'flux'];
+                    const cur = wr.perSrc[cfg.key] || '';
+                    const next = cycle[(cycle.indexOf(cur) + 1) % cycle.length];
+                    wr.perSrc[cfg.key] = next;
+                    this._postSnap();
+                    this._renderReactSrcPill(pill, next);
+                    this._applyToEngine(true);
+                });
+                this._renderReactSrcPill(pill, this.currentState.waveReact?.perSrc?.[cfg.key] || '');
+            }
+        });
+    }
+
+    /** Update a react-source pill's label + active state. */
+    _renderReactSrcPill(pill, src) {
+        const labels = { '': '·', bass: 'B', mid: 'M', treb: 'T', vol: 'V', flux: 'F' };
+        pill.textContent = labels[src] ?? '·';
+        pill.classList.toggle('react-src-pill--override', !!src);
+    }
+
+    _syncWaveReact() {
+        const wr = this.currentState.waveReact || (this.currentState.waveReact = deepClone(BLANK.waveReact));
+        const srcSel = document.getElementById('wave-react-source');
+        if (srcSel) srcSel.value = wr.source || 'bass';
+        const curveBtns = document.querySelectorAll('#wave-react-curve .lseg');
+        curveBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.curve === (wr.curve || 'linear')));
+
+        const map = [
+            ['wr-scale',   'scaleAmt',   -1.50, 1.50],
+            ['wr-opacity', 'opacityAmt', -1.00, 1.00],
+            ['wr-mystery', 'mysteryAmt', -1.00, 1.00],
+            ['wr-orbit',   'orbitAmt',    0.00, 1.00],
+        ];
+        const perSrc = wr.perSrc || {};
+        map.forEach(([id, key, min, max]) => {
+            const input = document.getElementById(id);
+            if (!input) return;
+            const v = Number(wr[key] || 0);
+            input.value = v;
+            const valEl = document.getElementById(`${id}-val`);
+            if (valEl) valEl.textContent = v.toFixed(2);
+            input.style.setProperty('--pct', `${((v - min) / (max - min)) * 100}%`);
+            const pill = document.getElementById(`${id}-src`);
+            if (pill) this._renderReactSrcPill(pill, perSrc[key] || '');
+        });
     }
 
     // ─── Motion reactivity (preset-only) ─────────────────────────────────────
@@ -5671,10 +6118,11 @@ export class EditorInspector {
 
     _buildRuntimePreset(state) {
         const runtime = deepClone(state);
-        const injected = buildMotionReactFrameEqs(state.motionReact);
+        const injectedMotion = buildMotionReactFrameEqs(state.motionReact);
+        const injectedWave = buildWaveReactFrameEqs(state.waveReact);
         const baseFrame = runtime.frame_eqs_str || '';
         const fluxLine = 'a.q31=(typeof __dcFlux!=="undefined"?__dcFlux:0);';
-        runtime.frame_eqs_str = [baseFrame, injected, fluxLine].filter(Boolean).join('\n').trim();
+        runtime.frame_eqs_str = [baseFrame, injectedMotion, injectedWave, fluxLine].filter(Boolean).join('\n').trim();
         return runtime;
     }
 
@@ -6937,6 +7385,7 @@ export class EditorInspector {
         this._syncColorSwatches();
         this._syncMotionSliders();
         this._syncMotionReact();
+        this._syncWaveReact();
         this._syncWaveControls();
         this._syncEchoOrient();
         this._syncPaletteSliders();
@@ -6951,6 +7400,8 @@ export class EditorInspector {
     _syncPaletteSliders() {
         this._syncSlider('ps-opacity', this.currentState.paletteOpacity ?? 1.0, 0, 1.0, 2);
         const bv = this.currentState.baseVals;
+        this._syncSlider('ps-glow-strength', bv.ob_a, 0, 1.0, 2);
+        this._syncSlider('ps-accent-strength', bv.ib_a, 0, 1.0, 2);
         this._syncSlider('ps-decay', bv.decay, 0.85, 0.999, 3);
         this._syncSlider('ps-ob-size', bv.ob_size, 0, 0.1, 3);
         this._syncSlider('ps-ob-a', bv.ob_a, 0, 1.0, 2);

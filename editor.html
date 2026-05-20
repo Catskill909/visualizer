@@ -237,11 +237,19 @@
 
                             <p class="section-label">Quick Palettes</p>
                             <div class="palette-grid" id="palette-grid"></div>
+                            <button class="ghost-btn ghost-btn--inline" id="btn-save-mymix" type="button"
+                                data-tooltip="Save current Wave / Glow / Accent colors as a personal chip">
+                                + Save current mix
+                            </button>
+                            <div id="palette-strength-sliders"></div>
 
                             <p class="section-label">Colors</p>
                             <div class="color-rows">
 
                                 <div class="color-row">
+                                    <button class="color-lock-btn" id="lock-wave" type="button"
+                                        data-tooltip="Lock the Wave color so palette chips and Save can't overwrite it"
+                                        aria-pressed="false">🔓</button>
                                     <span class="color-row-label" id="wave-row-label">Wave</span>
                                     <div class="color-swatch-wrap">
                                         <span class="color-swatch" id="swatch-wave" style="background:#ffffff"
@@ -253,6 +261,9 @@
                                 </div>
 
                                 <div class="color-row">
+                                    <button class="color-lock-btn" id="lock-glow" type="button"
+                                        data-tooltip="Lock the Glow color so palette chips can't overwrite it"
+                                        aria-pressed="false">🔓</button>
                                     <span class="color-row-label">Glow</span>
                                     <div class="color-swatch-wrap">
                                         <span class="color-swatch" id="swatch-glow" style="background:#ffffff"
@@ -264,6 +275,9 @@
                                 </div>
 
                                 <div class="color-row">
+                                    <button class="color-lock-btn" id="lock-accent" type="button"
+                                        data-tooltip="Lock the Accent color so palette chips can't overwrite it"
+                                        aria-pressed="false">🔓</button>
                                     <span class="color-row-label">Accent</span>
                                     <div class="color-swatch-wrap">
                                         <span class="color-swatch" id="swatch-accent" style="background:#000000"
@@ -314,7 +328,15 @@
                     <!-- ─── MOTION TAB ─── -->
                     <div id="tab-motion" class="tab-panel" role="tabpanel" hidden>
                         <div class="tab-scroll">
-                            <p class="section-label">Movement</p>
+                            <div class="section-label-row">
+                                <p class="section-label">Motion Presets</p>
+                                <button id="btn-motion-reset" class="mini-btn" type="button"
+                                    data-tooltip="Reset all motion sliders to defaults">↺ Reset</button>
+                            </div>
+                            <div class="motion-presets-grid" id="motion-presets-grid"
+                                role="group" aria-label="Motion presets"></div>
+
+                            <p class="section-label" style="margin-top:16px">Movement</p>
                             <div id="motion-sliders"></div>
 
                             <p class="section-label">Echo Direction</p>
@@ -393,7 +415,11 @@
                     <!-- ─── WAVE TAB ─── -->
                     <div id="tab-wave" class="tab-panel" role="tabpanel" hidden>
                         <div class="tab-scroll">
-                            <p class="section-label">Shape</p>
+                            <div class="section-label-row">
+                                <p class="section-label">Shape</p>
+                                <button id="btn-wave-reset" class="mini-btn" type="button"
+                                    data-tooltip="Hide the wave (no shape drawn)">↺ Reset</button>
+                            </div>
                             <div class="wave-mode-grid" id="wave-mode-grid" role="group" aria-label="Wave shape"></div>
 
                             <p class="section-label">Style</p>
@@ -421,6 +447,33 @@
                                     <span class="toggle-track"><span class="toggle-thumb"></span></span>
                                 </label>
                             </div>
+
+                            <p class="section-label" style="margin-top:16px">Reactivity</p>
+                            <p class="section-note">Audio drives wave size, opacity, shape, and position
+                                independently of Motion reactivity.</p>
+                            <div class="layer-row-inline" style="gap:8px;margin-bottom:6px">
+                                <span class="layer-ctrl-label"
+                                    data-tooltip="Which frequency band drives wave modulation">Source</span>
+                                <select id="wave-react-source" class="layer-react-source">
+                                    <option value="bass">Bass</option>
+                                    <option value="mid">Mid</option>
+                                    <option value="treb">Treble</option>
+                                    <option value="vol">Volume</option>
+                                    <option value="flux">Flux</option>
+                                </select>
+                            </div>
+                            <div class="layer-row-inline" style="gap:8px;margin-bottom:8px">
+                                <span class="layer-ctrl-label"
+                                    data-tooltip="How the signal is shaped before driving wave modulation">Curve</span>
+                                <div id="wave-react-curve" class="layer-react-curve" role="group"
+                                    aria-label="Wave reactivity curve">
+                                    <button class="lseg active" data-curve="linear">Linear</button>
+                                    <button class="lseg" data-curve="squared">Squared</button>
+                                    <button class="lseg" data-curve="cubed">Cubed</button>
+                                    <button class="lseg" data-curve="threshold">Gate</button>
+                                </div>
+                            </div>
+                            <div id="wave-react-sliders"></div>
 
                             <button class="ghost-btn" id="btn-randomize-wave">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -509,7 +562,9 @@
                             data-tooltip="Browse all 1,144 library presets to remix">Remix</button>
                         <button id="btn-new-preset-footer" class="reset-btn" type="button"
                             data-tooltip="Start a fresh preset">+ New</button>
-                        <button id="btn-save" class="save-btn" type="button">Save preset</button>
+                        <button id="btn-surprise" class="reset-btn reset-btn--icon" type="button"
+                            data-tooltip="Surprise — random variation + palette + motion + wave shape" aria-label="Surprise">✨</button>
+                        <button id="btn-save" class="save-btn" type="button">Save</button>
                         <button id="btn-reset" class="reset-btn" type="button">Reset</button>
                     </footer>
 

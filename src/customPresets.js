@@ -475,3 +475,61 @@ export function buildMotionReactFrameEqs(mr) {
         `a.gammaadj=Math.max(0.50,Math.min(4.00,a.gammaadj*(1.0+(_strobe*${strobeAmp}*0.6000))));`,
     ].join('\n');
 }
+
+/**
+ * Build the frame_eqs_str snippet that drives wave-only audio reactivity.
+ * Mirrors buildMotionReactFrameEqs but modulates wave_a / wave_scale /
+ * wave_mystery / wave_x / wave_y instead of motion params. Returns '' when all
+ * amounts are zero (no-op preset).
+ *
+ * Per-target source override: `wr.perSrc` may map an amount key (scaleAmt /
+ * opacityAmt / mysteryAmt / orbitAmt) to a source name (bass/mid/treb/vol/flux).
+ * Empty string falls back to the global `wr.source`. This is what lets a user
+ * pump wave size with bass while morphing shape with treble.
+ *
+ * @param {object} wr - preset.waveReact object (may be null/undefined)
+ */
+export function buildWaveReactFrameEqs(wr) {
+    const conf = wr || {};
+    const srcMap = { bass: 'a.bass', mid: 'a.mid', treb: 'a.treb', vol: 'a.vol', flux: 'a.q31' };
+    const globalSrc = srcMap[conf.source] || 'a.bass';
+    const curve = conf.curve || 'linear';
+    const perSrc = conf.perSrc || {};
+
+    const scaleAmt   = Number(conf.scaleAmt   || 0).toFixed(4);
+    const opacityAmt = Number(conf.opacityAmt || 0).toFixed(4);
+    const mysteryAmt = Number(conf.mysteryAmt || 0).toFixed(4);
+    const orbitAmt   = Number(conf.orbitAmt   || 0).toFixed(4);
+
+    const hasAny = [scaleAmt, opacityAmt, mysteryAmt, orbitAmt]
+        .some(v => Math.abs(Number(v)) > 0.00001);
+    if (!hasAny) return '';
+
+    // Pick the per-target source expression. Falls back to the global source
+    // when no override is set (empty string).
+    const srcExpr = (key) => srcMap[perSrc[key]] || globalSrc;
+
+    const curveOf = (rawVar) => {
+        if (curve === 'squared')   return `${rawVar}*${rawVar}`;
+        if (curve === 'cubed')     return `${rawVar}*${rawVar}*${rawVar}`;
+        if (curve === 'threshold') return `Math.max(0,Math.min(1,(${rawVar}-0.3)*8))`;
+        return rawVar;
+    };
+
+    // Emit one curved value per amount line so a per-target source override
+    // takes effect on that line only. Orbit pulls _wrO from its own source.
+    return [
+        `var _wrS=${curveOf(srcExpr('scaleAmt'))};`,
+        `a.wave_scale=Math.max(0.05,Math.min(5.00,a.wave_scale+_wrS*${scaleAmt}));`,
+        `var _wrA=${curveOf(srcExpr('opacityAmt'))};`,
+        `a.wave_a=Math.max(0.00,Math.min(1.50,a.wave_a+_wrA*${opacityAmt}));`,
+        `var _wrM=${curveOf(srcExpr('mysteryAmt'))};`,
+        `a.wave_mystery=Math.max(-1.00,Math.min(1.00,a.wave_mystery+_wrM*${mysteryAmt}));`,
+        // Orbit traces a small circle around the preset's saved wave_x/wave_y;
+        // the radius scales with audio so quiet = sit still, loud = wide circle.
+        `var _wrO=${curveOf(srcExpr('orbitAmt'))};`,
+        `var _orbR=_wrO*${orbitAmt}*0.15;`,
+        `a.wave_x=Math.max(0.00,Math.min(1.00,a.wave_x+Math.cos(a.time*1.7)*_orbR));`,
+        `a.wave_y=Math.max(0.00,Math.min(1.00,a.wave_y+Math.sin(a.time*1.7)*_orbR));`,
+    ].join('\n');
+}
