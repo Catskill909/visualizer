@@ -10,6 +10,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
         rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"
+        rel="stylesheet" />
     <link rel="stylesheet" href="/src/editor/style.css" />
 </head>
 
@@ -556,16 +558,28 @@
                         </div>
                     </div>
 
-                    <!-- Footer: remix + new + save + reset -->
+                    <!-- Footer: 5 big icon buttons — New / Random / Remix / Save / Reset -->
                     <footer class="panel-footer">
-                        <button id="btn-browse-library" class="reset-btn" type="button"
-                            data-tooltip="Browse all 1,144 library presets to remix">Remix</button>
-                        <button id="btn-new-preset-footer" class="reset-btn" type="button"
-                            data-tooltip="Start a fresh preset">+ New</button>
-                        <button id="btn-surprise" class="reset-btn reset-btn--icon" type="button"
-                            data-tooltip="Surprise — random variation + palette + motion + wave shape" aria-label="Surprise">✨</button>
-                        <button id="btn-save" class="save-btn" type="button">Save</button>
-                        <button id="btn-reset" class="reset-btn" type="button">Reset</button>
+                        <button id="btn-new-preset-footer" class="footer-icon tooltip-up" type="button"
+                            data-tooltip="New" aria-label="New">
+                            <span class="material-symbols-outlined">add</span>
+                        </button>
+                        <button id="btn-random" class="footer-icon tooltip-up" type="button"
+                            data-tooltip="Random" aria-label="Random">
+                            <span class="material-symbols-outlined">casino</span>
+                        </button>
+                        <button id="btn-surprise" class="footer-icon tooltip-up" type="button"
+                            data-tooltip="Remix" aria-label="Remix">
+                            <span class="material-symbols-outlined">shuffle</span>
+                        </button>
+                        <button id="btn-save" class="footer-icon tooltip-up" type="button"
+                            data-tooltip="Save" aria-label="Save">
+                            <span class="material-symbols-outlined">save</span>
+                        </button>
+                        <button id="btn-reset" class="footer-icon tooltip-up" type="button"
+                            data-tooltip="Reset" aria-label="Reset">
+                            <span class="material-symbols-outlined">restart_alt</span>
+                        </button>
                     </footer>
 
                 </div><!-- /panel-edit-content -->

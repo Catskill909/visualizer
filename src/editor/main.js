@@ -384,6 +384,38 @@ function _rpClose() {
     if (search) search.value = '';
 }
 
+// ─── Random bundled preset (footer 🎲 button, RX-2) ─────────────────────────
+//
+// Shares the load path with _rpSelect — same dirty-state check, same
+// loadBundledPreset call, same toast/markDirty/setMode tail. Difference:
+// no picker UI; we just pull a random name from the bundled-names cache
+// and excluded the currently-loaded preset so consecutive clicks reroll.
+async function _loadRandomBundled() {
+    if (!inspector) return;
+    _rpBuild();
+    if (!_rpNames || _rpNames.length === 0) return;
+    if (isDirty) {
+        const proceed = await confirmDirty();
+        if (!proceed) return;
+    }
+    // Exclude the current preset from the pool so back-to-back clicks always reroll.
+    const current = inspector.currentState?.parentPresetName || null;
+    const pool = current ? _rpNames.filter(n => n !== current) : _rpNames;
+    const name = pool[Math.floor(Math.random() * pool.length)];
+    try {
+        inspector.loadBundledPreset(name);
+        const nameInput = document.getElementById('preset-name-input');
+        if (nameInput) nameInput.value = name;
+        activePresetId = null;
+        markDirty();
+        setMode('edit');
+        showToast(`Random: ${name}`);
+    } catch (err) {
+        showToast('Load failed: ' + err.message, true);
+        console.warn('[Studio] Random load failed:', err.message);
+    }
+}
+
 // Static listeners — safe to wire once at module load (they guard on modal.hidden)
 document.getElementById('remix-picker-close')?.addEventListener('click', _rpClose);
 document.getElementById('remix-picker-modal')?.addEventListener('click', e => {
@@ -427,9 +459,6 @@ async function boot(connectAudioFn) {
         engine,
     });
 
-    // Wire "Remix…" button in the Edit panel footer — opens the library picker
-    document.getElementById('btn-browse-library')?.addEventListener('click', _rpOpen);
-
     // Wire New Preset button in the Edit panel footer
     document.getElementById('btn-new-preset-footer')?.addEventListener('click', async () => {
         if (isDirty) {
@@ -438,6 +467,9 @@ async function boot(connectAudioFn) {
         }
         handleLibraryNew();
     });
+
+    // Wire 🎲 Random button — RX-2
+    document.getElementById('btn-random')?.addEventListener('click', _loadRandomBundled);
 
     // Wire mode toggle
     initModeToggle();

@@ -17,7 +17,7 @@
   --panel-w: 340px;
   --hdr-h:   52px;
   --tab-h:   38px;
-  --foot-h:  48px;
+  --foot-h:  58px;
   --font:    'Inter', system-ui, -apple-system, sans-serif;
   --r-s: 4px;
   --r-m: 8px;
@@ -1294,31 +1294,66 @@ html, body {
    ══════════════════════════════════════════════════════════════════════ */
 
 .panel-footer {
-  display: flex; gap: 6px;
-  padding: 9px 10px;
+  display: flex; gap: 8px;
+  padding: 8px 12px;
   border-top: 1px solid var(--border);
   flex-shrink: 0; height: var(--foot-h); align-items: center;
+  justify-content: space-between;
+  overflow: visible; /* let tooltips escape above the footer */
 }
 
-/* Primary CTA — filled white pill, grows to fill remaining space */
-.save-btn {
-  flex: 1; min-width: 0;
-  height: 30px; padding: 0 10px;
-  background: #fff; color: #111;
-  border: none; border-radius: 100px;
-  font-family: var(--font); font-size: 13px; font-weight: 600;
+/* ─── Icon-only footer buttons (Remix Family RX-1, 2026-05-20) ──────────
+   Five equal square icon buttons fill the footer width. No primary-CTA
+   differentiation — all buttons visually equal per discovery aesthetic.
+   Icons rendered via Material Symbols Outlined font from Google Fonts. */
+.footer-icon {
+  flex: 1 1 0; min-width: 0;
+  height: 42px;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent; color: rgba(255,255,255,0.72);
+  border: 1px solid rgba(255,255,255,0.13); border-radius: 12px;
   cursor: pointer;
-  transition: background 0.12s ease, box-shadow 0.12s ease;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.4), 0 0 0 0 rgba(255,255,255,0);
-  white-space: nowrap;
+  transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease, transform 0.06s ease;
+  outline: none;
 }
-.save-btn:hover {
-  background: rgba(255,255,255,0.9);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.45);
+.footer-icon:hover {
+  border-color: rgba(255,255,255,0.32);
+  color: rgba(255,255,255,1);
+  background: rgba(255,255,255,0.06);
 }
-.save-btn:active { background: rgba(255,255,255,0.8); box-shadow: none; }
+.footer-icon:active {
+  background: rgba(255,255,255,0.10);
+  transform: scale(0.96);
+}
+/* No focus ring on mouse click — keyboard-nav users still get an outline. */
+.footer-icon:focus { outline: none; }
+.footer-icon:focus-visible {
+  outline: 2px solid rgba(255,255,255,0.45);
+  outline-offset: 2px;
+}
+.footer-icon .material-symbols-outlined {
+  font-size: 22px;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  line-height: 1;
+}
 
-/* Ghost pill buttons — Remix, +New, Reset */
+/* Force tooltip-up tooltips on footer buttons to center horizontally
+   above each button (the .editor-panel rule otherwise left-aligns them),
+   keep the text short so it never reaches the panel edge, and raise
+   z-index above the canvas. */
+.panel-footer .footer-icon[data-tooltip]::after {
+  left: 50%;
+  transform: translateX(-50%) translateY(3px);
+  z-index: 1000;
+}
+.panel-footer .footer-icon[data-tooltip]:hover::after,
+.panel-footer .footer-icon[data-tooltip]:focus-visible::after {
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ─── .reset-btn / .save-btn — used by modal Save/Cancel buttons
+       throughout editor.html (save-modal, overwrite-modal, dirty-modal,
+       layer-delete, gif-opt). Not used in the footer post-RX-1. ──── */
 .reset-btn {
   flex-shrink: 0;
   height: 30px; padding: 0 11px;
@@ -1335,13 +1370,26 @@ html, body {
   background: rgba(255,255,255,0.07);
 }
 .reset-btn:active { background: rgba(255,255,255,0.11); }
-
-/* Icon-only variant — tight square footprint so a glyph-only button doesn't
-   eat horizontal space when the footer is already dense (e.g. Surprise ✨). */
 .reset-btn--icon {
   width: 30px; padding: 0;
   font-size: 15px; line-height: 1;
 }
+.save-btn {
+  flex: 1; min-width: 0;
+  height: 30px; padding: 0 10px;
+  background: #fff; color: #111;
+  border: none; border-radius: 100px;
+  font-family: var(--font); font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease, box-shadow 0.12s ease;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4), 0 0 0 0 rgba(255,255,255,0);
+  white-space: nowrap;
+}
+.save-btn:hover {
+  background: rgba(255,255,255,0.9);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.45);
+}
+.save-btn:active { background: rgba(255,255,255,0.8); box-shadow: none; }
 
 /* ══════════════════════════════════════════════════════════════════════
    REMIX PICKER MODAL

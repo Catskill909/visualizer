@@ -167,7 +167,7 @@ const BLANK = {
         wave_r: 1.0, wave_g: 1.0, wave_b: 1.0, wave_a: 0.8,
         wave_scale: 1.0, wave_mystery: 0.0,
         wave_smoothing: 0.75, wave_x: 0.5, wave_y: 0.5,
-        wave_thick: 0, additivewave: 0, wave_usedots: 0, wave_brighten: 0,
+        wave_thick: 0, wave_thickness: 0, wave_rot: 0, additivewave: 0, wave_usedots: 0, wave_brighten: 0,
         ob_size: 0.0, ob_r: 0.0, ob_g: 0.0, ob_b: 0.0, ob_a: 0.0,
         ib_size: 0.0, ib_r: 0.0, ib_g: 0.0, ib_b: 0.0, ib_a: 0.0,
         mv_x: 12, mv_y: 9, mv_l: 0.9, mv_r: 0.0, mv_g: 0.0, mv_b: 1.0, mv_a: 0.0,
@@ -271,7 +271,7 @@ const BASE_VARIATIONS = [
             echo_zoom: 1.6,
             wave_mode: 3,
             wave_r: 0.0, wave_g: 0.85, wave_b: 1.0, wave_a: 0.95,
-            wave_scale: 1.4, wave_thick: 1, additivewave: 1,
+            wave_scale: 1.4, wave_thickness: 2, additivewave: 1,
             ob_size: 0.02, ob_r: 0.0, ob_g: 0.25, ob_b: 0.9, ob_a: 0.7,
         },
     },
@@ -283,7 +283,7 @@ const BASE_VARIATIONS = [
             echo_zoom: 1.1,
             wave_mode: 1,
             wave_r: 1.0, wave_g: 1.0, wave_b: 1.0, wave_a: 0.85,
-            wave_scale: 1.8, wave_thick: 1, additivewave: 1,
+            wave_scale: 1.8, wave_thickness: 2, additivewave: 1,
         },
     },
     {
@@ -327,7 +327,7 @@ const BASE_VARIATIONS = [
             echo_zoom: 3.5,
             wave_mode: 0,
             wave_r: 1.0, wave_g: 0.25, wave_b: 0.55, wave_a: 0.9,
-            wave_scale: 0.9, wave_thick: 1,
+            wave_scale: 0.9, wave_thickness: 2,
             ob_size: 0.025, ob_r: 0.9, ob_g: 0.05, ob_b: 0.35, ob_a: 0.75,
         },
     },
@@ -1327,10 +1327,12 @@ export class EditorInspector {
         const configs = [
             { id: 'ws-scale', label: 'Size', min: 0.10, max: 4.0, step: 0.05, value: BLANK.baseVals.wave_scale, key: 'wave_scale' },
             { id: 'ws-opacity', label: 'Opacity', min: 0, max: 1.0, step: 0.01, value: BLANK.baseVals.wave_a, key: 'wave_a' },
+            { id: 'ws-thickness', label: 'Thickness', min: 0, max: 8.0, step: 0.5, value: BLANK.baseVals.wave_thickness, key: 'wave_thickness' },
             { id: 'ws-smoothing', label: 'Smoothing', min: 0, max: 1.0, step: 0.01, value: BLANK.baseVals.wave_smoothing, key: 'wave_smoothing' },
             { id: 'ws-mystery', label: 'Mystery', min: -1.0, max: 1.0, step: 0.01, value: BLANK.baseVals.wave_mystery, key: 'wave_mystery' },
             { id: 'ws-pos-x', label: 'Position X', min: 0, max: 1.0, step: 0.01, value: BLANK.baseVals.wave_x, key: 'wave_x' },
             { id: 'ws-pos-y', label: 'Position Y', min: 0, max: 1.0, step: 0.01, value: BLANK.baseVals.wave_y, key: 'wave_y' },
+            { id: 'ws-rot', label: 'Rotation', min: -180, max: 180, step: 1, value: BLANK.baseVals.wave_rot, key: 'wave_rot' },
         ];
         configs.forEach(cfg => {
             const input = makeSlider(container, cfg);
@@ -1346,35 +1348,14 @@ export class EditorInspector {
             input.addEventListener('pointerup', () => this._postSnap());
         });
 
-        // Thickness — binary on/off rendered as an inline toggle row in the slider container
-        {
-            const row = document.createElement('div');
-            row.className = 'slider-row wave-thick-row';
-            row.innerHTML = `
-              <div class="slider-header">
-                <span class="slider-label">Thickness</span>
-                <label class="toggle-switch toggle-switch--sm" style="margin-left:auto">
-                  <input type="checkbox" id="toggle-thick" role="switch" />
-                  <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                </label>
-              </div>`;
-            container.appendChild(row);
-            const thickCb = row.querySelector('#toggle-thick');
-            thickCb.addEventListener('change', () => {
-                this._preSnap();
-                this.currentState.baseVals.wave_thick = thickCb.checked ? 1 : 0;
-                this._postSnap();
-                this._applyToEngine();
-            });
-        }
-
         document.getElementById('btn-randomize-wave')?.addEventListener('click', () => {
             this._preSnap();
             const bv = this.currentState.baseVals;
             bv.wave_mode = Math.floor(Math.random() * 8);
             bv.wave_scale = 0.3 + Math.random() * 3.2;
             bv.wave_a = 0.4 + Math.random() * 0.6;
-            bv.wave_thick = Math.random() > 0.65 ? 1 : 0;
+            bv.wave_thickness = Math.random() > 0.5 ? 0.5 + Math.random() * 4.5 : 0;
+            bv.wave_thick = 0;
             bv.wave_usedots = Math.random() > 0.80 ? 1 : 0;
             bv.additivewave = Math.random() > 0.65 ? 1 : 0;
             bv.wave_mystery = (Math.random() * 2) - 1;
@@ -1382,6 +1363,7 @@ export class EditorInspector {
             bv.wave_x = 0.3 + Math.random() * 0.4;
             bv.wave_y = 0.3 + Math.random() * 0.4;
             bv.wave_brighten = Math.random() > 0.70 ? 1 : 0;
+            bv.wave_rot = Math.random() > 0.5 ? Math.floor(Math.random() * 360 - 180) : 0;
             this._postSnap();
             this._applyToEngine();
             this._syncWaveControls();
@@ -1401,10 +1383,12 @@ export class EditorInspector {
         const map = [
             ['ws-scale', 'wave_scale', 0.1, 4.0],
             ['ws-opacity', 'wave_a', 0, 1.0],
+            ['ws-thickness', 'wave_thickness', 0, 8.0],
             ['ws-smoothing', 'wave_smoothing', 0, 1.0],
             ['ws-mystery', 'wave_mystery', -1.0, 1.0],
             ['ws-pos-x', 'wave_x', 0, 1.0],
             ['ws-pos-y', 'wave_y', 0, 1.0],
+            ['ws-rot', 'wave_rot', -180, 180],
         ];
         map.forEach(([id, key, min, max]) => {
             const input = document.getElementById(id);
@@ -1415,8 +1399,6 @@ export class EditorInspector {
             if (valEl) valEl.textContent = Number(v).toFixed(2);
             input.style.setProperty('--pct', `${((v - min) / (max - min)) * 100}%`);
         });
-        // Thickness toggle sync
-        this._syncToggle('toggle-thick', 'wave_thick');
         // Toggles
         this._syncToggle('toggle-dots', 'wave_usedots');
         this._syncToggle('toggle-additive', 'additivewave');
@@ -1693,7 +1675,6 @@ export class EditorInspector {
             'toggle-dots': 'wave_usedots',
             'toggle-additive': 'additivewave',
             'toggle-brighten': 'wave_brighten',
-            // toggle-thick is wired in _buildWaveSliders (created dynamically)
         };
         Object.entries(map).forEach(([id, key]) => {
             document.getElementById(id)?.addEventListener('change', (e) => {

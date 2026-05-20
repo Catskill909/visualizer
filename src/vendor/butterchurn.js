@@ -8,9 +8,24 @@
  *   Vendored on  : 2026-05-20
  *
  * DO NOT regenerate this file by re-copying from node_modules. Patches we
- * add (variable wave_thickness, wave_rot, wave_echoes, additional shape
- * modes, etc.) live in this file directly. See milkdrop-dev.md → "Butterchurn
- * fork plan" for the patch list and per-phase context.
+ * add live in this file directly. See milkdrop-dev.md → "Butterchurn fork
+ * plan" for the patch list and per-phase context.
+ *
+ * Applied patches:
+ *   - Phase B (2026-05-20): variable wave stroke width. New baseVal
+ *     `wave_thickness` (0.5–8) replaces binary `wave_thick`. Legacy
+ *     presets fall back via `wave_thick ? 2 : 0`. Touch points:
+ *       • mdVS defaults (~L6553)
+ *       • mixedFrame snap-at-midpoint (~L3028)
+ *       • drawBasicWaveform (~L5914, main + waveMode=7 ripple)
+ *   - Phase C (2026-05-20): wave rotation. New baseVal `wave_rot`
+ *     in degrees (-180 to 180), converted to radians at use. Pivots
+ *     around (wave_x, wave_y) so off-center waves spin in place.
+ *     Applies to all 8 shape modes uniformly. Touch points:
+ *       • mdVS defaults (~L6554)
+ *       • mixedFrame linear mix (~L3030)
+ *       • generateWaveform rotation pass between y-flip and smoothWave
+ *         (~L5896, main + ~L5914 for waveMode=7 ripple second strip)
  *
  * If you want to pull an upstream fix: diff this file against the current
  * node_modules/butterchurn/lib/butterchurn.js, cherry-pick the relevant lines,
@@ -3026,6 +3041,8 @@ function () {
       mixedFrame.echo_orient = mix * mdVSFrame.echo_orient + mix2 * mdVSFramePrev.echo_orient;
       mixedFrame.wave_dots = mix < snapPoint ? mdVSFramePrev.wave_dots : mdVSFrame.wave_dots;
       mixedFrame.wave_thick = mix < snapPoint ? mdVSFramePrev.wave_thick : mdVSFrame.wave_thick;
+      mixedFrame.wave_thickness = mix < snapPoint ? mdVSFramePrev.wave_thickness : mdVSFrame.wave_thickness;
+      mixedFrame.wave_rot = mix * mdVSFrame.wave_rot + mix2 * mdVSFramePrev.wave_rot;
       mixedFrame.additivewave = mix < snapPoint ? mdVSFramePrev.additivewave : mdVSFrame.additivewave;
       mixedFrame.wave_brighten = mix < snapPoint ? mdVSFramePrev.wave_brighten : mdVSFrame.wave_brighten;
       mixedFrame.darken_center = mix < snapPoint ? mdVSFramePrev.darken_center : mdVSFrame.darken_center;
@@ -5885,12 +5902,42 @@ function () {
           this.positions[_i15 * 3 + 1] = -this.positions[_i15 * 3 + 1];
         }
 
+        // DiscoCast fork (Phase C): wave rotation around (wave_x, wave_y).
+        // Pivot y is negated because positions were y-flipped above.
+        var waveRot = (mdVSFrame.wave_rot || 0) * Math.PI / 180;
+        if (waveRot !== 0) {
+          var cos_r = Math.cos(waveRot);
+          var sin_r = Math.sin(waveRot);
+          var cx = wavePosX;
+          var cy = -wavePosY;
+          for (var ri = 0; ri < this.numVert; ri++) {
+            var rx = this.positions[ri * 3 + 0] - cx;
+            var ry = this.positions[ri * 3 + 1] - cy;
+            this.positions[ri * 3 + 0] = rx * cos_r - ry * sin_r + cx;
+            this.positions[ri * 3 + 1] = rx * sin_r + ry * cos_r + cy;
+          }
+        }
+
         this.smoothedNumVert = this.numVert * 2 - 1;
         _waveUtils__WEBPACK_IMPORTED_MODULE_1__["default"].smoothWave(this.positions, this.smoothedPositions, this.numVert);
 
         if (newWaveMode === 7 || oldWaveMode === 7) {
           for (var _i16 = 0; _i16 < this.numVert; _i16++) {
             this.positions2[_i16 * 3 + 1] = -this.positions2[_i16 * 3 + 1];
+          }
+
+          // Mirror rotation for the Ripple-mode second strip.
+          if (waveRot !== 0) {
+            var cos_r2 = Math.cos(waveRot);
+            var sin_r2 = Math.sin(waveRot);
+            var cx2 = wavePosX;
+            var cy2 = -wavePosY;
+            for (var ri2 = 0; ri2 < this.numVert; ri2++) {
+              var rx2 = this.positions2[ri2 * 3 + 0] - cx2;
+              var ry2 = this.positions2[ri2 * 3 + 1] - cy2;
+              this.positions2[ri2 * 3 + 0] = rx2 * cos_r2 - ry2 * sin_r2 + cx2;
+              this.positions2[ri2 * 3 + 1] = rx2 * sin_r2 + ry2 * cos_r2 + cy2;
+            }
           }
 
           _waveUtils__WEBPACK_IMPORTED_MODULE_1__["default"].smoothWave(this.positions2, this.smoothedPositions2, this.numVert);
@@ -5911,9 +5958,15 @@ function () {
         this.gl.vertexAttribPointer(this.aPosLoc, 3, this.gl.FLOAT, false, 0, 0);
         this.gl.enableVertexAttribArray(this.aPosLoc);
         this.gl.uniform4fv(this.colorLoc, this.color);
+        // DiscoCast fork (Phase B): wave_thickness (0.5–8) replaces binary wave_thick.
+        // Legacy presets without wave_thickness fall back to wave_thick ? 2 : 0.
+        var thickness = (mdVSFrame.wave_thickness !== undefined && mdVSFrame.wave_thickness !== 0)
+            ? mdVSFrame.wave_thickness
+            : (mdVSFrame.wave_thick ? 2 : 0);
+        var thickPass = thickness > 0;
         var instances = 1;
 
-        if (mdVSFrame.wave_thick !== 0 || mdVSFrame.wave_dots !== 0) {
+        if (thickPass || mdVSFrame.wave_dots !== 0) {
           instances = 4;
         }
 
@@ -5926,7 +5979,7 @@ function () {
         var drawMode = mdVSFrame.wave_dots !== 0 ? this.gl.POINTS : this.gl.LINE_STRIP; // TODO: use drawArraysInstanced
 
         for (var i = 0; i < instances; i++) {
-          var offset = 2;
+          var offset = thickPass ? thickness : 2;
 
           if (i === 0) {
             this.gl.uniform2fv(this.thickOffsetLoc, [0, 0]);
@@ -5950,7 +6003,7 @@ function () {
           this.gl.enableVertexAttribArray(this.aPosLoc);
 
           for (var _i17 = 0; _i17 < instances; _i17++) {
-            var _offset = 2;
+            var _offset = thickPass ? thickness : 2;
 
             if (_i17 === 0) {
               this.gl.uniform2fv(this.thickOffsetLoc, [0, 0]);
@@ -6545,6 +6598,8 @@ function () {
       additivewave: 0,
       wave_dots: 0,
       wave_thick: 0,
+      wave_thickness: 0,
+      wave_rot: 0,
       wave_a: 0.8,
       wave_scale: 1,
       wave_smoothing: 0.75,

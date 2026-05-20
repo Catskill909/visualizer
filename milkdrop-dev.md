@@ -1,6 +1,6 @@
 # MilkDrop Preset Editor — Dev Notes
 
-Status: phases 1, 3, 6, 7, 8, 10 shipped (2026-05-19 → 2026-05-20). Butterchurn fork **Phase A complete** — vendored copy live + ESM bridge wired. Phase B (variable stroke width) is the next concrete patch. Phase 9 deferred (GLSL territory).
+Status: phases 1, 3, 6, 7, 8, 10 shipped (2026-05-19 → 2026-05-20). Butterchurn fork **Phases A + B + C complete** — vendored copy live + ESM bridge wired + variable wave stroke width + wave rotation. **Remix Family RX-1 + RX-2 shipped** (2026-05-20) — Material-Symbols icon footer + one-click 🎲 Random from 1,144 bundled presets. **Next up: Phase D (wave echoes).** Phase 9 (warp picker) remains deferred.
 
 Last updated: 2026-05-20
 
@@ -10,36 +10,37 @@ Last updated: 2026-05-20
 
 **If you're opening this doc to resume work, this is the only block you need to read.**
 
-### ✅ Shipped
-- **Palette** — bug fix (no forced borders), Glow/Accent Strength sliders (couple alpha+size), hover-preview chips, per-channel 🔓/🔒 locks, "+ Save current mix" (single My Mix slot).
-- **Motion** — 6-preset grid (Vortex/Calm Drift/Earthquake/Tunnel In/Spin Lock/Hyperspace) + ↺ Reset.
-- **Wave** — Reactivity panel (Source/Curve + Size/Opacity/Shape/Orbit sliders, per-slider source pills), Shape Reset, conditional active highlight.
-- **Footer** — ✨ Surprise rolls coherent random combo. "Save preset" → "Save" so it fits.
-- **Universal** — double-click any slider label → reset to default (via `makeSlider`).
+### ✅ Recently shipped
+- **Palette** — bug fix (no forced borders), Glow/Accent Strength sliders, hover-preview chips, per-channel 🔓/🔒 locks, "+ Save current mix" slot.
+- **Motion** — 6-preset grid (Vortex / Calm Drift / Earthquake / Tunnel In / Spin Lock / Hyperspace) + ↺ Reset.
+- **Wave** — Reactivity panel, Shape Reset, conditional active highlight, **Thickness slider 0–8 (fork Phase B)**, **Rotation slider ±180° (fork Phase C)**.
+- **Footer** — ✨ Surprise rolls a coherent random combo (will be renamed `Remix` in RX-1).
+- **Universal** — double-click any slider label → reset to default.
 
-### 🎯 Next: Butterchurn fork — Phase A done, Phase B is next
+### 🎯 Next: Phase D — Wave echoes
 
-**Fork status:** [src/vendor/butterchurn.js](src/vendor/butterchurn.js) is live with an ESM bridge appended; [src/visualizer.js](src/visualizer.js) imports from it. Player + Preset Studio verified working in browser. Bundle size effectively unchanged so far (vendored content is currently bit-identical to the npm source).
+Remix Family is fully shipped (RX-1 icon footer + RX-2 random bundled preset). Footer is 5 Material-Symbols icon buttons: `add` (New), `casino` (Random), `shuffle` (Remix), `save` (Save), `restart_alt` (Reset). 🎲 picks a random name from the 1,144 bundled presets (excluding the current one), confirms-if-dirty, calls `inspector.loadBundledPreset()`, toasts the rolled preset name. Discovery aesthetic preserved — no gray-out / hint banners.
 
-**Recommended remaining sequence:**
-1. ~~Phase A — fork setup.~~ ✅ Shipped 2026-05-20.
-2. **Phase B** — variable stroke width slider. Easiest patch, biggest visible win. ~2 hours.
-3. **Phase C** — wave rotation. Clean uniform transform, applies to all shape modes. ~3 hours.
-4. **Phase D** — wave echoes. Bigger patch, render-loop change. ~half day.
-5. **Phase E** — more shape modes (polygon / lissajous / spiral). Pure additive, low risk. Each ~half day.
-
-**Stop / re-evaluate point:** after Phase B. Once stroke width ships, decide whether the maintenance cost feels acceptable before continuing.
-
-Full per-phase audit and patch plan in §"Butterchurn fork plan" below.
+**Next:** Phase D — wave echoes. Render the wave shape 2/3/4 times per frame in a radial arrangement with optional color cycling. Render-loop wrap; bigger patch (~half day). Full plan in §"Butterchurn fork plan → Phase D" below.
 
 ### 📋 Backlog (no fork needed)
-- Per-slider source override on Motion-react panel (mechanical extension of Phase 8 pattern).
+- **Layer randomization on Remix** — Remix today only re-rolls palette/motion/wave; could also nudge per-layer effects (hue rotate, saturation, mirror toggle, one random VJ effect with subtle params). Pushed later. Safe-vs-unsafe field list in §"Remix Family plan".
+- Per-slider source override on the Motion-react panel (mechanical extension of the wave-tab Phase 8 pattern).
 - Pinned multiple My Mixes (today's single slot → array of N).
-- Variation mix slider — revisit if you want to lerp between same-mode variations only.
+- Variation mix slider — only practical for same-mode pairs; revisit if there's demand.
+- Reset palette section (Motion + Wave tabs have ↺ Reset; Palette doesn't).
+- **Per-wave trail length** — a separate decay on the wave channel so wave trails can be long without the whole frame smearing.
 
 ### ⏸ Deferred indefinitely
-- **Phase 9 — Warp shape picker.** Real GLSL work. The warp shader is a separate module ([node_modules/butterchurn/lib/butterchurn.js:2321](node_modules/butterchurn/lib/butterchurn.js#L2321)), not inline in `butterchurn.js`. See "GLSL future work" section for what this entails if you ever decide to go there.
-- Multi-shape sub-tab (Wave → stack of 1–4 shape entries). Parked — single-wave improvements cover most of the creative payoff for less surface.
+- **Phase 9 — Warp shape picker.** Real GLSL work. The warp shader is a separate webpacked submodule. See §"GLSL future work" for the implementation sketch if we ever revisit.
+- **Multi-shape sub-tab.** Single-wave improvements have covered the creative payoff for less surface.
+- **Gray-out conflicting sliders / motion-is-preset-driven hint banner.** Filed under discovery-aesthetic — see §"Remix Family plan → Discovery aesthetic" for the reasoning. Revisit only if user feedback signals confusion.
+
+### After Remix Family ships: back to engine fork
+1. **Phase D** — wave echoes. Render-loop change. ~half day.
+2. **Phase E** — more shape modes (polygon / lissajous / spiral). ~half day each.
+
+Full per-phase audit and patch plan in §"Butterchurn fork plan" below.
 
 ---
 
@@ -48,8 +49,10 @@ Full per-phase audit and patch plan in §"Butterchurn fork plan" below.
 | Phase | What | State |
 |---|---|---|
 | Fork A | Vendor butterchurn + ESM bridge | **Shipped** 2026-05-20 |
+| Fork B | Variable wave stroke width slider | **Shipped** 2026-05-20 |
+| Fork C | Wave rotation slider | **Shipped** 2026-05-20 |
 | 1 | Palette bug fix + Glow/Accent Strength sliders | **Shipped** |
-| 2 | Wave stroke width + Rotation | **Next** — fork Phase B + C |
+| 2 | Wave stroke width + Rotation | **Shipped** — both fork Phase B + C |
 | 3 | Wave audio reactivity (Source + Curve + FX) | **Shipped** |
 | 4 | Wave Echoes (count + color mode) | **Queued** — fork Phase D |
 | 5 | More wave shape modes | **Queued** — fork Phase E |
@@ -57,8 +60,122 @@ Full per-phase audit and patch plan in §"Butterchurn fork plan" below.
 | 7 | Motion presets grid (+ Reset) | **Shipped** |
 | 8 | Per-slider source override (wave-tab variant) | **Shipped** |
 | 9 | Motion warp shape picker | **Deferred** — GLSL future work |
-| 10 | Surprise button (variation mix slider deferred) | **Partially shipped** |
+| 10 | Surprise button (renaming to Remix in RX-1) | **Shipped** — variation mix slider deferred |
 | polish | Dbl-click-label reset, Wave Shape Reset, Save→Save, no redundant tooltips | **Shipped** |
+| RX-1 | Icon footer layout (5 Material Symbols, instant tooltips, drop library picker, rename Surprise→Remix) | **Shipped** 2026-05-20 |
+| RX-2 | Wire 🎲 Random to load random bundled preset as Studio base | **Shipped** 2026-05-20 |
+| RX-future | Layer randomization on Remix · Gray-out conflicting sliders · Hint banner | **Backlog / Future maybe** — see "Remix Family plan" |
+
+---
+
+## Remix Family plan
+
+### Why this is the next move
+The Studio currently always starts from BLANK. Every "theme" the user sees is a permutation of 12 palettes × 6 motion presets × 8 wave modes on top of a single empty base. That feels like ~12 themes because the underlying engine config (warp shader, frame equations, comp pipeline) never changes — only the surface. The 1,144 bundled presets each ship their own warp + frame_eqs + comp shader; remixing on top of those takes the visual taxonomy from ~12 themes to ~1,144 starting points with zero engine work.
+
+### Final design call (2026-05-20)
+The conceptual model is **main player = browse/discover, Studio = edit/remix**. The Studio doesn't need its own library browser — the main player's preset drawer (P key) already does that, and the user can keystroke between player and Studio (E key). So we drop the existing `Remix` button (which opens a library picker) and replace it with one-click `Random`.
+
+**Footer becomes 5 big icon buttons with instant tooltips** (no labels under the icons, tooltip on hover with zero delay):
+
+```
+ ＋     🎲      🎨       💾     ↺
+New   Random  Remix    Save  Reset
+```
+
+| Icon | Verb | Behavior |
+|---|---|---|
+| ＋ | New | Blank baseline. Existing `+ New` behavior, kept verbatim. |
+| 🎲 | Random | One-click. Picks a random name from the 1,144 bundled presets, loads it into the Studio as the new base. No picker, no menu — just roulette. |
+| 🎨 | Remix | One-click. Re-rolls palette + motion + wave on whatever is currently loaded. **This is the existing Surprise button renamed** — same code path, clearer verb. |
+| 💾 | Save | Existing Save behavior. |
+| ↺ | Reset | Existing Reset behavior. |
+
+**Why this layout works for the discovery aesthetic:** every button does one thing, one click. No dropdowns, no submenus, no "pick a category." The two leftmost set the *base* (blank or random); the middle mutates the *surface* of what's loaded; the two rightmost commit or clear. Left-to-right narrative: *get something / shake it / save or undo.*
+
+**Dropped from the v1 ship:**
+- Library browser inside Studio (the existing Remix button) — main player covers it.
+- Starter packs (curated sub-list) — Random gives the same value with less surface area; if users want curation later we can add it back.
+- "Motion is preset-driven" hint banner / gray-out conflicting sliders — see "Discovery aesthetic" below.
+
+### Discovery aesthetic — what we are NOT doing
+
+When the user remixes a bundled preset, some Studio controls (zoom / decay / echo_zoom / warp / motion vectors) won't visibly affect the output because the bundled preset's `frame_eqs` recompute those values every frame and stomp the slider. Two ways to "fix" this surfaced in design discussion; both are intentionally **not** being shipped:
+
+1. ❌ **Hint banner** ("Motion is preset-driven on this base — try palette, wave, or layers"). Reasoning: the player already starts with random presets out of the box, so users arrive at the Studio already in a "what does this do?" mindset. A banner pre-empts discovery. Lots of sliders are already subtle in their effect; adding an "you can't tell because of X" explainer is the wrong vibe.
+2. ❌ **Gray-out conflicting sliders on load.** Reasoning: same as above, plus the visual complexity of selectively disabling sliders pushes the app toward the "VJ-software-grid-of-knobs" geek aesthetic that this project is deliberately moving away from. The aim is "spin the dial, see what happens," not "carefully read which dials are connected."
+
+**Filed as "possible future plan, low priority":** if user feedback eventually says "I was confused why zoom didn't do anything," revisit. Until then, the discovery aesthetic wins.
+
+### What aligns and what doesn't between Studio controls and bundled presets
+
+Studio controls write to `baseVals` (the engine's starting numeric state at frame 0). Bundled presets have `frame_eqs` (per-frame math) and `pixel_eqs` (per-pixel math) that re-derive many of those same fields every frame. So a Studio slider only "sticks" if no preset eq overwrites that field. Quick taxonomy:
+
+| Studio control | Bundled-preset behavior |
+|---|---|
+| Palette (wave_r/g/b, ob_r/g/b, ib_r/g/b) | **Sticks reliably** — most bundled presets don't touch color in frame_eqs. Palette swap on any of 1,144 presets is a massive creative win. |
+| Wave shape mode / Thickness / Rotation / Size / Pos | **Sticks reliably** — wave geometry is baseVals-driven, rarely scripted in frame_eqs. |
+| Glow / Accent borders (ob_*, ib_*) | **Sticks reliably** — border state is almost never re-derived per frame. |
+| Saturation / Hue Rotate | **Sticks reliably** — `studio_*`-prefixed, lives in the comp shader, separate path. |
+| Invert / Darken / Brighten / Solarize toggles | **Sticks reliably** — boolean comp-shader gates, no frame_eqs override. |
+| Zoom / Decay / Echo zoom / Warp / Rot / Motion vectors | **Often dead** — bundled `frame_eqs` recompute these every frame and stomp the slider in 16ms. Most "named" presets get their character from exactly these equations. |
+| Wave Reactivity panel, Motion Reactivity panel | **Often dead on bundled** — bundled presets already have their own audio mapping baked into frame_eqs. |
+| Image layers / Canvas Mirror / VJ Effects | **Sticks reliably** — separate pipeline, runs after butterchurn renders. |
+
+**User-facing implication:** when remixing a bundled preset, palette + wave + borders + image layers give the most reliable creative leverage. Motion sliders may feel cosmetic. This is acknowledged and accepted per the discovery aesthetic.
+
+### Phase RX-1 — Icon footer layout ✅ Shipped 2026-05-20
+
+**Goal:** convert all five footer buttons to big icon-only buttons with instant tooltips. Drop the existing "Remix" (library picker) button entirely. Rename `btn-surprise` to function as "Remix" (label/tooltip change, same wiring). Add a placeholder `btn-random` icon that is non-functional in this phase — just renders so we can verify spacing/styling before wiring it in RX-2.
+
+Touch points:
+- [editor.html:559-569](editor.html#L559-L569) — replace the 5 footer buttons with the new icon set. The `btn-browse-library` element gets deleted. `btn-surprise` keeps its id but its tooltip changes to "Remix — re-roll palette + motion + wave". A new `btn-random` icon button is added.
+- [src/editor/main.js:430-431](src/editor/main.js#L430-L431) — delete the `btn-browse-library` listener since the element is gone.
+- [src/editor/style.css](src/editor/style.css) — adjust `.reset-btn--icon` (or add a new `.footer-icon` class) so all five footer buttons render at ~44–48px square. Confirm the existing `data-tooltip` system supports zero-delay (may need a CSS tweak).
+
+**Open questions before code:**
+- What icon for Remix? Options: 🎨 (paintbrush palette), 🌀 (swirl — implies mutation), 🎭 (mask — implies variation). Lean toward 🎨.
+- Save icon: 💾 (floppy — clear) or 📥 (download — modern but ambiguous)?
+- Does the existing `data-tooltip` CSS render instantly, or is there a hover delay?
+
+**Estimated effort:** 2 hours including icon selection and tooltip-delay verification.
+
+**Done = footer renders with 5 icons in a clean row, every button shows a tooltip on hover with zero delay, all existing behaviors (+ New / Remix / Save / Reset) work, Random button renders but is inert.**
+
+### Phase RX-2 — Wire 🎲 Random to load random bundled preset ✅ Shipped 2026-05-20
+
+**Goal:** clicking 🎲 picks a random name from `presetRegistry.getBundledNames()` and loads it into the Studio as the new base. One click, no confirmation modal (unless there's a dirty-state).
+
+**Open questions to resolve in the planning step before code:**
+- Does `presetRegistry.getByName()` return a preset object the Studio's `loadPresetData()` can consume directly, or is there a shape mismatch between bundled-preset format (`shapes`/`waves`/`warp`/`comp`/`init_eqs`/`frame_eqs`/`pixel_eqs` + `baseVals`) and Studio's saved format (`baseVals` + `images` + a few extras)?
+- If there's a mismatch: do we adapt the loader, or write a translator that strips bundled presets to a Studio-compatible subset?
+- Dirty-state behavior — reuse the same `confirmDirty()` flow that `+ New` already uses.
+
+**Estimated effort:** 3–4 hours including the shape-mismatch resolution.
+
+**Done = clicking 🎲 loads a random bundled preset into the Studio, the editing surfaces (palette/wave/etc.) wrap around it correctly, dirty-state is respected, no console errors across 20+ random clicks.**
+
+### Stop-and-evaluate gate
+
+After **Phase RX-2 ships**: pause and confirm the random-bundled loader actually delivers the "1,144 starting points" experience without surfacing weird presets (engine errors, completely black outputs, presets with custom shaders that crash the Studio). If yes → call the Remix Family v1 done. If no → fix failure modes before any further work in this area.
+
+### Future maybe — layer randomization on Remix
+
+Today's Remix (post-RX-1) re-rolls palette/motion/wave on the current state but doesn't touch image/video/text layers. A future expansion could nudge per-layer effects too:
+
+**Suggested safe set per layer** (preserves user content, adds visual variety):
+- Hue rotate (random 0–360°)
+- Saturation (random 0.7–1.5)
+- Canvas Mirror / per-tile mirror toggle (30% chance)
+- One random VJ effect (chromatic aberration / scan lines / film grain / pixelate / threshold) with subtle params
+- Tile mode: if already tiling, nudge cols/rows by ±1
+
+**Explicitly skip** (would destroy the layer):
+- Position, scale, opacity, content swap
+- Speed/direction (would break video sync)
+- Border feather/width changes (visual noise, low payoff)
+
+Effort: ~1–2 hours when scheduled. Pushed back from initial Remix Family v1 to keep RX-1/RX-2 scope tight.
 
 ---
 
@@ -101,9 +218,9 @@ We `import butterchurn from 'butterchurn'` in [src/visualizer.js:5](src/visualiz
 
 ---
 
-### Phase B — Variable wave stroke width
+### Phase B — Variable wave stroke width ✅ Shipped 2026-05-20
 
-**Goal:** replace the binary Thickness toggle with a real 0.5–8 px slider.
+**Goal:** replace the binary Thickness toggle with a real 0–8 slider.
 
 **Current engine behavior** ([node_modules/butterchurn/lib/butterchurn.js:5895-5925](node_modules/butterchurn/lib/butterchurn.js#L5895-L5925)):
 ```js
@@ -140,7 +257,7 @@ Touch points: ~10 lines around L5898–L5925 in `drawBasicWaveform`.
 
 ---
 
-### Phase C — Wave rotation
+### Phase C — Wave rotation ✅ Shipped 2026-05-20
 
 **Goal:** rotate the active wave shape around its own center.
 
@@ -288,6 +405,67 @@ This works because the UMD wrapper's `else root["butterchurn"] = factory()` bran
 
 **Bundle impact**: zero so far (vendored content is bit-identical to npm). Will grow with each patch we add.
 
+### Fork Phase B — Variable wave stroke width (2026-05-20)
+Replaced the binary Thickness toggle (`wave_thick: 0|1`) with a continuous Thickness slider driving new field `wave_thickness` (range 0–8, step 0.5, default 0). Slider sits between Opacity and Smoothing in the Wave-tab Style sliders, so it inherits double-click-label-to-reset for free via `makeSlider()`.
+
+**Engine patch** ([src/vendor/butterchurn.js](src/vendor/butterchurn.js)):
+- New `mdVS` default `wave_thickness: 0` at ~L6553.
+- New `mixedFrame.wave_thickness = mix < snapPoint ? prev : curr` line in the preset-blend mixer (~L3029) — snap-at-midpoint, matching `wave_thick`'s behavior. Linear-mixing the field would have produced an odd "growing line" effect during 8-second crossfades; snap is cleaner.
+- In `drawBasicWaveform` (~L5914) and the mirrored waveMode=7 (Ripple) block (~L5952): replaced `var offset = 2;` with `var offset = thickPass ? thickness : 2;` where `thickness = wave_thickness || (wave_thick ? 2 : 0)`. The 4-instance diagonal pattern is preserved; the offset between passes is what scales now. Dots mode (`wave_dots != 0`) is preserved with offset=2 because it depends on the fixed-diagonal fake-size pattern.
+
+**The compat fallback (the load-bearing piece):** `thickness = wave_thickness || (wave_thick ? 2 : 0)`. Legacy presets in localStorage that still have `wave_thick: 1` render with offset=2 (visually identical to before) without a normalizer pass. Resaving them through the editor naturally migrates to `wave_thickness` going forward.
+
+**Editor patch** ([src/editor/inspector.js](src/editor/inspector.js)):
+- Added `wave_thickness: 0` to `BLANK.baseVals` (L170); left `wave_thick: 0` in place for explicit legacy save fidelity.
+- Three Motion Presets (Vortex, Storm, Bloom) updated from `wave_thick: 1` → `wave_thickness: 2` so they write the new field directly.
+- Slider config inserted into `_buildWaveSliders` configs array between Opacity and Smoothing.
+- Deleted the dynamically-injected `<input id="toggle-thick">` block (~21 lines) and its `_syncToggle('toggle-thick', 'wave_thick')` mirror in `_syncWaveControls`.
+- Cleaned up the now-misleading comment in the toggles binding map.
+- Randomize updated to roll continuous thickness — 50% chance of 0 (hairline), otherwise 0.5–5.0 random.
+
+**Done check passed**: slider drags 0 → 8 smoothly, label reads back in 0.5 steps, double-click resets to 0, all 8 shape modes including Ripple honor the new width, dots mode unaffected, save+reload round-trips the value, legacy preset with `wave_thick: 1` still renders bold without resave.
+
+### Fork Phase C — Wave rotation (2026-05-20)
+Added a Rotation slider (-180° to 180°, step 1, default 0) to the Wave-tab Style sliders, below Position Y. Drives new field `wave_rot` (stored in degrees; engine converts to radians at use).
+
+**Engine patch** ([src/vendor/butterchurn.js](src/vendor/butterchurn.js)):
+- `wave_rot: 0` added to mdVS defaults (~L6555).
+- `mixedFrame.wave_rot = mix * curr + mix2 * prev` linear mix in the preset-blend mixer (~L3030). Unlike `wave_thick`/`wave_thickness` (which snap at midpoint), rotation is continuous and benefits from a smooth ease through preset transitions.
+- Rotation pass inserted in `generateWaveform` after the y-flip and before `smoothWave` (~L5896). Reads `wave_rot` (degrees), converts to radians, rotates `this.positions[]` around the pivot `(wavePosX, -wavePosY)` — the y-component is negated because positions are y-flipped immediately above. Mirrored block inserted for `this.positions2[]` in the Ripple-mode (waveMode=7) branch.
+
+**Why pivot after the y-flip, not before:** the y-flip is a coordinate-system fix-up baked into the engine — every shape mode writes positions in a "normal" math-y-up frame, then the flip flips them to screen-y-down for GL. If rotation happened before the flip, the resulting visual direction would feel inverted (positive angles rotate the wrong way). Doing it after the flip means a positive `wave_rot` produces a visually clockwise rotation, which is what every user intuitively expects.
+
+**Editor patch** ([src/editor/inspector.js](src/editor/inspector.js)):
+- `wave_rot: 0` added to `BLANK.baseVals` next to `wave_thickness`.
+- Rotation slider config appended to `_buildWaveSliders` after Position Y.
+- `_syncWaveControls` map gets `['ws-rot', 'wave_rot', -180, 180]`.
+- Randomize rolls 50/50 between 0 and a random angle in [-180, 180].
+
+**Backwards compat:** none needed. Old presets load through `BLANK` overlay; missing `wave_rot` defaults to 0 (no rotation), engine reads 0 and skips the rotation pass entirely.
+
+**Done check passed**: slider drags -180 → 180 smoothly, double-click resets to 0, all 8 shape modes rotate including Ripple's second strip, off-center waves (wave_x/y ≠ 0.5) pivot around their anchor rather than canvas center, `wave_thickness > 0` rotates with the wave (no shear), preset cross-fade eases the angle smoothly.
+
+### Remix Family RX-1 — Material-Symbols icon footer (2026-05-20)
+Replaced the five-pill footer (Remix / + New / ✨ Surprise / Save / Reset) with five equal-weight icon buttons rendered via Material Symbols Outlined (Google Fonts). Order: `add` (New) · `casino` (Random) · `shuffle` (Remix) · `save` (Save) · `restart_alt` (Reset). Tooltips are single words ("New", "Random", "Remix", "Save", "Reset") positioned above each button via `tooltip-up` and explicitly centered via a `.panel-footer` selector that overrides the global `.editor-panel [data-tooltip]::after` left-align rule.
+
+**Design iterations during the ship:**
+1. **First pass used color emojis (＋/🎲/🎨/💾/↺)** — visually inconsistent (mix of monochrome glyphs and color emojis), and Save retained a white-pill primary-CTA treatment that felt unbalanced against four ghost-pill peers. Both rejected.
+2. **Second pass** swapped emojis for Material Symbols, killed the Save white-pill (Save now visually equal to the other four — discovery aesthetic prefers equality over CTA emphasis), added `outline: none` on `:focus` with a proper `:focus-visible` ring (keyboard-only focus indicator so mouse clicks don't leave a halo), and shortened tooltips from sentences to single words so they fit centered above each ~57px button without extending past the panel edge.
+
+**Footer height bumped** `--foot-h: 48px` → `58px` to accommodate 42px buttons + 8px vertical padding.
+
+**Dormant code intentionally preserved:** the Remix Picker modal (`_rpOpen` / `_rpRender` / `_rpSelect` etc. in main.js, `.remix-picker-*` CSS, modal markup in editor.html) is still in the file but unreachable — its only entry point (`btn-browse-library`) was deleted. The `_rpSelect` function calls `inspector.loadBundledPreset(name)`, which is the load mechanism RX-2 reused. The dormant picker code can be removed in a later cleanup pass; leaving it now keeps the diff small.
+
+### Remix Family RX-2 — 🎲 Random bundled preset (2026-05-20)
+Clicking 🎲 picks a random preset name from the 1,144 bundled presets and loads it into the Studio as a new base. One click; no picker UI; reuses `inspector.loadBundledPreset()` which already overlays bundled `baseVals` + `shapes` + `waves` + `warp` + `comp` + `init_eqs_str` + `frame_eqs_str` + `pixel_eqs_str` onto the Studio state and sets `parentPresetName` for save provenance.
+
+**Implementation:** new `_loadRandomBundled()` helper in [src/editor/main.js](src/editor/main.js), parallel to `_rpSelect`. Builds the bundled-names cache via `_rpBuild()` (idempotent — reuses the same `_rpNames` cache the dormant picker built), checks `isDirty` and prompts via the existing `confirmDirty()` dialog, excludes the currently-loaded preset from the random pool so consecutive 🎲 clicks always reroll, calls `loadBundledPreset(randomName)` inside try/catch, updates the preset-name input field, clears `activePresetId`, marks dirty, toasts `Random: <name>` so the user knows what they rolled.
+
+**Open questions from the plan, resolved during implementation:**
+- Shape mismatch — none. `loadBundledPreset` already handles the bundled→Studio format gap.
+- Dirty-state — reused `confirmDirty()` 1:1 from `_rpSelect`.
+- Where to grab names — reused `_rpNames` cache from the dormant picker via `_rpBuild()`.
+
 ### Phase 1 — Palette bug fix + Strength sliders
 Two surfaces were silently forcing border state on every color change: `_applyPalette()` and the individual Glow/Accent color-swatch handlers in `_bindColorSwatches()`. Both wrote `ob_a = 0.75` (and conditionally `ib_a = 0.5`) plus default sizes whenever the user picked a color, producing the "palettes add several borders" symptom. Both fixed — color writes now do colors only.
 
@@ -309,10 +487,12 @@ The "↺ Reset" button beside the section header calls `_resetMotion()` which sn
 ### Phase 8 — Per-slider source override (wave-tab)
 The original brainstorm ("pick which motion param audio modulates") turned out to be already covered by per-amount sliders on `motionReact`. Shipped the meaningful next step on the **wave-tab** instead: each of the 4 wave-react sliders gets a small "src" pill in its header. Click cycles `· → B → M → T → V → F → ·`. Override (`·` = "use global source") shown as inverted (white background). Eq builder rewritten to emit per-amount `_raw` lines so each slider can pull from a different source on the same frame. Unlocks combos like "bass pumps wave size while treble morphs shape." Motion-tab pattern unchanged — extending to motion is mechanical follow-up.
 
-### Phase 10 — Surprise button (partial)
+### Phase 10 — Surprise button
 **Shipped:** `✨` icon-only button in the editor footer. Rolls random variation → random palette → random motion preset → wave-randomize, all using existing apply methods. Each step uses its own snap, so the surprise can be step-undone back to the starting state. Wired in `_bindSurpriseButton()`.
 
-**Deferred:** the variation mix slider. The brainstorm imagined a 0→100% lerp between two variations, but solid-mode variations (`Solid`, `Shift`) use a different comp shader pipeline than feedback-mode variations — there's no clean midpoint between the two. A mix slider would only work for same-mode pairs, which is fragile UX.
+**Renamed in RX-1 (2026-05-20):** the button kept its `btn-surprise` id and wiring but its label/tooltip/aria-label all became "Remix" — clearer verb for "re-roll palette + motion + wave on the current state." The `🎨 shuffle` Material Symbol replaced the ✨ emoji.
+
+**Deferred indefinitely:** the variation mix slider. The brainstorm imagined a 0→100% lerp between two variations, but solid-mode variations (`Solid`, `Shift`) use a different comp shader pipeline than feedback-mode variations — there's no clean midpoint between the two. A mix slider would only work for same-mode pairs, which is fragile UX.
 
 ### Polish (2026-05-20)
 - **Dbl-click slider label → default.** Extended `makeSlider()` so every slider built by the helper now wires a `dblclick` on its label to reset to its initial `value`. Dispatches a synthetic pointerdown/input/pointerup sequence so the reset is undoable through the existing snap pipeline. CSS rule `.slider-label.is-resettable` adds the dashed-underline cursor hint. Doesn't affect the hardcoded palette-opacity slider in markup (its existing handler is unchanged and still works).
@@ -331,18 +511,13 @@ Four tabs:
 |---|---|
 | **Palette** | Palette Opacity, Start-from variations (8), Pulse & Breath, 12 Quick Palettes + optional "My Mix" 13th chip + "+ Save current mix" button, Glow Strength + Accent Strength sliders, 3 color rows with per-channel 🔓/🔒 locks, Appearance sliders (Trail / Border Size & Alpha × outer + inner / Wave-fade / Saturation / Hue Rotate), Invert / Darken / Brighten / Solarize toggles |
 | **Motion** | **Motion Presets grid (6) + ↺ Reset**, Movement sliders, Echo Direction segmented, Drift & Stretch, Warp Center, Reactivity panel (Source + Curve + 6 amount sliders + Shrink + 5 FX amounts + Beat Sensitivity) |
-| **Wave** | 8 Shape modes + **↺ Reset** (highlight conditional on `wave_a > 0`), Style sliders (Size/Opacity/Smoothing/Mystery/PosX/PosY + Thickness toggle), Options toggles (Dots/Additive/Brighten), **Reactivity panel (Source + Curve + 4 sliders with per-slider source pills)**, Randomize |
+| **Wave** | 8 Shape modes + **↺ Reset** (highlight conditional on `wave_a > 0`), Style sliders (Size/Opacity/**Thickness 0–8**/Smoothing/Mystery/PosX/PosY/**Rotation ±180°**), Options toggles (Dots/Additive/Brighten), **Reactivity panel (Source + Curve + 4 sliders with per-slider source pills)**, Randomize |
 | **Layers** | Canvas Mirror (incl. Kaleido), up to 5 layers (image / video / GIF / text), full per-layer effect pipeline |
 
-**Footer:** Remix · + New · ✨ Surprise · Save · Reset.
+**Footer:** 5 Material Symbols icon buttons — `add` (New) · `casino` (🎲 Random) · `shuffle` (Remix) · `save` (Save) · `restart_alt` (Reset). Single-word tooltips above each button, instant on hover.
 
 Every slider built via `makeSlider()` supports **double-click on the label to reset to default**.
 
 ---
 
-## Backlog (no fork needed)
-
-- **Extend per-slider source override to the Motion-react panel.** Same pattern shipped on wave-react; mechanical to extend once the wave-tab UX is validated.
-- **Per-wave trail length.** A separate decay on the wave channel so wave trails can be long without the whole frame smearing. Doable via post-render shader or by injecting a wave-specific alpha cap.
-- **Pinned multiple My Mixes.** Today's single slot is intentional. If users want a row of saved chips, generalize the storage key to an array and render N saved chips.
-- **Reset palette section.** Motion + Wave tabs have a ↺ Reset button; Palette doesn't. Could ship "Reset palette to defaults" for symmetry.
+Backlog and deferred items live in §"Pick up here" at the top of this doc.
