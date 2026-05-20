@@ -1,6 +1,6 @@
 # MilkDrop Preset Editor — Dev Notes
 
-Status: phases 1, 3, 6, 7, 8, 10 shipped (2026-05-19 → 2026-05-20). Phases 2, 4, 5 next via butterchurn fork. Phase 9 deferred (GLSL territory).
+Status: phases 1, 3, 6, 7, 8, 10 shipped (2026-05-19 → 2026-05-20). Butterchurn fork **Phase A complete** — vendored copy live + ESM bridge wired. Phase B (variable stroke width) is the next concrete patch. Phase 9 deferred (GLSL territory).
 
 Last updated: 2026-05-20
 
@@ -17,11 +17,12 @@ Last updated: 2026-05-20
 - **Footer** — ✨ Surprise rolls coherent random combo. "Save preset" → "Save" so it fits.
 - **Universal** — double-click any slider label → reset to default (via `makeSlider`).
 
-### 🎯 Next: Butterchurn fork — start with Phase A
-**Why now:** the four highest-impact deferred features (variable stroke width, wave rotation, wave echoes, more shape modes) all need engine ownership. The fork itself is mechanical; the patches per feature range from 2 hours (stroke width) to a day (echoes).
+### 🎯 Next: Butterchurn fork — Phase A done, Phase B is next
 
-**Recommended starting sequence:**
-1. **Phase A** — set up the fork (no new feature, just prove the swap works). ~1 hour.
+**Fork status:** [src/vendor/butterchurn.js](src/vendor/butterchurn.js) is live with an ESM bridge appended; [src/visualizer.js](src/visualizer.js) imports from it. Player + Preset Studio verified working in browser. Bundle size effectively unchanged so far (vendored content is currently bit-identical to the npm source).
+
+**Recommended remaining sequence:**
+1. ~~Phase A — fork setup.~~ ✅ Shipped 2026-05-20.
 2. **Phase B** — variable stroke width slider. Easiest patch, biggest visible win. ~2 hours.
 3. **Phase C** — wave rotation. Clean uniform transform, applies to all shape modes. ~3 hours.
 4. **Phase D** — wave echoes. Bigger patch, render-loop change. ~half day.
@@ -46,6 +47,7 @@ Full per-phase audit and patch plan in §"Butterchurn fork plan" below.
 
 | Phase | What | State |
 |---|---|---|
+| Fork A | Vendor butterchurn + ESM bridge | **Shipped** 2026-05-20 |
 | 1 | Palette bug fix + Glow/Accent Strength sliders | **Shipped** |
 | 2 | Wave stroke width + Rotation | **Next** — fork Phase B + C |
 | 3 | Wave audio reactivity (Source + Curve + FX) | **Shipped** |
@@ -269,6 +271,22 @@ Currently butterchurn ships ONE warp shader compiled at engine init. Switching w
 ---
 
 ## Shipped notes (detail per phase)
+
+### Fork Phase A — Vendor + ESM bridge (2026-05-20)
+Copied `node_modules/butterchurn/lib/butterchurn.js` (6,738 lines, v2.6.7) to [src/vendor/butterchurn.js](src/vendor/butterchurn.js). Prepended a header comment block + appended an **ESM bridge** at the bottom. Updated [src/visualizer.js](src/visualizer.js) to import from `./vendor/butterchurn.js` instead of `'butterchurn'`.
+
+**The gotcha (don't repeat):** the upstream file is a UMD bundle (CJS/AMD/global, no ESM exports). Vite handles UMD inside `node_modules` automatically via its CJS interop, but **not for local files** — local files are treated as ESM by default. The first swap attempt failed at runtime with *"The requested module … does not provide an export named 'default'"*. The fix is the ESM bridge appended to the file:
+
+```js
+// At the very end of src/vendor/butterchurn.js:
+export default window.butterchurn;
+```
+
+This works because the UMD wrapper's `else root["butterchurn"] = factory()` branch fires when neither `module.exports`, `define.amd`, nor `exports` is available (true in browser ESM), assigning to `window.butterchurn`. The subsequent `export default` re-exports that. The `// sourceMappingURL` line was also stripped to silence a "missing map file" warning in the dev console (we didn't vendor the `.js.map` file).
+
+**Build warnings to ignore**: `COMMONJS_VARIABLE_IN_ESM` at L21 (`module.exports = factory();`) and L25 (`exports["butterchurn"] = factory();`). These flag CJS-style code inside an ESM file. Both branches are dead code at runtime in a browser ESM context (the `typeof exports === 'object'` guards short-circuit), so the warnings are noise.
+
+**Bundle impact**: zero so far (vendored content is bit-identical to npm). Will grow with each patch we add.
 
 ### Phase 1 — Palette bug fix + Strength sliders
 Two surfaces were silently forcing border state on every color change: `_applyPalette()` and the individual Glow/Accent color-swatch handlers in `_bindColorSwatches()`. Both wrote `ob_a = 0.75` (and conditionally `ib_a = 0.5`) plus default sizes whenever the user picked a color, producing the "palettes add several borders" symptom. Both fixed — color writes now do colors only.

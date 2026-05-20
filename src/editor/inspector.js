@@ -19,7 +19,7 @@ import {
     shouldOptimize, getRecommendedSettings, formatBytes,
     estimateGpuMemory
 } from './gifOptimizer.js';
-import { transcodeTo720p, needsTranscode } from '../videoTranscoder.js';
+import { transcodeTo720p, needsTranscode, stripAudio } from '../videoTranscoder.js';
 
 // ─── Phase 1: layer limits + upload resize ───────────────────────────────────
 // Cap surface area for Phase 1. Internals (shader builder, state array) are
@@ -2927,6 +2927,12 @@ export class EditorInspector {
     // ─── Add a video layer ─────────────────────────────────────────────────────
     // Videos are single-instance (no tiling), with playback controls and color grading.
     // Auto-transcodes oversized videos to 720p using FFmpeg.wasm.
+    //
+    // Invariant: every video stored in this app MUST be audio-free. Oversized
+    // videos lose audio via `-an` in `transcodeTo720p`; all other videos pass
+    // through `stripAudio` below. Audio-laden video elements grabbed the
+    // MediaSession in WKWebView and broke the main audio player — see
+    // milkdrop-dev.md "Video audio strip" entry.
 
     async _addVideoLayer(file, opts = {}) {
         const isStackedAlpha = !!opts.isStackedAlpha;
@@ -2945,8 +2951,9 @@ export class EditorInspector {
         video.preload = 'metadata';
         video.playsInline = true;  // Critical for WKWebView inline playback
         video.muted = true;        // WKWebView autoplay requires muted initially
+        video.volume = 0;          // Belt-and-suspenders — audio is already stripped, but never trust the file
         video.loop = true;         // Required for continuous playback
-        const videoUrl = URL.createObjectURL(file);
+        let videoUrl = URL.createObjectURL(file);
 
         let videoWidth = 0;
         let videoHeight = 0;
@@ -3001,9 +3008,36 @@ export class EditorInspector {
                     return;
                 }
             } else {
-                // Non-transcoded path: keep original blob URL valid
-                // Don't revoke - video element still needs it
-                // finalVideoUrl will be used in texObj for texture system
+                // Non-transcoded path: strip audio via FFmpeg remux (no re-encode,
+                // a few seconds even on 50MB+ clips). Oversized videos already lose
+                // audio via `-an` in transcodeTo720p above. See invariant block at
+                // top of _addVideoLayer for why this is non-negotiable.
+                URL.revokeObjectURL(videoUrl);
+                try {
+                    showToast('Stripping audio from video…');
+                    file = await stripAudio(file);
+                } catch (stripErr) {
+                    console.error('[Editor] Audio strip failed:', stripErr);
+                    showToast('Could not strip audio from video', true);
+                    return;
+                }
+                // Rebuild the probe element from the stripped file so finalVideo
+                // (which is set to `video` below) plays the audio-free version.
+                video.src = '';
+                video.load();
+                videoUrl = URL.createObjectURL(file);
+                try {
+                    await new Promise((resolve, reject) => {
+                        const timer = setTimeout(() => reject(new Error('reload timeout')), 10000);
+                        video.onloadedmetadata = () => { clearTimeout(timer); resolve(); };
+                        video.onerror = () => { clearTimeout(timer); reject(new Error('reload failed')); };
+                        video.src = videoUrl;
+                    });
+                } catch (e) {
+                    URL.revokeObjectURL(videoUrl);
+                    showToast('Could not reload stripped video', true);
+                    return;
+                }
             }
         } catch (err) {
             URL.revokeObjectURL(videoUrl);
@@ -3023,6 +3057,7 @@ export class EditorInspector {
             finalVideo = document.createElement('video');
             finalVideo.playsInline = true;
             finalVideo.muted = true;
+            finalVideo.volume = 0;        // Audio stripped at transcode (-an); guard anyway
             finalVideo.loop = true;
             finalVideo.preload = 'auto';  // Changed from 'metadata' for continuous playback
             finalVideoUrl = URL.createObjectURL(file);
@@ -7647,12 +7682,19 @@ export class EditorInspector {
                     video.preload = 'metadata';
                     video.playsInline = true;
                     video.muted = true;
+                    video.volume = 0;       // Stored blobs are audio-stripped at upload/import; guard anyway
                     video.loop = true;
                     await new Promise((res, rej) => {
                         video.onloadedmetadata = res;
                         video.onerror = () => rej(new Error('Video metadata failed'));
                         video.src = videoUrl;
                     });
+                    // Self-test: warn if a stored video still reports audio tracks.
+                    // Means the upload/import strip step missed it — file a bug.
+                    const trackCount = video.audioTracks?.length;
+                    if (trackCount && trackCount > 0) {
+                        console.warn('[Studio] Stored video has audio tracks — strip step missed it:', savedEntry.fileName, 'tracks:', trackCount);
+                    }
                     const isStackedAlpha = !!savedEntry.isStackedAlpha;
                     const entry = this._normalizeImageEntry(deepClone(savedEntry));
                     entry.texW = video.videoWidth;

@@ -2,7 +2,10 @@
  * VisualizerEngine — Wraps Butterchurn for audio visualization
  * Loads ~1,100 presets from official packs + Baron community pack
  */
-import butterchurnImport from 'butterchurn';
+// Vendored copy — see src/vendor/butterchurn.js header + milkdrop-dev.md
+// for the fork plan and patch list. npm `butterchurn` stays installed for
+// upstream diffing but is no longer what runs.
+import butterchurnImport from './vendor/butterchurn.js';
 import butterchurnPresetsImport from 'butterchurn-presets';
 import butterchurnPresetsExtra from 'butterchurn-presets/lib/butterchurnPresetsExtra.min.js';
 import butterchurnPresetsExtra2 from 'butterchurn-presets/lib/butterchurnPresetsExtra2.min.js';

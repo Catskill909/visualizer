@@ -332,6 +332,22 @@ export async function importPreset(json) {
                 }
             }
 
+            // Strip audio from any video that didn't already pass through the
+            // macOS stacked-alpha transcoder above (which strips audio as a
+            // side effect of re-encoding). Mirrors the invariant in
+            // _addVideoLayer — no stored video may carry an audio track.
+            if (img.type === 'video' && (blob.type === 'video/mp4' || blob.type === 'video/quicktime' || blob.type === 'video/webm')) {
+                try {
+                    // Dynamic import keeps FFmpeg.wasm out of the main app bundle.
+                    const { stripAudio } = await import('./videoTranscoder.js');
+                    const tmpFile = new File([blob], imgClean.fileName || 'video', { type: blob.type });
+                    const stripped = await stripAudio(tmpFile);
+                    blob = stripped;
+                } catch (stripErr) {
+                    console.warn('[Import] Audio strip failed; storing original blob:', stripErr);
+                }
+            }
+
             const newId = generateId();
             await storeImage(newId, blob);
             // Video layers use videoId, image layers use imageId

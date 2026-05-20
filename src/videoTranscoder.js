@@ -101,6 +101,45 @@ export async function transcodeTo720p(file, onProgress = null) {
 }
 
 /**
+ * Strip the audio track from a video without re-encoding the video stream.
+ * Lossless remux (`-c:v copy -an`) — finishes in seconds even on 50MB+ clips.
+ *
+ * Invariant: every video that enters this app must pass through here (or
+ * `transcodeTo720p`, which also strips audio via `-an`). Audio-laden video
+ * elements can grab the MediaSession in WKWebView and disrupt the main
+ * audio player. We never use video audio in this app, so it's safe to drop.
+ */
+export async function stripAudio(file) {
+  const ffmpeg = await getFFmpeg();
+
+  const inputName = 'strip_in' + getExtension(file.name);
+  const outputName = 'strip_out' + getExtension(file.name);
+
+  await ffmpeg.writeFile(inputName, await fetchFile(file));
+
+  await ffmpeg.exec([
+    '-i', inputName,
+    '-c:v', 'copy',
+    '-an',
+    '-y',
+    outputName,
+  ]);
+
+  const data = await ffmpeg.readFile(outputName);
+
+  await ffmpeg.deleteFile(inputName);
+  await ffmpeg.deleteFile(outputName);
+
+  const outputFile = new File([data], file.name, {
+    type: file.type || 'video/mp4',
+    lastModified: Date.now(),
+  });
+
+  console.log('[VideoTranscoder] Audio stripped:', formatBytes(file.size), '→', formatBytes(outputFile.size));
+  return outputFile;
+}
+
+/**
  * Check if video needs transcoding (over 720p)
  */
 export function needsTranscode(videoWidth, videoHeight) {
