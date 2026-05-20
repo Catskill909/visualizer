@@ -33,23 +33,27 @@
 
 ### 🔨 Up Next
 
-| Feature | § | Status |
-|---|---|---|
-| **Clipper** (`/clipper.html`) — video trim tool, In/Out markers, FFmpeg trim-encode | §19 | 📋 Active planning |
+_(none — Echo work pulled May 19, see Skipped)_
 
 ### ⏭️ Skipped / Blocked
 
 | Feature | Reason |
 |---|---|
-| Frame Buffer / Echo (Phase B) | Butterchurn's built-in `echo_alpha` / `decay` / `echo_zoom` already covers this — skip |
 | Seamless Video Loop | Three hard browser walls — do not retry. See §26. |
+| **Frame Echo / Motion Trails (canvas 2D)** | **Pulled May 19, 2026** after shipping then ripping out. Three formulas tried in canvas 2D: (1) mix `current*(1-d) + trail*d` — produced fuzzy smear on all content but dimmed image at high decay, (2) max/lighten — invisible on uniform-brightness content, (3) additive long-exposure — worked only on dark-bg/light-fg, "nothing special" per user. Root cause: canvas 2D source-over with fully opaque source pixels wipes accumulated trails — fundamental compositing limit confirmed by online research. Revisit ONLY via WebGL FBO ping-pong with a custom shader pass (see §15.2 B1) — 3–4 hr of careful GL state work around Butterchurn's context. Do not retry in canvas 2D. |
 
-### 📋 Future (after Clipper is stable)
+### 📋 Future
 
 | Feature | § | Notes |
 |---|---|---|
 | Layer Processing Panel — Chroma Key, Frame Diff, Blur/Desat background | §22 | Canvas-first, no AI needed |
 | Subject Isolation — YOLO/SAM WASM pipeline | §23 | Long-term, not prioritized |
+
+### 🗓️ Way Future
+
+| Feature | § | Notes |
+|---|---|---|
+| **Clipper** (`/clipper.html`) — video trim tool, In/Out markers, FFmpeg trim-encode | §19 | Too much bloat for now — revisit post-beta |
 
 ---
 
@@ -1016,13 +1020,18 @@ These can each be added with minimal GLSL and a single slider in the layer contr
   3. Control wiring (L3870–3888) — input events → entry prop → refresh()
   4. GLSL generation in `_buildImageBlock()` (L5147–5150)
 
-### Phase B: Frame Buffer Required — ⏭️ SKIPPED (May 8, 2026)
+### Phase B: Frame Buffer Required — ⏭️ DEFERRED
 
-> **Audit finding:** Butterchurn already provides native frame echo/feedback via `echo_alpha`, `echo_zoom`, `echo_orient` (Motion tab) and `decay` (Trail slider in Palette tab). These are MilkDrop 2 built-in parameters exposed in our UI. Custom FBO infrastructure would only add per-layer independent trails — marginal improvement vs. significant complexity/risk.
+> **May 19, 2026 retrospective:** Attempted per-layer Frame Echo three times in canvas 2D — all three formulas failed for different reasons (see Skipped table at top of doc). Confirmed via online research that canvas 2D cannot produce VJ trails on fully opaque source pixels. The only viable path is a real WebGL FBO ping-pong, scoped here as B1.
+>
+> Butterchurn's `echo_alpha`/`decay` covers the full-canvas feedback case. The per-layer trail is a different feature — each layer with its own independent echo, composited before the canvas is written.
 
-#### B1. Frame Buffer / Echo (Motion Trails) 🟡 — ALREADY COVERED
-- **Existing controls:** Trail slider (`ps-decay` 0.85–0.999), Echo Opacity (`ms-ealpha`), Echo Zoom (`ms-ezoom`), Echo Orient
-- **Why skipped:** Building a separate FBO ping-pong outside Butterchurn would be 6–8 hours with fragile WebGL context sharing and no guarantee of compatibility across preset switches
+#### B1. Frame Echo / Motion Trails 🟡 — DEFERRED, FBO REQUIRED
+- **What it would do:** Each GIF/video/image layer accumulates a true motion trail behind moving content. Current frame stays sharp; ghosts fade behind it via shader blend math (not canvas compositing).
+- **Why canvas 2D failed:** `source-over` with opaque source pixels overwrites accumulated trails. Tried mix (dimmed image), max/lighten (invisible on uniform content), additive (worked only on dark-bg/light-fg). All shipped briefly and pulled.
+- **Architecture (when picked up):** Two FBOs + textures per echoed layer (ping-pong). Small WebGL program with a fragment shader that does `mix(current, trail, decay)` or similar — the shader has no opacity-wipeout problem. Replace `imgTextures.samplers[texName]` pointer with the FBO output texture so Butterchurn's comp shader naturally reads the trailed version.
+- **Risk:** Sharing Butterchurn's GL context. Must save/restore all GL state around the FBO pass. Prior work in `clearFeedbackBuffer()` shows the pattern.
+- **Estimate:** 3–4 hours including state safety + lazy FBO allocation + cleanup on layer delete / echo off.
 
 #### B2. Feedback Loop 🟡
 - **Why:** #1 effect in analog VJ rigs. Creates infinite tunnels, fractal smears.
