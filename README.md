@@ -265,7 +265,7 @@ The script does everything in one pass:
 4. Signs with `Developer ID Application: Paul Henshaw (3UT7698LZ6)` + hardened runtime
 5. Notarizes with Apple (`xcrun notarytool`) and staples the ticket
 6. Verifies: `source=Notarized Developer ID`
-7. Creates HFS+ drag-to-install DMG with Applications folder shortcut
+7. Creates HFS+ drag-to-install DMG with branded dark background image and Applications folder shortcut
 8. Signs and clears quarantine from the DMG
 9. Copies versioned DMG to `promo/DiscoCast Visualizer-1.0.YYYYMMDD.HHMM.dmg`
 10. Updates `promo/DiscoCast-Visualizer.dmg` (the canonical download link)

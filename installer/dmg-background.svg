@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1320" height="800" viewBox="0 0 1320 800">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#1a1a2e"/>
+      <stop offset="100%" stop-color="#080810"/>
+    </radialGradient>
+    <filter id="softglow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="30" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1320" height="800" fill="url(#bg)"/>
+
+  <!-- Subtle grid lines for depth -->
+  <g stroke="#ffffff" stroke-opacity="0.025" stroke-width="1">
+    <line x1="0" y1="160" x2="1320" y2="160"/>
+    <line x1="0" y1="320" x2="1320" y2="320"/>
+    <line x1="0" y1="480" x2="1320" y2="480"/>
+    <line x1="0" y1="640" x2="1320" y2="640"/>
+    <line x1="220" y1="0" x2="220" y2="800"/>
+    <line x1="440" y1="0" x2="440" y2="800"/>
+    <line x1="660" y1="0" x2="660" y2="800"/>
+    <line x1="880" y1="0" x2="880" y2="800"/>
+    <line x1="1100" y1="0" x2="1100" y2="800"/>
+  </g>
+
+  <!-- Glowing halo behind app icon area -->
+  <circle cx="330" cy="340" r="200" fill="#6c3fff" fill-opacity="0.07" filter="url(#softglow)"/>
+
+  <!-- Glowing halo behind Applications area -->
+  <circle cx="990" cy="340" r="200" fill="#3f8fff" fill-opacity="0.07" filter="url(#softglow)"/>
+
+  <!-- App icon dashed circle guide -->
+  <circle cx="330" cy="320" r="144" fill="none" stroke="#ffffff" stroke-opacity="0.07" stroke-width="2" stroke-dasharray="6 6"/>
+
+  <!-- Applications folder dashed circle guide -->
+  <circle cx="990" cy="320" r="144" fill="none" stroke="#ffffff" stroke-opacity="0.07" stroke-width="2" stroke-dasharray="6 6"/>
+
+  <!-- Arrow shaft -->
+  <line x1="530" y1="320" x2="760" y2="320" stroke="white" stroke-opacity="0.5" stroke-width="3" stroke-linecap="round"/>
+  <!-- Arrow head -->
+  <polygon points="790,320 756,302 756,338" fill="white" fill-opacity="0.5"/>
+
+  <!-- Label: DiscoCast Visualizer -->
+  <text x="330" y="510" text-anchor="middle" font-family="-apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif" font-size="24" font-weight="600" letter-spacing="1" fill="white" fill-opacity="0.7">DiscoCast Visualizer</text>
+
+  <!-- Label: Applications -->
+  <text x="990" y="510" text-anchor="middle" font-family="-apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif" font-size="24" font-weight="600" letter-spacing="1" fill="white" fill-opacity="0.7">Applications</text>
+
+  <!-- Bottom separator line -->
+  <line x1="420" y1="660" x2="900" y2="660" stroke="white" stroke-opacity="0.1" stroke-width="1"/>
+
+  <!-- Bottom tagline -->
+  <text x="660" y="690" text-anchor="middle" font-family="-apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif" font-size="20" fill="white" fill-opacity="0.25" letter-spacing="4">DRAG TO INSTALL</text>
+</svg>

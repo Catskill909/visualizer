@@ -150,22 +150,24 @@ xcrun stapler staple "$APP_PATH"
 echo -e "${YELLOW}Step 7: Verifying notarization...${NC}"
 spctl --assess --type exec --verbose "$APP_PATH" 2>&1 | head -5
 
-# Step 8: Create drag-to-install DMG with Applications shortcut
-echo -e "${YELLOW}Step 8: Creating drag-to-install DMG...${NC}"
+# Step 8: Create drag-to-install DMG with branded background
+echo -e "${YELLOW}Step 8: Creating branded drag-to-install DMG...${NC}"
 
 # Detach any stale volumes from previous interrupted builds
-for vol in "/Volumes/DiscoCast Visualizer" "/Volumes/discocast-visualizer" "$MOUNT_VOL"; do
+for vol in "/Volumes/DiscoCast Visualizer" "/Volumes/discocast-visualizer"; do
     if [ -d "$vol" ]; then
         hdiutil detach "$vol" -force 2>/dev/null || true
     fi
 done
 
-# Build DMG staging folder with app + Applications symlink (no .app in project root)
+# Build DMG staging folder: app + Applications symlink + hidden background image
 DMG_STAGING="/tmp/dmg-staging"
 rm -rf "$DMG_STAGING"
-mkdir -p "$DMG_STAGING"
+mkdir -p "$DMG_STAGING/.background"
 cp -R "$APP_PATH" "$DMG_STAGING/${DISPLAY_NAME}.app"
 ln -s /Applications "$DMG_STAGING/Applications"
+cp "$(pwd)/installer/dmg-background.png"    "$DMG_STAGING/.background/background.png"
+cp "$(pwd)/installer/dmg-background@2x.png" "$DMG_STAGING/.background/background@2x.png"
 
 # Create a writable temp DMG first, then convert to compressed
 TEMP_DMG="/tmp/${APP_NAME}-temp.dmg"
@@ -178,11 +180,9 @@ hdiutil create \
     -ov -format UDRW \
     "$TEMP_DMG"
 
-# Mount, set window size/icon layout via AppleScript, then eject
-MOUNT_VOL="/tmp/discocast-dmg-mount"
-rm -rf "$MOUNT_VOL"
-mkdir -p "$MOUNT_VOL"
-hdiutil attach "$TEMP_DMG" -readwrite -nobrowse -mountpoint "$MOUNT_VOL"
+# Mount to /Volumes/ (no custom mountpoint) so Finder can find the disk by name
+hdiutil detach "/Volumes/${DISPLAY_NAME}" -force 2>/dev/null || true
+hdiutil attach "$TEMP_DMG" -readwrite -nobrowse
 
 osascript <<APPLESCRIPT || true
 tell application "Finder"
@@ -191,21 +191,23 @@ tell application "Finder"
         set current view of container window to icon view
         set toolbar visible of container window to false
         set statusbar visible of container window to false
-        set bounds of container window to {200, 120, 780, 480}
+        set bounds of container window to {200, 120, 860, 520}
         set viewOptions to the icon view options of container window
         set arrangement of viewOptions to not arranged
-        set icon size of viewOptions to 110
-        set position of item "${DISPLAY_NAME}.app" of container window to {170, 170}
-        set position of item "Applications" of container window to {420, 170}
+        set icon size of viewOptions to 100
+        set background picture of viewOptions to file ".background:background.png"
+        set position of item "${DISPLAY_NAME}.app" of container window to {165, 175}
+        set position of item "Applications" of container window to {495, 175}
         close
         open
         update without registering applications
+        delay 2
     end tell
 end tell
 APPLESCRIPT
 
 sleep 2
-hdiutil detach "$MOUNT_VOL" -quiet
+hdiutil detach "/Volumes/${DISPLAY_NAME}" -quiet
 
 # Convert to compressed read-only DMG
 hdiutil convert "$TEMP_DMG" -format UDZO -ov -o "$FINAL_DMG"
