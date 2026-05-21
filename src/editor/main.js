@@ -12,6 +12,7 @@ import { getCustomPreset, loadAllCustomPresets, CUSTOM_PREFIX } from '../customP
 import { initAuthGate } from '../auth-gate.js';
 import { pickAndConnect } from '../devicePicker.js';
 import { showAudioLoadingModal, hideAudioLoadingModal } from '../fileUtils.js';
+import { initOutputUI } from '../output/outputUI.js';
 
 initAuthGate();
 
@@ -473,6 +474,22 @@ async function boot(connectAudioFn) {
 
     // Wire mode toggle
     initModeToggle();
+
+    // Output panel — Send to display (output-dev.md Phase 1)
+    const outBtn   = document.getElementById('editor-btn-output');
+    const outPanel = document.getElementById('editor-output-panel');
+    if (outBtn && outPanel) {
+        outBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            outPanel.hidden = !outPanel.hidden;
+        });
+        document.addEventListener('click', (e) => {
+            if (!outPanel.hidden && !outPanel.contains(e.target) && !outBtn.contains(e.target)) {
+                outPanel.hidden = true;
+            }
+        });
+        initOutputUI({ engine, root: outPanel });
+    }
 
     _wireSaveModal();
 

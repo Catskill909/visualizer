@@ -2464,3 +2464,62 @@ html, body {
   font-size: 14px; font-weight: 500; letter-spacing: 0.04em;
   color: rgba(255, 255, 255, 0.82);
 }
+
+/* ─── Output panel (output-dev.md Phase 1 — Send to display) ─────────────────── */
+.editor-output-panel {
+    position: fixed;
+    top: 46px;
+    right: 12px;
+    z-index: 50;
+    width: 260px;
+    padding: 14px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    font-size: 0.85rem;
+    color: var(--text-1);
+}
+.editor-output-panel[hidden] { display: none; }
+.eop-title {
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: var(--text-1);
+}
+.eop-row { display: flex; gap: 6px; align-items: center; }
+.eop-select {
+    flex: 1;
+    min-width: 0;
+    padding: 6px 8px;
+    background: var(--bg-3);
+    color: var(--text-1);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.82rem;
+}
+.eop-btn {
+    padding: 6px 10px;
+    background: var(--bg-3);
+    color: var(--text-1);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.82rem;
+}
+.eop-btn:hover { background: var(--bg-4); }
+.eop-btn--full { width: 100%; margin-top: 8px; }
+.eop-btn.is-active { background: var(--bg-4); border-color: var(--border-hi); }
+.eop-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    cursor: pointer;
+    color: var(--text-2);
+}
+.eop-hint {
+    margin: 8px 0 0;
+    font-size: 0.74rem;
+    color: var(--text-3);
+    line-height: 1.4;
+}

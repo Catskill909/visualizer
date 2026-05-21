@@ -458,7 +458,8 @@ These are the entry points. Each one references its focused subdocs in `docs/`.
 | [`timeline-editor.md`](timeline-editor.md) | Timeline Editor design and planning — zone compositor, export/import bundle format. |
 | [`macos-app-generate.md`](macos-app-generate.md) | macOS app packaging guide — Tauri build, code signing, notarization, DMG creation. |
 | [`windows-dev.md`](windows-dev.md) | Windows build & compatibility reference — GitHub Actions workflow, bringup bugs. |
-| [`app-output-dev.md`](app-output-dev.md) | Output / projection settings — resolution lock, aspect ratio, virtual camera. |
+| [`output-dev.md`](output-dev.md) | **Output & multi-monitor hub.** Source/Output/Route model, zone→display routing, stacking presets onto one output, shared OutputManager across player/editor/timeline, phased plan. |
+| [`app-output-dev.md`](app-output-dev.md) | Shipped single-canvas output settings — resolution lock, aspect ratio, virtual camera. (Multi-monitor planning now lives in `output-dev.md`.) |
 
 ### Preset Studio Subdocs ([`docs/preset-editor/`](docs/preset-editor/))
 

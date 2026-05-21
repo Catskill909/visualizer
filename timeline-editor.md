@@ -750,9 +750,9 @@ Phases 4.4-A, 4.4-B, 4.4-C, and the colour picker shipped (see archive). The blo
 
 ### 9 · Phase 5 — Timeline Output to External Displays 🔬
 
-**Status**: Research in progress — see `visualizer-output-dev.md` for detailed findings.
+**Status**: Scoped — see [`output-dev.md`](output-dev.md) (the hub doc). Decisions locked 2026-05-21: true web/desktop parity; direct output only (NDI/Syphon/Spout deferred). Timeline routing = its Phase 2; **stacking many zones onto one output = its Phase 3, which depends on Phase 4.9 Zone Stack below.**
 
-**Goal**: Route each zone to a separate physical display (monitor/projector) for live performance setups.
+**Goal**: Route each zone to a separate physical display (monitor/projector) — and stack multiple zones onto one display — for live performance setups.
 
 **Architecture**: This is built on the **Output System** — a modular subsystem shared between the timeline editor and main app player. The core handles display enumeration, window positioning, and streaming; the timeline editor adds per-zone output assignment UI.
 
@@ -764,7 +764,7 @@ Phases 4.4-A, 4.4-B, 4.4-C, and the colour picker shipped (see archive). The blo
 | **macOS (Tauri)** | 🔬 Research | `set_position()` → `set_fullscreen()` pattern identified |
 | **Windows (Tauri)** | 🔬 Research | Same pattern + Spout for VJ integration |
 
-**Key Research Findings** (see `visualizer-output-dev.md` for full details):
+**Key Research Findings** (see [`output-dev.md`](output-dev.md) for the full scope + phased plan):
 - **Web**: `getScreenDetails()` enumerates screens; `window.open(left=2560)` positioning needs validation
 - **Tauri**: `availableMonitors()` JS API exists; fullscreen to specific monitor requires `set_position` → `set_fullscreen` workaround (Issue #6394)
 - **VJ Protocols**: Syphon (macOS), Spout (Windows), NDI (cross-platform) identified for professional integration

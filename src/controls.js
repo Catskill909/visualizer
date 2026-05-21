@@ -14,6 +14,7 @@ import {
 } from './customPresets.js';
 import { showImportResult } from './importResultModal.js';
 import { pickAndConnect } from './devicePicker.js';
+import { initOutputUI } from './output/outputUI.js';
 
 export class ControlPanel {
   constructor(engine) {
@@ -513,6 +514,9 @@ export class ControlPanel {
 
     // Apply saved output settings on boot
     this._restoreOutputSettings();
+
+    // Shared "Send to display" output section (output-dev.md Phase 1)
+    initOutputUI({ engine: this.engine, root: this.els.outputPanel });
 
     // Sync cycle UI to engine defaults
     this.syncCyclePanel();

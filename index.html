@@ -331,6 +331,20 @@
               </select>
             </div>
 
+            <div class="tuning-group" style="border-top: 1px solid var(--border-subtle); padding-top: 10px; margin-top: 4px;">
+              <label>Send to display</label>
+              <div class="output-display-row" style="display:flex; gap:6px; align-items:center;">
+                <select id="output-display" class="ctrl-select output-select" style="flex:1;"></select>
+                <button id="btn-output-detect" class="output-apply-btn" type="button" title="Detect connected displays">↻</button>
+              </div>
+              <label class="output-fs-row" style="display:flex; align-items:center; gap:8px; margin-top:8px; cursor:pointer;">
+                <input type="checkbox" id="output-fullscreen-toggle" />
+                <span>Fullscreen on open</span>
+              </label>
+              <button id="btn-output-open" class="output-apply-btn" type="button" style="width:100%; margin-top:8px;">Open output window</button>
+              <p class="popover-hint">Sends the visualizer to a 2nd display/projector <strong>attached to this computer</strong>. Drag it to that screen, then ⛶ Fullscreen. <strong>Keep this window visible</strong> — if it's hidden the output stops reacting. (A separate computer needs network output, coming later.)</p>
+            </div>
+
             <div class="switch-row" style="border-top: 1px solid var(--border-subtle); padding-top: 10px; margin-top: 4px;">
               <label class="switch-label" for="toggle-virtual-camera">Virtual Camera</label>
               <label class="switch">

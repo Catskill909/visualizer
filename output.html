@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Output — DiscoCast Visualizer</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <style>
+    html, body { margin: 0; height: 100%; background: #000; overflow: hidden; font-family: system-ui, sans-serif; }
+    #out-canvas { display: block; width: 100vw; height: 100vh; }
+    .chrome {
+      position: fixed; top: 14px; left: 14px; z-index: 2;
+      display: flex; gap: 10px; align-items: center;
+      transition: opacity .4s ease;
+    }
+    body.idle .chrome { opacity: 0; pointer-events: none; }
+    body.idle { cursor: none; }
+    #out-fs {
+      background: rgba(20,20,24,.7); color: #fff;
+      border: 1px solid rgba(255,255,255,.18); border-radius: 7px;
+      padding: 7px 12px; font: 13px system-ui; cursor: pointer;
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    }
+    #out-fs:hover { background: rgba(40,40,48,.85); }
+    #out-status { color: rgba(255,255,255,.6); font-size: 12px; }
+    #out-meter { width: 64px; height: 8px; border-radius: 4px; background: rgba(255,255,255,.12); overflow: hidden; }
+    #out-meter > i { display: block; height: 100%; width: 0; background: #5ad27a; transition: width .08s linear; }
+    #out-meter.stale > i { background: #d2685a; width: 100% !important; opacity: .35; }
+  </style>
+</head>
+<body>
+  <canvas id="out-canvas"></canvas>
+  <div class="chrome">
+    <button id="out-fs" type="button">⛶ Fullscreen</button>
+    <div id="out-meter" title="Audio level from the main window"><i></i></div>
+    <span id="out-status">Connecting…</span>
+  </div>
+  <script type="module" src="/src/output/outputWindow.js"></script>
+</body>
+</html>
