@@ -1333,6 +1333,12 @@ export class VisualizerEngine {
       // the rejection so the global unhandledrejection listener can't see it.
       videoElement.loop = true;
       videoElement.play().catch(err => {
+        // AbortError = play() was superseded by a pause()/src-swap during a
+        // fast timeline transition. Benign teardown race, not a playback failure.
+        if (err?.name === 'AbortError') {
+          console.debug('[DiscoCast Visualizer] Video play() interrupted by teardown (ignored):', err.message);
+          return;
+        }
         console.warn('[DiscoCast Visualizer] Video play failed:', err.message);
         this._showRenderError('video.play() rejected: ' + (err?.name || '') + ': ' + (err?.message || err));
       });
@@ -1343,6 +1349,12 @@ export class VisualizerEngine {
         if (videoElement.loop) {
           videoElement.currentTime = 0;
           videoElement.play().catch(err => {
+            // AbortError = loop restart superseded by a pause()/src-swap when a
+            // block transition lands on end-of-video. Benign teardown race.
+            if (err?.name === 'AbortError') {
+              console.debug('[DiscoCast Visualizer] Video loop restart interrupted by teardown (ignored):', err.message);
+              return;
+            }
             console.warn('[DiscoCast Visualizer] Video loop restart failed:', err.message);
             this._showRenderError('video.play() loop restart rejected: ' + (err?.name || '') + ': ' + (err?.message || err));
           });
