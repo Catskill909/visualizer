@@ -423,10 +423,10 @@ body.force-hide-ui, body.controls-hidden {
 
 /* PRESET DRAWER */
 #preset-drawer {
-  position: fixed; top: 0; right: 0; bottom: 0; width: 360px; max-width: 90vw; z-index: 60;
+  position: fixed; top: 0; left: 0; bottom: 0; width: 360px; max-width: 90vw; z-index: 60;
   background: var(--bg-glass);
-  border-left: 1px solid var(--border-subtle); box-shadow: -8px 0 40px rgba(0,0,0,0.8);
-  display: flex; flex-direction: column; animation: slideInRight 0.3s ease; pointer-events: auto;
+  border-right: 1px solid var(--border-subtle); box-shadow: 8px 0 40px rgba(0,0,0,0.8);
+  display: flex; flex-direction: column; animation: slideInLeft 0.3s ease; pointer-events: auto;
 }
 
 .drawer-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 20px 12px; border-bottom: 1px solid var(--border-subtle); }
@@ -930,6 +930,7 @@ kbd {
 @keyframes scaleIn { from { opacity: 0; transform: translate(-50%, -48%) scale(0.96); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes slideInLeft { from { transform: translateX(-100%); } to { transform: translateX(0); } }
 @keyframes logoPulse {
   0%, 100% { transform: scale(1); filter: drop-shadow(0 0 8px rgba(255,255,255,0.2)); }
   50% { transform: scale(1.05); filter: drop-shadow(0 0 16px rgba(255,255,255,0.4)); }

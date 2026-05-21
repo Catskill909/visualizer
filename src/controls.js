@@ -55,6 +55,7 @@ export class ControlPanel {
       btnUseFile: document.getElementById('btn-use-file'),
       btnPresets: document.getElementById('btn-presets'),
       btnFullscreen: document.getElementById('btn-fullscreen'),
+      btnBackToMenu: document.getElementById('btn-back-to-menu'),
       btnMic: document.getElementById('btn-mic'),
       deviceSelect: document.getElementById('device-select'),
       btnFile: document.getElementById('btn-file'),
@@ -349,6 +350,18 @@ export class ControlPanel {
       } else {
         window.location.href = `/editor.html?preset=${encodeURIComponent(name)}`;
       }
+    });
+
+    // --- Back to Main Menu ---
+    els.btnBackToMenu?.addEventListener('click', () => {
+      this.closeDrawer();
+      this.closeCyclePanel();
+      this.closeTuningPanel();
+      this.closeOutputPanel();
+      engine.disconnectSource();
+      els.controlBar.classList.add('hidden');
+      els.audioPlayer.classList.add('hidden');
+      els.startScreen.classList.remove('hidden');
     });
 
     // --- Fullscreen ---

@@ -94,6 +94,15 @@
   <!-- ============== CONTROL BAR (bottom overlay) ============== -->
   <div id="control-bar" class="hidden">
     <div class="control-bar-inner">
+      <!-- Preset Drawer Toggle -->
+      <div class="control-section">
+        <button id="btn-presets" class="ctrl-btn" data-tooltip="Browse Presets (P)" type="button">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z" />
+          </svg>
+        </button>
+      </div>
+
       <!-- Preset Name -->
       <div class="control-section preset-info">
         <button id="btn-favorite" class="ctrl-btn heart-btn" data-tooltip="Add to Favorites (S)" type="button">
@@ -267,15 +276,6 @@
         </div>
       </div>
 
-      <!-- Preset Drawer Toggle -->
-      <div class="control-section">
-        <button id="btn-presets" class="ctrl-btn" data-tooltip="Browse Presets (P)" type="button">
-          <svg viewBox="0 0 24 24" fill="currentColor">
-            <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z" />
-          </svg>
-        </button>
-      </div>
-
       <!-- Output Settings -->
       <div class="control-section" style="position: relative;">
         <button id="btn-output" class="ctrl-btn" data-tooltip="Output Settings (O)" type="button">
@@ -350,6 +350,15 @@
           <svg viewBox="0 0 24 24" fill="currentColor">
             <path
               d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Back to Main Menu -->
+      <div class="control-section">
+        <button id="btn-back-to-menu" class="ctrl-btn" data-tooltip="Back to Main Menu" type="button">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
           </svg>
         </button>
       </div>
