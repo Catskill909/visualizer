@@ -499,12 +499,12 @@ export class ControlPanel {
       els.toggleVirtualCamera.addEventListener('change', (e) => {
         if (e.target.checked) {
           this.engine.startVirtualCamera(60);
-          els.virtualCameraHint.textContent = 'LIVE — select this window in OBS / Zoom';
+          els.virtualCameraHint.textContent = 'Active — canvas available as camera in Zoom / Meet';
           els.outputStatusDot.classList.add('active');
-          this.showToast('📷 Virtual Camera ON — pick this window in OBS/Zoom');
+          this.showToast('📷 Virtual Camera ON — available in Zoom / Meet');
         } else {
           this.engine.stopVirtualCamera();
-          els.virtualCameraHint.textContent = 'Stream canvas to OBS / Zoom';
+          els.virtualCameraHint.textContent = 'Use canvas as camera in Zoom / Meet';
           this._updateOutputDot();
           this.showToast('📷 Virtual Camera OFF');
         }
