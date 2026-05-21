@@ -10,8 +10,6 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
         rel="stylesheet" />
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"
-        rel="stylesheet" />
     <link rel="stylesheet" href="/src/editor/style.css" />
 </head>
 
@@ -558,27 +556,47 @@
                         </div>
                     </div>
 
-                    <!-- Footer: 5 big icon buttons — New / Random / Remix / Save / Reset -->
+                    <!-- Footer: 5 big icon buttons — New / Random / Remix / Save / Reset.
+                         Inline SVG (not a font) so they render under any CSP, including the
+                         Tauri WebView's no-Google-Fonts policy. Vector → sharp at any size. -->
                     <footer class="panel-footer">
                         <button id="btn-new-preset-footer" class="footer-icon tooltip-up" type="button"
                             data-tooltip="New" aria-label="New">
-                            <span class="material-symbols-outlined">add</span>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 5v14M5 12h14"/>
+                            </svg>
                         </button>
                         <button id="btn-random" class="footer-icon tooltip-up" type="button"
                             data-tooltip="Random" aria-label="Random">
-                            <span class="material-symbols-outlined">casino</span>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                <path d="M8 8h.01M16 8h.01M12 12h.01M8 16h.01M16 16h.01"/>
+                            </svg>
                         </button>
                         <button id="btn-surprise" class="footer-icon tooltip-up" type="button"
                             data-tooltip="Remix" aria-label="Remix">
-                            <span class="material-symbols-outlined">shuffle</span>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22"/>
+                                <path d="m18 2 4 4-4 4"/>
+                                <path d="M2 6h1.9c1.5 0 2.9.9 3.6 2.2"/>
+                                <path d="M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8"/>
+                                <path d="m18 14 4 4-4 4"/>
+                            </svg>
                         </button>
                         <button id="btn-save" class="footer-icon tooltip-up" type="button"
                             data-tooltip="Save" aria-label="Save">
-                            <span class="material-symbols-outlined">save</span>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                                <polyline points="17 21 17 13 7 13 7 21"/>
+                                <polyline points="7 3 7 8 15 8"/>
+                            </svg>
                         </button>
                         <button id="btn-reset" class="footer-icon tooltip-up" type="button"
                             data-tooltip="Reset" aria-label="Reset">
-                            <span class="material-symbols-outlined">restart_alt</span>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                <path d="M3 3v5h5"/>
+                            </svg>
                         </button>
                     </footer>
 
