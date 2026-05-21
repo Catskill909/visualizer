@@ -261,63 +261,7 @@ async fn convert_to_stacked_alpha_b64(window: tauri::Window, input_b64: String) 
     result
 }
 
-fn cleanup_installer_dmg() {
-    // Find any mounted volume named "DiscoCast Visualizer" and eject it,
-    // then move the source .dmg file to Trash. Runs silently — never blocks launch.
-    std::thread::spawn(|| {
-        // Give the window a moment to appear before doing disk I/O
-        std::thread::sleep(std::time::Duration::from_secs(3));
-
-        // hdiutil info -plist outputs XML; find the image-path for our volume
-        let info = Command::new("hdiutil")
-            .args(["info", "-plist"])
-            .output();
-
-        let dmg_path: Option<String> = info.ok().and_then(|out| {
-            let text = String::from_utf8_lossy(&out.stdout).into_owned();
-            // Walk through <dict> entries: find system-entities containing
-            // mount-point "/Volumes/DiscoCast Visualizer" then grab image-path
-            let mut found_volume = false;
-            let mut last_image_path: Option<String> = None;
-            for line in text.lines() {
-                let trimmed = line.trim();
-                if trimmed.contains("<string>") {
-                    let val = trimmed
-                        .trim_start_matches("<string>")
-                        .trim_end_matches("</string>");
-                    if val.ends_with(".dmg") || val.ends_with(".DMG") {
-                        last_image_path = Some(val.to_string());
-                    }
-                    if val == "/Volumes/DiscoCast Visualizer" {
-                        found_volume = true;
-                    }
-                }
-            }
-            if found_volume { last_image_path } else { None }
-        });
-
-        // Eject the volume
-        let _ = Command::new("hdiutil")
-            .args(["detach", "/Volumes/DiscoCast Visualizer", "-quiet"])
-            .output();
-
-        // Move the .dmg to Trash via osascript (user can recover it)
-        if let Some(path) = dmg_path {
-            if std::path::Path::new(&path).exists() {
-                let script = format!(
-                    "tell application \"Finder\" to delete POSIX file \"{}\"",
-                    path.replace('"', "\\\"")
-                );
-                let _ = Command::new("osascript").args(["-e", &script]).output();
-                eprintln!("[DiscoCast] Moved installer DMG to Trash: {}", path);
-            }
-        }
-    });
-}
-
 fn main() {
-    cleanup_installer_dmg();
-
     tauri::Builder::default()
         .manage(CaffeinateState(Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![caffeinate_start, caffeinate_stop, toggle_fullscreen, get_fullscreen, pick_audio_file, pick_image_file, save_file, store_blob, get_blob, delete_blob, convert_to_stacked_alpha, convert_to_stacked_alpha_b64])
