@@ -190,6 +190,7 @@
         <div class="tl-transport-sep"></div>
 
         <button id="tl-btn-zones" class="tl-btn" type="button">⊞ Zones</button>
+        <button id="tl-btn-outputs" class="tl-btn" type="button">⊟ Outputs</button>
     </div>
 
     <!-- ─── TIMELINE STRIP ─── -->
@@ -402,6 +403,23 @@
                 <button class="tl-modal-close" id="tl-zone-mgr-close" type="button" aria-label="Close">×</button>
             </div>
             <div id="tl-zone-layouts" class="tl-zone-layouts"></div>
+        </div>
+    </div>
+
+    <!-- ─── OUTPUT MANAGER MODAL ─── -->
+    <div id="tl-output-mgr" class="tl-modal-backdrop" hidden role="dialog" aria-modal="true" aria-label="Outputs">
+        <div class="tl-output-mgr-card">
+            <div class="tl-modal-header">
+                <span class="tl-modal-title">Outputs</span>
+                <button class="tl-output-detect" id="tl-output-detect" type="button" title="Detect displays">↻ Detect</button>
+                <button class="tl-modal-close" id="tl-output-mgr-close" type="button" aria-label="Close">×</button>
+            </div>
+            <div class="tl-output-body">
+                <div class="tl-output-section-label">Displays</div>
+                <div id="tl-output-displays" class="tl-output-displays"></div>
+                <div class="tl-output-section-label">Routing — send a zone to a display</div>
+                <div id="tl-output-routes" class="tl-output-routes"></div>
+            </div>
         </div>
     </div>
 

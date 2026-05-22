@@ -28,7 +28,7 @@
   --ruler-h:    26px;
   --marker-lane-h: 20px;
   --track-h:    68px;
-  --zone-col-w: 120px;
+  --zone-col-w: 150px;
   --strip-h: calc(var(--ruler-h) + var(--marker-lane-h) + var(--track-h) + 2px);
 }
 
@@ -599,6 +599,8 @@ body.tl-fullscreen #tl-canvas-container { cursor: pointer; }
 .tl-zone-name {
   font: 500 11.5px var(--font);
   color: var(--text-2);
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1437,6 +1439,104 @@ body.tl-fullscreen #tl-canvas-container { cursor: pointer; }
 }
 .tl-layout-tile.active span { color: var(--text-2); }
 .tl-layout-tile:hover span  { color: var(--text-2); }
+
+/* ══════════════════════════════════════════════════════════════════════
+   OUTPUT MANAGER MODAL  (neutral greys — floats over the live canvas)
+   ══════════════════════════════════════════════════════════════════════ */
+
+.tl-output-mgr-card {
+  background: var(--bg-3);
+  border: 1px solid var(--border-hi);
+  border-radius: var(--r-l);
+  width: min(520px, 92vw);
+  max-height: 76vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.8);
+  overflow: hidden;
+}
+
+.tl-output-detect {
+  margin-right: 8px;
+  padding: 5px 10px;
+  font: 500 11.5px var(--font);
+  color: var(--text-2);
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  border-radius: var(--r-s);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.tl-output-detect:hover { background: rgba(255,255,255,0.12); color: var(--text); }
+
+.tl-output-body { padding: 14px 16px; overflow-y: auto; }
+
+.tl-output-section-label {
+  font: 600 11px var(--font);
+  letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--text-3);
+  margin: 0 0 8px;
+}
+.tl-output-routes ~ .tl-output-section-label { margin-top: 14px; }
+
+.tl-output-displays {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;
+}
+.tl-output-display-card {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--r-m);
+  min-width: 116px;
+}
+.tl-od-label { font: 500 12px var(--font); color: var(--text-2); }
+.tl-od-res   { font: 500 10.5px var(--font); color: var(--text-3); }
+
+.tl-output-route {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 0;
+  border-top: 1px solid var(--border);
+}
+.tl-output-route:first-child { border-top: none; }
+.tl-or-name {
+  flex: 1; display: flex; align-items: center; gap: 7px;
+  font: 500 12px var(--font); color: var(--text-2);
+}
+.tl-or-select {
+  background: var(--bg-2);
+  color: var(--text-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-s);
+  padding: 5px 8px;
+  font: 500 11.5px var(--font);
+  cursor: pointer;
+  max-width: 220px;
+}
+
+.tl-output-empty {
+  font: 500 12px var(--font); color: var(--text-3);
+  padding: 6px 0;
+}
+
+/* Zone-row output chip (neutral grey; brighter when an output is live) */
+.tl-zone-out-chip {
+  flex-shrink: 0;
+  padding: 3px 6px;
+  font: 600 10px var(--font);
+  color: var(--text-3);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.tl-zone-out-chip:hover { background: rgba(255,255,255,0.12); color: var(--text-2); }
+.tl-zone-out-chip.is-live {
+  color: var(--text);
+  background: rgba(255,255,255,0.14);
+  border-color: var(--border-hi);
+}
 
 /* ══════════════════════════════════════════════════════════════════════
    FULLSCREEN BUTTON — always-visible, top-right corner

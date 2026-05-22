@@ -21,6 +21,7 @@ import {
 import { VisualizerEngine } from '../visualizer.js';
 import { showImportResult } from '../importResultModal.js';
 import { downloadFile } from '../fileUtils.js';
+import { outputManager } from '../output/outputManager.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -52,7 +53,7 @@ function transitionOf(entry) {
 }
 
 // Width of the fixed zone-label column at the left of the strip (px).
-const ZONE_COL_W = 120;
+const ZONE_COL_W = 150;   // must match --zone-col-w in style.css
 
 function fmtTime(totalSec) {
     const s = Math.floor(totalSec);
@@ -62,7 +63,7 @@ function fmtTime(totalSec) {
 }
 
 function mkZone(id, name, color, region, zIndex, blendMode = 'normal') {
-    return { id, name, color, region, opacity: 1, blendMode, zIndex, gapBehavior: 'black' };
+    return { id, name, color, region, opacity: 1, blendMode, zIndex, gapBehavior: 'black', output: null };
 }
 
 // ─── Predefined zone layouts ──────────────────────────────────────────────────
@@ -225,6 +226,15 @@ export class TimelineEditor {
         this._zoneMgrClose  = document.getElementById('tl-zone-mgr-close');
         this._zoneLayoutsEl = document.getElementById('tl-zone-layouts');
 
+        // Output Manager modal
+        this._btnOutputs       = document.getElementById('tl-btn-outputs');
+        this._outputMgrEl      = document.getElementById('tl-output-mgr');
+        this._outputMgrClose   = document.getElementById('tl-output-mgr-close');
+        this._outputDetect     = document.getElementById('tl-output-detect');
+        this._outputDisplaysEl = document.getElementById('tl-output-displays');
+        this._outputRoutesEl   = document.getElementById('tl-output-routes');
+        this._displays         = [];   // last-detected display list
+
         // Modals
         this._pickerEl      = document.getElementById('tl-picker');
         this._pickerSearch  = document.getElementById('tl-picker-search');
@@ -343,6 +353,19 @@ export class TimelineEditor {
         this._zoneMgrClose?.addEventListener('click',  () => this._closeZoneMgr());
         this._zoneMgrEl?.addEventListener('click', e => {
             if (e.target === this._zoneMgrEl) this._closeZoneMgr();
+        });
+
+        // Output Manager
+        this._btnOutputs?.addEventListener('click', () => this._openOutputMgr());
+        this._outputMgrClose?.addEventListener('click', () => this._closeOutputMgr());
+        this._outputMgrEl?.addEventListener('click', e => {
+            if (e.target === this._outputMgrEl) this._closeOutputMgr();
+        });
+        this._outputDetect?.addEventListener('click', () => this._detectDisplays(true));
+        // Reflect any output open/close (incl. manual popup close) in the chips + modal.
+        outputManager.onChange(() => {
+            this._updateOutputChips();
+            if (this._outputMgrEl && !this._outputMgrEl.hidden) this._renderOutputRoutes();
         });
 
         // Picker
@@ -848,6 +871,126 @@ export class TimelineEditor {
         if (this._zoneMgrEl) this._zoneMgrEl.hidden = true;
     }
 
+    // ─── Output Manager (route zones to physical displays) ──────────────────────
+
+    _openOutputMgr() {
+        if (!this._outputMgrEl) return;
+        this._detectDisplays(false);   // permission-free initial list; ↻ Detect prompts
+        this._renderOutputRoutes();
+        this._outputMgrEl.hidden = false;
+    }
+
+    _closeOutputMgr() {
+        if (this._outputMgrEl) this._outputMgrEl.hidden = true;
+    }
+
+    async _detectDisplays(prompt) {
+        this._displays = await outputManager.listDisplays({ prompt });
+        this._renderOutputDisplays();
+        this._renderOutputRoutes();
+    }
+
+    _renderOutputDisplays() {
+        if (!this._outputDisplaysEl) return;
+        this._outputDisplaysEl.innerHTML = '';
+        if (!this._displays.length) {
+            this._outputDisplaysEl.innerHTML = '<div class="tl-output-empty">No displays detected — click ↻ Detect</div>';
+            return;
+        }
+        for (const d of this._displays) {
+            const card = document.createElement('div');
+            card.className = 'tl-output-display-card';
+            card.innerHTML =
+                `<span class="tl-od-label">${d.label}</span>` +
+                `<span class="tl-od-res">${d.w}×${d.h}${d.isPrimary ? ' · primary' : ''}</span>`;
+            this._outputDisplaysEl.appendChild(card);
+        }
+    }
+
+    _renderOutputRoutes() {
+        if (!this._outputRoutesEl) return;
+        this._outputRoutesEl.innerHTML = '';
+        const zones = this._tl?.zones || [];
+        if (!zones.length) {
+            this._outputRoutesEl.innerHTML = '<div class="tl-output-empty">No zones in this layout.</div>';
+            return;
+        }
+        for (const zone of zones) {
+            const row = document.createElement('div');
+            row.className = 'tl-output-route';
+
+            const name = document.createElement('span');
+            name.className = 'tl-or-name';
+            name.innerHTML =
+                `<span class="tl-zone-dot" style="background:${zone.color}"></span>${zone.name}`;
+
+            const sel = document.createElement('select');
+            sel.className = 'tl-or-select';
+            sel.innerHTML = '<option value="">Off</option>';
+            for (const d of this._displays) {
+                const o = document.createElement('option');
+                o.value = d.id;
+                o.textContent = `${d.label} — ${d.w}×${d.h}`;
+                sel.appendChild(o);
+            }
+            sel.value = zone.output?.displayId ?? '';
+            sel.addEventListener('change', () => {
+                const d = this._displays.find(x => x.id === sel.value) || null;
+                this._assignZoneOutput(zone.id, d);
+            });
+
+            row.appendChild(name);
+            row.appendChild(sel);
+            this._outputRoutesEl.appendChild(row);
+        }
+    }
+
+    async _assignZoneOutput(zoneId, display) {
+        const zone = (this._tl?.zones || []).find(z => z.id === zoneId);
+        if (!zone) return;
+
+        if (!display) {
+            zone.output = null;
+            outputManager.closeOutput(zoneId);
+            this._setDirty();
+            this._updateOutputChips();
+            return;
+        }
+
+        const zd = this._zoneMap.get(zoneId);
+        if (!zd?.canvas) { this._toast('Zone has no canvas yet'); return; }
+
+        zone.output = { displayId: display.id, displayLabel: display.label, fullscreen: false };
+        try {
+            await outputManager.openOutput({ outId: zoneId, display, canvas: zd.canvas });
+            this._toast(`${zone.name} → ${display.label}`);
+        } catch (e) {
+            zone.output = null;
+            this._toast(e.message === 'popup-blocked' ? 'Allow pop-ups, then try again' : 'Could not open output');
+        }
+        this._setDirty();
+        this._updateOutputChips();
+        this._renderOutputRoutes();
+    }
+
+    _zoneOutTag(zone) {
+        if (!zone?.output) return '▸';
+        const n = Number(zone.output.displayId);
+        return '▸' + (Number.isFinite(n) ? n + 1 : '•');
+    }
+
+    _updateOutputChips() {
+        if (!this._tracksEl) return;
+        for (const row of this._tracksEl.querySelectorAll('.tl-zone-row')) {
+            const chip = row.querySelector('.tl-zone-out-chip');
+            if (!chip) continue;
+            const zone = (this._tl?.zones || []).find(z => z.id === row.dataset.zoneId);
+            chip.classList.toggle('is-live', outputManager.isActive(row.dataset.zoneId) && !!zone?.output);
+            chip.textContent = this._zoneOutTag(zone);
+            chip.title = zone?.output?.displayLabel ? `Output: ${zone.output.displayLabel}` : 'Send this zone to a display';
+        }
+    }
+
     _buildLayoutTiles() {
         this._zoneLayoutsEl.innerHTML = '';
         const currentKey = this._currentLayoutKey();
@@ -893,6 +1036,9 @@ export class TimelineEditor {
         if (hasEntries && !confirm(`Switch to "${layout.name}" layout? This will clear all timeline entries.`)) {
             return;
         }
+
+        // New layout = new zone ids; close any outputs bound to the old zones.
+        outputManager.closeAll();
 
         // Deep-copy layout zones so each timeline gets independent objects
         this._tl.zones   = JSON.parse(JSON.stringify(layout.zones));
@@ -1343,6 +1489,20 @@ export class TimelineEditor {
             e.stopPropagation();
             this._openPicker(zone.id);
         });
+
+        // Output routing chip — neutral grey, brighter when an output is live.
+        const outChip = document.createElement('button');
+        outChip.className = 'tl-zone-out-chip';
+        outChip.type = 'button';
+        if (outputManager.isActive(zone.id) && zone.output) outChip.classList.add('is-live');
+        outChip.textContent = this._zoneOutTag(zone);
+        outChip.title = zone.output?.displayLabel ? `Output: ${zone.output.displayLabel}` : 'Send this zone to a display';
+        outChip.addEventListener('click', e => {
+            e.stopPropagation();
+            this._openOutputMgr();
+        });
+        labelEl.appendChild(outChip);
+
         labelEl.appendChild(addBtn);
 
         // Track content
@@ -2461,6 +2621,7 @@ export class TimelineEditor {
     handleEscape() {
         if (this._guideModal && !this._guideModal.hidden) { this._guideModal.hidden = true; return; }
         if (!this._zoneMgrEl?.hidden)  { this._closeZoneMgr();     return; }
+        if (!this._outputMgrEl?.hidden) { this._closeOutputMgr();  return; }
         if (!this._pickerEl.hidden)    { this._closePicker();       return; }
         if (!this._colorPickerEl.hidden) { this._closeColorPicker(); return; }
         if (!this._quickEditEl.hidden) { this._closeQuickEdit();    return; }

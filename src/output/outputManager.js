@@ -1,21 +1,19 @@
 /**
- * OutputManager — discovers displays and opens/closes a single output window.
- * Phase 1 of output-dev.md (§4): single source → one display, for preview /
- * secondary-screen performance in the player and editor.
+ * OutputManager — discovers displays and opens/closes output windows. Holds
+ * several outputs at once, keyed by `outId`: 'main' for the player/editor single
+ * mirror, a zone id in the timeline (output-dev.md §4). Each output mirrors one
+ * source canvas to one display via the pixel pipe (§5).
  *
- * Web path is implemented fully (window.open positioned via the Window
- * Management API). The Tauri native window (set_position → set_fullscreen,
- * output-dev.md §6) is a fast-follow; Phase 1 uses window.open on both.
+ * Web path = window.open positioned via the Window Management API. The Tauri
+ * native window (set_position → set_fullscreen) + native pixel pipe are Phase B/C.
  */
-import { OutputTransport } from './outputTransport.js';
+import { attachSource, detachSource } from './outputPipe.js';
 
 class OutputManager {
   constructor() {
     this.platform = (typeof window !== 'undefined' && window.__TAURI__) ? 'tauri' : 'web';
-    this._win = null;
-    this._transport = null;
-    this._poll = null;
-    this._onClose = null;
+    this._outputs = new Map();   // outId → { win, displayId, poll }
+    this._onChange = null;
   }
 
   /**
@@ -61,38 +59,69 @@ class OutputManager {
     };
   }
 
-  isActive() { return !!(this._win && !this._win.closed); }
+  isActive(outId = 'main') {
+    const o = this._outputs.get(outId);
+    return !!(o && o.win && !o.win.closed);
+  }
 
-  /** opts: { display, fullscreen, source } */
-  async openOutput({ display, fullscreen, source }) {
-    this.closeOutput();
-    // Phase 1: window.open for both platforms. Native Tauri WebviewWindow is a
-    // fast-follow (output-dev.md §6).
+  /** Live outputs: [{ id, displayId, active }]. */
+  getOutputs() {
+    return [...this._outputs.entries()].map(([id, o]) => ({
+      id, displayId: o.displayId, active: !!(o.win && !o.win.closed),
+    }));
+  }
+
+  /** opts: { outId='main', display, fullscreen, canvas } — canvas is the source we mirror */
+  async openOutput({ outId = 'main', display, fullscreen, canvas }) {
+    this.closeOutput(outId);
+    if (!canvas) throw new Error('no-source-canvas');
+    // Mirror model (output-dev.md §5): start the pixel pipe BEFORE opening the
+    // window so the popup can read its stream from its opener on first load.
+    attachSource(canvas, outId);
     const fs = fullscreen ? 1 : 0;
-    const features = `popup=yes,width=${display.w},height=${display.h},left=${display.x},top=${display.y}`;
-    const win = window.open(`/output.html?fs=${fs}`, 'dc-output', features);
-    if (!win) throw new Error('popup-blocked');
-    this._win = win;
-    this._transport = new OutputTransport();
-    this._transport.start(source);
+    // Spawn a comfortable, moveable preview window — NOT full-monitor, which
+    // buries the window edges on a big display. The user fullscreens it when
+    // ready (⛶ button), or auto-FS rides the open when fullscreen:true.
+    const aspect = (display.w / display.h) || (16 / 9);
+    const w = Math.min(960, Math.round(display.w * 0.5));
+    const h = Math.round(w / aspect);
+    const idx = this._outputs.size;                  // cascade so stacked outputs don't overlap
+    const left = Math.round(display.x + (display.w - w) / 2 + idx * 40);
+    const top  = Math.round(display.y + (display.h - h) / 2 + idx * 40);
+    const features = `popup=yes,width=${w},height=${h},left=${left},top=${top}`;
+    // Unique window name per outId so each output is its own popup, never reused.
+    const win = window.open(
+      `/output.html?out=${encodeURIComponent(outId)}&fs=${fs}`,
+      `dc-output-${outId}`,
+      features,
+    );
+    if (!win) { detachSource(outId); throw new Error('popup-blocked'); }
     // Detect the user closing the popout manually.
-    this._poll = setInterval(() => {
-      if (this._win && this._win.closed) this.closeOutput();
+    const poll = setInterval(() => {
+      if (win.closed) this.closeOutput(outId);
     }, 1000);
-    return { close: () => this.closeOutput() };
+    this._outputs.set(outId, { win, displayId: display.id, poll });
+    this._emitChange();
+    return { close: () => this.closeOutput(outId) };
   }
 
-  closeOutput() {
-    if (this._poll) { clearInterval(this._poll); this._poll = null; }
-    if (this._transport) { this._transport.dispose(); this._transport = null; }
-    if (this._win && !this._win.closed) { try { this._win.close(); } catch { /* ignore */ } }
-    const had = !!this._win;
-    this._win = null;
-    if (had && this._onClose) this._onClose();
+  closeOutput(outId = 'main') {
+    const o = this._outputs.get(outId);
+    if (!o) return;
+    if (o.poll) clearInterval(o.poll);
+    detachSource(outId);
+    if (o.win && !o.win.closed) { try { o.win.close(); } catch { /* ignore */ } }
+    this._outputs.delete(outId);
+    this._emitChange();
   }
 
-  /** Single callback fired whenever the output closes (manual or programmatic). */
-  onClose(fn) { this._onClose = fn; }
+  closeAll() {
+    for (const id of [...this._outputs.keys()]) this.closeOutput(id);
+  }
+
+  /** Single callback fired whenever any output opens or closes. */
+  onChange(fn) { this._onChange = fn; }
+  _emitChange() { if (this._onChange) { try { this._onChange(); } catch { /* ignore */ } } }
 }
 
 export const outputManager = new OutputManager();

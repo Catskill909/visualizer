@@ -45,13 +45,6 @@ export function initOutputUI({ engine, root }) {
     renderOptions();
   };
 
-  // The output window reads from this one live engine.
-  const source = {
-    analyser: engine.analyser,
-    getName: () => engine.getCurrentPresetName(),
-    getPreset: (name) => engine.presets?.[name],
-  };
-
   detect?.addEventListener('click', () => refresh(true));
 
   openBtn.addEventListener('click', async () => {
@@ -61,8 +54,9 @@ export function initOutputUI({ engine, root }) {
     const display = displays.find(d => d.id === sel.value) || displays[0];
     if (!display) return;
     try {
-      source.analyser = engine.analyser; // re-read in case the engine re-initialised
-      await outputManager.openOutput({ display, fullscreen: !!fsChk?.checked, source });
+      const canvas = engine.canvas; // the live source we mirror
+      if (!canvas) { console.warn('[output] engine has no canvas'); return; }
+      await outputManager.openOutput({ display, fullscreen: !!fsChk?.checked, canvas });
       syncBtn();
     } catch (e) {
       if (e.message === 'popup-blocked') {
@@ -73,7 +67,7 @@ export function initOutputUI({ engine, root }) {
     }
   });
 
-  outputManager.onClose(syncBtn);
+  outputManager.onChange(syncBtn);
 
   refresh(false);  // permission-free initial list
   syncBtn();
