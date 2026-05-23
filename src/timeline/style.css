@@ -1467,6 +1467,15 @@ body.tl-fullscreen #tl-canvas-container { cursor: pointer; }
   transition: background 0.15s, color 0.15s;
 }
 .tl-output-detect:hover { background: rgba(255,255,255,0.12); color: var(--text); }
+.tl-output-detect.is-live {
+  background: rgba(255,255,255,0.16);
+  color: var(--text);
+  border-color: var(--border-hi);
+}
+
+/* Composed-program section */
+.tl-output-program { display: flex; flex-direction: column; gap: 6px; }
+.tl-output-program .tl-output-detect { align-self: flex-start; margin-right: 0; }
 
 .tl-output-body { padding: 14px 16px; overflow-y: auto; }
 

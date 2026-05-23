@@ -22,6 +22,7 @@ import { VisualizerEngine } from '../visualizer.js';
 import { showImportResult } from '../importResultModal.js';
 import { downloadFile } from '../fileUtils.js';
 import { outputManager } from '../output/outputManager.js';
+import { Composer } from '../output/composer.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -235,7 +236,9 @@ export class TimelineEditor {
         this._outputDetect     = document.getElementById('tl-output-detect');
         this._outputDisplaysEl = document.getElementById('tl-output-displays');
         this._outputRoutesEl   = document.getElementById('tl-output-routes');
+        this._outputProgramBtn = document.getElementById('tl-output-program-btn');
         this._displays         = [];   // last-detected display list
+        this._composer         = null; // lazy Composer for the composed-program output
 
         // Modals
         this._pickerEl      = document.getElementById('tl-picker');
@@ -364,9 +367,14 @@ export class TimelineEditor {
             if (e.target === this._outputMgrEl) this._closeOutputMgr();
         });
         this._outputDetect?.addEventListener('click', () => this._detectDisplays(true));
+        this._outputProgramBtn?.addEventListener('click', () => this._toggleProgramOutput());
         // Reflect any output open/close (incl. manual popup close) in the chips + modal.
         outputManager.onChange(() => {
             this._updateOutputChips();
+            // Stop the composer if its program window went away (incl. manual close).
+            if (outputManager.isActive('program')) this._syncComposer();
+            else this._composer?.stop();
+            this._updateProgramBtn();
             if (this._outputMgrEl && !this._outputMgrEl.hidden) this._renderOutputRoutes();
         });
 
@@ -899,6 +907,7 @@ export class TimelineEditor {
         if (!this._outputMgrEl) return;
         this._detectDisplays(false);   // permission-free initial list; ↻ Detect prompts
         this._renderOutputRoutes();
+        this._updateProgramBtn();
         this._outputMgrEl.hidden = false;
     }
 
@@ -1144,6 +1153,75 @@ export class TimelineEditor {
                 this._toast(e.message === 'popup-blocked' ? 'Allow pop-ups, then try again' : 'Could not open output');
             }
         }
+
+        // Keep the composed-program feed (if open) in step with zone/blend changes.
+        this._syncComposer();
+    }
+
+    // ─── Composed program (whole timeline → one layered feed) ───────────────────
+    // Composites ALL zones into one canvas (native-output-dev.md Step 0): the
+    // single-stream output style. Reused by NDI/Syphon later; today it drives a
+    // single "composed program" output window.
+
+    // Build the full-stack layer list for the composer — ALL zones (not just
+    // routed ones), full-frame, z-ordered, with cover-aware live opacity so the
+    // feed follows the timeline exactly like the per-display windows.
+    _composerLayers() {
+        const layers = [];
+        for (const zone of (this._tl?.zones || [])) {
+            const zd = this._zoneMap.get(zone.id);
+            if (!zd?.canvas) continue;
+            const cover = this._zoneCovers.get(zone.id);
+            layers.push({
+                id: zone.id,
+                canvas: zd.canvas,
+                zIndex: zone.zIndex ?? 0,
+                blendMode: zone.blendMode || 'normal',
+                // live (read each frame): base × (1 − animated cover opacity)
+                getOpacity: () => {
+                    const co = cover ? (parseFloat(getComputedStyle(cover).opacity) || 0) : 0;
+                    return (zone.opacity ?? 1) * (1 - co);
+                },
+            });
+        }
+        return layers;
+    }
+
+    _syncComposer() {
+        if (this._composer && this._composer.running) {
+            this._composer.setLayers(this._composerLayers());
+        }
+    }
+
+    async _toggleProgramOutput() {
+        if (outputManager.isActive('program')) {
+            outputManager.closeOutput('program');
+            this._composer?.stop();
+            this._updateProgramBtn();
+            return;
+        }
+        if (!this._composer) this._composer = new Composer({ width: 1920, height: 1080 });
+        this._composer.setLayers(this._composerLayers());
+        this._composer.start();
+        const display = (this._displays && this._displays[0]) ||
+            (await outputManager.listDisplays({ prompt: false }))[0];
+        try {
+            await outputManager.openOutput({
+                outId: 'program', display,
+                layers: [{ id: 'program', canvas: this._composer.canvas }],
+            });
+        } catch (e) {
+            this._composer.stop();
+            this._toast(e.message === 'popup-blocked' ? 'Allow pop-ups, then try again' : 'Could not open program');
+        }
+        this._updateProgramBtn();
+    }
+
+    _updateProgramBtn() {
+        if (!this._outputProgramBtn) return;
+        const on = outputManager.isActive('program');
+        this._outputProgramBtn.textContent = on ? '▦ Close composed program' : '▦ Open composed program';
+        this._outputProgramBtn.classList.toggle('is-live', on);
     }
 
     _zoneOutTag(zone) {
