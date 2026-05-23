@@ -111,6 +111,22 @@ Video is a **core feature**, and it is **safe with NDI**. Evidence, from this co
 
 ## 7. Phased plan (spike-gated, lowest-risk first)
 
+### 7.0 Roadmap — the set order (2026-05-23)
+
+Shipping product = the **desktop app** (web is the dev/proving ground). Order reflects the user's stated priority: **event sync on monitors/projectors matters most**, and that's the low-latency **local-display** path — so Phase B is elevated above finishing NDI's polish. NDI's core is already proven (N0); its remaining work is "make it nice + shippable" and can interleave.
+
+| # | Phase | State |
+|---|---|---|
+| — | **Web: A1 mirror · A2 routing · A3 stacking/layering · Step 0 composed program** | ✅ done |
+| — | **N0 — NDI proof** (sender + JPEG transport + real app frames; live in OBS + Monitor) | ✅ done |
+| **1** | **Phase B — desktop local display** (projector/monitor on the Mac app, low-latency = the event-sync priority). B0 spike: fullscreen-on-monitor (`set_position`+`set_fullscreen`) vs Syphon vs readback. | ⬅ **next** |
+| **2** | **N1 — NDI as a real output** (named source, `output.target` display\|ndi, persist with the set) | 📋 |
+| **3** | **N2 — ship-enable NDI** (bundle `libndi` + fix rpath + licensing; x86_64 sidecar slice). *Blocks any NDI release.* | 📋 |
+| **4** | **Phase C — Windows local display** (Spout / readback; window placement) | 📋 |
+| **5** | **Enhancements** (as needed): audio-over-NDI A/V lock (§6.1); A4 web polish (venue presets, mirror); transparent-bg → NDI alpha | 📋 |
+
+**Locked rules:** ⚠ don't ship a release with the NDI button until **N2** (libndi bundling); event sync rides the **local-display path, not NDI** (§6.1); never re-render at the destination (§13 / output-dev.md). *Reorder is fine — this is the agreed starting order, not a contract.*
+
 ### Step 0 — Compositor on web (no native, zero risk) ✅ BUILT & BROWSER-VERIFIED 2026-05-23
 - [x] **`src/output/composer.js`** — `Composer` class: an offscreen 2D canvas + a rAF loop that draws each source layer full-frame, ordered by `zIndex`, with per-layer `globalAlpha` + `globalCompositeOperation` (canvas2D blend names == CSS `mix-blend-mode`; `normal`→`source-over`). Composites from each source's `captureStream`→hidden `<video>` (NOT raw `drawImage` of the WebGL canvas) → sidesteps the buffer-clear timing trap, stays untainted. `getOpacity` is read **every frame** → cover-aware live fades.
 - [x] **Timeline wiring** ([timelineEditor.js](src/timeline/timelineEditor.js)): `_composerLayers()` builds the full stack from **all** zones (cover-aware `getOpacity` = `zone.opacity × (1 − animated cover opacity)`); `_toggleProgramOutput()` opens a single output window fed by `composer.canvas` (reuses `openOutput` with one full-frame layer — no new window code); `_syncComposer()` keeps it in step on zone/blend changes; auto-stops when the program window closes.
