@@ -1,8 +1,9 @@
 # Native Output Pipe — NDI / Syphon / Spout (Design & Dev Doc)
 
-**Status:** Planning (no native output code yet). Deep audit + plan done 2026-05-23, *before* implementation. The web output feature (mirror + per-zone routing + A3 stacking) is shipped; this doc covers getting that same composited output OUT of the **desktop app** (macOS + Windows) onto NDI, projectors, and monitors.
-**Created:** 2026-05-23
-**Hub:** this is the native half of [`output-dev.md`](output-dev.md) (the output truth doc — read it first for the Source/Output/Route model, the pixel-mirror architecture, and the web phases A1–A4). This doc is referenced from `output-dev.md` §5/§9/§11 and the README doc index.
+> ⚠️ **This is a REFERENCE doc — it does NOT track status.** For *where we are* and *what's next*, read the **§0 status block in [`output-dev.md`](output-dev.md)** (the single source of truth). Open this doc only when actually coding the native pipe (NDI / Syphon / Spout) and you need the deep detail: the binding recipe, the frame compositor, transport options + throughput math, the video-taint + A/V-sync resolutions.
+
+**What's built so far** (status authority is output-dev.md §0): Step 0 web compositor ✅, N0 NDI proof ✅ (composed program live in OBS + NDI Monitor via the Rust-relay `ndi-send` sidecar).
+**Created:** 2026-05-23 · **Hub:** [`output-dev.md`](output-dev.md) — the output truth doc (Source/Output/Route model, pixel-mirror architecture).
 **Goal (north star):** one timeline/layer brain → a *menu* of outputs the performer picks per show — projector, monitor, **NDI** (→ OBS / streaming / other machines / hardware). One shared architecture, one swappable "last-inch pixel pipe."
 
 ---
@@ -14,7 +15,7 @@
 - **Three real sub-problems:** (A) a frame **compositor** (N layers → 1 frame — web today composites in the popup via CSS, which NDI can't use), (B) frame **transport** JS→native (the throughput unknown), (C) the native **NDI sender** (SDK/licensing/bundling). See §3.
 - **Video is NOT a blocker** (§5) — the WKWebView taint issue is already solved by the H.264 import pipeline; NDI readback inherits an already-clean canvas.
 - **A/V sync** (§6.1) — the NDI feed has a small *constant* transport delay (not a reactivity bug; operator screen is real-time). For OBS, align with an audio Sync Offset (set once) + NDI Latency:Low; the clean fix is sending audio over NDI (planned, N1/N2). Live rooms use the low-latency local-display path, not NDI.
-- **Build order:** **Step 0 web compositor ✅ built & verified 2026-05-23** (`src/output/composer.js` + a "Composed program" output in the timeline; zero native risk, reused everywhere) → **N0 NDI spike ✅ COMPLETE 2026-05-23** (sender hop → JPEG transport → real app frames; composed program live in OBS + NDI Video Monitor, small steady latency) → **N1 model/UI ⬅ next** → N2 production (bundle libndi + licensing). Then Phase B/C local pipes. See §7.
+- **Built:** Step 0 web compositor ✅ (`src/output/composer.js` + "Composed program") and N0 NDI proof ✅ (composed program live in OBS + NDI Monitor). **For the running order / what's next, see [`output-dev.md`](output-dev.md) §0** (next = Phase B). The §7 write-ups below are per-phase detail.
 
 ---
 
@@ -111,21 +112,7 @@ Video is a **core feature**, and it is **safe with NDI**. Evidence, from this co
 
 ## 7. Phased plan (spike-gated, lowest-risk first)
 
-### 7.0 Roadmap — the set order (2026-05-23)
-
-Shipping product = the **desktop app** (web is the dev/proving ground). Order reflects the user's stated priority: **event sync on monitors/projectors matters most**, and that's the low-latency **local-display** path — so Phase B is elevated above finishing NDI's polish. NDI's core is already proven (N0); its remaining work is "make it nice + shippable" and can interleave.
-
-| # | Phase | State |
-|---|---|---|
-| — | **Web: A1 mirror · A2 routing · A3 stacking/layering · Step 0 composed program** | ✅ done |
-| — | **N0 — NDI proof** (sender + JPEG transport + real app frames; live in OBS + Monitor) | ✅ done |
-| **1** | **Phase B — desktop local display** (projector/monitor on the Mac app, low-latency = the event-sync priority). B0 spike: fullscreen-on-monitor (`set_position`+`set_fullscreen`) vs Syphon vs readback. | ⬅ **next** |
-| **2** | **N1 — NDI as a real output** (named source, `output.target` display\|ndi, persist with the set) | 📋 |
-| **3** | **N2 — ship-enable NDI** (bundle `libndi` + fix rpath + licensing; x86_64 sidecar slice). *Blocks any NDI release.* | 📋 |
-| **4** | **Phase C — Windows local display** (Spout / readback; window placement) | 📋 |
-| **5** | **Enhancements** (as needed): audio-over-NDI A/V lock (§6.1); A4 web polish (venue presets, mirror); transparent-bg → NDI alpha | 📋 |
-
-**Locked rules:** ⚠ don't ship a release with the NDI button until **N2** (libndi bundling); event sync rides the **local-display path, not NDI** (§6.1); never re-render at the destination (§13 / output-dev.md). *Reorder is fine — this is the agreed starting order, not a contract.*
+> **Order/status: see [`output-dev.md`](output-dev.md) §0 (single source of truth).** The per-phase write-ups below are the *technical detail* — what each phase entails — not the running order. (As of 2026-05-23: Step 0 + N0 ✅; Phase B next.)
 
 ### Step 0 — Compositor on web (no native, zero risk) ✅ BUILT & BROWSER-VERIFIED 2026-05-23
 - [x] **`src/output/composer.js`** — `Composer` class: an offscreen 2D canvas + a rAF loop that draws each source layer full-frame, ordered by `zIndex`, with per-layer `globalAlpha` + `globalCompositeOperation` (canvas2D blend names == CSS `mix-blend-mode`; `normal`→`source-over`). Composites from each source's `captureStream`→hidden `<video>` (NOT raw `drawImage` of the WebGL canvas) → sidesteps the buffer-clear timing trap, stays untainted. `getOpacity` is read **every frame** → cover-aware live fades.
