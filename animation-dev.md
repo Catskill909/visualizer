@@ -1,7 +1,45 @@
-# Animation System — Design & Brainstorm Doc
+# Animation System — Design & Planning Doc
 
-**Status:** Research / pre-build
 **Last updated:** 2026-05-23
+
+---
+
+## 📊 Status Dashboard
+
+*Read this section first. It is the single source of truth for where the animation system stands. Update it immediately when any phase ships or stalls.*
+
+### Legend
+
+| Mark | Meaning |
+|---|---|
+| ✅ | Shipped |
+| 🔧 | In progress |
+| ⬜ | Planned — not started |
+| 🔬 | Research / design only |
+| ⏸ | Deferred |
+
+### Current status
+
+**Nothing built yet.** This doc is in the research/planning phase. Phase 0 (infrastructure) is the next thing to build — no UI, no GSAP, just the WebGL uniform foundation.
+
+### 🎯 Up Next — priority order
+
+> Reorder rows to re-prioritise. Top unbuilt row = what gets built next.
+
+| # | Phase | What | Status |
+|---|-------|------|--------|
+| 1 | **P0** — Infrastructure | `_anim` object on entries + 5 animation uniforms + rAF upload + save/load | ⬜ |
+| 2 | **A1** — Modal shell + Entrance | Modal trigger on layer card, entrance chip picker, duration scrubber, bezier easing editor, Preview button | ⬜ |
+| 3 | **A2** — Exit tab | Mirror of entrance; layer waits for exit tween before hiding | ⬜ |
+| 4 | **A3** — Idle tab | Re-skin of existing shader motion (spinSpeed / swayAmt / bounceAmp) as named presets with speed slider | ⬜ |
+| 5 | **A4** — UI polish | Layer card add/remove transitions, modal open animation, chip/tab cross-fades | ⬜ |
+| 6 | **B1** — Beat-step locomotion | Step sequence per layer, beat clock advances states, stutter-motion feel | ⏸ design first |
+| 7 | **B2** — Keyframe sequences | Per-layer GSAP Timeline from serialised keyframe array | ⏸ |
+| 8 | **C1** — Performance triggering | Keyboard / MIDI / OSC fire animations live | ⏸ |
+
+### Recently shipped
+
+*Nothing yet.*
 
 ---
 
@@ -566,7 +604,9 @@ Before touching any UI:
 
 ---
 
-## Phase plan
+## Phase detail
+
+*Priority order lives in the § Status Dashboard up top. This section contains the implementation detail for each phase.*
 
 ### Phase 0 — Pre-build infrastructure (no UI, no visible features)
 
