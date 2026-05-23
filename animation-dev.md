@@ -372,7 +372,65 @@ No native form controls anywhere in the modal. Every interactive element is a cu
 
 ---
 
-## Architecture audit — conflicts with existing motion system
+## Audio reactivity + animation — UX and compositing
+
+### How they relate
+
+These are two **independent, additive systems** that run at different times and on different properties. They are designed to coexist, not compete.
+
+| System | Where it runs | When it fires | What it touches |
+|---|---|---|---|
+| Audio reactivity | GPU shader, every frame | Always-on, continuous | Shader-internal opacity/scale/position modulations, driven by `bass`/`mid`/`treble` uniforms |
+| Animation (entrance/exit) | CPU (GSAP), `entry._anim.*` uniforms | Event-triggered (layer show/hide) | `u_anim_opacity`, `u_anim_scale`, `u_anim_cx_offset`, `u_anim_cy_offset` |
+| Idle (existing shader motion) | GPU shader, every frame | Always-on while layer is visible | `spinSpeed`, `swayAmt`, `bounceAmp`, `orbitRadius` — shader time-based motion |
+
+### Compositing order
+
+The GPU composes these layers multiplicatively at render time:
+
+```
+final_opacity  = baked_opacity  × u_anim_opacity  × audio_factor
+final_scale    = baked_size     × u_anim_scale     × audio_scale_factor
+final_position = (baked_cx + u_anim_cx_offset) + audio_position_offset
+```
+
+**During a fade-in entrance:** `u_anim_opacity` goes 0 → 1 over the tween duration. The audio reactivity factor is also applied every frame. The layer fades in while already reacting to the beat — it arrives alive, not static. This is correct and desirable.
+
+**After the entrance completes:** `u_anim_opacity` rests at 1.0 (neutral). Only audio reactivity remains. Identical to a layer with no animation configured.
+
+**During an exit:** `u_anim_opacity` goes 1 → 0. Audio reactivity continues — the layer pulses as it fades out. Also correct.
+
+### UX — where the controls live
+
+**No cross-linking needed in the UI.** The two systems operate independently and the stacking is automatic. Do not add reactivity controls to the animate modal, and do not add animation controls to the reactivity section of the layer card.
+
+```
+Layer card
+├── [existing reactivity sliders]  — source (Bass/Mid/Treble), curve, intensity
+│    └── always visible, always-on, user sets the continuous "behaviour"
+└── [✦ animate button]  → opens modal
+     └── entrance / exit / idle  — event-driven, user sets the "moments"
+```
+
+These answer different questions:
+- **Reactivity sliders:** "how does this layer behave moment-to-moment with the music?"
+- **Animation modal:** "how does this layer arrive and leave?"
+
+### Edge case: aggressive reactivity during entrance
+
+If a layer has audio-reactive opacity set very high (e.g. heavy bass gating — opacity drops to near 0 between kicks), and the entrance tween is also fading in, the two will fight visually during the entrance. The layer will flicker as it tries to fade in.
+
+This is not a bug — it is the expected composition of two user-configured systems. Document it in user-facing notes (not tooltips — the dev doc) and let the user decide. Do not add a "suppress reactivity during entrance" toggle — that is complexity for a fringe case.
+
+### Idle tab and reactivity — same story
+
+The Idle tab controls (`spinSpeed`, `swayAmt` etc.) are also always-on shader motion. Audio reactivity modulates on top of them. A layer spinning at `spinSpeed = 0.3` with bass-reactive orbit radius will spin continuously AND pulse in orbit with the kick. This is the intended VJ layering effect — the controls are designed to stack.
+
+**Summary: no UI needed to manage the interaction. Document the stacking behaviour here. Let it compose.**
+
+---
+
+
 
 **This section must be resolved before any animation code is written.**
 
