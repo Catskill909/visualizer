@@ -140,7 +140,7 @@ No `bgMode` enum needed. One boolean. Simpler.
 
 ## Implementation phases
 
-### Phase 1 — Engine ✓ DONE (May 2026)
+### Phase 1 — Engine ✗ NOT DONE — code was wiped (May 2026)
 1. `butterchurn.js` ~6609: `alpha: false → true`
 2. `butterchurn.js` ~2413: `clearColor(0,0,0,1) → clearColor(0,0,0,0)`
 3. `butterchurn.js` comp shader `main()`: `float ret_a = 1.0;` declared before fragShaderText; `fragColor = vec4(ret, ret_a) * vColor;`
@@ -255,18 +255,46 @@ This section documents every mistake made during the first implementation attemp
 
 ---
 
-### State of files after the botched implementation (May 2026)
+### Mistake 8 — `git checkout -- .` wiped an entire day of uncommitted work (CRITICAL)
+
+**What happened:** The user asked to revert "changes made in this conversation." Instead of reverting only the specific files touched during this session, `git checkout -- .` was run — which wiped ALL uncommitted changes across every tracked file, including a full day of work from the previous session that had never been committed.
+
+**The correct command** when you need to undo your own changes: `git checkout -- path/to/specific/file` — only the files YOU touched in the current session.
+
+**Rule:** NEVER run `git checkout -- .` or `git restore .`. Always revert individual files by exact path. Before reverting anything, run `git diff --name-only` to confirm the exact list of files changed, then revert only the ones you personally modified in the current session.
+
+---
+
+### Mistake 9 — This doc was never updated during development
+
+**What happened:** `transparent-dev.md` exists and contains the full spec, architecture, and implementation plan. It was never opened, referenced, or updated during the entire implementation attempt. Phase 1 was marked DONE in the doc but the actual code was never committed. Bugs that are explicitly documented in the post-mortem (wave_a location, spec deviation) were made anyway because no one read the doc before coding.
+
+**Rule:** This document MUST be read at the start of every session touching this feature. It MUST be updated immediately after every code change — phase status, what was tried, what failed, what is next. If the doc is out of date, the doc is wrong and the next session will repeat the same mistakes.
+
+---
+
+### State of codebase after May 22 session (accurate)
 
 | File | Status |
 |---|---|
-| `src/vendor/butterchurn.js` | **REVERTED** to committed clean version after catastrophic reformat. The 3 Phase 1 changes must be re-applied surgically. |
-| `src/editor/inspector.js` | Phase 2 changes present: toggle chip wired, `bgTransparent` in BLANK state, `_buildCompShader` branch, `_buildRuntimePreset` wave_a suppression, `_syncAllControls` sync. Early-return guard has `!bgTransparent` added (this session). Needs verification. |
-| `editor.html` | Toggle chip HTML present. Fine. |
+| `src/vendor/butterchurn.js` | Clean committed state. Phase 1 changes (alpha:true, clearColor, ret_a) were wiped. Must be re-implemented. |
+| `src/editor/inspector.js` | Clean committed state. Phase 2 changes were wiped. Must be re-implemented. |
+| `editor.html` | Clean committed state. Toggle chip HTML was wiped. Must be re-implemented. |
+| `transparent-dev.md` | Up to date. Phase 1 correctly marked NOT DONE. |
 
-### Correct re-implementation order
+---
 
-1. Revert `butterchurn.js` to committed clean version (`git checkout -- src/vendor/butterchurn.js`)
-2. Read each of the 3 target lines in butterchurn.js with the Read tool before editing
-3. Apply each change as a precise single-line Edit — verify after each one
-4. Verify the app loads without WebGL errors before touching inspector.js
-5. Then review inspector.js Phase 2 logic against spec line by line
+## Strict guardrails — mandatory before next implementation attempt
+
+These rules exist because each one corresponds to a real mistake that cost hours.
+
+1. **Read this doc first.** Every session. Before opening any code file.
+2. **No code without a written plan approved by the user.** State: what is happening now, what should happen, exactly what will change and why. Wait for "yes" or "go ahead."
+3. **Never touch `butterchurn.js` without reading the exact target lines first.** Use Read tool. Copy the exact bytes as `old_string`. If Edit fails to match, stop and re-read — do not reformat.
+4. **Never run `git checkout -- .`** Only revert specific files you personally touched this session.
+5. **Update this doc after every code change.** Not after the session. After each change. Phase status, what was done, what failed.
+6. **Do not declare a phase DONE until the code is committed.** Working in the console or uncommitted does not count as done.
+7. **If a fix fails once, stop patching.** Write a failure analysis, propose a clean approach, wait for approval.
+8. **Before suppressing any baseVal at runtime, check whether `_applyVariation` will overwrite it.** Only `_buildRuntimePreset()` is safe.
+
+---
