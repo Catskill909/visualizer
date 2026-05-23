@@ -13,7 +13,7 @@
 - **NDI leads** (decision in output-dev.md §intro #4): cross-platform (one build → Mac + Windows), native-only (browsers can't emit NDI), widest reach (OBS / streaming / Resolume / other machines / hardware in one shot). Syphon (Mac) / Spout (Win) follow for directly-attached displays.
 - **Three real sub-problems:** (A) a frame **compositor** (N layers → 1 frame — web today composites in the popup via CSS, which NDI can't use), (B) frame **transport** JS→native (the throughput unknown), (C) the native **NDI sender** (SDK/licensing/bundling). See §3.
 - **Video is NOT a blocker** (§5) — the WKWebView taint issue is already solved by the H.264 import pipeline; NDI readback inherits an already-clean canvas.
-- **Build order:** Step 0 web compositor (zero native risk, reused everywhere) → N0 NDI spike (measure transport) → N1 model/UI → N2 production. Then Phase B/C local pipes. See §7.
+- **Build order:** **Step 0 web compositor ✅ built 2026-05-23** (`src/output/composer.js` + a "Composed program" output in the timeline; zero native risk, reused everywhere) → N0 NDI spike (measure transport) → N1 model/UI → N2 production. Then Phase B/C local pipes. See §7.
 
 ---
 
@@ -92,10 +92,13 @@ Video is a **core feature**, and it is **safe with NDI**. Evidence, from this co
 
 ## 7. Phased plan (spike-gated, lowest-risk first)
 
-### Step 0 — Compositor on web (no native, zero risk) ⬅ recommended first build
-- [ ] Offscreen canvas that stacks the routed source canvases into one frame with each zone's zIndex/opacity/blend (the §3A compositor).
-- [ ] Wire it to the existing virtual camera ([visualizer.js:567](src/visualizer.js#L567) `startVirtualCamera`) as a **"composed view"** output — ships A4 value today.
-- **Exit:** a single composited stream of the whole layer stack, verifiable in the browser; the exact input every native sender will consume.
+### Step 0 — Compositor on web (no native, zero risk) ✅ BUILT 2026-05-23 (browser-verify pending)
+- [x] **`src/output/composer.js`** — `Composer` class: an offscreen 2D canvas + a rAF loop that draws each source layer full-frame, ordered by `zIndex`, with per-layer `globalAlpha` + `globalCompositeOperation` (canvas2D blend names == CSS `mix-blend-mode`; `normal`→`source-over`). Composites from each source's `captureStream`→hidden `<video>` (NOT raw `drawImage` of the WebGL canvas) → sidesteps the buffer-clear timing trap, stays untainted. `getOpacity` is read **every frame** → cover-aware live fades.
+- [x] **Timeline wiring** ([timelineEditor.js](src/timeline/timelineEditor.js)): `_composerLayers()` builds the full stack from **all** zones (cover-aware `getOpacity` = `zone.opacity × (1 − animated cover opacity)`); `_toggleProgramOutput()` opens a single output window fed by `composer.canvas` (reuses `openOutput` with one full-frame layer — no new window code); `_syncComposer()` keeps it in step on zone/blend changes; auto-stops when the program window closes.
+- [x] **UI:** a **"▦ Composed program"** toggle in the `⊟ Outputs` modal (its own section).
+- [x] `npm run build` clean; dev-server modules transform OK.
+- **NOTE — the "virtual camera" is a dead sink on web** ([visualizer.js:567](src/visualizer.js#L567) just does `captureStream` with no system consumer; a real system cam needs the OBS driver). So Step 0 surfaces the compositor via a **composed-program output window**, not the vestigial virtual camera.
+- **Exit:** ✅ a single composited stream of the whole layer stack (the exact input every native sender will consume). ⬜ browser-verify the window shows the live stacked composite.
 
 ### Phase N — NDI (cross-platform, first native milestone)
 - [ ] **N0 — Spike (throwaway):** NDI sender (crate vs sidecar) + transport **B1 (JPEG)** at 720p30; receive in OBS/Studio Monitor; **measure** latency/fps/CPU at 1080p; settle SDK bundling + licensing; confirm video composite readback in a production build.

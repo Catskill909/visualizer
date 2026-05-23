@@ -40,6 +40,7 @@ The original plan picked **Option A — re-render in the output window** (the se
 | `src/output/outputManager.js` | Singleton `outputManager`. Detect displays; open/close/track output windows, multi-output keyed by `outId`. | `listDisplays({prompt})`, `openOutput({outId='main', display, fullscreen, layers \| canvas})`, `setLayers(outId, layers)` (live, no reopen), `closeOutput(outId)`, `closeAll()`, `isActive(outId)`, `getOutputs()`, `onChange(fn)` |
 | `src/output/outputWindow.js` | Runs INSIDE `output.html`. No engine. Reads `?out=<id>`, builds one full-frame `<video>` per `getLayers(outId)` entry into `#out-stage`, **overlaid** & composited by zIndex/opacity/blend (no region — layers fill the frame), fullscreen button. | — |
 | `src/output/outputUI.js` | Shared "Send to display" section for player + editor. | `initOutputUI({engine, root})`; mirrors `engine.canvas` as `outId='main'` (one full-region layer) |
+| `src/output/composer.js` | Composites N source canvases → ONE offscreen canvas (the single-frame "composed program"; Step 0 of the native pipe, reused by NDI/Syphon). | `Composer({width,height})`, `setLayers([{id,canvas,zIndex,blendMode,getOpacity}])`, `start()`, `stop()`, `.canvas` |
 | `output.html` | The output window: `#out-stage` (`isolation:isolate`) holding N `.out-layer` `<video>`s, fullscreen button, status. | Vite MPA entry |
 | `index.html` / `src/controls.js` | Player Output popover (`O`) hosts the shared section. | `#output-panel` + `initOutputUI` |
 | `editor.html` / `src/editor/main.js` | Editor topbar Output panel hosts the same section. | `#editor-output-panel` + `initOutputUI` |
@@ -354,8 +355,9 @@ Web first (the pipe is free and you VJ there now); native after (the pipe is the
 - **Exit:** two/three presets stacked on one projector, layered & following the timeline, no drift. ✅
 
 **A4 — Web polish & venue presets**
+- [x] **Composed program** (2026-05-23): all zones composited into one layered feed (`src/output/composer.js`) shown in a single output window — the "▦ Composed program" toggle in the timeline `⊟ Outputs` modal. This is also Step 0 of the native pipe (the single-frame compositor NDI/Syphon reuse — see [`native-output-dev.md`](native-output-dev.md) §7). *(The old "→ virtual camera" idea is dropped: the web virtual camera is a dead sink — no system consumer without the OBS driver.)*
 - [ ] **Output presets** (Resolume-style): save/name a whole display→route map per venue; one-click switch.
-- [ ] Mirror (one source → multiple displays); "composed view" → virtual camera.
+- [ ] Mirror (one source → multiple displays).
 - [ ] Hot-unplug recovery; perf pass (several 1080p60 mirrors with main UI still 60fps); clean teardown.
 - **Exit:** production-ready multi-screen on web.
 
