@@ -7,7 +7,10 @@
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <style>
     html, body { margin: 0; height: 100%; background: #000; overflow: hidden; font-family: system-ui, sans-serif; }
-    #out-video { display: block; width: 100vw; height: 100vh; object-fit: fill; background: #000; }
+    #out-stage { position: relative; width: 100vw; height: 100vh; background: #000; isolation: isolate; }
+    /* Every routed track is a full-frame layer — stacking is overlay, composited
+       by zIndex/opacity/blend (region is an operator-screen concern, not output). */
+    #out-stage .out-layer { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; background: transparent; }
     .chrome {
       position: fixed; top: 14px; left: 14px; z-index: 2;
       display: flex; gap: 10px; align-items: center;
@@ -26,7 +29,7 @@
   </style>
 </head>
 <body>
-  <video id="out-video" autoplay muted playsinline></video>
+  <div id="out-stage"></div>
   <div class="chrome">
     <button id="out-fs" type="button">⛶ Fullscreen</button>
     <span id="out-status">Connecting…</span>

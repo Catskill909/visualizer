@@ -7,7 +7,7 @@
  * Web path = window.open positioned via the Window Management API. The Tauri
  * native window (set_position → set_fullscreen) + native pixel pipe are Phase B/C.
  */
-import { attachSource, detachSource } from './outputPipe.js';
+import { setLayers as pipeSetLayers, clearLayers } from './outputPipe.js';
 
 class OutputManager {
   constructor() {
@@ -71,13 +71,21 @@ class OutputManager {
     }));
   }
 
-  /** opts: { outId='main', display, fullscreen, canvas } — canvas is the source we mirror */
-  async openOutput({ outId = 'main', display, fullscreen, canvas }) {
+  /**
+   * opts: { outId='main', display, fullscreen, layers?, canvas? }
+   *   layers — [{ id, canvas, opacity?, blendMode?, zIndex? }] composited full-frame
+   *            (overlay) in the output window (timeline stacking, A3).
+   *   canvas — convenience single-source shorthand (player/editor 'main').
+   */
+  async openOutput({ outId = 'main', display, fullscreen, layers, canvas }) {
     this.closeOutput(outId);
-    if (!canvas) throw new Error('no-source-canvas');
+    const list = Array.isArray(layers)
+      ? layers
+      : (canvas ? [{ id: 'main', canvas }] : null);
+    if (!list) throw new Error('no-source-canvas');
     // Mirror model (output-dev.md §5): start the pixel pipe BEFORE opening the
-    // window so the popup can read its stream from its opener on first load.
-    attachSource(canvas, outId);
+    // window so the popup can read its layers from its opener on first load.
+    pipeSetLayers(outId, list);
     const fs = fullscreen ? 1 : 0;
     // Spawn a comfortable, moveable preview window — NOT full-monitor, which
     // buries the window edges on a big display. The user fullscreens it when
@@ -95,7 +103,7 @@ class OutputManager {
       `dc-output-${outId}`,
       features,
     );
-    if (!win) { detachSource(outId); throw new Error('popup-blocked'); }
+    if (!win) { clearLayers(outId); throw new Error('popup-blocked'); }
     // Detect the user closing the popout manually.
     const poll = setInterval(() => {
       if (win.closed) this.closeOutput(outId);
@@ -105,11 +113,21 @@ class OutputManager {
     return { close: () => this.closeOutput(outId) };
   }
 
+  /**
+   * Update the composited layers of an already-open output, live — no reopen.
+   * Used by timeline stacking when a zone is added/removed/reordered on a display
+   * or its opacity/blend changes. No-op if the output isn't open.
+   */
+  setLayers(outId, layers) {
+    if (!this.isActive(outId)) return;
+    pipeSetLayers(outId, layers);
+  }
+
   closeOutput(outId = 'main') {
     const o = this._outputs.get(outId);
     if (!o) return;
     if (o.poll) clearInterval(o.poll);
-    detachSource(outId);
+    clearLayers(outId);
     if (o.win && !o.win.closed) { try { o.win.close(); } catch { /* ignore */ } }
     this._outputs.delete(outId);
     this._emitChange();

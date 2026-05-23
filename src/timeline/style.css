@@ -1493,11 +1493,33 @@ body.tl-fullscreen #tl-canvas-container { cursor: pointer; }
 .tl-od-res   { font: 500 10.5px var(--font); color: var(--text-3); }
 
 .tl-output-route {
-  display: flex; align-items: center; gap: 10px;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
   padding: 7px 0;
   border-top: 1px solid var(--border);
 }
 .tl-output-route:first-child { border-top: none; }
+
+/* Stacked-layer controls (blend + opacity) — own line under the route row */
+.tl-or-stack {
+  flex-basis: 100%;
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 0 2px 17px;   /* indent past the zone dot */
+}
+.tl-or-blend {
+  background: var(--bg-2);
+  color: var(--text-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-s);
+  padding: 4px 7px;
+  font: 500 11px var(--font);
+  cursor: pointer;
+}
+.tl-or-op {
+  flex: 1; display: flex; align-items: center; gap: 8px;
+  font: 500 11px var(--font); color: var(--text-3);
+}
+.tl-or-op input[type="range"] { flex: 1; accent-color: var(--text-3); max-width: 160px; }
+.tl-or-op-val { min-width: 34px; text-align: right; }
 .tl-or-name {
   flex: 1; display: flex; align-items: center; gap: 7px;
   font: 500 12px var(--font); color: var(--text-2);

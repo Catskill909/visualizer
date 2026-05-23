@@ -180,6 +180,8 @@ export class TimelineEditor {
         // are only needed after stop(). Primary engine renders one frame during
         // boot, so its cover hides that stray frame.
         this._zoneCovers = new Map();  // zoneId → HTMLDivElement
+        this._coverDur = {};           // zoneId → seconds, the fade duration to ride to the output on next sync
+        this._outputSyncQueued = false;
 
         this._bindDOM();
         this._loadAll();
@@ -819,6 +821,24 @@ export class TimelineEditor {
             cover.style.transition = 'none';
             cover.style.opacity = String(opacity);
         }
+
+        // Mirror this cover change to the output stack so the layer fades in/out
+        // with the same timing (a black cover on the operator = a transparent
+        // layer on the output, revealing whatever is beneath). cover.style.opacity
+        // is the fade TARGET, which is exactly what the output layer transitions to.
+        this._coverDur[zoneId] = durationSec;
+        this._scheduleOutputSync();
+    }
+
+    // Coalesce the many _fadeZoneCover calls a single playback step fires into one
+    // output reconcile per frame.
+    _scheduleOutputSync() {
+        if (this._outputSyncQueued) return;
+        this._outputSyncQueued = true;
+        requestAnimationFrame(() => {
+            this._outputSyncQueued = false;
+            this._syncOutputs();
+        });
     }
 
     _positionCanvas(canvas, zone) {
@@ -832,6 +852,7 @@ export class TimelineEditor {
         canvas.style.height    = `${r.height * 100}%`;
         canvas.style.zIndex    = zone.zIndex ?? 0;
         canvas.style.mixBlendMode = zone.blendMode || 'normal';
+        canvas.style.opacity   = String(zone.opacity ?? 1);
         canvas.width  = w;
         canvas.height = h;
     }
@@ -918,7 +939,7 @@ export class TimelineEditor {
         }
 
         // Restore button — shown when saved routes exist that aren't currently open
-        const restorable = zones.filter(z => z.output && !z.output._offline && !outputManager.isActive(z.id));
+        const restorable = zones.filter(z => z.output && !z.output._offline && !this._zoneOutputLive(z));
         if (restorable.length) {
             const btn = document.createElement('button');
             btn.className = 'tl-output-detect';
@@ -927,6 +948,17 @@ export class TimelineEditor {
             btn.textContent = `↺ Restore ${restorable.length} saved route${restorable.length > 1 ? 's' : ''}`;
             btn.addEventListener('click', () => this._reopenSavedRoutes());
             this._outputRoutesEl.appendChild(btn);
+        }
+
+        const displays = this._displays || [];
+
+        // How many zones share each display → ≥2 means a stack, which gets the
+        // per-layer blend + opacity controls below.
+        const countByDisplay = new Map();
+        for (const z of zones) {
+            if (z.output && !z.output._offline) {
+                countByDisplay.set(z.output.displayId, (countByDisplay.get(z.output.displayId) || 0) + 1);
+            }
         }
 
         for (const zone of zones) {
@@ -949,7 +981,7 @@ export class TimelineEditor {
                 sel.appendChild(offlineOpt);
             }
 
-            for (const d of this._displays) {
+            for (const d of displays) {
                 const o = document.createElement('option');
                 o.value = d.id;
                 o.textContent = `${d.label} — ${d.w}×${d.h}`;
@@ -958,14 +990,69 @@ export class TimelineEditor {
             sel.value = zone.output?._offline ? '__offline' : (zone.output?.displayId ?? '');
             sel.addEventListener('change', () => {
                 if (sel.value === '__offline') return;
-                const d = this._displays.find(x => x.id === sel.value) || null;
+                const d = displays.find(x => x.id === sel.value) || null;
                 this._assignZoneOutput(zone.id, d);
             });
 
             row.appendChild(name);
             row.appendChild(sel);
+
+            // Stacked? expose this layer's blend mode + opacity (one source of
+            // truth — the same fields that drive the operator screen).
+            const stacked = zone.output && !zone.output._offline &&
+                (countByDisplay.get(zone.output.displayId) || 0) >= 2;
+            if (stacked) row.appendChild(this._buildStackControls(zone));
+
             this._outputRoutesEl.appendChild(row);
         }
+    }
+
+    // Per-stacked-layer blend + opacity controls. Writes zone.blendMode/opacity —
+    // the same fields _positionCanvas reads — so the operator screen and the
+    // mirrored output update together (one source of truth).
+    _buildStackControls(zone) {
+        const BLEND_MODES = ['normal', 'screen', 'lighten', 'color-dodge', 'multiply', 'overlay', 'difference', 'exclusion'];
+        const wrap = document.createElement('div');
+        wrap.className = 'tl-or-stack';
+
+        const blend = document.createElement('select');
+        blend.className = 'tl-or-blend';
+        blend.title = 'Blend mode';
+        for (const m of BLEND_MODES) {
+            const o = document.createElement('option');
+            o.value = m; o.textContent = m;
+            blend.appendChild(o);
+        }
+        blend.value = zone.blendMode || 'normal';
+        blend.addEventListener('change', () => {
+            zone.blendMode = blend.value;
+            this._applyZoneStyle(zone);
+            this._setDirty();
+            this._syncOutputs();
+        });
+
+        const opWrap = document.createElement('label');
+        opWrap.className = 'tl-or-op';
+        opWrap.title = 'Layer opacity';
+        const op = document.createElement('input');
+        op.type = 'range'; op.min = '0'; op.max = '1'; op.step = '0.01';
+        op.value = String(zone.opacity ?? 1);
+        const opVal = document.createElement('span');
+        opVal.className = 'tl-or-op-val';
+        opVal.textContent = Math.round((zone.opacity ?? 1) * 100) + '%';
+        op.addEventListener('input', () => {
+            zone.opacity = Number(op.value);
+            opVal.textContent = Math.round(zone.opacity * 100) + '%';
+            this._applyZoneStyle(zone);
+            this._setDirty();
+            this._syncOutputs();
+        });
+        opWrap.appendChild(op);
+        opWrap.appendChild(opVal);
+
+        wrap.appendChild(blend);
+        wrap.appendChild(opWrap);
+        return wrap;
     }
 
     async _assignZoneOutput(zoneId, display) {
@@ -974,26 +1061,89 @@ export class TimelineEditor {
 
         if (!display) {
             zone.output = null;
-            outputManager.closeOutput(zoneId);
-            this._setDirty();
-            this._updateOutputChips();
-            return;
+        } else {
+            const zd = this._zoneMap.get(zoneId);
+            if (!zd?.canvas) { this._toast('Zone has no canvas yet'); return; }
+            zone.output = { displayId: display.id, displayLabel: display.label, fullscreen: false };
         }
 
-        const zd = this._zoneMap.get(zoneId);
-        if (!zd?.canvas) { this._toast('Zone has no canvas yet'); return; }
-
-        zone.output = { displayId: display.id, displayLabel: display.label, fullscreen: false };
-        try {
-            await outputManager.openOutput({ outId: zoneId, display, canvas: zd.canvas });
-            this._toast(`${zone.name} → ${display.label}`);
-        } catch (e) {
-            zone.output = null;
-            this._toast(e.message === 'popup-blocked' ? 'Allow pop-ups, then try again' : 'Could not open output');
-        }
+        await this._syncOutputs();
+        if (display && this._zoneOutputLive(zone)) this._toast(`${zone.name} → ${display.label}`);
         this._setDirty();
         this._updateOutputChips();
         this._renderOutputRoutes();
+    }
+
+    // Output windows are keyed by DISPLAY, not zone (A3 stacking): many zones →
+    // one display compose into one window as layered <video>s. This key is the
+    // outId handed to outputManager for a given physical display.
+    _displayKey(displayId) { return 'disp:' + displayId; }
+
+    _zoneOutputLive(zone) {
+        return !!(zone?.output && !zone.output._offline &&
+            outputManager.isActive(this._displayKey(zone.output.displayId)));
+    }
+
+    // Apply a zone's live compositing (blend + opacity) to its operator canvas so
+    // the operator screen stays pixel-identical to its mirrored output.
+    _applyZoneStyle(zone) {
+        const zd = this._zoneMap.get(zone.id);
+        if (!zd?.canvas) return;
+        zd.canvas.style.mixBlendMode = zone.blendMode || 'normal';
+        zd.canvas.style.opacity = String(zone.opacity ?? 1);
+    }
+
+    // Reconcile every physical display's output window against the current routes.
+    // Window lifecycle is driven by ROUTING (a window is open while any zone is
+    // routed to that display). Layer VISIBILITY follows the TIMELINE: each layer's
+    // output opacity = its base opacity × (1 − its operator cover opacity), so when
+    // a track's clip ends and the operator covers it with black, the output layer
+    // fades out instead — revealing the layer beneath (the layer-stack model). The
+    // cover's fade duration rides along as `transitionMs` so the reveal crossfades.
+    async _syncOutputs() {
+        const byDisplay = new Map();   // displayId → layers[]
+        for (const zone of (this._tl?.zones || [])) {
+            if (!zone.output || zone.output._offline) continue;
+            const zd = this._zoneMap.get(zone.id);
+            if (!zd?.canvas) continue;
+            const cover = this._zoneCovers.get(zone.id);
+            const coverOp = cover ? (parseFloat(cover.style.opacity) || 0) : 0;
+            const dur = this._coverDur[zone.id] || 0;
+            this._coverDur[zone.id] = 0;   // consume: applied to this push only
+            const displayId = zone.output.displayId;
+            if (!byDisplay.has(displayId)) byDisplay.set(displayId, []);
+            byDisplay.get(displayId).push({
+                id: zone.id,
+                canvas: zd.canvas,
+                opacity: (zone.opacity ?? 1) * (1 - coverOp),
+                blendMode: zone.blendMode || 'normal',
+                zIndex: zone.zIndex ?? 0,
+                transitionMs: Math.round(dur * 1000),
+            });
+        }
+
+        // Close output windows for displays that lost all their zones.
+        for (const o of outputManager.getOutputs()) {
+            if (!o.id.startsWith('disp:')) continue;
+            if (!byDisplay.has(o.id.slice(5))) outputManager.closeOutput(o.id);
+        }
+
+        // Open or live-update one window per display that has zones.
+        for (const [displayId, layers] of byDisplay) {
+            layers.sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
+            const key = this._displayKey(displayId);
+            if (outputManager.isActive(key)) {
+                outputManager.setLayers(key, layers);
+                continue;
+            }
+            const display = (this._displays || []).find(d => d.id === displayId);
+            if (!display) continue;   // not enumerated — can't place a window
+            try {
+                await outputManager.openOutput({ outId: key, display, layers });
+            } catch (e) {
+                this._toast(e.message === 'popup-blocked' ? 'Allow pop-ups, then try again' : 'Could not open output');
+            }
+        }
     }
 
     _zoneOutTag(zone) {
@@ -1009,7 +1159,7 @@ export class TimelineEditor {
             const chip = row.querySelector('.tl-zone-out-chip');
             if (!chip) continue;
             const zone = (this._tl?.zones || []).find(z => z.id === row.dataset.zoneId);
-            chip.classList.toggle('is-live', outputManager.isActive(row.dataset.zoneId) && !!zone?.output && !zone.output._offline);
+            chip.classList.toggle('is-live', this._zoneOutputLive(zone));
             chip.classList.toggle('is-offline', !!zone?.output?._offline);
             chip.textContent = this._zoneOutTag(zone);
             chip.title = zone?.output?._offline
@@ -1036,15 +1186,8 @@ export class TimelineEditor {
     }
 
     async _reopenSavedRoutes() {
-        const zones = (this._tl?.zones || []).filter(
-            z => z.output && !z.output._offline && !outputManager.isActive(z.id)
-        );
-        let count = 0;
-        for (const zone of zones) {
-            const d = this._displays.find(x => x.id === zone.output.displayId);
-            if (d) { await this._assignZoneOutput(zone.id, d); count++; }
-        }
-        if (!count) this._toast('No saved routes to restore');
+        await this._syncOutputs();
+        this._updateOutputChips();
         this._renderOutputRoutes();
     }
 
@@ -1551,7 +1694,7 @@ export class TimelineEditor {
         const outChip = document.createElement('button');
         outChip.className = 'tl-zone-out-chip';
         outChip.type = 'button';
-        if (outputManager.isActive(zone.id) && zone.output) outChip.classList.add('is-live');
+        if (this._zoneOutputLive(zone)) outChip.classList.add('is-live');
         outChip.textContent = this._zoneOutTag(zone);
         outChip.title = zone.output?.displayLabel ? `Output: ${zone.output.displayLabel}` : 'Send this zone to a display';
         outChip.addEventListener('click', e => {
@@ -2446,39 +2589,16 @@ export class TimelineEditor {
         this._updateTimeDisplay(t);
 
         if (!this._playing) {
-            // Load presets corresponding to time t into the view
-            if (this._tl?.zones && this._tl?.entries) {
-                for (const zone of this._tl.zones) {
-                    const entries = this._tl.entries.filter(e => e.zoneId === zone.id)
-                                                    .sort((a, b) => (a.startTime || 0) - (b.startTime || 0));
-                    
-                    // Last (latest-starting) entry containing t wins — in an
-                    // overlap region the incoming block is the active one.
-                    let activeEntry = null;
-                    for (const e of entries) {
-                        const start = e.startTime || 0;
-                        if (t >= start && t < start + e.duration) {
-                            activeEntry = e;
-                        }
-                    }
-
-                    if (activeEntry) {
-                        const zd = this._zoneMap.get(zone.id);
-                        if (zd && zd.engine) {
-                            if (this._cueZoneId !== zone.id) {
-                                zd.engine.loadPreset(activeEntry.presetName, 0).catch(() => {});
-                                this._fadeZoneCover(zone.id, 0, 0);
-                            }
-                            // Try to render a single frame if the engine allows it when stopped
-                            if (typeof zd.engine.renderFrame === 'function' && !zd.engine.isRunning) {
-                                zd.engine.renderFrame();
-                            }
-                        }
-                    } else {
-                        // Playhead is in an empty gap — cover this zone
-                        this._fadeZoneCover(zone.id, 1, 0);
-                    }
-                }
+            // The output is a live-only surface. Audio-reactive presets render
+            // nothing meaningful when stopped — a frozen idle frame is either dark
+            // (the preset's pre-audio state) or garbage (a raw tiled texture), and
+            // there's no render loop running to animate it anyway. So when stopped,
+            // every zone shows black. "What does this preset look like" is answered
+            // by picker thumbnails (Phase 4.15), not by the output canvas.
+            // Exception: a zone mid-cue keeps whatever _cueEntry just set up.
+            for (const zone of (this._tl?.zones || [])) {
+                if (this._cueZoneId === zone.id) continue;
+                this._fadeZoneCover(zone.id, 1, 0);
             }
             return;
         }
