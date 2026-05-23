@@ -13,6 +13,7 @@
 - **NDI leads** (decision in output-dev.md §intro #4): cross-platform (one build → Mac + Windows), native-only (browsers can't emit NDI), widest reach (OBS / streaming / Resolume / other machines / hardware in one shot). Syphon (Mac) / Spout (Win) follow for directly-attached displays.
 - **Three real sub-problems:** (A) a frame **compositor** (N layers → 1 frame — web today composites in the popup via CSS, which NDI can't use), (B) frame **transport** JS→native (the throughput unknown), (C) the native **NDI sender** (SDK/licensing/bundling). See §3.
 - **Video is NOT a blocker** (§5) — the WKWebView taint issue is already solved by the H.264 import pipeline; NDI readback inherits an already-clean canvas.
+- **A/V sync** (§6.1) — the NDI feed has a small *constant* transport delay (not a reactivity bug; operator screen is real-time). For OBS, align with an audio Sync Offset (set once) + NDI Latency:Low; the clean fix is sending audio over NDI (planned, N1/N2). Live rooms use the low-latency local-display path, not NDI.
 - **Build order:** **Step 0 web compositor ✅ built & verified 2026-05-23** (`src/output/composer.js` + a "Composed program" output in the timeline; zero native risk, reused everywhere) → **N0 NDI spike ✅ COMPLETE 2026-05-23** (sender hop → JPEG transport → real app frames; composed program live in OBS + NDI Video Monitor, small steady latency) → **N1 model/UI ⬅ next** → N2 production (bundle libndi + licensing). Then Phase B/C local pipes. See §7.
 
 ---
@@ -88,6 +89,22 @@ Video is a **core feature**, and it is **safe with NDI**. Evidence, from this co
 - **Streams:** each routed display-group (or a composed view) can be its own named NDI source.
 - **Test receivers:** OBS + the **DistroAV** plugin (renamed obs-ndi); NDI Tools **Studio Monitor** as an independent cross-check.
 
+### 6.1 A/V sync — audio-reactive visuals + a delayed video feed
+
+**The concern (real, raised 2026-05-23):** our visuals are audio-reactive. The NDI feed has a small **transport delay** (NDI buffering + our JPEG encode→relay→decode hops). If that delayed video is shown next to near-real-time audio that took a *different* path, they drift.
+
+**Crucial framing — this is a transport delay, NOT a reactivity bug.** The visualizer renders perfectly in sync with the audio *inside the app*; the operator screen is real-time. Only the *outgoing* NDI copy is delayed. Nothing about beat-tracking is wrong.
+
+**Where it matters / doesn't:**
+- **Operator screen:** real-time. No issue.
+- **Live room / projector:** the room hears the PA in real time. Use the **directly-attached display path (Phase B Syphon / local window)** here — much lower latency than NDI. NDI is not the in-room path, so this case is mostly sidestepped.
+- **OBS streaming/recording:** video (delayed) + audio (OBS's own capture) arrive on different paths → can drift. **This is the one place to align them.**
+
+**Fixes (standard, easy — and they rely on the latency being CONSTANT, which observed it is):**
+1. **OBS audio Sync Offset** — right-click the audio source → *Advanced Audio Properties* → *Sync Offset*; delay audio to match the video. Set once, holds (constant latency).
+2. **OBS NDI Source → Latency: Low, Bandwidth: Highest** — shrinks the gap so the needed offset is small.
+3. **(Planned — the clean fix) send audio over NDI** — NDI carries audio alongside video, so a receiver gets an A/V-locked pair and needs **zero** offset. Logged in §7 (N1/N2). *(If latency ever GROWS instead of staying constant, no fixed offset works — that signals a buffering bug to fix, not an offset to tune.)*
+
 ---
 
 ## 7. Phased plan (spike-gated, lowest-risk first)
@@ -108,8 +125,9 @@ Video is a **core feature**, and it is **safe with NDI**. Evidence, from this co
   - [x] **End-to-end VERIFIED 2026-05-23 (tauri-dev).** The composed program reaches **both NDI Video Monitor and OBS** (via DistroAV) live. Latency: a small, steady delay; **OBS > Monitor** as expected (OBS buffers each NDI source + its own render pipeline). Tuning: OBS NDI Source → **Latency: Low**, **Bandwidth: Highest** tightens the OBS gap. → **N0 (NDI spike) COMPLETE: sender + JPEG transport + real app frames all proven.**
   - [ ] (later) push toward 1080p measurement; confirm video-composite readback in a production build.
   - [ ] **Distribution:** bundle the NDI runtime + fix the sidecar's rpath (spike used `/usr/local/lib`); settle NDI licensing. (Deferred to N2.)
-- [ ] **N1 — model `target`:** add `output.target` (`display | ndi`); NDI route carries a stream name (no displayId/window); Outputs modal gains an "NDI output" target. Routing/stacking UI reused.
-- [ ] **N2 — production:** stable sender behind the pipe contract; per-output NDI streams; alpha; clean start/stop; perf pass.
+- [ ] **N1 — model `target` + UX:** add `output.target` (`display | ndi`); NDI route carries a stream name (no displayId/window); Outputs modal gains an "NDI output" target. Routing/stacking UI reused. Custom NDI source name; persist the NDI on/off + name with the set.
+- [ ] **N2 — production:** stable sender behind the pipe contract; per-output NDI streams; alpha; clean start/stop; perf pass; **bundle libndi + fix rpath + NDI licensing** (the only thing blocking a shippable NDI release); x86_64 sidecar slice for Intel/universal builds.
+- [ ] **Audio over NDI (A/V-lock enhancement — §6.1):** send the app's audio alongside the video so receivers get an A/V-locked pair (zero OBS offset needed). NDI carries audio (`NDIlib_send_send_audio_v2`, interleaved/planar float). Tap the engine's audio (Web Audio → the sidecar) and interleave with the video send. Scoped N1/N2; until then, OBS audio Sync Offset is the workaround.
 - **Exit:** the desktop app publishes its visuals as NDI; OBS (and any NDI receiver) shows them in sync.
 
 ### Phase B — MAC local pipe (Syphon) + native window placement
@@ -130,7 +148,8 @@ For a projector/monitor plugged directly into the Mac (NDI needs a receiver; a d
 
 | Risk | Mitigation |
 |---|---|
-| **Transport throughput** (B) is the real unknown | N0 measures B1 (JPEG) first; B3 (native capture) is the codec-agnostic fallback. |
+| **Transport throughput** (B) is the real unknown | ✅ N0 measured B1 (JPEG): ~12.8ms roundtrip @720p, holds 30fps. B3 (native capture) is the codec-agnostic fallback. |
+| **A/V sync** — audio-reactive visuals + delayed NDI video drift vs. real-time audio (§6.1) | Transport delay, not a reactivity bug; constant offset → OBS audio Sync Offset (set once) + NDI Latency:Low; clean fix = send audio over NDI (N1/N2). Live rooms use the low-latency local-display path, not NDI. |
 | Tauri v1.5 has no raw binary IPC | Per-frame JPEG keeps payloads small; do **not** bundle a v2 migration into this work. |
 | NDI SDK licensing / runtime bundling | Settle in N0 before any production wiring; mirror the ffmpeg sidecar bundling. |
 | ~~Video layers taint the canvas → readback fails~~ | **Resolved (§5)** — H.264 pipeline keeps the canvas clean; B3 is codec-agnostic regardless. |
