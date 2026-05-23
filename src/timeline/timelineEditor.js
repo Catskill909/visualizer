@@ -237,8 +237,11 @@ export class TimelineEditor {
         this._outputDisplaysEl = document.getElementById('tl-output-displays');
         this._outputRoutesEl   = document.getElementById('tl-output-routes');
         this._outputProgramBtn = document.getElementById('tl-output-program-btn');
+        this._outputNdiBtn     = document.getElementById('tl-output-ndi-btn');
         this._displays         = [];   // last-detected display list
-        this._composer         = null; // lazy Composer for the composed-program output
+        this._composer         = null; // lazy Composer (shared: program window + NDI)
+        this._ndiActive        = false;
+        this._ndiPump          = null;
 
         // Modals
         this._pickerEl      = document.getElementById('tl-picker');
@@ -368,11 +371,16 @@ export class TimelineEditor {
         });
         this._outputDetect?.addEventListener('click', () => this._detectDisplays(true));
         this._outputProgramBtn?.addEventListener('click', () => this._toggleProgramOutput());
+        // NDI is desktop-app only — reveal the button under Tauri.
+        if (typeof window !== 'undefined' && window.__TAURI__ && this._outputNdiBtn) {
+            this._outputNdiBtn.hidden = false;
+            this._outputNdiBtn.addEventListener('click', () => this._toggleNdi());
+        }
         // Reflect any output open/close (incl. manual popup close) in the chips + modal.
         outputManager.onChange(() => {
             this._updateOutputChips();
-            // Stop the composer if its program window went away (incl. manual close).
-            if (outputManager.isActive('program')) this._syncComposer();
+            // Keep the composer running while EITHER consumer is live; stop otherwise.
+            if (outputManager.isActive('program') || this._ndiActive) this._syncComposer();
             else this._composer?.stop();
             this._updateProgramBtn();
             if (this._outputMgrEl && !this._outputMgrEl.hidden) this._renderOutputRoutes();
@@ -908,6 +916,7 @@ export class TimelineEditor {
         this._detectDisplays(false);   // permission-free initial list; ↻ Detect prompts
         this._renderOutputRoutes();
         this._updateProgramBtn();
+        this._updateNdiBtn();
         this._outputMgrEl.hidden = false;
     }
 
@@ -1193,16 +1202,25 @@ export class TimelineEditor {
         }
     }
 
+    // The composer is shared by the program window AND the NDI feed; run it while
+    // either consumer is active, stop it only when both are off.
+    _ensureComposerRunning() {
+        if (!this._composer) this._composer = new Composer({ width: 1920, height: 1080 });
+        this._composer.setLayers(this._composerLayers());
+        if (!this._composer.running) this._composer.start();
+    }
+    _maybeStopComposer() {
+        if (!outputManager.isActive('program') && !this._ndiActive) this._composer?.stop();
+    }
+
     async _toggleProgramOutput() {
         if (outputManager.isActive('program')) {
             outputManager.closeOutput('program');
-            this._composer?.stop();
+            this._maybeStopComposer();
             this._updateProgramBtn();
             return;
         }
-        if (!this._composer) this._composer = new Composer({ width: 1920, height: 1080 });
-        this._composer.setLayers(this._composerLayers());
-        this._composer.start();
+        this._ensureComposerRunning();
         const display = (this._displays && this._displays[0]) ||
             (await outputManager.listDisplays({ prompt: false }))[0];
         try {
@@ -1211,7 +1229,7 @@ export class TimelineEditor {
                 layers: [{ id: 'program', canvas: this._composer.canvas }],
             });
         } catch (e) {
-            this._composer.stop();
+            this._maybeStopComposer();
             this._toast(e.message === 'popup-blocked' ? 'Allow pop-ups, then try again' : 'Could not open program');
         }
         this._updateProgramBtn();
@@ -1222,6 +1240,68 @@ export class TimelineEditor {
         const on = outputManager.isActive('program');
         this._outputProgramBtn.textContent = on ? '▦ Close composed program' : '▦ Open composed program';
         this._outputProgramBtn.classList.toggle('is-live', on);
+    }
+
+    // ─── NDI output (desktop app only) ──────────────────────────────────────────
+    // Sends the composed program over NDI via the ndi-send sidecar: the composer
+    // canvas → JPEG → base64 → invoke('ndi_send_frame') → Rust relays to the
+    // sidecar's stdin → NDI (native-output-dev.md N0b). Browser builds have no NDI.
+
+    async _toggleNdi() {
+        const tauri = (typeof window !== 'undefined') && window.__TAURI__;
+        if (!tauri) { this._toast('NDI is available in the desktop app only'); return; }
+        if (this._ndiActive) {
+            this._stopNdiPump();
+            this._ndiActive = false;
+            try { await tauri.invoke('ndi_stop'); } catch { /* ignore */ }
+            this._maybeStopComposer();
+            this._updateNdiBtn();
+            this._toast('NDI output stopped');
+            return;
+        }
+        this._ensureComposerRunning();
+        try {
+            await tauri.invoke('ndi_start');
+        } catch (e) {
+            this._maybeStopComposer();
+            this._toast('Could not start NDI');
+            return;
+        }
+        this._ndiActive = true;
+        this._startNdiPump();
+        this._updateNdiBtn();
+        this._toast('NDI ON — add an NDI source in OBS / NDI Monitor');
+    }
+
+    _startNdiPump() {
+        if (this._ndiPump) return;
+        let busy = false;
+        this._ndiPump = setInterval(async () => {
+            if (busy || !this._ndiActive || !this._composer) return;
+            busy = true;
+            try {
+                const blob = await new Promise(r => this._composer.canvas.toBlob(r, 'image/jpeg', 0.8));
+                if (blob && this._ndiActive) {
+                    const buf = new Uint8Array(await blob.arrayBuffer());
+                    let bin = '';
+                    const chunk = 0x8000;
+                    for (let i = 0; i < buf.length; i += chunk) {
+                        bin += String.fromCharCode.apply(null, buf.subarray(i, i + chunk));
+                    }
+                    await window.__TAURI__.invoke('ndi_send_frame', { frameB64: btoa(bin) });
+                }
+            } catch { /* a dropped frame is fine */ }
+            busy = false;
+        }, 33);   // ~30fps
+    }
+    _stopNdiPump() {
+        if (this._ndiPump) { clearInterval(this._ndiPump); this._ndiPump = null; }
+    }
+
+    _updateNdiBtn() {
+        if (!this._outputNdiBtn) return;
+        this._outputNdiBtn.textContent = this._ndiActive ? '📡 Stop NDI' : '📡 Send program to NDI';
+        this._outputNdiBtn.classList.toggle('is-live', !!this._ndiActive);
     }
 
     _zoneOutTag(zone) {

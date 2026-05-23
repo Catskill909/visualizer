@@ -6,11 +6,69 @@
 use std::process::{Child, Command};
 use std::sync::Mutex;
 use tauri::api::dialog::FileDialogBuilder;
-use tauri::api::process::{Command as TauriCommand, CommandEvent};
+use tauri::api::process::{Command as TauriCommand, CommandChild, CommandEvent};
 use tauri::async_runtime::channel;
 use base64::{engine::general_purpose, Engine as _};
 
 struct CaffeinateState(Mutex<Option<Child>>);
+
+// Holds the running NDI sidecar (ndi-send). The app spawns it and relays JPEG
+// frames to its stdin; libndi lives ONLY in the sidecar, never in the app binary
+// (native-output-dev.md N0b, Rust-relay).
+struct NdiState(Mutex<Option<CommandChild>>);
+
+#[tauri::command]
+fn ndi_start(window: tauri::Window, state: tauri::State<NdiState>) -> Result<(), String> {
+    let mut guard = state.0.lock().unwrap();
+    if guard.is_some() {
+        return Ok(()); // already running
+    }
+    let (mut rx, child) = TauriCommand::new_sidecar("ndi-send")
+        .map_err(|e| format!("sidecar lookup failed: {}", e))?
+        .args(["stream", "DiscoCast Program"])
+        .spawn()
+        .map_err(|e| format!("ndi-send spawn failed: {}", e))?;
+    // Drain the sidecar's output so its pipe never fills; surface its fps/decode
+    // logs to the webview as an "ndi-log" event.
+    tauri::async_runtime::spawn(async move {
+        while let Some(ev) = rx.recv().await {
+            match ev {
+                CommandEvent::Stderr(line) | CommandEvent::Stdout(line) => {
+                    let _ = window.emit("ndi-log", line);
+                }
+                _ => {}
+            }
+        }
+    });
+    *guard = Some(child);
+    Ok(())
+}
+
+#[tauri::command]
+fn ndi_send_frame(state: tauri::State<NdiState>, frame_b64: String) -> Result<(), String> {
+    let bytes = general_purpose::STANDARD
+        .decode(&frame_b64)
+        .map_err(|e| e.to_string())?;
+    let mut guard = state.0.lock().unwrap();
+    if let Some(child) = guard.as_mut() {
+        // length-prefixed (u32 LE) JPEG frame — matches the sidecar's stdin reader
+        let mut buf = Vec::with_capacity(4 + bytes.len());
+        buf.extend_from_slice(&(bytes.len() as u32).to_le_bytes());
+        buf.extend_from_slice(&bytes);
+        child.write(&buf).map_err(|e| e.to_string())?;
+        Ok(())
+    } else {
+        Err("ndi not started".into())
+    }
+}
+
+#[tauri::command]
+fn ndi_stop(state: tauri::State<NdiState>) {
+    let mut guard = state.0.lock().unwrap();
+    if let Some(child) = guard.take() {
+        let _ = child.kill();
+    }
+}
 
 
 #[tauri::command]
@@ -264,7 +322,8 @@ async fn convert_to_stacked_alpha_b64(window: tauri::Window, input_b64: String) 
 fn main() {
     tauri::Builder::default()
         .manage(CaffeinateState(Mutex::new(None)))
-        .invoke_handler(tauri::generate_handler![caffeinate_start, caffeinate_stop, toggle_fullscreen, get_fullscreen, pick_audio_file, pick_image_file, save_file, store_blob, get_blob, delete_blob, convert_to_stacked_alpha, convert_to_stacked_alpha_b64])
+        .manage(NdiState(Mutex::new(None)))
+        .invoke_handler(tauri::generate_handler![caffeinate_start, caffeinate_stop, toggle_fullscreen, get_fullscreen, pick_audio_file, pick_image_file, save_file, store_blob, get_blob, delete_blob, convert_to_stacked_alpha, convert_to_stacked_alpha_b64, ndi_start, ndi_send_frame, ndi_stop])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
