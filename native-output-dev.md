@@ -97,8 +97,10 @@ Video is a **core feature**, and it is **safe with NDI**. Evidence, from this co
 
 **Where it matters / doesn't:**
 - **Operator screen:** real-time. No issue.
-- **Live room / projector:** the room hears the PA in real time. Use the **directly-attached display path (Phase B Syphon / local window)** here — much lower latency than NDI. NDI is not the in-room path, so this case is mostly sidestepped.
-- **OBS streaming/recording:** video (delayed) + audio (OBS's own capture) arrive on different paths → can drift. **This is the one place to align them.**
+- **Live room / projector (the priority for event sync):** the room hears the PA in real time. Use the **directly-attached display path (Phase B Syphon / local window)** — GPU-direct, much lower latency than NDI; or run the app fullscreen *on* the projector display (engine renders directly, ~zero added latency). NDI is **not** the in-room path, so this case is sidestepped by design.
+- **OBS streaming/recording:** video (delayed) + audio (OBS's own capture) arrive on different paths → can drift. **This is the one place to align them**, and a small constant delay is acceptable for streaming.
+
+> **Priority call (user, 2026-05-23):** event sync (monitors/projectors) is what matters most, and it rides the low-latency local-display path — not NDI. NDI's latency is fine for its streaming role. *Live-performance-over-NDI* sync is deferred until it actually comes up (the audio-over-NDI fix below covers it when it does).
 
 **Fixes (standard, easy — and they rely on the latency being CONSTANT, which observed it is):**
 1. **OBS audio Sync Offset** — right-click the audio source → *Advanced Audio Properties* → *Sync Offset*; delay audio to match the video. Set once, holds (constant latency).
