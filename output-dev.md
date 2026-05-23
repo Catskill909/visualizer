@@ -1,6 +1,6 @@
 # Output & Multi-Monitor — Design & Dev Doc
 
-**Status:** Architecture corrected 2026-05-22 — re-render path replaced by a pixel mirror (see the §13 post-mortem; do **not** rebuild re-render). **Web shipped & committed:** A1 (player/editor mirror) + A2.1 (multi-output foundation) + A2.2 (timeline per-zone→display routing) + A2.3 (route persistence + offline re-resolve). **Next: A3** (stacking — many zones → one display). Native Mac/Windows (Phase B/C) not started. Truth doc; supersedes all prior recommendations. New here? Read §0.
+**Status:** Architecture corrected 2026-05-22 — re-render path replaced by a pixel mirror (see the §13 post-mortem; do **not** rebuild re-render). **Web shipped:** A1 (player/editor mirror) + A2.1 (multi-output foundation) + A2.2 (timeline per-zone→display routing) + A2.3 (route persistence + offline re-resolve) all **committed**; A3 (stacking — many zones → one display as full-frame overlaid layers that **follow the timeline**, with per-layer blend/opacity) **built & browser-verified 2026-05-23** (commit pending). **Next: A4** (web polish & venue presets) — but see the §9 sequencing note; transparent-bg integration likely precedes the native phases. Native Mac/Windows (Phase B/C) not started. Truth doc; supersedes all prior recommendations. New here? Read §0.
 **Created:** 2026-05-21 · **Corrected:** 2026-05-22
 **Scope:** Routing visualizer output to one or more physical displays/projectors, across the player (`index.html`), Preset Studio (`editor.html`), and Timeline (`timeline.html`), all on one shared engine.
 
@@ -12,11 +12,11 @@ The original plan picked **Option A — re-render in the output window** (the se
 
 **The correct model: the output window is a dumb display of copied pixels.** It never re-renders, never runs an engine, never needs audio. It shows a live **mirror** of the operator's canvas. Same pixels in two places = cannot drift, by construction.
 
-**Decisions locked (2026-05-22):**
+**Decisions locked (2026-05-22, release strategy updated 2026-05-23):**
 1. **Output = mirror, not re-render.** The output window displays a copy of the source canvas pixels. No second engine. No audio in the output path. (Replaces the old "Option A / true-parity" decision.)
-2. **One shared architecture, one swappable "pixel pipe."** ~90% of this feature — UI, routing, the Source/Output/Route model, the layer compositing — is one codebase for web + Mac + Windows. The **only** platform-specific part is the small low-level pipe that physically moves pixels to the second window (§5). We are **not** building 2–3 separate apps.
-3. **Ship order: web → Mac → Windows.** The web pixel pipe (`captureStream`) is free and works today. The native (Mac/Windows) pipe is the one genuinely hard, unsolved piece and is built **after** the web feature is complete (§9).
-4. **Pro protocols are the native pipe, not a "someday."** Syphon (Mac) / Spout (Windows) / NDI move from "deferred forever" (§11) into the scheduled native phases as candidate mechanisms for the native pixel pipe.
+2. **One shared architecture, one swappable "pixel pipe."** ~90% of this feature — UI, routing, the Source/Output/Route model, the layer compositing — is one codebase for web + Mac + Windows. The **only** platform-specific part is the small low-level pipe that physically moves pixels to the destination (§5). We are **not** building 2–3 separate apps. The user's mental model, confirmed: *"one brain, swappable last-inch pipe."*
+3. **Web is the DEV/proving ground; the SHIPPING product is the desktop app (macOS + Windows).** *(Release strategy clarified 2026-05-23.)* The web build is **not** being released for beta — piracy risk (browser source is trivially copyable; a compiled Tauri binary is not). May change later. **Consequence:** the native pixel pipe is **beta-critical, not eventual polish** — without it, multi-output never reaches end users. We still BUILD features on web first (the `captureStream` pipe is free and iteration is fast), then they ride into the desktop app behind the native pipe. So "web first" = development order, **not** release order.
+4. **NDI is a first-class, central output — likely the FIRST native pipe.** *(Elevated 2026-05-23.)* Goal = fill every output gap: projectors, screens, OBS, streaming, other apps/machines. NDI is "one cable to everything on the LAN" — a single NDI sender feeds OBS / streaming / Resolume / other machines / hardware at once, covering the most targets in one build. It's inherently **native** (browsers can't emit NDI) and **cross-platform** (one implementation covers Mac *and* Windows, vs. Syphon=Mac-only / Spout=Win-only). So the native order is **NDI first**, then Syphon/Spout as local low-latency upgrades. (NDI also needs a model tweak — see §8: an NDI output has no `displayId`/window, so the Output model needs a `target` discriminator: `display` | `ndi` | `syphon`/`spout`.)
 
 **Relationship to existing docs (this doc is the hub):**
 - [`app-output-dev.md`](app-output-dev.md) — the **shipped** single-canvas output settings (resolution lock, aspect/fill, wake-lock, virtual camera). Still accurate as history; this doc supersedes its multi-monitor sections.
@@ -27,25 +27,27 @@ The original plan picked **Option A — re-render in the output window** (the se
 
 ## 0. Handoff orientation — read this if you're new (AI or human)
 
-**One-paragraph state.** Output = a **pixel mirror**: the output window is a dumb `<video>` showing a live `canvas.captureStream()` copy of a source canvas — never a second engine, never audio (the re-render approach drifts; §13). Web is shipped and committed: player/editor mirror (A1), multi-output foundation (A2.1), timeline per-zone→display routing (A2.2), route persistence + offline re-resolve (A2.3). Remaining: stacking (A3 — many zones → one display) and the native Mac/Windows pixel pipe (Phase B/C). Ship order web → Mac → Windows; only the low-level `outputPipe.js` is platform-specific.
+**One-paragraph state.** Output = a **pixel mirror**: an output window is a dumb stage of `<video>` layers, each a live `canvas.captureStream()` copy of a source canvas — never a second engine, never audio (the re-render approach drifts; §13). Committed: player/editor mirror (A1), multi-output foundation (A2.1), timeline per-zone→display routing (A2.2), route persistence + offline re-resolve (A2.3). **Built & browser-verified 2026-05-23 (commit pending):** stacking (A3 — many zones → one display as **full-frame overlaid layers**, composited by zIndex/opacity/blendMode, with per-layer blend+opacity controls). **Output layers overlay, they do NOT tile by region** — region is an operator-screen layout concern only (the layer-stack / transparent-bg orchestration model; see §1). **Layers follow the timeline:** a layer's output opacity = `zone.opacity × (1 − operatorCoverOpacity)`, so when a clip ends the layer fades out and reveals the one beneath. Remaining: A4 web polish + the native Mac/Windows pixel pipe (Phase B/C). Ship order web → Mac → Windows; only the low-level `outputPipe.js` is platform-specific.
+
+**A3 key change (read before touching output code):** output windows are now keyed by **display**, not zone. `outputManager` outId = `'main'` (player/editor) or `'disp:'+displayId` (timeline). One window per display hosts one `<video>` per routed zone. The pixel pipe carries a **layer list** (`setLayers`/`getLayers`), not a single stream. `zone.output` data model is unchanged — stacking is emergent (zones sharing a `displayId` stack). `timelineEditor._syncOutputs()` reconciles all display windows from the routes.
 
 **Code map (as built — verify line numbers before relying on them):**
 
 | File | Role | Key symbols |
 |---|---|---|
-| `src/output/outputPipe.js` | THE platform seam. Web: `captureStream` → same-origin popup. | `attachSource(canvas, outId='main', fps=60)`, `detachSource(outId)`, `receiveStream(outId)`; stash = `window.__dcOutputStreams[outId]` |
-| `src/output/outputManager.js` | Singleton `outputManager`. Detect displays; open/close/track output windows, multi-output keyed by `outId`. | `listDisplays({prompt})`, `openOutput({outId='main', display, fullscreen, canvas})`, `closeOutput(outId)`, `closeAll()`, `isActive(outId)`, `getOutputs()`, `onChange(fn)` |
-| `src/output/outputWindow.js` | Runs INSIDE `output.html`. No engine. Reads `?out=<id>`, shows `receiveStream(outId)` in the `<video>`, fullscreen button. | — |
-| `src/output/outputUI.js` | Shared "Send to display" section for player + editor. | `initOutputUI({engine, root})`; mirrors `engine.canvas` as `outId='main'` |
-| `output.html` | The output window: one full-window `<video id="out-video">` (`object-fit:fill`), fullscreen button, status. | Vite MPA entry |
+| `src/output/outputPipe.js` | THE platform seam. Web: per-source `captureStream` → same-origin popup, as a **layer list** per output. | `setLayers(outId, layers, fps=60)`, `clearLayers(outId)`, `getLayers(outId)`; layer = `{id, canvas, opacity, blendMode, zIndex, region}`; stash = `window.__dcOutputLayers[outId]` |
+| `src/output/outputManager.js` | Singleton `outputManager`. Detect displays; open/close/track output windows, multi-output keyed by `outId`. | `listDisplays({prompt})`, `openOutput({outId='main', display, fullscreen, layers \| canvas})`, `setLayers(outId, layers)` (live, no reopen), `closeOutput(outId)`, `closeAll()`, `isActive(outId)`, `getOutputs()`, `onChange(fn)` |
+| `src/output/outputWindow.js` | Runs INSIDE `output.html`. No engine. Reads `?out=<id>`, builds one full-frame `<video>` per `getLayers(outId)` entry into `#out-stage`, **overlaid** & composited by zIndex/opacity/blend (no region — layers fill the frame), fullscreen button. | — |
+| `src/output/outputUI.js` | Shared "Send to display" section for player + editor. | `initOutputUI({engine, root})`; mirrors `engine.canvas` as `outId='main'` (one full-region layer) |
+| `output.html` | The output window: `#out-stage` (`isolation:isolate`) holding N `.out-layer` `<video>`s, fullscreen button, status. | Vite MPA entry |
 | `index.html` / `src/controls.js` | Player Output popover (`O`) hosts the shared section. | `#output-panel` + `initOutputUI` |
 | `editor.html` / `src/editor/main.js` | Editor topbar Output panel hosts the same section. | `#editor-output-panel` + `initOutputUI` |
-| `timeline.html` / `src/timeline/timelineEditor.js` | Timeline `⊟ Outputs` modal + per-zone routing. | `#tl-btn-outputs`, `#tl-output-mgr`; `_openOutputMgr`/`_assignZoneOutput`/`_renderOutputRoutes`/`_updateOutputChips`/`_zoneOutTag`; `mkZone().output`; chip `.tl-zone-out-chip` |
+| `timeline.html` / `src/timeline/timelineEditor.js` | Timeline `⊟ Outputs` modal + per-zone routing + stacking. Outputs keyed by display (`'disp:'+id`). | `#tl-btn-outputs`, `#tl-output-mgr`; `_openOutputMgr`/`_assignZoneOutput`/`_syncOutputs`/`_displayKey`/`_zoneOutputLive`/`_buildStackControls`/`_applyZoneStyle`/`_renderOutputRoutes`/`_updateOutputChips`/`_zoneOutTag`; `mkZone().output`; chip `.tl-zone-out-chip` |
 | `src/timeline/style.css` | Timeline output modal + chip styles; `--zone-col-w` **must equal** JS `ZONE_COL_W` in `timelineEditor.js`. | — |
 
 **How to run & verify (web — a single screen is enough to prove sync):** `npm run dev:safe` → open the player → press `O` → **↻ Detect** (grant the window-management prompt) → pick a display → **Open output window**. A popup mirrors the canvas in perfect sync. Timeline: open `/timeline.html` → **`⊟ Outputs`** → route a zone to a display. *Keep the operator window visible — a hidden/occluded window throttles its rAF and the mirror freezes (known limit, §5).* Output windows spawn at half-display size, centred + cascaded; fullscreen each with the ⛶ button.
 
-**Where to start next:** Phase **A3** (§9) — timeline stacking. Route two or more zones to the same display. The output window gets one `<video>` per routed zone, layered with each zone's existing `zIndex`/`opacity`/`blendMode`. No new data fields — reuses `mkZone()`. The operator screen already composites this way; the output window is a second copy of that stack.
+**Where to start next:** A3 is verified — commit it. Then **sequencing is a real decision** (see the §9 note): the native Mac/Windows pixel pipe (Phase B/C) is the project's one genuinely hard unknown and a big detour, whereas finishing **transparent-bg** (built in tandem) directly amplifies the layering you just shipped and stays web/low-risk. Recommended order: commit A3 → transparent-bg integration → light A4 polish → **then** Phase B0 spike before any native production code.
 
 **Two house rules that bit us (also in `CLAUDE.md`):** (1) plan before coding — trace the real path first; (2) in the timeline, the JS `ZONE_COL_W` constant and the CSS `--zone-col-w` var must change **together** or the playhead/blocks misalign.
 
@@ -123,9 +125,12 @@ Sources: [Resolume Advanced Output](https://resolume.com/support/en/advanced-out
 - `src/output/` (`outputManager`, `outputWindow`, `outputPipe`, `outputUI`) + `output.html` — the **pixel mirror**. `outputTransport.js` deleted; the output window is a dumb `<video>` (0.95 kB chunk, no engine, no audio); web pipe = `engine.canvas.captureStream(60)` handed to the popup via `window.opener.__dcOutputStream`. Builds clean; **runtime-verified 2026-05-22 (same pixels, in sync).**
 
 **What's missing (as of 2026-05-23):**
-- **Stacking** — many zones → one display, composited (A3). ⬅ next
 - **Player/editor persistence** — `lastDisplayId` / `openFullscreen` restore (§8) not yet wired.
-- **The native (Mac/Windows) pixel pipe** — desktop apps can't mirror yet; `captureStream` + the same-origin handoff is web-only (Phase B/C).
+- **Transparent-bg integration** — built in tandem; turns blend-mode layering into true alpha reveal (the orchestration payoff). ⬅ recommended next
+- **A4 web polish** — venue/output presets, one-source→many-displays mirror, hot-unplug recovery, perf pass.
+- **The native (Mac/Windows) pixel pipe** — desktop apps can't mirror yet; `captureStream` + the same-origin handoff is web-only (Phase B/C; spike first).
+
+*(Stacking — A3 — is built & verified; commit pending; see §9.)*
 
 **The gift in the existing code:** zones already carry the full compositing recipe (`opacity`/`blendMode`/`zIndex`) and the engine already knows how to `captureStream`. The mirror is mostly *plumbing existing pixels to a second window*, not inventing anything.
 
@@ -162,7 +167,7 @@ class OutputManager {
 
 A **route** carries the source **canvas** (to mirror) plus the compositing recipe. `sourceCanvas` is the single canvas in player/editor; a zone's canvas in the timeline. Many routes on one handle = a stacked output.
 
-> **As built (A1/A2.1) vs. the shape above.** The shipped `outputManager` is **one mirror window per `outId`** — there is **no `setRoutes` yet** (it arrives with A3 stacking, when one output composites several sources). Real signatures today: `openOutput({ outId='main', display, fullscreen, canvas })`, `closeOutput(outId)`, `closeAll()`, `isActive(outId)`, `getOutputs() → [{id, displayId, active}]`, `onChange(fn)`, `listDisplays({ prompt })`. The pixel handoff lives in `outputPipe.js` (`attachSource`/`detachSource`/`receiveStream`, keyed by `outId`). `outId` = `'main'` for player/editor, the `zone.id` in the timeline.
+> **As built (through A3) vs. the shape above.** `setRoutes` landed as **`setLayers(outId, layers)`** (A3): one output window composites several sources as layered `<video>`s. Real signatures today: `openOutput({ outId='main', display, fullscreen, layers | canvas })`, `setLayers(outId, layers)` (live update, no reopen), `closeOutput(outId)`, `closeAll()`, `isActive(outId)`, `getOutputs() → [{id, displayId, active}]`, `onChange(fn)`, `listDisplays({ prompt })`. The pixel handoff lives in `outputPipe.js` (`setLayers`/`clearLayers`/`getLayers`, keyed by `outId`); a layer = `{id, canvas, opacity, blendMode, zIndex, region}`. **`outId` keying changed in A3:** `'main'` for player/editor (one full-region layer); **`'disp:'+displayId`** in the timeline (one window per physical display, NOT per zone — that's what lets many zones stack into one window).
 
 **Design rules (carry into every phase):**
 1. **One brain, dumb outputs.** The main page owns playback, audio, preset state, *and all rendering*. The output window only displays mirrored pixels — it decides nothing and renders nothing. This is what makes multi-output safe and drift-free.
@@ -282,7 +287,7 @@ A new transport button **`⊟ Outputs`** beside **`⊞ Zones`**. Opens a modal m
 - **Quick-assign from the zone row:** each zone-row header gets a small output chip (`▸2`); click → inline display picker. No modal mid-show.
 - **At-a-glance state:** a routed zone shows a small monitor glyph; live = a calm pulse (never a strobe).
 
-> **As built (A2.2) vs. the mock above.** The shipped modal is simpler: a **Displays** list (cards) + a **Routing** list with **one dropdown per zone** (Off / each display). No drag-onto-display, no stacked chips, no per-source opacity/blend yet — those are **A3** (stacking). The zone-row chip is `▸`/`▸N` and **opens the modal** (the inline picker is a later refinement). On assign, the output window opens immediately mirroring that zone's canvas; "Off" closes it.
+> **As built (through A3) vs. the mock above.** The modal is a **Displays** list (cards) + a **Routing** list with **one dropdown per zone** (Off / each display). When 2+ zones target the **same** display (a stack), each of those zone rows grows a second line with a **blend-mode dropdown + opacity slider** (`_buildStackControls`) — these write `zone.blendMode`/`zone.opacity`, the same fields `_positionCanvas` reads, so the operator screen and the mirrored output update together (one source of truth). No drag-onto-display yet; the zone-row chip (`▸`/`▸N`) still **opens the modal** (inline picker is a later refinement). On assign, the display's output window opens/updates immediately; "Off" removes that layer (and closes the window when its last zone leaves).
 
 ### 7.3 What we deliberately do NOT build (v1)
 Edge-blending, projection warping/meshes, slices/sub-regions of one source across outputs, per-output colour calibration. MadMapper/Resolume-Arena territory — far-future.
@@ -306,7 +311,8 @@ zone = { id, name, color, region, opacity, blendMode, zIndex, gapBehavior,
            fullscreen: false
          } }
 ```
-- **As built (A2.2 + A2.3):** the shape above is exactly what `_assignZoneOutput` writes. A `target` field (display/window/virtualcam) is **not** implemented — only `'display'` exists today. On load, `_resolveOutputRoutes()` re-resolves each saved `zone.output` by `displayLabel` (IDs aren't stable), updates `displayId`, and sets `_offline: true` if the display isn't found. Chip shows `▸!` + dashed border for offline; `↺ Restore N routes` button appears in the modal when restorable routes exist.
+- **As built (A2.2 + A2.3):** the shape above is exactly what `_assignZoneOutput` writes. A `target` field is **not** implemented — only a display destination exists today. On load, `_resolveOutputRoutes()` re-resolves each saved `zone.output` by `displayLabel` (IDs aren't stable), updates `displayId`, and sets `_offline: true` if the display isn't found. Chip shows `▸!` + dashed border for offline; `↺ Restore N routes` button appears in the modal when restorable routes exist.
+- **`target` discriminator arrives with NDI (Phase N1).** An NDI output has **no** `displayId`/window — it's a network stream name. So the model grows `output.target: 'display' | 'ndi'` (later `'syphon'`/`'spout'`); `display` routes keep `displayId`/`displayLabel`, `ndi` routes carry a `streamName`. The keying generalizes from `'disp:'+displayId` to a per-target output key. Everything above the pixel pipe (routing/stacking/compositing) is unaffected.
 - **Stacking is emergent (A3):** two zones whose `output.displayId` match are stacked on that display, ordered by `zIndex`, composited by their existing `opacity`/`blendMode`. No new field — reuses `mkZone()`.
 - **Display ID stability:** OS display IDs aren't stable across reboots/replug. Persist `displayLabel` too and re-resolve by label on load; if gone, show "output offline — reassign", never silently drop.
 - **Migration:** absent `output` → `null` → today's behaviour. No migration pass.
@@ -316,6 +322,8 @@ zone = { id, name, color, region, opacity, blendMode, zIndex, gapBehavior,
 ## 9. Phased development plan — web → Mac → Windows
 
 Web first (the pipe is free and you VJ there now); native after (the pipe is the hard part). Each phase ships standalone value.
+
+> **Sequencing note (2026-05-23).** With A3 done, "Mac/Windows next?" is tempting but the native pixel pipe (Phase B/C) is the **one genuinely unsolved unknown** — a second Tauri WebviewWindow can't take a `MediaStream`, so it needs Syphon/Spout/readback/NDI, which is a large, risky, Tauri-v1.5-constrained effort. Recommended order instead: **(1) commit A3; (2) integrate transparent-bg** (built in tandem — turns blend-mode layering into true alpha reveal and is the natural completion of the orchestration vision, web/low-risk); **(3) light A4 polish** (output/venue presets are the highest-value bit); **(4) Phase B0 spike** to de-risk the native pipe *before* writing any native production code. Don't start Phase B by building — start it by spiking. This is advice, not a lock; the phase order below still stands if you'd rather go straight to native.
 
 ### Phase A — WEB (the whole feature on web)
 
@@ -334,11 +342,13 @@ Web first (the pipe is free and you VJ there now); native after (the pipe is the
 - [x] **A2.3** ✅ committed 2026-05-23 — `_resolveOutputRoutes()` fires on every `_loadTimeline`: detects displays (no prompt), re-resolves each `zone.output` by `displayLabel` (IDs aren't stable), updates `displayId` or sets `_offline:true`. Chip: `▸!` + dashed border = offline, `▸N` dim = saved-not-live, `▸N` bright = live. Modal: `⚠ DisplayName — not detected` option when offline; `↺ Restore N routes` button when restorable routes exist (user gesture opens popups). New methods: `_resolveOutputRoutes`, `_reopenSavedRoutes`.
 - **Exit:** each zone drives its own monitor; assignments persist and survive reload.
 
-**A3 — Timeline stacking (many zones → one display)  ⬅ headline ask**
-- [ ] Route multiple zones to one display: one `<video>` layer per zone in the output window, composited by `zIndex` with each zone's `opacity`/`blendMode`/`region`.
-- [ ] Stacked-chip UI; shared opacity/blend controls (one source of truth with the Zone Stack popover).
-- **No longer depends on Phase 4.9 Zone Stack** — we reuse CSS layer compositing, not a re-hosted compositor.
-- **Exit:** two/three presets stacked on one projector, pixel-identical to the operator screen, no drift.
+**A3 — Timeline stacking (many zones → one display)  ✅ BUILT & VERIFIED 2026-05-23 (commit pending)**
+- [x] Output windows re-keyed **per display** (`'disp:'+id`), not per zone. Pixel pipe carries a **layer list** (`setLayers`/`getLayers`); the output window builds one **full-frame, overlaid** `<video>` per layer into `#out-stage` (`isolation:isolate`), composited by `zIndex`/`opacity`/`blendMode`. **Layers overlay, they do NOT tile by region** (corrected 2026-05-23 after a Left/Right test tiled side-by-side instead of stacking) — region stays on the zone for the operator screen only. `timelineEditor._syncOutputs()` groups routed zones by display and opens/live-updates/closes one window each.
+- [x] Per-stacked-zone **blend-mode dropdown + opacity slider** in the Outputs modal (`_buildStackControls`), writing `zone.blendMode`/`zone.opacity` — one source of truth with the operator screen (`_positionCanvas` now also applies `opacity`).
+- [x] **Layers follow the timeline (2026-05-23).** Window lifecycle = routing; layer *visibility* = playback. Each output layer's opacity = `zone.opacity × (1 − operatorCoverOpacity)`, so when a track's clip ends and the operator covers it with black, the output layer fades out instead — **revealing the layer beneath** (the layer-stack model). The cover's fade duration rides along as `transitionMs` (pipe → `<video>` CSS transition) so the reveal crossfades. Hooked in `_fadeZoneCover` (the single chokepoint for every play/gap/scrub/stop cover change) → debounced `_scheduleOutputSync` → `_syncOutputs`. **Root cause of the original "frozen ended preset" bug:** the operator's black gap is a DOM `<div>` cover over the canvas; `captureStream` only grabs canvas pixels, so the output never saw the gap. Now visibility is mirrored from the cover. (Consequence: when stopped/at a gap the output is black, matching the operator.)
+- **No new data fields** — stacking is emergent (zones sharing `output.displayId`), reuses `mkZone()`. **No dependency on Phase 4.9 Zone Stack** — reuses CSS layer compositing, not a re-hosted compositor.
+- [x] **Verified 2026-05-23** — two presets stacked on one window: top shows over bottom; top clip ends → top fades out and exposes the bottom layer; no drift. ✅ A3 complete (commit pending).
+- **Exit:** two/three presets stacked on one projector, layered & following the timeline, no drift. ✅
 
 **A4 — Web polish & venue presets**
 - [ ] **Output presets** (Resolume-style): save/name a whole display→route map per venue; one-click switch.
@@ -346,19 +356,29 @@ Web first (the pipe is free and you VJ there now); native after (the pipe is the
 - [ ] Hot-unplug recovery; perf pass (several 1080p60 mirrors with main UI still 60fps); clean teardown.
 - **Exit:** production-ready multi-screen on web.
 
-### Phase B — MAC (native pixel pipe, Tauri macOS)
-- [ ] **B0 — Spike the native pipe (no production code):** prototype Syphon vs pixel-readback vs NDI; measure latency/fps/effort; pick one. This is the project's one true unknown.
-- [ ] **B1:** implement the chosen pipe behind the **same** `outputManager`/`outputPipe` interface; reuse all of Phase A's UI/routing/compositing untouched.
-- [ ] **B2:** native window placement + fullscreen-on-monitor (`set_position`→`set_fullscreen`), wake-lock, multi-output teardown.
-- **Exit:** the Mac desktop app drives a second monitor in sync, with the identical UI and routing as web.
+> **Native phases reordered 2026-05-23 (NDI-first).** The shipping product is the desktop app (decision #3), so the native pixel pipe is beta-critical. NDI is cross-platform (one build → Mac + Windows) and covers the most targets, so it leads. The local-projector pipe (Syphon/Spout/readback to a directly-attached display) follows. Each native phase opens with a **spike** — prototype + measure before any production code; the pixel pipe is the project's one true unknown.
 
-### Phase C — WINDOWS (native pixel pipe, Tauri Windows)
+### Phase N — NDI (cross-platform, the FIRST native milestone)
+NDI = "one cable to everything on the LAN": a single sender feeds OBS, streaming software, Resolume, other machines, and NDI hardware at once. Native-only (browsers/webviews can't emit NDI) and one implementation covers both desktops.
+- [ ] **N0 — Spike:** stand up an NDI sender from Rust (Tauri sidecar/command); push the operator canvas (readback → NDI frames) and receive it in OBS/NDI Studio Monitor; measure latency/fps/CPU; settle the NDI SDK/runtime bundling + licensing.
+- [ ] **N1 — Output model `target` extension:** add `output.target` (`display` | `ndi`), an NDI route carries a stream name (no `displayId`/window); the Outputs modal gains an "NDI output" target alongside displays. Everything above the pipe (routing/stacking/compositing) reused untouched.
+- [ ] **N2:** stable NDI sender behind the same `outputPipe` contract; per-output NDI streams (each routed display-group or a composed view as its own NDI source); clean start/stop.
+- **Exit:** the desktop app publishes its visuals as NDI; OBS (and any NDI receiver) shows them in sync.
+
+### Phase B — MAC local pipe (Syphon) + native window placement
+For a projector/screen plugged directly into the Mac (NDI needs a receiver; a directly-attached display wants pixels on a real fullscreen window).
+- [ ] **B0 — Spike:** Syphon (GPU texture share) vs pixel-readback→IPC→second window; measure; pick one.
+- [ ] **B1:** chosen pipe behind the **same** `outputManager`/`outputPipe` interface; reuse all shared UI/routing/compositing.
+- [ ] **B2:** native window placement + fullscreen-on-monitor (`set_position`→`set_fullscreen`), wake-lock (`caffeinate`), multi-output teardown.
+- **Exit:** the Mac app drives a directly-attached second monitor in sync, identical UI/routing to web.
+
+### Phase C — WINDOWS local pipe (Spout) + window placement
 - [ ] **C1:** Spout (or the readback path proven in B0) behind the same interface.
 - [ ] **C2:** Windows window-placement quirks (#7139 cross-monitor `set_position`); Win32 fallback only if it bites.
-- **Exit:** the Windows desktop app reaches parity with Mac.
+- **Exit:** the Windows app reaches parity with Mac.
 
 ### Future (not scheduled) — §11
-NDI as a first-class network output; projection warp / edge-blend; slices.
+Projection warp / edge-blend; slices/sub-regions; per-output colour calibration.
 
 ---
 
@@ -369,7 +389,8 @@ NDI as a first-class network output; projection warp / edge-blend; slices.
 | ~~Butterchurn can't take injected audio~~ — *moot; we don't inject audio anymore* | The mirror needs no audio. |
 | Web mirror upscale softness (display > canvas) | Acceptable for organic visuals; raise source canvas resolution if a venue needs it. |
 | Occluded operator window freezes the mirror | Documented limit (§5); operator screen is always visible during a show. |
-| **Native pixel pipe is unsolved** (the real risk) | Phase B0 spike gates it before any production native code; three candidate mechanisms (Syphon/Spout, readback, NDI). |
+| **Native pixel pipe is unsolved** AND beta-critical (shipping product is desktop) | Spike-first per phase (N0/B0) before any production native code; NDI leads (cross-platform, widest reach). Candidates: NDI, Syphon/Spout, pixel-readback. |
+| Web build not released → no end-user multi-output until native lands | Accepted: web is the dev/proving ground (decision #3, piracy). Keep the pipe seam clean so native swaps in fast; don't let web-only assumptions leak above `outputPipe.js`. |
 | Cross-window perf (many mirrors at 60fps) | `captureStream` layers are GPU-cheap (no codec); FPS budget in A4; HUD exists (`` ` `` key). |
 | Display IDs unstable across sessions | Persist + re-resolve by label; "offline — reassign", never silent drop. |
 | Tauri v1.5 multi-window rough edges (#6394/#7139) | Documented workaround; scope a v2 migration **separately**. |
@@ -379,14 +400,14 @@ NDI as a first-class network output; projection warp / edge-blend; slices.
 
 ## 11. Native pipe candidates & far-future protocols
 
-The first three are now **the native pixel pipe** (Phases B/C), not "deferred forever." Detail in [`visualizer-output-dev.md`](visualizer-output-dev.md).
+These ARE the native pixel pipe (the shipping product is desktop — decision #3), not "deferred forever." NDI leads (cross-platform, widest reach). Detail in [`visualizer-output-dev.md`](visualizer-output-dev.md).
 
 | Tech | Platform | Role | Phase |
 |---|---|---|---|
-| **Syphon** | macOS | GPU texture share → native output surface. Strong Mac pipe candidate. | B0 spike |
+| **NDI** | macOS + Windows (one impl) | Network output → OBS / streaming / Resolume / other machines / hardware. Widest gap-coverage; native-only. **Lead native pipe.** | **N0 spike → N1/N2** |
+| **Syphon** | macOS | GPU texture share → native output surface for a directly-attached display. | B0 spike |
 | **Spout** | Windows | Syphon's Windows twin. | C |
-| **Pixel readback over IPC/shared-mem** | all native | Simple, web-ish; heavy at high res/fps. Fallback pipe. | B0 spike |
-| **NDI** | macOS + Windows | Network output; also feeds OBS/Resolume. Cross-platform, adds latency. | B0 spike / Future |
+| **Pixel readback over IPC/shared-mem** | all native | Simple, web-ish; heavy at high res/fps. Fallback for both NDI feed and local window. | N0 / B0 spike |
 | Warp / edge-blend / slices | all | Projection-mapping (MadMapper/Arena). | Far-future only |
 
 ---
@@ -419,4 +440,4 @@ The first three are now **the native pixel pipe** (Phases B/C), not "deferred fo
 
 ---
 
-*Last updated: 2026-05-23 — A1 + A2.1 + A2.2 + A2.3 all committed to main. Pixel mirror, not re-render (§13). One shared architecture + one swappable pixel pipe. Ship order web → Mac → Windows. Next action: A3 (stacking — many zones → one display), then Phase B/C (native pipe).*
+*Last updated: 2026-05-23 — A1 + A2.1 + A2.2 + A2.3 committed; A3 (stacking, per-display windows + layer-list pipe + per-layer blend/opacity, layers follow the timeline) **built & browser-verified**, commit pending. Pixel mirror, not re-render (§13). One shared architecture + one swappable pixel pipe. Ship order web → Mac → Windows. Recommended next: commit A3 → transparent-bg integration → light A4 polish → Phase B0 native-pipe spike (see §9 sequencing note).*

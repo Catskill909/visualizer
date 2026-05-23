@@ -44,6 +44,7 @@
 
 | # | Phase | What it adds |
 |---|-------|--------------|
+| 2 | 4.15 — Preset Thumbnails | Animated preview tiles in the Add Preset picker — the proper way to see "what a preset looks like" now that the output is live-only |
 | 3 | 4.14-B — Transition Wipes | Directional `wipe-left/right/up/down` transitions *(4.14-A — colour fades — shipped 2026-05-19)* |
 | 4 | 4.9 — Zone Stack | Layered compositing — zone opacity + blend-mode popover, overlay layout |
 | 5 | 4.11 — Staging Mode | Safe overlay editing; changes commit on the next block boundary |
@@ -160,6 +161,26 @@ The block boundary is the only transition point. This is the default for all ope
 ## 🎯 Roadmap — Planned Phases
 
 Built in the order of the *Up Next* table. Each entry below carries the same number.
+
+---
+
+### 2 · Phase 4.15 — Preset Thumbnails (Picker Previews) ⬜
+
+**Why.** As of 2026-05-23 the output canvas is **live-only** — it shows black when stopped (see Open Bugs: white-circle fix). That removed the confusing idle-preset artifact but also removed the only "what does this preset look like" feedback. Every real VJ tool (Resolume, VDMX, Modul8) answers this the same way: a **thumbnail in the browser/library**, never an idle render on the live output. This phase brings that pattern to the **Add Preset picker** (`#tl-picker-list`).
+
+**The hard part — a meaningful thumbnail.** A single frame of an audio-reactive preset rendered against silence is dark or garbage (exactly the artifact we just removed). So a thumbnail must be captured while the preset is *animating*:
+
+- **Drive it with synthetic audio.** Feed the analyser a short synthetic signal (a beat + bass/mid/high sweep) so the preset moves like it would live, let it run a beat or two, then grab a representative frame. The engine already has the capture primitive: `captureNextFrame()` (resolves to a 320×180 JPEG data URL right after `render()`).
+- **Capture off the live output.** Use a dedicated offscreen engine/canvas (or the primary engine while the output cover is down), never the visible zones — generating thumbnails must not flash the live canvas.
+- **Cache aggressively.** Bundled presets are static — capture once, store the data URL in IndexedDB/localStorage keyed by preset name + a content hash, reuse forever. Custom presets re-capture when their definition changes. Thumbnail generation is the expensive part; it should happen lazily (on first picker open, or a background pass) and never block the UI.
+
+**Surface.**
+- Picker list items get a thumbnail tile (the list is built in `_renderPickerList` / around `#tl-picker-list`). Fall back to a neutral placeholder (preset name on dark) until the thumbnail resolves.
+- Optionally animate on hover — swap the still for a short looping capture (a few frames) so hovering "auditions" the preset. Decide still-vs-GIF after the still path works; a GIF/webm loop is more storage and more capture work.
+
+**Explicitly NOT this phase.** No preview on the timeline blocks themselves (the block shows the preset *name* — keep the strip simple, per the UX philosophy), and no live preview monitor. Auditioning lives in the picker only.
+
+**Open questions to settle when building.** Synthetic-audio profile (one generic beat vs. per-preset tuning — start generic); still vs. animated tile; capture timing (lazy-on-open vs. background warm); storage budget for the thumbnail cache.
 
 ---
 
@@ -902,6 +923,7 @@ Same design language as the rest of the app: full-screen canvas, glassmorphic ov
 - ~~**Added presets force-load onto the canvas regardless of playhead**~~: ✅ Fixed 2026-05-17 — the picker click handler used to call `loadPreset` + `_fadeZoneCover` after `addEntry`, so any block you added (or at any start time) jumped straight onto the canvas. Fix: the picker now only mutates the data model; `addEntry` / `_removeEntry` re-derive the canvas from the playhead — `_rescheduleIfPlaying()` while playing, `_scrubTo(this._currentTime)` while stopped. The playhead is the single source of truth; the canvas only ever shows what is under it, and the playhead never moves on add/remove.
 - ~~**Playhead follows the mouse with no button held**~~: ✅ Fixed 2026-05-18 — the ruler scrub set an `isScrubbing` flag cleared only on `pointerup`; when the browser swallowed the release as a `pointercancel` (gesture reinterpreted as a scroll), the flag stuck and every mouse-move scrubbed the playhead. Three-part fix across all four drag handlers (ruler scrub, marker drag, block move, block resize): (1) an `e.buttons === 0` self-heal guard ends the drag the instant no button is held; (2) `pointercancel` now runs the same cleanup as `pointerup`, with a re-entry guard; (3) `touch-action: none` on `#tl-ruler` and `.tl-marker-flag` stops the browser stealing the gesture at the source.
 - ~~**Block resize/move runs out of room past the visible strip**~~: ✅ Fixed 2026-05-19 — `_renderStrip` only gave 200px of runway past the *current* content end, and the inner width was recomputed on release, never during the drag. Stretching a 30s block to 3:00 meant drag → release → scroll → re-grab, over and over. Fix: a shared `_makeDragScroller` helper drives both block drag handlers — while the pointer nears either horizontal edge of `#tl-scroll` the strip auto-scrolls (speed scales with closeness), `_ensureRunway` grows `#tl-inner` ahead of the drag, and the drag delta is measured in *content* px (viewport movement + auto-scroll travel) so the block keeps tracking the cursor while the strip scrolls. One continuous gesture now stretches or moves a block any distance. `_renderStrip` reconciles ruler/playhead/width on release.
+- ~~**White-circle / idle-preset artifact in a zone canvas when stopped (esp. Left zone, worse on resize)**~~: ✅ Fixed 2026-05-23 — root cause was a wrong premise, not a missing render. `_scrubTo`'s stopped branch tried to paint a *static preview* of the preset under the playhead (lift cover + load + render one frame). But Milkdrop/Butterchurn presets are **audio-reactive animations**: a single frame with no audio and no running render loop is meaningless — for the primary engine (`'full'`/Left zone) the cover lifted onto the stale boot frame (the "white circle"); for a loaded preset it showed a dark pre-audio state or a raw tiled texture; resize reallocated the WebGL buffer and re-exposed it. **The output is now a live-only surface: when stopped, every zone's cover is set to black** (`_fadeZoneCover(zoneId, 1, 0)` for all zones in `_scrubTo`'s `!_playing` branch; a zone mid-cue is the only exception). No preset is loaded or rendered to the output while stopped. This matches every VJ tool — the live output only ever shows what's actually playing. "What does this preset look like" moves to **picker thumbnails (Phase 4.15)**. (Reverted the interim `renderFrame()` engine method and the resize re-scrub — both dead under this model.)
 - **Undo/Redo not yet implemented** — scheduled for Roadmap Phase 4.7. Until then, delete and drag are irreversible.
 
 ---
