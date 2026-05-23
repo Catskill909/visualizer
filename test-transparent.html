@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Transparent Canvas — Concept Proof</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      overflow: hidden;
+      font-family: monospace;
+      color: #fff;
+    }
+
+    /* Z=0  Rainbow — only visible where canvas is transparent */
+    #bg {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background: conic-gradient(from 0deg at 50% 50%,
+          #ff0080, #ff8800, #ffff00, #00ff88, #00ffff, #0088ff, #8800ff, #ff0080);
+    }
+
+    /* Z=1  Canvas — transparent WebGL surface (preset background lives here) */
+    #viz {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1;
+    }
+
+    /* Z=2  Layer simulation — represents image/GIF/text layers */
+    #layer {
+      position: fixed;
+      z-index: 2;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 32px 48px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.12);
+      border: 2px solid rgba(255, 255, 255, 0.5);
+      text-align: center;
+      pointer-events: none;
+    }
+
+    #layer h2 {
+      font-size: 20px;
+      margin-bottom: 8px;
+    }
+
+    #layer p {
+      font-size: 13px;
+      opacity: 0.7;
+    }
+
+    #hud {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      z-index: 10;
+      font-size: 13px;
+      line-height: 2;
+      text-shadow: 0 1px 6px #000;
+    }
+
+    #controls {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      display: flex;
+      gap: 10px;
+    }
+
+    button {
+      padding: 8px 18px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      background: rgba(0, 0, 0, 0.7);
+      color: #fff;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    button.active {
+      background: rgba(255, 255, 255, 0.2);
+      border-color: #fff;
+    }
+
+    .ok {
+      color: #4f4;
+    }
+
+    .bad {
+      color: #f55;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="bg"></div>
+  <canvas id="viz"></canvas>
+
+  <div id="layer">
+    <h2>🖼 Image / GIF / Text Layer</h2>
+    <p>This is your layer content — sits on top of the canvas background</p>
+    <p>Rainbow bleeding through = canvas background is transparent ✓</p>
+  </div>
+
+  <div id="hud">
+    <strong>Transparent Canvas — Concept Proof</strong><br>
+    Canvas BG: <span id="state" class="ok">TRANSPARENT</span>
+  </div>
+
+  <div id="controls">
+    <button id="btn-alpha" class="active">Background: TRANSPARENT</button>
+    <button id="btn-bg" class="active">Rainbow: ON</button>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('viz');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    // Create WebGL canvas with alpha:true — this is the patch we need on butterchurn
+    const gl = canvas.getContext('webgl2', { alpha: true, premultipliedAlpha: false });
+
+    let transparent = true;
+
+    function draw() {
+      if (transparent) {
+        gl.clearColor(0, 0, 0, 0); // fully transparent
+      } else {
+        gl.clearColor(0, 0, 0, 1); // opaque black (current app behaviour)
+      }
+      gl.clear(gl.COLOR_BUFFER_BIT);
+    }
+    draw();
+
+    // Controls
+    const stateEl = document.getElementById('state');
+    const alphaBtn = document.getElementById('btn-alpha');
+
+    alphaBtn.addEventListener('click', () => {
+      transparent = !transparent;
+      draw();
+      alphaBtn.textContent = `Background: ${transparent ? 'TRANSPARENT' : 'OPAQUE BLACK'}`;
+      alphaBtn.classList.toggle('active', transparent);
+      stateEl.textContent = transparent ? 'TRANSPARENT' : 'OPAQUE BLACK';
+      stateEl.className = transparent ? 'ok' : 'bad';
+    });
+
+    const bgEl = document.getElementById('bg');
+    const bgBtn = document.getElementById('btn-bg');
+    let bgOn = true;
+    bgBtn.addEventListener('click', () => {
+      bgOn = !bgOn;
+      bgEl.style.display = bgOn ? '' : 'none';
+      bgBtn.textContent = `Rainbow: ${bgOn ? 'ON' : 'OFF'}`;
+      bgBtn.classList.toggle('active', bgOn);
+    });
+
+    window.addEventListener('resize', () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      draw();
+    });
+  </script>
+</body>
+
+</html>
