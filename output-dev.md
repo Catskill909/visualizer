@@ -1,6 +1,6 @@
 # Output & Multi-Monitor — Design & Dev Doc
 
-**Status:** Architecture corrected 2026-05-22 — re-render path replaced by a pixel mirror (see the §13 post-mortem; do **not** rebuild re-render). **Web shipped & runtime-verified 2026-05-22:** A1 (player/editor single-output mirror) + A2.1 (multi-output foundation) + A2.2 (timeline per-zone→display routing). **Next: A2.3** (persist routes + offline re-resolve). Native Mac/Windows (Phase B/C) not started. Truth doc; supersedes all prior recommendations. New here? Read §0.
+**Status:** Architecture corrected 2026-05-22 — re-render path replaced by a pixel mirror (see the §13 post-mortem; do **not** rebuild re-render). **Web shipped & committed:** A1 (player/editor mirror) + A2.1 (multi-output foundation) + A2.2 (timeline per-zone→display routing) + A2.3 (route persistence + offline re-resolve). **Next: A3** (stacking — many zones → one display). Native Mac/Windows (Phase B/C) not started. Truth doc; supersedes all prior recommendations. New here? Read §0.
 **Created:** 2026-05-21 · **Corrected:** 2026-05-22
 **Scope:** Routing visualizer output to one or more physical displays/projectors, across the player (`index.html`), Preset Studio (`editor.html`), and Timeline (`timeline.html`), all on one shared engine.
 
@@ -27,7 +27,7 @@ The original plan picked **Option A — re-render in the output window** (the se
 
 ## 0. Handoff orientation — read this if you're new (AI or human)
 
-**One-paragraph state.** Output = a **pixel mirror**: the output window is a dumb `<video>` showing a live `canvas.captureStream()` copy of a source canvas — never a second engine, never audio (the re-render approach drifts; §13). Web is shipped and runtime-verified for the player, editor, and timeline (per-zone→display). Remaining: route persistence (A2.3), stacking (A3), and the native Mac/Windows pixel pipe (Phase B/C). Ship order web → Mac → Windows; only the low-level `outputPipe.js` is platform-specific.
+**One-paragraph state.** Output = a **pixel mirror**: the output window is a dumb `<video>` showing a live `canvas.captureStream()` copy of a source canvas — never a second engine, never audio (the re-render approach drifts; §13). Web is shipped and committed: player/editor mirror (A1), multi-output foundation (A2.1), timeline per-zone→display routing (A2.2), route persistence + offline re-resolve (A2.3). Remaining: stacking (A3 — many zones → one display) and the native Mac/Windows pixel pipe (Phase B/C). Ship order web → Mac → Windows; only the low-level `outputPipe.js` is platform-specific.
 
 **Code map (as built — verify line numbers before relying on them):**
 
@@ -45,7 +45,7 @@ The original plan picked **Option A — re-render in the output window** (the se
 
 **How to run & verify (web — a single screen is enough to prove sync):** `npm run dev:safe` → open the player → press `O` → **↻ Detect** (grant the window-management prompt) → pick a display → **Open output window**. A popup mirrors the canvas in perfect sync. Timeline: open `/timeline.html` → **`⊟ Outputs`** → route a zone to a display. *Keep the operator window visible — a hidden/occluded window throttles its rAF and the mirror freezes (known limit, §5).* Output windows spawn at half-display size, centred + cascaded; fullscreen each with the ⛶ button.
 
-**Where to start next:** Phase **A2.3** (§9) — persist `zone.output` with the timeline set (it already round-trips via the set's JSON), re-resolve the display **by label** on load (OS IDs aren't stable), and show "offline — reassign" when a saved display is gone.
+**Where to start next:** Phase **A3** (§9) — timeline stacking. Route two or more zones to the same display. The output window gets one `<video>` per routed zone, layered with each zone's existing `zIndex`/`opacity`/`blendMode`. No new data fields — reuses `mkZone()`. The operator screen already composites this way; the output window is a second copy of that stack.
 
 **Two house rules that bit us (also in `CLAUDE.md`):** (1) plan before coding — trace the real path first; (2) in the timeline, the JS `ZONE_COL_W` constant and the CSS `--zone-col-w` var must change **together** or the playhead/blocks misalign.
 
@@ -122,9 +122,8 @@ Sources: [Resolume Advanced Output](https://resolume.com/support/en/advanced-out
 **What exists (the mirror — Phase A1, built 2026-05-22):**
 - `src/output/` (`outputManager`, `outputWindow`, `outputPipe`, `outputUI`) + `output.html` — the **pixel mirror**. `outputTransport.js` deleted; the output window is a dumb `<video>` (0.95 kB chunk, no engine, no audio); web pipe = `engine.canvas.captureStream(60)` handed to the popup via `window.opener.__dcOutputStream`. Builds clean; **runtime-verified 2026-05-22 (same pixels, in sync).**
 
-**What's missing (as of 2026-05-22):**
-- **Route persistence** — timeline `zone.output` is set live but not yet saved/restored across reload (A2.3).
-- **Stacking** — many zones → one display, composited (A3).
+**What's missing (as of 2026-05-23):**
+- **Stacking** — many zones → one display, composited (A3). ⬅ next
 - **Player/editor persistence** — `lastDisplayId` / `openFullscreen` restore (§8) not yet wired.
 - **The native (Mac/Windows) pixel pipe** — desktop apps can't mirror yet; `captureStream` + the same-origin handoff is web-only (Phase B/C).
 
@@ -307,7 +306,7 @@ zone = { id, name, color, region, opacity, blendMode, zIndex, gapBehavior,
            fullscreen: false
          } }
 ```
-- **As built (A2.2):** the shape above is exactly what `_assignZoneOutput` writes. A `target` field (display/window/virtualcam) is **not** implemented — only `'display'` exists today. Persistence isn't wired yet (A2.3): `zone.output` already round-trips via the set's JSON, so A2.3 is just the **loader** — re-open valid routes, flag offline ones.
+- **As built (A2.2 + A2.3):** the shape above is exactly what `_assignZoneOutput` writes. A `target` field (display/window/virtualcam) is **not** implemented — only `'display'` exists today. On load, `_resolveOutputRoutes()` re-resolves each saved `zone.output` by `displayLabel` (IDs aren't stable), updates `displayId`, and sets `_offline: true` if the display isn't found. Chip shows `▸!` + dashed border for offline; `↺ Restore N routes` button appears in the modal when restorable routes exist.
 - **Stacking is emergent (A3):** two zones whose `output.displayId` match are stacked on that display, ordered by `zIndex`, composited by their existing `opacity`/`blendMode`. No new field — reuses `mkZone()`.
 - **Display ID stability:** OS display IDs aren't stable across reboots/replug. Persist `displayLabel` too and re-resolve by label on load; if gone, show "output offline — reassign", never silently drop.
 - **Migration:** absent `output` → `null` → today's behaviour. No migration pass.
@@ -332,7 +331,7 @@ Web first (the pipe is free and you VJ there now); native after (the pipe is the
 **A2 — Timeline routing (1 zone → 1 display)** — built in 3 increments:
 - [x] **A2.1 multi-output foundation** ✅ 2026-05-22 (builds clean; A1 re-verified in sync after refactor). Pipe keyed by `outId` (`window.__dcOutputStreams[outId]`, default `'main'`); `outputManager` holds `Map<outId,{win,displayId,poll}>` + `closeAll`/`getOutputs`/`onChange`; popup reads `?out=<id>`; unique popup name `dc-output-<id>`. Player/editor = the `'main'` case, unchanged.
 - [x] **A2.2** ✅ built & runtime-verified 2026-05-22 (working in browser; routes live-only until A2.3). `⊟ Outputs` transport button + `#tl-output-mgr` modal (neutral greys): Detect displays + per-zone display picker. `mkZone` gets `output:null`. Assign → `outputManager.openOutput({outId:zone.id, canvas:_zoneMap.get(id).canvas})` opens a window mirroring that zone; "Off" closes it. Compact `▸`/`▸N` chip on each zone row (brighter when live) opens the modal. `closeAll()` on layout change. *Routes are live-only here — persistence is A2.3.* **Fixes (2026-05-22):** output `<video>` is `object-fit:fill` (fills the display; stretches if source aspect ≠ display — proper letterbox/crop/stretch Fill Mode is a later toggle); zone-label column widened 120→150px (CSS `--zone-col-w` **and** JS `ZONE_COL_W` in lock-step) so the chip doesn't truncate zone names; output windows now spawn at half-display size (cap 960w, aspect-preserved), centred + cascaded 40px (not full-monitor, which buried the window edges) — user fullscreens with ⛶ when ready.
-- [ ] **A2.3** routes save/load with the set (free via JSON); re-resolve display by label on load; offline → "reassign", never silent drop.
+- [x] **A2.3** ✅ committed 2026-05-23 — `_resolveOutputRoutes()` fires on every `_loadTimeline`: detects displays (no prompt), re-resolves each `zone.output` by `displayLabel` (IDs aren't stable), updates `displayId` or sets `_offline:true`. Chip: `▸!` + dashed border = offline, `▸N` dim = saved-not-live, `▸N` bright = live. Modal: `⚠ DisplayName — not detected` option when offline; `↺ Restore N routes` button when restorable routes exist (user gesture opens popups). New methods: `_resolveOutputRoutes`, `_reopenSavedRoutes`.
 - **Exit:** each zone drives its own monitor; assignments persist and survive reload.
 
 **A3 — Timeline stacking (many zones → one display)  ⬅ headline ask**
@@ -420,4 +419,4 @@ The first three are now **the native pixel pipe** (Phases B/C), not "deferred fo
 
 ---
 
-*Last updated: 2026-05-22 — Architecture corrected; A1 + A2.1 + A2.2 built & runtime-verified on web (pixel mirror, not re-render — Option A abandoned, drifts, §13). One shared architecture + one swappable pixel pipe (web `captureStream` now; native Syphon/Spout/readback later). Ship order web → Mac → Windows. Next action: A2.3 (persist routes + offline re-resolve), then A3 (stacking), then Phase B/C (native pipe). Uncommitted: A1/A2.1/A2.2 are in the working tree, not yet committed.*
+*Last updated: 2026-05-23 — A1 + A2.1 + A2.2 + A2.3 all committed to main. Pixel mirror, not re-render (§13). One shared architecture + one swappable pixel pipe. Ship order web → Mac → Windows. Next action: A3 (stacking — many zones → one display), then Phase B/C (native pipe).*
