@@ -10,3 +10,10 @@ publish = false
 [[bin]]
 name = "ndi-spike"
 path = "src/main.rs"
+
+[dependencies]
+# JPEG only — the sidecar decodes frames the app sends as JPEG over stdin.
+image = { version = "0.25", default-features = false, features = ["jpeg"] }
+
+[profile.release]
+opt-level = 3
