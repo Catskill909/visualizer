@@ -19,6 +19,7 @@ The original plan picked **Option A — re-render in the output window** (the se
 4. **NDI is a first-class, central output — likely the FIRST native pipe.** *(Elevated 2026-05-23.)* Goal = fill every output gap: projectors, screens, OBS, streaming, other apps/machines. NDI is "one cable to everything on the LAN" — a single NDI sender feeds OBS / streaming / Resolume / other machines / hardware at once, covering the most targets in one build. It's inherently **native** (browsers can't emit NDI) and **cross-platform** (one implementation covers Mac *and* Windows, vs. Syphon=Mac-only / Spout=Win-only). So the native order is **NDI first**, then Syphon/Spout as local low-latency upgrades. (NDI also needs a model tweak — see §8: an NDI output has no `displayId`/window, so the Output model needs a `target` discriminator: `display` | `ndi` | `syphon`/`spout`.)
 
 **Relationship to existing docs (this doc is the hub):**
+- [`native-output-dev.md`](native-output-dev.md) — **the native half of this doc**: the deep design + plan for the NDI / Syphon / Spout pixel pipe (Phases N/B/C), the frame compositor, JS→native transport options, and the video/taint resolution. Read it before building anything native. (Phases here in §9 are the summary; that doc is the detail.)
 - [`app-output-dev.md`](app-output-dev.md) — the **shipped** single-canvas output settings (resolution lock, aspect/fill, wake-lock, virtual camera). Still accurate as history; this doc supersedes its multi-monitor sections.
 - [`visualizer-output-dev.md`](visualizer-output-dev.md) — earlier research + an `OutputManager` mock; kept for platform-API detail and the Syphon/Spout/NDI reference tables.
 - [`timeline-editor.md`](timeline-editor.md) Phase 5 — the timeline-side consumer. **Note the change:** Phase 4.9 Zone Stack is **no longer a prerequisite** for stacking-to-output (the mirror reuses the existing CSS layer compositing instead of re-hosting a compositor — see §1 and §5).
@@ -204,6 +205,8 @@ Stacking = one `<video>` per routed source, layered with the **same** `zIndex` /
 | **Mac** (Tauri desktop) | A second Tauri `WebviewWindow` is a **sealed, isolated** WebView — you cannot hand it a `MediaStream`. Needs a native pipe: **Syphon** (GPU texture share), or pixel-readback pushed over IPC/shared memory, or **NDI**. | Hard — native interop, must spike | **Phase B — pick via spike.** |
 | **Windows** (Tauri desktop) | Same isolation problem. Native pipe: **Spout** (Syphon's Windows twin), pixel-readback, or **NDI**. | Hard | **Phase C.** |
 
+> **Native pipe (Mac/Win) full design lives in [`native-output-dev.md`](native-output-dev.md)** — NDI-first, the frame compositor, JS→native transport options, and why video is *not* a taint blocker.
+
 The web fidelity trade-off (be honest): the mirror copies the operator canvas at its render resolution, then scales to the display. If the display is larger than the canvas, slight upscale softness. Acceptable for organic Milkdrop visuals and tunable by raising the source canvas resolution. (The native-resolution re-render the old plan promised was never achievable anyway — it drifted.)
 
 ### Web pipe handoff (no BroadcastChannel needed)
@@ -356,7 +359,7 @@ Web first (the pipe is free and you VJ there now); native after (the pipe is the
 - [ ] Hot-unplug recovery; perf pass (several 1080p60 mirrors with main UI still 60fps); clean teardown.
 - **Exit:** production-ready multi-screen on web.
 
-> **Native phases reordered 2026-05-23 (NDI-first).** The shipping product is the desktop app (decision #3), so the native pixel pipe is beta-critical. NDI is cross-platform (one build → Mac + Windows) and covers the most targets, so it leads. The local-projector pipe (Syphon/Spout/readback to a directly-attached display) follows. Each native phase opens with a **spike** — prototype + measure before any production code; the pixel pipe is the project's one true unknown.
+> **Native phases reordered 2026-05-23 (NDI-first).** The shipping product is the desktop app (decision #3), so the native pixel pipe is beta-critical. NDI is cross-platform (one build → Mac + Windows) and covers the most targets, so it leads. The local-projector pipe (Syphon/Spout/readback to a directly-attached display) follows. Each native phase opens with a **spike** — prototype + measure before any production code; the pixel pipe is the project's one true unknown. **Full design + plan for everything below: [`native-output-dev.md`](native-output-dev.md)** (the three sub-problems — compositor / transport / sender — transport options + throughput math, and the video/taint resolution). The bullets below are the summary.
 
 ### Phase N — NDI (cross-platform, the FIRST native milestone)
 NDI = "one cable to everything on the LAN": a single sender feeds OBS, streaming software, Resolume, other machines, and NDI hardware at once. Native-only (browsers/webviews can't emit NDI) and one implementation covers both desktops.
@@ -403,7 +406,7 @@ Projection warp / edge-blend; slices/sub-regions; per-output colour calibration.
 
 ## 11. Native pipe candidates & far-future protocols
 
-These ARE the native pixel pipe (the shipping product is desktop — decision #3), not "deferred forever." NDI leads (cross-platform, widest reach). Detail in [`visualizer-output-dev.md`](visualizer-output-dev.md).
+These ARE the native pixel pipe (the shipping product is desktop — decision #3), not "deferred forever." NDI leads (cross-platform, widest reach). **Full design + plan: [`native-output-dev.md`](native-output-dev.md).** Older API reference tables in [`visualizer-output-dev.md`](visualizer-output-dev.md).
 
 | Tech | Platform | Role | Phase |
 |---|---|---|---|
