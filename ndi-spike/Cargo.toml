@@ -1,0 +1,12 @@
+[package]
+name = "ndi-spike"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# Throwaway N0 spike (native-output-dev.md §7). Proves Rust → NDI runtime →
+# receiver on this machine, standalone from DiscoCast. Not part of the app build.
+
+[[bin]]
+name = "ndi-spike"
+path = "src/main.rs"

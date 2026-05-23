@@ -13,7 +13,7 @@
 - **NDI leads** (decision in output-dev.md §intro #4): cross-platform (one build → Mac + Windows), native-only (browsers can't emit NDI), widest reach (OBS / streaming / Resolume / other machines / hardware in one shot). Syphon (Mac) / Spout (Win) follow for directly-attached displays.
 - **Three real sub-problems:** (A) a frame **compositor** (N layers → 1 frame — web today composites in the popup via CSS, which NDI can't use), (B) frame **transport** JS→native (the throughput unknown), (C) the native **NDI sender** (SDK/licensing/bundling). See §3.
 - **Video is NOT a blocker** (§5) — the WKWebView taint issue is already solved by the H.264 import pipeline; NDI readback inherits an already-clean canvas.
-- **Build order:** **Step 0 web compositor ✅ built & verified 2026-05-23** (`src/output/composer.js` + a "Composed program" output in the timeline; zero native risk, reused everywhere) → **N0 NDI spike ⬅ next** (measure transport; needs NDI SDK + OBS/DistroAV) → N1 model/UI → N2 production. Then Phase B/C local pipes. See §7.
+- **Build order:** **Step 0 web compositor ✅ built & verified 2026-05-23** (`src/output/composer.js` + a "Composed program" output in the timeline; zero native risk, reused everywhere) → **N0a NDI sender hop ✅ proven 2026-05-23** (`ndi-spike/` standalone Rust → NDI Video Monitor at 720/30p) → **N0b real-frame transport + measurement ⬅ next** → N1 model/UI → N2 production. Then Phase B/C local pipes. See §7.
 
 ---
 
@@ -101,7 +101,8 @@ Video is a **core feature**, and it is **safe with NDI**. Evidence, from this co
 - **Exit:** ✅ a single composited stream of the whole layer stack, verified live in the browser (the composed-program window plays the stacked timeline) — the exact input every native sender will consume.
 
 ### Phase N — NDI (cross-platform, first native milestone)
-- [ ] **N0 — Spike (throwaway):** NDI sender (crate vs sidecar) + transport **B1 (JPEG)** at 720p30; receive in OBS/Studio Monitor; **measure** latency/fps/CPU at 1080p; settle SDK bundling + licensing; confirm video composite readback in a production build.
+- [x] **N0a — Sender hop PROVEN 2026-05-23.** Standalone Rust spike (`ndi-spike/`, throwaway, not in the app) broadcasts an animated BGRA test frame; received live in NDI Video Monitor as `PAULS-MAC-MINI.LOCAL (DiscoCast Spike) (720/30p)`, steady 30fps. **Binding recipe (no SDK install needed):** hand-rolled FFI to the 6 `NDIlib_*` symbols in `/usr/local/lib/libndi.dylib` (installed by NDI Tools); `build.rs` = `rustc-link-lib=dylib=ndi` + `rustc-link-search=/usr/local/lib` **and an rpath** (`-Wl,-rpath,/usr/local/lib`) because the dylib's install name is `@rpath/libndi.dylib`. `#[repr(C)]` structs for `NDIlib_send_create_t` + `NDIlib_video_frame_v2_t` match the SDK header; FourCC BGRA = `0x41524742`, format progressive = 1, `clock_video=true` paces 30fps. (`get_no_connections(0)` reads 0 even while Monitor views — a preview-bandwidth quirk, ignore.)
+- [ ] **N0b — Real-frame transport + measurement ⬅ NEXT:** feed actual composer frames (JS `composer.canvas` → **B1 JPEG** → Tauri `invoke` → Rust decode → NDI) at 720p30; **measure** latency/fps/CPU, push toward 1080p; confirm video-composite readback in a production build. Settle NDI runtime **bundling + licensing** for distribution (the spike used the locally-installed runtime).
 - [ ] **N1 — model `target`:** add `output.target` (`display | ndi`); NDI route carries a stream name (no displayId/window); Outputs modal gains an "NDI output" target. Routing/stacking UI reused.
 - [ ] **N2 — production:** stable sender behind the pipe contract; per-output NDI streams; alpha; clean start/stop; perf pass.
 - **Exit:** the desktop app publishes its visuals as NDI; OBS (and any NDI receiver) shows them in sync.
