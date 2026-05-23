@@ -650,6 +650,7 @@ export class TimelineEditor {
         this._selectEl.value  = id;
         this.stop();
         this._syncZoneCanvases();
+        this._resolveOutputRoutes();
         this._renderStrip();
         this._setClean();
         this._toast(`Loaded: ${tl.name}`);
@@ -915,6 +916,19 @@ export class TimelineEditor {
             this._outputRoutesEl.innerHTML = '<div class="tl-output-empty">No zones in this layout.</div>';
             return;
         }
+
+        // Restore button — shown when saved routes exist that aren't currently open
+        const restorable = zones.filter(z => z.output && !z.output._offline && !outputManager.isActive(z.id));
+        if (restorable.length) {
+            const btn = document.createElement('button');
+            btn.className = 'tl-output-detect';
+            btn.type = 'button';
+            btn.style.cssText = 'margin-bottom:10px;';
+            btn.textContent = `↺ Restore ${restorable.length} saved route${restorable.length > 1 ? 's' : ''}`;
+            btn.addEventListener('click', () => this._reopenSavedRoutes());
+            this._outputRoutesEl.appendChild(btn);
+        }
+
         for (const zone of zones) {
             const row = document.createElement('div');
             row.className = 'tl-output-route';
@@ -927,14 +941,23 @@ export class TimelineEditor {
             const sel = document.createElement('select');
             sel.className = 'tl-or-select';
             sel.innerHTML = '<option value="">Off</option>';
+
+            if (zone.output?._offline) {
+                const offlineOpt = document.createElement('option');
+                offlineOpt.value = '__offline';
+                offlineOpt.textContent = `⚠ ${zone.output.displayLabel || 'Saved display'} — not detected`;
+                sel.appendChild(offlineOpt);
+            }
+
             for (const d of this._displays) {
                 const o = document.createElement('option');
                 o.value = d.id;
                 o.textContent = `${d.label} — ${d.w}×${d.h}`;
                 sel.appendChild(o);
             }
-            sel.value = zone.output?.displayId ?? '';
+            sel.value = zone.output?._offline ? '__offline' : (zone.output?.displayId ?? '');
             sel.addEventListener('change', () => {
+                if (sel.value === '__offline') return;
                 const d = this._displays.find(x => x.id === sel.value) || null;
                 this._assignZoneOutput(zone.id, d);
             });
@@ -975,6 +998,7 @@ export class TimelineEditor {
 
     _zoneOutTag(zone) {
         if (!zone?.output) return '▸';
+        if (zone.output._offline) return '▸!';
         const n = Number(zone.output.displayId);
         return '▸' + (Number.isFinite(n) ? n + 1 : '•');
     }
@@ -985,10 +1009,43 @@ export class TimelineEditor {
             const chip = row.querySelector('.tl-zone-out-chip');
             if (!chip) continue;
             const zone = (this._tl?.zones || []).find(z => z.id === row.dataset.zoneId);
-            chip.classList.toggle('is-live', outputManager.isActive(row.dataset.zoneId) && !!zone?.output);
+            chip.classList.toggle('is-live', outputManager.isActive(row.dataset.zoneId) && !!zone?.output && !zone.output._offline);
+            chip.classList.toggle('is-offline', !!zone?.output?._offline);
             chip.textContent = this._zoneOutTag(zone);
-            chip.title = zone?.output?.displayLabel ? `Output: ${zone.output.displayLabel}` : 'Send this zone to a display';
+            chip.title = zone?.output?._offline
+                ? `Output offline — ${zone.output.displayLabel} not detected`
+                : zone?.output?.displayLabel ? `Output: ${zone.output.displayLabel}` : 'Send this zone to a display';
         }
+    }
+
+    async _resolveOutputRoutes() {
+        const zones = (this._tl?.zones || []).filter(z => z.output);
+        if (!zones.length) return;
+        const displays = await outputManager.listDisplays({ prompt: false });
+        this._displays = displays;
+        for (const zone of zones) {
+            const match = displays.find(d => d.label === zone.output.displayLabel);
+            if (match) {
+                zone.output.displayId = match.id;
+                zone.output._offline  = false;
+            } else {
+                zone.output._offline  = true;
+            }
+        }
+        this._updateOutputChips();
+    }
+
+    async _reopenSavedRoutes() {
+        const zones = (this._tl?.zones || []).filter(
+            z => z.output && !z.output._offline && !outputManager.isActive(z.id)
+        );
+        let count = 0;
+        for (const zone of zones) {
+            const d = this._displays.find(x => x.id === zone.output.displayId);
+            if (d) { await this._assignZoneOutput(zone.id, d); count++; }
+        }
+        if (!count) this._toast('No saved routes to restore');
+        this._renderOutputRoutes();
     }
 
     _buildLayoutTiles() {
