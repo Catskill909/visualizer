@@ -376,7 +376,13 @@ export class TimelineEditor {
         this._outputDetect?.addEventListener('click', () => this._detectDisplays(true));
         this._outputProgramBtn?.addEventListener('click', () => this._toggleProgramOutput());
         // NDI is desktop-app only — reveal the button under Tauri.
-        if (typeof window !== 'undefined' && window.__TAURI__ && this._outputNdiBtn) {
+        // ⚠ PARKED until N2: the ndi-send sidecar links an external libndi (not
+        // bundled), so it can't ship — and bundling it broke DMG packaging. The
+        // ndi-send binary is removed from externalBin (tauri.macos.conf.json) and
+        // this button is hidden. Re-enable (flip to true) once N2 bundles libndi.
+        // See native-output-dev.md.
+        const NDI_ENABLED = false;
+        if (NDI_ENABLED && typeof window !== 'undefined' && window.__TAURI__ && this._outputNdiBtn) {
             if (this._outputNdiRow) this._outputNdiRow.hidden = false;
             this._loadNdiPrefs();
             this._outputNdiBtn.addEventListener('click', () => this._toggleNdi());
