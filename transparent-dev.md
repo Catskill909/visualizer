@@ -1,5 +1,53 @@
 # Transparent Preset Background — Dev Doc
 
+## 🔍 Audit & re-plan — 2026-05-23 (read this FIRST; supersedes older details below)
+
+Re-audited against the **current code** + everything learned building the output/NDI pipeline today (see [`output-dev.md`](output-dev.md) / [`native-output-dev.md`](native-output-dev.md)). The older sections (spec, phases, **post-mortem, guardrails**) are still valuable — the post-mortem + guardrails especially. **Where this audit and the older text disagree, this audit wins** (line numbers + which shader to edit have been corrected).
+
+### A. Clean slate confirmed
+`bgTransparent` appears **nowhere** in `src/` or `editor.html` — the wiped attempt left no residue. `butterchurn.js` is **6,819 lines** (committed-clean; the "12,379 lines" in Mistake 1 was the reformatting damage, since reverted). Start fresh.
+
+### B. Verified anchors (the doc's old line numbers, re-checked today)
+| What | Where (verified 2026-05-23) | Note |
+|---|---|---|
+| WebGL context `alpha` | `butterchurn.js:6570` — `alpha: false` (inside `getContext('webgl2',{…})` @6569; `premultipliedAlpha:false` @6574) | ✅ doc was right |
+| Display clear colour | `butterchurn.js:2391` — `clearColor(0,0,0,1)` | nearly cosmetic — see C |
+| **Display COMP shader output** | `butterchurn.js:~3602` — `fragColor = vec4(ret, vColor.a)` | ⚠️ **the old doc pointed at line 4356 — that's the WARP/feedback shader (`vec4(ret,1.0)*vColor`, an internal buffer, NOT the display). Display alpha = the COMP shader (~3602).** Confirm it's the screen pass at impl time. |
+| `_buildCompShader()` | `inspector.js:6162` | ✅ |
+| `_buildImageBlock(img)` | `inspector.js:6293` | ✅ |
+| `_buildRuntimePreset(state)` | `inspector.js:6135` | the safe choke point (Mistake 4) |
+| **early-return guard** | `inspector.js:6173` — `if (visibleImages.length===0 && !_solidColor && sm==='none' && _po>=1.0) { comp=BLANK_COMP; return; }` | ⚠️ **must add `&& !this.currentState.bgTransparent`** or transparent-with-no-layers falls back to opaque. (Exactly Mistake 6 — but now *verified*, not blind.) |
+| comp `col` type | `inspector.js:6215/6251` (`vec3 col …`), `ret = col;` @6269 | needs a parallel `float col_a` |
+
+### C. The real mechanism (sharper than the old spec)
+The comp shader draws a **full-screen quad every frame**, so `clearColor` is almost irrelevant — **the canvas alpha is whatever the comp shader writes**, today `vColor.a` (=1.0) → opaque everywhere. The load-bearing change is **making the comp shader output a computed alpha.** Minimal, surgical (verify at impl time):
+- `butterchurn.js` comp shader (~3602): declare `float ret_a = 1.0;` before `fragShaderText`; output `fragColor = vec4(ret, vColor.a * ret_a);`. Opaque presets: `ret_a` stays 1.0 → byte-identical to today.
+- `butterchurn.js:6570`: `alpha:false → true`.
+- `inspector.js _buildCompShader` (**only when `bgTransparent`**): track `float col_a` beside `col` (start `0.0` in `_imagesOnly`), accumulate per layer with "over" (`col_a = col_a + a*(1.0-col_a)`), append `ret_a = col_a;` after `ret = col;`. Add `&& !bgTransparent` to the 6173 guard.
+- `clearColor` (2391) → 0 is harmless to add but **not** load-bearing (the quad covers every pixel).
+
+### D. Where transparent alpha ACTUALLY reaches (reconciliation with today's output work)
+Stacking already **shipped today** (A3) — via **blend modes**, because canvases are opaque. Transparent-bg upgrades that to **true alpha reveal**, but only on paths that carry alpha:
+
+| Output path | Carries alpha? | Result with transparent-bg |
+|---|---|---|
+| **Operator screen** (CSS-stacked canvases) | ✅ yes (`alpha:true` canvas) | **true alpha reveal** |
+| **Approach A — fullscreen app on the projector** (the EVENT priority) | ✅ yes (it *is* the operator render) | **true alpha reveal — the headline win** |
+| Web mirror **output window** (`<video>` of `captureStream`) | ❌ no — `<video>` shows alpha as **black** | falls back to blend-mode (= today) |
+| **NDI** (current `ndi-send` = **JPEG**) | ❌ no — JPEG has no alpha; composer's `<video>` path drops it too | falls back to blend-mode |
+
+**So the headline payoff is the operator screen + Approach-A projector — exactly the event path prioritized today.** It adds no alpha to the web window / JPEG-NDI (those already blend-mode stack; no regression, just no bonus). **This answers the old "does captureStream preserve alpha?" question: effectively NO** for the `<video>` path. True alpha over NDI/Syphon would need an RGBA transport (PNG/raw) — a later enhancement.
+
+### E. Re-scoped plan (ready for tomorrow)
+1. **Engine** — the surgical changes in C. **Console-test in `editor.html`** with a layers-only preset before any UI.
+2. **One toggle** — `bgTransparent` chip in the Palette tab + `bgTransparent:false` schema default (old UI section still valid).
+3. **Verify on the paths that matter** — operator-screen reveal; **Approach-A fullscreen-on-projector reveal** (the real test, once the projector's here). Confirm web-window/NDI degrade to blend-mode (no black-box regression).
+
+### F. Guardrails still in force
+All of "Strict guardrails" below is mandatory — especially: read this doc first; **no code without an approved written plan**; never paraphrase `old_string` when editing `butterchurn.js` (read exact bytes; the reformat disaster is Mistake 1); never `git checkout -- .`; update this doc after every change; not done until committed.
+
+---
+
 ## What this feature is
 
 A preset can have a **transparent background** — the canvas behind image/GIF/video/text layers is fully transparent instead of black. Layers float on nothing. Everything beneath them in the timeline shows through.
@@ -41,6 +89,8 @@ Butterchurn draws a **full-screen quad** every frame — every pixel is overwrit
 ---
 
 ## What needs to change
+
+> ⚠️ **Superseded in part by the Audit & re-plan (top of doc).** Steps 1–3 still hold; **step 4's "line 4356" is the WARP shader, not the display COMP — edit the COMP shader at ~3602 (`vec4(ret, vColor.a)`) instead** (Audit §B/C). The alpha-tracking gate is `bgTransparent` and the §B early-return guard fix is required.
 
 ### 1. `butterchurn.js` — WebGL context alpha (1 line)
 ```js
@@ -139,6 +189,8 @@ No `bgMode` enum needed. One boolean. Simpler.
 ---
 
 ## Implementation phases
+
+> ⚠️ **Use the Audit §E re-scoped plan (top of doc) as the running order.** The numbered steps here are mostly right but predate today's findings — in particular Phase 1 step 3 names the wrong shader line (see Audit §B) and the early-return guard fix (§B) must be included. Phase 3 "output window / virtual camera" is now answered by Audit §D (the `<video>`/JPEG paths drop alpha → blend-mode fallback; the real alpha test is the operator screen + Approach-A projector).
 
 ### Phase 1 — Engine ✗ NOT DONE — code was wiped (May 2026)
 1. `butterchurn.js` ~6609: `alpha: false → true`
