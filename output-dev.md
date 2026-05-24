@@ -1,8 +1,35 @@
 # Output & Multi-Monitor — Design & Dev Doc
 
-**Status (the one place: §0 below):** pixel mirror, not re-render (§13). **Committed:** web A1–A3 (mirror → per-zone routing → stacking/layering) + composed program + **N0 NDI proof** (composed program live in OBS + NDI Video Monitor). **Next: Phase B — desktop local display.** Truth doc; supersedes all prior recommendations. **New here? Read §0 — it's the single source of truth for where we are and what's next.**
+**Status:** pixel mirror, not re-render (§13). Web A1–A3 + composed program + **N0 NDI proof** all done; **next = Phase B (desktop local display).** Truth doc; supersedes all prior recommendations. **👉 Scan the 📋 Phase Board just below — it's the single status + step tracker.**
 **Created:** 2026-05-21 · **Corrected:** 2026-05-22
 **Scope:** Routing visualizer output to one or more physical displays/projectors, across the player (`index.html`), Preset Studio (`editor.html`), and Timeline (`timeline.html`), all on one shared engine.
+
+---
+
+## 📋 Phase Board — START HERE (the single status + order tracker)
+
+Legend: ✅ done · ⬅ **next** · 📋 planned. Shipping product = the **desktop app** (web is the dev/proving ground). Per-step *detail* is in §9; this board is the authority for *status & order*.
+
+**WEB — ✅ complete** (whole feature works in-browser)
+- ✅ **A1** — player/editor mirror → a display
+- ✅ **A2** — timeline per-zone → display routing (+ persistence / offline re-resolve)
+- ✅ **A3** — stacking/layering: overlaid layers that follow the timeline (per-layer blend/opacity)
+- ✅ **A4 · composed program** — one feed of the whole timeline *(rest of A4 — venue presets, mirror — = 📋)*
+
+**NATIVE — in progress** (the shipping path)
+- ✅ **N0** — NDI proof: composed program live in OBS + NDI Video Monitor
+- ⬅ **Phase B — desktop local display (projector/monitor)  ◀ WE ARE HERE**
+  - ⬅ **B1** — fullscreen the app on a chosen monitor · **Approach A** (one projector, whole show, ~zero latency) · *starting now*
+  - 📋 **B2** — separate operator + output · **Approach B** spike (Syphon vs pixel-readback) · *needs the 2nd display — projector arriving ~end of week (2026-05); will test monitor + projector as 2 outputs*
+  - 📋 **B3** — placement polish: wake-lock on output, clean teardown, multi-output
+- 📋 **N1** — NDI as a real output (named source, `target` model, persists with the set)
+- 📋 **N2** — ship-enable NDI (bundle `libndi` + licensing; x86_64 slice) · ⚠ **blocks any NDI release**
+- 📋 **Phase C** — Windows local display (Spout)
+- 📋 **Enhancements** — audio-over-NDI A/V-lock, A4 venue presets, transparent-bg → NDI alpha
+
+**Locked rules:** event sync rides the **local-display path, not NDI**; ⚠ don't ship NDI until **N2**; never re-render at the destination (§13).
+
+---
 
 ## The decision that changed (read this first)
 
@@ -28,27 +55,10 @@ The original plan picked **Option A — re-render in the output window** (the se
 
 ## 0. Handoff orientation — read this if you're new (AI or human)
 
-### 📍 WHERE WE ARE & WHAT'S NEXT — the ONE status block (2026-05-23)
+### Orientation
 
-> **Which doc is which (read this to stop the confusion):**
-> **`output-dev.md` (THIS doc) = the single source of truth for *where we are*, *what's next*, and the model. Always start here.**
-> [`native-output-dev.md`](native-output-dev.md) = deep native-pipe *reference only* (NDI binding recipe, transport math, sub-problem detail). Open it **only** when actually coding NDI/Syphon/Spout internals. **No status or roadmap lives there — it points back here.**
-
-**Done & committed:** web **A1** mirror · **A2** per-zone routing · **A3** stacking/layering (full-frame overlaid layers that follow the timeline) · **composed program** (one feed of the whole timeline). **N0 — NDI proof:** the composed program goes out over NDI, live in OBS + NDI Video Monitor (Rust-relay `ndi-send` sidecar).
-
-**Set order from here** (reorderable — reflects the priority: event sync on monitors/projectors matters most → the local-display path leads):
-
-| # | Next | Why |
-|---|---|---|
-| **1** | **Phase B — desktop local display** (projector/monitor on the Mac app, low-latency) | ⬅ event-sync priority |
-| 2 | **N1 — NDI as a real output** (named source, `output.target` display\|ndi, persists with the set) | finish NDI |
-| 3 | **N2 — ship-enable NDI** (bundle `libndi` + rpath + licensing; x86_64 slice) | ⚠ blocks any NDI release |
-| 4 | **Phase C — Windows local display** (Spout) | parity |
-| 5 | **Enhancements** — audio-over-NDI A/V-lock, A4 venue presets, transparent-bg→NDI alpha | as needed |
-
-**⚠ Don't ship a release with the NDI button until N2** (the sidecar currently links `libndi` from a dev path; works on this Mac, broken on clean machines). Locked rules: event sync rides the **local-display path, not NDI**; never re-render at the destination (§13).
-
----
+> **Status & order = the 📋 Phase Board at the very top of this doc.** That's the single tracker — scan it first.
+> **Which doc is which:** `output-dev.md` (THIS doc) = where we are, what's next, the model — always start here. [`native-output-dev.md`](native-output-dev.md) = native-pipe *reference detail only* (NDI binding recipe, transport math). Open it only when coding native internals; no status lives there.
 
 **One-paragraph state.** Output = a **pixel mirror**: an output window is a dumb stage of `<video>` layers, each a live `canvas.captureStream()` copy of a source canvas — never a second engine, never audio (the re-render approach drifts; §13). Committed: player/editor mirror (A1), multi-output foundation (A2.1), timeline per-zone→display routing (A2.2), route persistence + offline re-resolve (A2.3). **Built & browser-verified 2026-05-23 (commit pending):** stacking (A3 — many zones → one display as **full-frame overlaid layers**, composited by zIndex/opacity/blendMode, with per-layer blend+opacity controls). **Output layers overlay, they do NOT tile by region** — region is an operator-screen layout concern only (the layer-stack / transparent-bg orchestration model; see §1). **Layers follow the timeline:** a layer's output opacity = `zone.opacity × (1 − operatorCoverOpacity)`, so when a clip ends the layer fades out and reveals the one beneath. Remaining: A4 web polish + the native Mac/Windows pixel pipe (Phase B/C). Ship order web → Mac → Windows; only the low-level `outputPipe.js` is platform-specific.
 
@@ -71,7 +81,7 @@ The original plan picked **Option A — re-render in the output window** (the se
 
 **How to run & verify (web — a single screen is enough to prove sync):** `npm run dev:safe` → open the player → press `O` → **↻ Detect** (grant the window-management prompt) → pick a display → **Open output window**. A popup mirrors the canvas in perfect sync. Timeline: open `/timeline.html` → **`⊟ Outputs`** → route a zone to a display. *Keep the operator window visible — a hidden/occluded window throttles its rAF and the mirror freezes (known limit, §5).* Output windows spawn at half-display size, centred + cascaded; fullscreen each with the ⛶ button.
 
-**Where to start next:** see the **📍 status block at the top of this section** — that's the single source of truth for the roadmap. (Short version: Phase B next.)
+**Where to start next:** the **📋 Phase Board at the top of the doc** is the tracker. (Short version: Phase B → B1, fullscreen-on-monitor.)
 
 **Two house rules that bit us (also in `CLAUDE.md`):** (1) plan before coding — trace the real path first; (2) in the timeline, the JS `ZONE_COL_W` constant and the CSS `--zone-col-w` var must change **together** or the playhead/blocks misalign.
 
@@ -343,7 +353,7 @@ zone = { id, name, color, region, opacity, blendMode, zIndex, gapBehavior,
 
 Web first (the pipe is free and you VJ there now); native after (the pipe is the hard part). Each phase ships standalone value.
 
-> **The roadmap & current order live in the §0 status block (top of this doc) — that's the single source of truth.** The phase write-ups below are the *detail* for each phase, not the running order. (As of 2026-05-23: web A1–A3 + composed program ✅, N0 NDI ✅, **Phase B next**.)
+> **Status & order = the 📋 Phase Board at the top of this doc** (the single tracker). The phase write-ups below are the *detail* per phase, not the running order. (As of 2026-05-23: web A1–A3 + composed program ✅, N0 NDI ✅, **Phase B → B1 next**.)
 
 ### Phase A — WEB (the whole feature on web)
 
@@ -377,7 +387,7 @@ Web first (the pipe is free and you VJ there now); native after (the pipe is the
 - [ ] Hot-unplug recovery; perf pass (several 1080p60 mirrors with main UI still 60fps); clean teardown.
 - **Exit:** production-ready multi-screen on web.
 
-> **Order lives in the §0 status block above** (single source of truth): web A1–A3 + composed program ✅, N0 NDI ✅, **Phase B next**. The Phase N/B/C write-ups below + [`native-output-dev.md`](native-output-dev.md) are the *technical detail* (compositor / transport / sender, transport math, video-taint + A/V-sync resolutions) — not the running order.
+> **Order = the 📋 Phase Board at the top.** The Phase N/B/C write-ups below + [`native-output-dev.md`](native-output-dev.md) are the *technical detail* (compositor / transport / sender, transport math, video-taint + A/V-sync resolutions) — not the running order.
 
 ### Phase N — NDI (cross-platform)  ·  N0 ✅ DONE (proof) · N1/N2 remain (see §0 order)
 NDI = "one cable to everything on the LAN": a single sender feeds OBS, streaming software, Resolume, other machines, and NDI hardware at once. Native-only (browsers/webviews can't emit NDI) and one implementation covers both desktops. *(N0 proof is complete; the live build detail is in [`native-output-dev.md`](native-output-dev.md). Per the §0 order, Phase B comes before N1/N2.)*
@@ -389,12 +399,17 @@ NDI = "one cable to everything on the LAN": a single sender feeds OBS, streaming
 - [ ] **N2:** stable NDI sender behind the pipe contract; per-output NDI streams (each routed group / a composed view as its own NDI source); clean start/stop; perf pass.
 - **Exit:** the desktop app publishes its visuals as NDI; OBS (and any NDI receiver) shows them in sync.
 
-### Phase B — MAC local pipe (Syphon) + native window placement
-For a projector/screen plugged directly into the Mac (NDI needs a receiver; a directly-attached display wants pixels on a real fullscreen window).
-- [ ] **B0 — Spike:** Syphon (GPU texture share) vs pixel-readback→IPC→second window; measure; pick one.
-- [ ] **B1:** chosen pipe behind the **same** `outputManager`/`outputPipe` interface; reuse all shared UI/routing/compositing.
-- [ ] **B2:** native window placement + fullscreen-on-monitor (`set_position`→`set_fullscreen`), wake-lock (`caffeinate`), multi-output teardown.
-- **Exit:** the Mac app drives a directly-attached second monitor in sync, identical UI/routing to web.
+### Phase B — Mac desktop local display (projector/monitor)  ◀ next
+Two approaches (decided 2026-05-23: do **A first**; B when the projector arrives ~end of week and we can test monitor + projector as 2 outputs):
+
+**Approach A — one projector shows the whole show** (no separate control screen). Lowest latency — the app renders directly on the projector; **no pixel pipe needed.**
+- [ ] **B1 — fullscreen the app on a chosen monitor** ⬅ *starting now.* Enumerate monitors (`availableMonitors()`); move the window to the chosen display + `set_fullscreen(true)` (Tauri `set_position`→`set_fullscreen`, #6394). Needs the `window` allowlist widened (only `setFullscreen` is enabled today in [tauri.conf.json](src-tauri/tauri.conf.json)). Operator uses the auto-hiding controls on the projector. *(Test on the monitor now; projector end of week.)*
+
+**Approach B — laptop control + a separate clean output** (the 2-output / pro setup). Needs the pixel pipe (the sealed-webview wall, §5).
+- [ ] **B2 — spike Syphon (GPU texture share) vs pixel-readback→IPC→second window;** measure latency; pick one. Then build it behind the **same** `outputManager`/`outputPipe` interface, reusing all shared UI/routing/compositing + the composer. *(Needs the 2nd display.)*
+- [ ] **B3 — placement polish:** wake-lock on the output (`caffeinate`), clean teardown, multi-output.
+
+- **Exit:** the Mac app drives a directly-attached projector/monitor in sync — Approach A now, Approach B when the projector lands.
 
 ### Phase C — WINDOWS local pipe (Spout) + window placement
 - [ ] **C1:** Spout (or the readback path proven in B0) behind the same interface.
@@ -464,4 +479,4 @@ These ARE the native pixel pipe (the shipping product is desktop — decision #3
 
 ---
 
-*Last updated: 2026-05-23 — Web A1–A3 + composed program + **N0 NDI proof** all committed (composed program live in OBS + NDI Monitor via the Rust-relay ndi-send sidecar). Pixel mirror, not re-render (§13). **Single source of truth for status & roadmap = the §0 status block** (next = Phase B). [`native-output-dev.md`](native-output-dev.md) is native reference detail only.*
+*Last updated: 2026-05-23 — Web A1–A3 + composed program + **N0 NDI proof** all committed (composed program live in OBS + NDI Monitor via the Rust-relay ndi-send sidecar). Pixel mirror, not re-render (§13). **Single source of truth for status & steps = the 📋 Phase Board at the top** (next = Phase B → B1, fullscreen-on-monitor). [`native-output-dev.md`](native-output-dev.md) is native reference detail only.*
