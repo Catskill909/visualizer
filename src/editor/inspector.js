@@ -563,6 +563,7 @@ export class EditorInspector {
         this._bindImageDropzone();
         this._bindGifOptimizer();
         this._bindImagesOnly();
+        this._bindBgTransparent();
         this._bindHdUploads();
         this._bindCollapseAll();
         this._bindAddTextLayer();
@@ -2382,6 +2383,21 @@ export class EditorInspector {
                     this.currentState.baseVals.wave_a = this._savedWaveA;
                 }
             }
+            this._buildCompShader();
+            this._applyToEngine();
+        });
+    }
+
+    // ─── Transparent background toggle (only effective in "Show layers only") ───
+    _bindBgTransparent() {
+        const cb = document.getElementById('toggle-bg-transparent');
+        if (!cb) return;
+        cb.addEventListener('change', () => {
+            this.currentState.bgTransparent = cb.checked;
+            // Editor-only affordance: a checkerboard behind the canvas shows the
+            // transparent areas (the canvas's CSS bg shows through alpha pixels).
+            // Timeline/output zones have no such bg, so they reveal real content.
+            this.engine?.canvas?.classList.toggle('bg-transparent-checker', cb.checked);
             this._buildCompShader();
             this._applyToEngine();
         });
