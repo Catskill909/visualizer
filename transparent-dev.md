@@ -50,7 +50,23 @@ The feature is *built* in the browser (dev), but the *shipping* product is the *
 - **Global engine change:** `alpha:false → true` is on **every** butterchurn canvas on **every** platform (player, editor, timeline zones). Regression-check that existing **MilkDrop presets look unchanged** in `tauri-dev` on macOS (and Windows), not only in the browser — the "zero impact" claim relies on the comp shader still outputting `alpha = 1.0` there too.
 - **Windows (WebView2 / Chromium):** behaves like Chrome → likely parity; verify after macOS (the Windows build is less mature — [`windows-dev.md`](windows-dev.md)).
 
-### F. Guardrails still in force
+### H. REUSE the existing alpha-layer plumbing (transparent video / GIF / luma key) — the big de-risk
+You already ship **per-layer alpha end-to-end.** `_buildImageBlock` samples each layer as `vec4 _t` and **already** composites with the layer's alpha — the normal blend is literally `col = mix(col, _src, _t.w * _op)` (per-blend-mode variants for additive/multiply/overlay/screen). Where `_t.w` comes from is already solved per layer type:
+- **PNG/still alpha + GIF** (`alphaMode` preserve/fade).
+- **Transparent video = the stacked-alpha pipeline:** WebM/VP9-alpha → H.264 (RGB top half + alpha-as-luma bottom half) via the ffmpeg sidecar (`convert_to_stacked_alpha`, `main.rs`; macOS import path). The texture is uploaded **2× tall** and the **comp shader reconstructs `_t.w` from the bottom-half R channel** (`visualizer.js:1450-1455` + the stacked-alpha branch in `_buildImageBlock`). See [[project_transparent_webm_macos_plan]] / [[project_webm_alpha_dead_ends]].
+- **Luma key** (`lumaKeyLo/Hi`) derives alpha by keying.
+
+**So transparent-bg invents NO new alpha — it accumulates the alpha the comp shader already computes** into a canvas-alpha output. After each existing blend line, add:
+```glsl
+col_a = col_a + (effective_a) * (1.0 - col_a);   // "over"
+```
+where **`effective_a` is the SAME per-blend-mode coverage the RGB blend just used** (`_t.w * _op` for normal, etc.). ⚠️ **This corrects the old spec's crude `col_a = col_a + _op*(1.0-col_a)`** — that ignores `_t.w`, so a fully-transparent texel (`_t.w=0`) would wrongly become opaque. **Reuse `_t.w * _op`, not `_op`.**
+
+**Unifies the features:** a stacked-alpha **video silhouette** reveals the layer beneath using the *same* alpha it already uses to composite — transparent video + transparent background become one coherent thing.
+
+**Cross-platform de-risk (feeds §G):** the stacked-alpha shader compositing **already runs in macOS WKWebView** — that's *why* stacked-alpha exists (WKWebView drops VP9 alpha, so alpha is reconstructed in-shader). **So per-pixel alpha math is already proven in WKWebView's comp shader.** The only unverified macOS bit is the canvas *output* (`alpha:true` context + writing the computed alpha to `fragColor`) — a much smaller surface than "does alpha work on macOS at all" (it does).
+
+### Guardrails still in force (all mandatory)
 All of "Strict guardrails" below is mandatory — especially: read this doc first; **no code without an approved written plan**; never paraphrase `old_string` when editing `butterchurn.js` (read exact bytes; the reformat disaster is Mistake 1); never `git checkout -- .`; update this doc after every change; not done until committed.
 
 ---
@@ -137,6 +153,7 @@ float a = layer_alpha * layer_opacity;
 col.rgb = mix(col.rgb, layer_colour, a);
 col.a   = col.a + a * (1.0 - col.a);  // standard "over" compositing
 ```
+> ✅ **This `a = layer_alpha * layer_opacity` is exactly right — and it already exists** as `_t.w * _op` in `_buildImageBlock` (Audit §H). Reuse that variable per blend mode; do NOT use the `_op`-only form that appears in Phase 1 step 5 below.
 
 **Only activates in `_imagesOnly` mode.** All other paths (solid colour, MilkDrop) keep `alpha = 1.0` — unchanged.
 
