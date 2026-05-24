@@ -6170,7 +6170,11 @@ export class EditorInspector {
             ? images.filter(img => img.solo)
             : images.filter(img => !img.muted);
         const _po = this.currentState.paletteOpacity ?? 1.0;
-        if (visibleImages.length === 0 && !this._solidColor && sm === 'none' && _po >= 1.0) {
+        // Transparent background (Phase 1) — only meaningful for layers-only presets
+        // (_imagesOnly). Gated this way so MilkDrop/solid modes are byte-identical
+        // (avoids the May-2026 "turns off the layers too" regression).
+        const _bgT = this._imagesOnly && !!this.currentState.bgTransparent;
+        if (visibleImages.length === 0 && !this._solidColor && sm === 'none' && _po >= 1.0 && !_bgT) {
             this.currentState.comp = BLANK_COMP;
             this._lastBuildMs = performance.now() - _t0;
             return;
@@ -6212,7 +6216,7 @@ export class EditorInspector {
 
         let base;
         if (this._imagesOnly) {
-            base = uvFold + '  vec3 col = vec3(0.0);\n';
+            base = uvFold + '  vec3 col = vec3(0.0);\n' + (_bgT ? '  float col_a = 0.0;\n' : '');
         } else if (this._solidColor) {
             const bv = this.currentState.baseVals;
             const aR = (bv.wave_r ?? this._solidColor[0]).toFixed(4);
@@ -6264,9 +6268,10 @@ export class EditorInspector {
             if (_satHue) body += _satHue;
         }
         for (const img of visibleImages) {
-            body += this._buildImageBlock(img);
+            body += this._buildImageBlock(img, _bgT);
         }
         body += '  ret = col;\n';
+        if (_bgT) body += '  ret_a = col_a;\n';
         const _rawComp = `${uniforms}\n shader_body {\n${body} }`;
         this._baseComp = _rawComp;
         // With images: end-block uses defaults (sat=1, hue=0) — sat/hue already applied above.
@@ -6290,7 +6295,7 @@ export class EditorInspector {
      * Orbit:        image centre follows a circular path even when spin=0.
      * Bounce:       bass pushes the image upward on every beat.
      */
-    _buildImageBlock(img) {
+    _buildImageBlock(img, trackAlpha = false) {
         const isVideo = img.type === 'video';
         // Videos use 'scale' (0.1-2.0 coverage), images use 'size' (tile density)
         const sz = isVideo ? (img.scale || 0.6).toFixed(4) : img.size.toFixed(4);
@@ -7361,6 +7366,10 @@ export class EditorInspector {
                 ? `    float _alphaMask = step(0.1, _t.w);\n    float _op = _alphaMask * _gapMask * clamp(${op} + _r * ${opa}, 0.0, 1.0);\n`
                 : `    float _op = _t.w * _gapMask * clamp(${op} + _r * ${opa}, 0.0, 1.0);\n`) +
             `    ${blendLine}\n` +
+            // Transparent-bg (§H): accumulate this layer's alpha into col_a using
+            // the SAME coverage the RGB blend used (_t.w*_op for normal; _op for the
+            // others, which already fold _t.w into _op). "over" compositing.
+            (trackAlpha ? `    col_a = col_a + (${img.blendMode === 'normal' ? '_t.w * _op' : '_op'}) * (1.0 - col_a);\n` : '') +
             // Video border ring: drawn outside video edge using signed distance _rd
             (isVideo && (img.vidBorderWidth || 0) > 0.001 ? (() => {
                 const bw = (img.vidBorderWidth || 0).toFixed(4);
