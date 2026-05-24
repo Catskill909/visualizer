@@ -41,7 +41,14 @@ Stacking already **shipped today** (A3) — via **blend modes**, because canvase
 ### E. Re-scoped plan (ready for tomorrow)
 1. **Engine** — the surgical changes in C. **Console-test in `editor.html`** with a layers-only preset before any UI.
 2. **One toggle** — `bgTransparent` chip in the Palette tab + `bgTransparent:false` schema default (old UI section still valid).
-3. **Verify on the paths that matter** — operator-screen reveal; **Approach-A fullscreen-on-projector reveal** (the real test, once the projector's here). Confirm web-window/NDI degrade to blend-mode (no black-box regression).
+3. **Verify on the paths that matter** — operator-screen reveal; **Approach-A fullscreen-on-projector reveal** (the real test, once the projector's here). Confirm web-window/NDI degrade to blend-mode (no black-box regression). **Then run the §G cross-platform gate** (browser → macOS `tauri-dev` → Windows) — this is the shipping platform; don't sign off on browser alone.
+
+### G. Cross-platform (Tauri webview) compatibility — VERIFY on the desktop builds, not just the browser
+The feature is *built* in the browser (dev), but the *shipping* product is the **desktop app** — and today proved desktop webviews differ from Chrome (WKWebView video taint; `captureStream` popups dead in Tauri). **Do not assume browser parity.** Gate Phase 3 as ✅ browser → ✅ macOS `tauri-dev` → ✅ Windows:
+- **macOS (WKWebView):** confirm `getContext('webgl2',{alpha:true})` + `clearColor(0,0,0,0)` + the comp-shader alpha actually render transparent *in `tauri-dev`*. WKWebView has historical straight-vs-premultiplied-alpha quirks — `premultipliedAlpha:false` is already set (`butterchurn.js:6574`), which is the right setting, but it MUST be eyeballed on the real build. Re-test the operator-screen + **Approach-A projector** reveal here specifically.
+- **Keep the Tauri window OPAQUE.** `tauri.conf.json` windows have **no** `transparent:true` (verified) — keep it. Transparency must composite *inside* the webview (canvas-over-canvas, or canvas-over-app-background), never bleed to the OS desktop. On the projector (Approach A), empty areas must read **black** (the app bg), not the macOS wallpaper. If they show the desktop, the window got transparent — revert.
+- **Global engine change:** `alpha:false → true` is on **every** butterchurn canvas on **every** platform (player, editor, timeline zones). Regression-check that existing **MilkDrop presets look unchanged** in `tauri-dev` on macOS (and Windows), not only in the browser — the "zero impact" claim relies on the comp shader still outputting `alpha = 1.0` there too.
+- **Windows (WebView2 / Chromium):** behaves like Chrome → likely parity; verify after macOS (the Windows build is less mature — [`windows-dev.md`](windows-dev.md)).
 
 ### F. Guardrails still in force
 All of "Strict guardrails" below is mandatory — especially: read this doc first; **no code without an approved written plan**; never paraphrase `old_string` when editing `butterchurn.js` (read exact bytes; the reformat disaster is Mistake 1); never `git checkout -- .`; update this doc after every change; not done until committed.
