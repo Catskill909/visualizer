@@ -182,6 +182,8 @@ const BLANK = {
     init_eqs_str: '', frame_eqs_str: '', pixel_eqs_str: '',
     images: [],
     paletteOpacity: 1.0,
+    imagesOnly: false,     // layers-only base (persists; was previously instance-only)
+    bgTransparent: false,  // transparent canvas behind layers (Phase 1/2)
     sceneMirror: 'none',  // 'none' | 'h' | 'v' | 'both' | 'kaleido'
     sceneMirrorKaleidoSpeed: 0.00,
     motionReact: {
@@ -656,10 +658,15 @@ export class EditorInspector {
         this.currentState.warp = '';
         // Solid color base: bake into comp shader; clear when not present
         this._solidColor = v.solid || null;
-        // Reset Images Only when switching variations
+        // Reset Images Only + Transparent BG when switching to a (non-layers) variation
         this._imagesOnly = false;
+        this.currentState.imagesOnly = false;
+        this.currentState.bgTransparent = false;
         const ioToggle = document.getElementById('toggle-images-only');
         if (ioToggle) ioToggle.checked = false;
+        const bgToggle = document.getElementById('toggle-bg-transparent');
+        if (bgToggle) bgToggle.checked = false;
+        this.engine?.canvas?.classList.remove('bg-transparent-checker');
         this._postSnap();
         this._buildCompShader();
         this._applyToEngine();
@@ -1949,6 +1956,9 @@ export class EditorInspector {
         });
         const ioToggle = document.getElementById('toggle-images-only');
         if (ioToggle) ioToggle.checked = false;
+        const bgToggle = document.getElementById('toggle-bg-transparent');
+        if (bgToggle) bgToggle.checked = false;
+        this.engine?.canvas?.classList.remove('bg-transparent-checker');
 
         // Wipe butterchurn's feedback buffer so pixels from the previous preset
         // don't bleed through (the auto-built comp shader samples sampler_main
@@ -2374,6 +2384,7 @@ export class EditorInspector {
         if (!cb) return;
         cb.addEventListener('change', () => {
             this._imagesOnly = cb.checked;
+            this.currentState.imagesOnly = cb.checked;   // persist (round-trips via currentState)
             // Suppress wave when images-only; restore when off
             if (this._imagesOnly) {
                 this._savedWaveA = this.currentState.baseVals.wave_a;
@@ -7768,6 +7779,9 @@ export class EditorInspector {
             s.classList.toggle('active', s.dataset.smirror === sm));
         const ioToggle = document.getElementById('toggle-images-only');
         if (ioToggle) ioToggle.checked = !!this.currentState.imagesOnly;
+        const bgToggle = document.getElementById('toggle-bg-transparent');
+        if (bgToggle) bgToggle.checked = !!this.currentState.bgTransparent;
+        this.engine?.canvas?.classList.toggle('bg-transparent-checker', !!this.currentState.bgTransparent);
 
         this.originalState = deepClone(this.currentState);
     }
