@@ -1,5 +1,21 @@
 # Transparent Preset Background — Dev Doc
 
+## ✅ STATUS — 2026-05-24 (Phase 1 + 2 BUILT & VERIFIED, committed)
+
+**Phase 1 (engine) + Phase 2 (toggle UI) are done and committed.** Transparency verified in `editor.html` (browser): with *Show layers only* + *Transparent background* on, the canvas goes truly transparent (a Photoshop-style checkerboard shows through; the logo layer floats on it) — confirming **~3602 IS the display comp shader** (the audit's correction was right).
+
+Shipped:
+- Engine: `alpha:true` + `clearColor 0` + comp shader `vec4(ret, vColor.a * ret_a)`; `_buildCompShader` gate `_bgT = _imagesOnly && bgTransparent`, guard `&& !_bgT`, `col_a` tracking, `_buildImageBlock(trackAlpha)` reusing `_t.w*_op`.
+- UI: **Transparent background** toggle beside *Show layers only* (Layers section, now stacked — was cramped); **editor-only checkerboard** indicator on the canvas (canvas CSS bg through alpha; timeline/output zones don't get it → they reveal real content).
+- Persistence: `bgTransparent` round-trips (stored on `currentState`, spread by save/load; `customPresets` stores wholesale). **Bonus fix:** `imagesOnly` never actually persisted (latent bug) — now it does (required, since the gate needs it on load). Backward-compatible (old presets → defaults false).
+
+**Remaining:**
+- **Phase 3 — timeline validation:** save a transparent preset → drop it in a timeline zone stacked over another zone → confirm the lower zone shows through (the real payoff). The editor checkerboard proves the alpha; the timeline proves the stacking.
+- **§G cross-platform gate:** verify in macOS `tauri-dev` (WKWebView) then Windows — NOT signed off on the browser alone. (De-risked by §H: stacked-alpha video already does per-pixel alpha in WKWebView.)
+- Optional: a transparency checkerboard isn't shown in the timeline editor's zone preview (only the studio canvas) — fine for now.
+
+---
+
 ## 🔍 Audit & re-plan — 2026-05-23 (read this FIRST; supersedes older details below)
 
 Re-audited against the **current code** + everything learned building the output/NDI pipeline today (see [`output-dev.md`](output-dev.md) / [`native-output-dev.md`](native-output-dev.md)). The older sections (spec, phases, **post-mortem, guardrails**) are still valuable — the post-mortem + guardrails especially. **Where this audit and the older text disagree, this audit wins** (line numbers + which shader to edit have been corrected).
@@ -349,7 +365,7 @@ This section documents every mistake made during the first implementation attemp
 
 ---
 
-### State of codebase after May 22 session (accurate)
+### State of codebase after May 22 session (HISTORICAL — superseded by the ✅ STATUS block at the very top, 2026-05-24: Phase 1+2 now built & committed)
 
 | File | Status |
 |---|---|
