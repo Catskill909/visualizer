@@ -19,7 +19,7 @@ Legend: ✅ done · ⬅ **next** · 📋 planned. Shipping product = the **deskt
 **NATIVE — in progress** (the shipping path)
 - ✅ **N0** — NDI proof: composed program live in OBS + NDI Video Monitor
 - ⬅ **Phase B — desktop local display (projector/monitor)  ◀ WE ARE HERE**
-  - ⬅ **B1** — fullscreen the app on a chosen monitor · **Approach A** (one projector, whole show, ~zero latency) · *starting now*
+  - 🔨 **B1** — fullscreen the app on a chosen monitor · **Approach A** (one projector, whole show, ~zero latency) · **built (compile-verified) — test in `tauri-dev`**
   - 📋 **B2** — separate operator + output · **Approach B** spike (Syphon vs pixel-readback) · *needs the 2nd display — projector arriving ~end of week (2026-05); will test monitor + projector as 2 outputs*
   - 📋 **B3** — placement polish: wake-lock on output, clean teardown, multi-output
 - 📋 **N1** — NDI as a real output (named source, `target` model, persists with the set)
@@ -403,7 +403,7 @@ NDI = "one cable to everything on the LAN": a single sender feeds OBS, streaming
 Two approaches (decided 2026-05-23: do **A first**; B when the projector arrives ~end of week and we can test monitor + projector as 2 outputs):
 
 **Approach A — one projector shows the whole show** (no separate control screen). Lowest latency — the app renders directly on the projector; **no pixel pipe needed.**
-- [ ] **B1 — fullscreen the app on a chosen monitor** ⬅ *starting now.* Enumerate monitors (`availableMonitors()`); move the window to the chosen display + `set_fullscreen(true)` (Tauri `set_position`→`set_fullscreen`, #6394). Needs the `window` allowlist widened (only `setFullscreen` is enabled today in [tauri.conf.json](src-tauri/tauri.conf.json)). Operator uses the auto-hiding controls on the projector. *(Test on the monitor now; projector end of week.)*
+- [~] **B1 — fullscreen the app on a chosen monitor** — **BUILT (compile-verified) 2026-05-23; runtime test pending in `tauri-dev`.** Rust commands `list_monitors()` + `fullscreen_on_monitor(x,y)` (Rust uses `available_monitors()`/`set_position`→`set_fullscreen`, #6394 — done in Rust so no JS `window` allowlist change needed). Timeline `⊟ Outputs` modal gets a **"Desktop — fullscreen this app on a display"** section (`#tl-output-desktop-fs`, shown only under `window.__TAURI__`): one card per monitor with a **⛶ Fullscreen here** button. `cargo check` + `vite build` clean. Operator uses auto-hiding controls on the projector; Esc/F exits. *(Test on the monitor now; projector end of week. macOS native fullscreen + reposition can race when switching while already fullscreen — add a delay in `fullscreen_on_monitor` if so.)*
 
 **Approach B — laptop control + a separate clean output** (the 2-output / pro setup). Needs the pixel pipe (the sealed-webview wall, §5).
 - [ ] **B2 — spike Syphon (GPU texture share) vs pixel-readback→IPC→second window;** measure latency; pick one. Then build it behind the **same** `outputManager`/`outputPipe` interface, reusing all shared UI/routing/compositing + the composer. *(Needs the 2nd display.)*

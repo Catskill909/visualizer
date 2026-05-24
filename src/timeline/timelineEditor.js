@@ -238,6 +238,8 @@ export class TimelineEditor {
         this._outputRoutesEl   = document.getElementById('tl-output-routes');
         this._outputProgramBtn = document.getElementById('tl-output-program-btn');
         this._outputNdiBtn     = document.getElementById('tl-output-ndi-btn');
+        this._outputDesktopFs  = document.getElementById('tl-output-desktop-fs');
+        this._outputMonitorsEl = document.getElementById('tl-output-monitors');
         this._displays         = [];   // last-detected display list
         this._composer         = null; // lazy Composer (shared: program window + NDI)
         this._ndiActive        = false;
@@ -917,6 +919,7 @@ export class TimelineEditor {
         this._renderOutputRoutes();
         this._updateProgramBtn();
         this._updateNdiBtn();
+        this._renderMonitorList();     // desktop-only: fullscreen-on-a-display (Phase B / B1)
         this._outputMgrEl.hidden = false;
     }
 
@@ -1302,6 +1305,49 @@ export class TimelineEditor {
         if (!this._outputNdiBtn) return;
         this._outputNdiBtn.textContent = this._ndiActive ? '📡 Stop NDI' : '📡 Send program to NDI';
         this._outputNdiBtn.classList.toggle('is-live', !!this._ndiActive);
+    }
+
+    // Phase B / B1 (Approach A, desktop only): list the Mac's monitors and let the
+    // user fullscreen this app on a chosen one — e.g. a projector showing the
+    // whole show. ~Zero latency (the app renders directly; no pixel pipe).
+    async _renderMonitorList() {
+        const tauri = (typeof window !== 'undefined') && window.__TAURI__;
+        if (!tauri || !this._outputDesktopFs || !this._outputMonitorsEl) return;
+        this._outputDesktopFs.hidden = false;
+        this._outputMonitorsEl.innerHTML = '';
+        let mons = [];
+        try { mons = await tauri.invoke('list_monitors'); } catch { /* leave empty */ }
+        if (!mons.length) {
+            this._outputMonitorsEl.innerHTML = '<div class="tl-output-empty">No monitors detected.</div>';
+            return;
+        }
+        for (const m of mons) {
+            const card = document.createElement('div');
+            card.className = 'tl-output-display-card';
+            const label = document.createElement('span');
+            label.className = 'tl-od-label';
+            label.textContent = (m.name || 'Display') + (m.current ? ' · this one' : '');
+            const res = document.createElement('span');
+            res.className = 'tl-od-res';
+            res.textContent = `${m.w}×${m.h}`;
+            const btn = document.createElement('button');
+            btn.className = 'tl-output-detect';
+            btn.type = 'button';
+            btn.style.cssText = 'margin:6px 0 0;';
+            btn.textContent = '⛶ Fullscreen here';
+            btn.addEventListener('click', async () => {
+                try {
+                    await tauri.invoke('fullscreen_on_monitor', { x: m.x, y: m.y });
+                    this._toast(`Fullscreen on ${m.name || 'display'} — press Esc/F to exit`);
+                } catch (e) {
+                    this._toast('Could not fullscreen on that display');
+                }
+            });
+            card.appendChild(label);
+            card.appendChild(res);
+            card.appendChild(btn);
+            this._outputMonitorsEl.appendChild(card);
+        }
     }
 
     _zoneOutTag(zone) {

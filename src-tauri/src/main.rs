@@ -82,6 +82,50 @@ fn toggle_fullscreen(window: tauri::Window) {
     let _ = window.set_fullscreen(!current);
 }
 
+// ── Phase B / B1 — fullscreen the app on a chosen monitor (Approach A) ──
+#[derive(serde::Serialize)]
+struct MonitorInfo {
+    name: String,
+    x: i32,
+    y: i32,
+    w: u32,
+    h: u32,
+    scale: f64,
+    current: bool,
+}
+
+#[tauri::command]
+fn list_monitors(window: tauri::Window) -> Vec<MonitorInfo> {
+    let current_pos = window.current_monitor().ok().flatten().map(|m| *m.position());
+    match window.available_monitors() {
+        Ok(mons) => mons.iter().enumerate().map(|(i, m)| {
+            let pos = m.position();
+            let size = m.size();
+            MonitorInfo {
+                name: m.name().cloned().unwrap_or_else(|| format!("Display {}", i + 1)),
+                x: pos.x,
+                y: pos.y,
+                w: size.width,
+                h: size.height,
+                scale: m.scale_factor(),
+                current: current_pos.map_or(false, |c| c == *pos),
+            }
+        }).collect(),
+        Err(_) => Vec::new(),
+    }
+}
+
+#[tauri::command]
+fn fullscreen_on_monitor(window: tauri::Window, x: i32, y: i32) -> Result<(), String> {
+    // Exit any current fullscreen, move onto the target monitor, then fullscreen
+    // there (Tauri #6394 approach). The window starts windowed, so the first call
+    // is just move→fullscreen.
+    let _ = window.set_fullscreen(false);
+    window.set_position(tauri::PhysicalPosition::new(x, y)).map_err(|e| e.to_string())?;
+    window.set_fullscreen(true).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 #[tauri::command]
 fn caffeinate_start(state: tauri::State<CaffeinateState>) {
     let mut guard = state.0.lock().unwrap();
@@ -323,7 +367,7 @@ fn main() {
     tauri::Builder::default()
         .manage(CaffeinateState(Mutex::new(None)))
         .manage(NdiState(Mutex::new(None)))
-        .invoke_handler(tauri::generate_handler![caffeinate_start, caffeinate_stop, toggle_fullscreen, get_fullscreen, pick_audio_file, pick_image_file, save_file, store_blob, get_blob, delete_blob, convert_to_stacked_alpha, convert_to_stacked_alpha_b64, ndi_start, ndi_send_frame, ndi_stop])
+        .invoke_handler(tauri::generate_handler![caffeinate_start, caffeinate_stop, toggle_fullscreen, get_fullscreen, list_monitors, fullscreen_on_monitor, pick_audio_file, pick_image_file, save_file, store_blob, get_blob, delete_blob, convert_to_stacked_alpha, convert_to_stacked_alpha_b64, ndi_start, ndi_send_frame, ndi_stop])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
