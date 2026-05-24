@@ -238,6 +238,8 @@ export class TimelineEditor {
         this._outputRoutesEl   = document.getElementById('tl-output-routes');
         this._outputProgramBtn = document.getElementById('tl-output-program-btn');
         this._outputNdiBtn     = document.getElementById('tl-output-ndi-btn');
+        this._outputNdiRow     = document.getElementById('tl-output-ndi-row');
+        this._outputNdiName    = document.getElementById('tl-output-ndi-name');
         this._outputDesktopFs  = document.getElementById('tl-output-desktop-fs');
         this._outputMonitorsEl = document.getElementById('tl-output-monitors');
         this._displays         = [];   // last-detected display list
@@ -375,8 +377,15 @@ export class TimelineEditor {
         this._outputProgramBtn?.addEventListener('click', () => this._toggleProgramOutput());
         // NDI is desktop-app only — reveal the button under Tauri.
         if (typeof window !== 'undefined' && window.__TAURI__ && this._outputNdiBtn) {
-            this._outputNdiBtn.hidden = false;
+            if (this._outputNdiRow) this._outputNdiRow.hidden = false;
+            this._loadNdiPrefs();
             this._outputNdiBtn.addEventListener('click', () => this._toggleNdi());
+            this._outputNdiName?.addEventListener('change', () => {
+                this._saveNdiPrefs();
+                if (this._ndiActive) { this._stopNdi().then(() => this._startNdi()); } // re-announce under the new name
+            });
+            // Restore last session's NDI state (the saved intent).
+            if (this._ndiPrefs?.enabled) setTimeout(() => this._startNdi(), 400);
         }
         // Reflect any output open/close (incl. manual popup close) in the chips + modal.
         outputManager.onChange(() => {
@@ -1250,21 +1259,32 @@ export class TimelineEditor {
     // canvas → JPEG → base64 → invoke('ndi_send_frame') → Rust relays to the
     // sidecar's stdin → NDI (native-output-dev.md N0b). Browser builds have no NDI.
 
-    async _toggleNdi() {
+    _ndiName() {
+        const v = (this._outputNdiName?.value || '').trim();
+        return v || 'DiscoCast Program';
+    }
+
+    _loadNdiPrefs() {
+        try { this._ndiPrefs = JSON.parse(localStorage.getItem('discocast_ndi') || '{}'); }
+        catch { this._ndiPrefs = {}; }
+        if (this._outputNdiName) this._outputNdiName.value = this._ndiPrefs.name || 'DiscoCast Program';
+    }
+    _saveNdiPrefs() {
+        this._ndiPrefs = { name: this._ndiName(), enabled: !!this._ndiActive };
+        try { localStorage.setItem('discocast_ndi', JSON.stringify(this._ndiPrefs)); } catch { /* quota */ }
+    }
+
+    _toggleNdi() {
+        return this._ndiActive ? this._stopNdi(true) : this._startNdi(true);
+    }
+
+    async _startNdi(announce = false) {
         const tauri = (typeof window !== 'undefined') && window.__TAURI__;
         if (!tauri) { this._toast('NDI is available in the desktop app only'); return; }
-        if (this._ndiActive) {
-            this._stopNdiPump();
-            this._ndiActive = false;
-            try { await tauri.invoke('ndi_stop'); } catch { /* ignore */ }
-            this._maybeStopComposer();
-            this._updateNdiBtn();
-            this._toast('NDI output stopped');
-            return;
-        }
+        if (this._ndiActive) return;
         this._ensureComposerRunning();
         try {
-            await tauri.invoke('ndi_start');
+            await tauri.invoke('ndi_start', { name: this._ndiName() });
         } catch (e) {
             this._maybeStopComposer();
             this._toast('Could not start NDI');
@@ -1273,7 +1293,19 @@ export class TimelineEditor {
         this._ndiActive = true;
         this._startNdiPump();
         this._updateNdiBtn();
-        this._toast('NDI ON — add an NDI source in OBS / NDI Monitor');
+        this._saveNdiPrefs();
+        if (announce) this._toast(`NDI ON — "${this._ndiName()}" — add an NDI source in OBS`);
+    }
+
+    async _stopNdi(announce = false) {
+        const tauri = (typeof window !== 'undefined') && window.__TAURI__;
+        this._stopNdiPump();
+        this._ndiActive = false;
+        try { await tauri?.invoke('ndi_stop'); } catch { /* ignore */ }
+        this._maybeStopComposer();
+        this._updateNdiBtn();
+        this._saveNdiPrefs();
+        if (announce) this._toast('NDI output stopped');
     }
 
     _startNdiPump() {

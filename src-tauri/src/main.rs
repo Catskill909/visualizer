@@ -18,14 +18,18 @@ struct CaffeinateState(Mutex<Option<Child>>);
 struct NdiState(Mutex<Option<CommandChild>>);
 
 #[tauri::command]
-fn ndi_start(window: tauri::Window, state: tauri::State<NdiState>) -> Result<(), String> {
+fn ndi_start(window: tauri::Window, state: tauri::State<NdiState>, name: Option<String>) -> Result<(), String> {
     let mut guard = state.0.lock().unwrap();
     if guard.is_some() {
         return Ok(()); // already running
     }
+    let source_name = name
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "DiscoCast Program".to_string());
     let (mut rx, child) = TauriCommand::new_sidecar("ndi-send")
         .map_err(|e| format!("sidecar lookup failed: {}", e))?
-        .args(["stream", "DiscoCast Program"])
+        .args(["stream", &source_name])
         .spawn()
         .map_err(|e| format!("ndi-send spawn failed: {}", e))?;
     // Drain the sidecar's output so its pipe never fills; surface its fps/decode

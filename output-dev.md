@@ -22,7 +22,7 @@ Legend: ✅ done · ⬅ **next** · 📋 planned. Shipping product = the **deskt
   - ✅ **B1** — fullscreen the app on a chosen monitor · **Approach A** (one projector, whole show, ~zero latency) · **verified in tauri-dev 2026-05-23** (app went fullscreen on the chosen display)
   - 📋 **B2** — separate operator + output · **Approach B** spike (Syphon vs pixel-readback) · *needs the 2nd display — projector arriving ~end of week (2026-05); will test monitor + projector as 2 outputs*
   - 📋 **B3** — placement polish: wake-lock on output, clean teardown, multi-output
-- 📋 **N1** — NDI as a real output (named source, `target` model, persists with the set)
+- 🔨 **N1** — NDI named source + persists (on/off + name) · **built (compile-verified) — test in `tauri-dev`** *(the `output.target` model refactor is deferred — not needed while NDI = the single composed-program output)*
 - 📋 **N2** — ship-enable NDI (bundle `libndi` + licensing; x86_64 slice) · ⚠ **blocks any NDI release**
 - 📋 **Phase C** — Windows local display (Spout)
 - 📋 **Enhancements** — audio-over-NDI A/V-lock, A4 venue presets, transparent-bg → NDI alpha
@@ -395,7 +395,7 @@ NDI = "one cable to everything on the LAN": a single sender feeds OBS, streaming
 > **Architectural finding (2026-05-23) — NDI needs a real frame compositor.** This is the one place NDI is *not* a drop-in behind the existing pipe, so don't underestimate it. Today layer compositing happens **in the output window**, free, via the browser's CSS compositor (N `<video>`s with zIndex/opacity/blend). **NDI sends ONE video stream**, so the N source canvases must be composited into a **single frame first** — an offscreen canvas/WebGL compositor applying the same zIndex/opacity/blend recipe — then read back and handed to the NDI sender. The good news: this same composited-single-frame is exactly what the **"composed view → virtual camera"** (A4) and a **single-texture Syphon/Spout** output also need, so build the compositor once and it serves all "single composed stream" outputs. Net: there are two output *styles* — (1) multi-layer **display** (local window: CSS-composite, as built); (2) single composed **stream** (NDI / virtual-cam / Syphon-single: canvas-composite then send). The pipe abstraction must cover both.
 
 - [ ] **N0 — Spike:** (a) build the offscreen frame compositor (stack the routed source canvases into one canvas with opacity/blend); (b) stand up an NDI sender from Rust (Tauri sidecar/command), push that composited frame (readback → NDI frames), receive it in OBS / NDI Studio Monitor; measure latency/fps/CPU at 1080p; settle NDI SDK/runtime bundling + licensing. No production wiring yet.
-- [ ] **N1 — Output model `target` extension:** add `output.target` (`display` | `ndi`); an NDI route carries a stream name (no `displayId`/window); the Outputs modal gains an "NDI output" target alongside displays. Routing/stacking UI reused untouched; the compositor + sender are the only new runtime path.
+- [~] **N1 — named NDI source + persistence** — **BUILT (compile-verified) 2026-05-23; test in `tauri-dev`.** `ndi_start(name)` (Rust) names the NDI source; an NDI **name input** sits by the 📡 button in the Outputs modal (Tauri-only, in `#tl-output-ndi-row`); changing it while live re-announces under the new name. Persisted to `localStorage` `discocast_ndi = {name, enabled}` (app-level — deliberately NOT the timeline export schema, which is the high-risk save path); on timeline load, the name restores and NDI **auto-starts if it was enabled**. JS refactored to `_startNdi`/`_stopNdi`/`_toggleNdi` + `_ndiName`/`_loadNdiPrefs`/`_saveNdiPrefs`. **Deferred:** the `output.target` (`display|ndi`) model refactor — not needed while NDI = the single composed-program output (revisit if NDI ever becomes a per-zone route).
 - [ ] **N2:** stable NDI sender behind the pipe contract; per-output NDI streams (each routed group / a composed view as its own NDI source); clean start/stop; perf pass.
 - **Exit:** the desktop app publishes its visuals as NDI; OBS (and any NDI receiver) shows them in sync.
 
@@ -408,6 +408,12 @@ Two approaches (decided 2026-05-23: do **A first**; B when the projector arrives
 **Approach B — laptop control + a separate clean output** (the 2-output / pro setup). Needs the pixel pipe (the sealed-webview wall, §5).
 - [ ] **B2 — spike Syphon (GPU texture share) vs pixel-readback→IPC→second window;** measure latency; pick one. Then build it behind the **same** `outputManager`/`outputPipe` interface, reusing all shared UI/routing/compositing + the composer. *(Needs the 2nd display.)*
 - [ ] **B3 — placement polish:** wake-lock on the output (`caffeinate`), clean teardown, multi-output.
+
+> **📅 Projector-day checklist (B2 — when the 2nd display/projector is connected, ~end of week 2026-05):**
+> 1. Plug in the projector; in `tauri-dev` open `⊟ Outputs` → confirm **two** monitor cards appear (Display 1 · *this one* + Display 2). Verify **⛶ Fullscreen here** lands on each correctly (this also confirms B1 multi-display). Watch for the macOS fullscreen-reposition race when switching *while already fullscreen* → add the delay in `fullscreen_on_monitor` if it bites.
+> 2. **Decide the B2 mechanism with a quick measurement, not a guess:** the readback path is already proven (it's how NDI works) — fastest to stand up: composer canvas → readback → Tauri event → a second `WebviewWindow` (output.html) draws it; place that window fullscreen on the projector. Measure its latency on the projector. If it's tight enough for the room, ship it; if not, escalate to **Syphon** (GPU-direct, lower latency, bigger build).
+> 3. Reuse everything above the pipe: the **composer** is the single source; the second window just displays it (no re-render — §13).
+> 4. Test the real gig flow: operator drives the timeline on the laptop while the projector shows the composed program in sync.
 
 - **Exit:** the Mac app drives a directly-attached projector/monitor in sync — Approach A now, Approach B when the projector lands.
 

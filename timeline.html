@@ -426,7 +426,10 @@
                 <div class="tl-output-section-label">Composed program — the whole timeline as one layered feed</div>
                 <div class="tl-output-program">
                     <button id="tl-output-program-btn" class="tl-output-detect" type="button">▦ Open composed program</button>
-                    <button id="tl-output-ndi-btn" class="tl-output-detect" type="button" hidden>📡 Send program to NDI</button>
+                    <span id="tl-output-ndi-row" class="tl-output-ndi-row" hidden>
+                        <button id="tl-output-ndi-btn" class="tl-output-detect" type="button">📡 Send program to NDI</button>
+                        <input id="tl-output-ndi-name" class="tl-or-select" type="text" maxlength="40" placeholder="NDI source name" title="Name OBS / receivers will see" />
+                    </span>
                     <span id="tl-output-program-hint" class="tl-output-empty">All zones stacked into one feed — point one projector at the whole show, or send it over NDI to OBS / another machine (desktop app only).</span>
                 </div>
             </div>

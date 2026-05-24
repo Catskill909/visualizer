@@ -1476,6 +1476,9 @@ body.tl-fullscreen #tl-canvas-container { cursor: pointer; }
 /* Composed-program section */
 .tl-output-program { display: flex; flex-direction: column; gap: 6px; }
 .tl-output-program .tl-output-detect { align-self: flex-start; margin-right: 0; }
+.tl-output-ndi-row { display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.tl-output-ndi-row .tl-output-detect { margin-right: 0; }
+#tl-output-ndi-name { width: 180px; max-width: 60vw; }
 
 .tl-output-body { padding: 14px 16px; overflow-y: auto; }
 
