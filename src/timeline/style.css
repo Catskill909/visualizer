@@ -214,8 +214,20 @@ body.tl-fullscreen #tl-canvas-container { cursor: pointer; }
 }
 
 .tl-topbar-actions {
-  display: flex; align-items: center; gap: 6px;
+  display: flex; align-items: center; gap: 9px;
   flex-shrink: 0;
+}
+
+/* Hide-panels toggle — swap eye / eye-off by active state. The default-hidden
+   icon is hidden via the stylesheet (NOT an inline style) so the .is-active rule
+   can override it; otherwise the button empties out and collapses its width. */
+#tl-btn-hideui .hideui-on  { display: none; }
+#tl-btn-hideui.is-active .hideui-off { display: none; }
+#tl-btn-hideui.is-active .hideui-on  { display: block; }
+#tl-btn-hideui.is-active {
+  background: rgba(255,255,255,0.16);
+  border-color: var(--border-hi);
+  color: var(--text);
 }
 
 .tl-btn {
@@ -1574,6 +1586,28 @@ body.tl-fullscreen #tl-canvas-container { cursor: pointer; }
 .tl-zone-out-chip.is-offline {
   border-style: dashed;
 }
+
+/* ─── Remove-track (×) — added tracks only ─── */
+.tl-zone-remove-btn {
+  flex-shrink: 0;
+  width: 20px; height: 20px;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-3);
+  font-size: 15px; line-height: 1;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.tl-zone-remove-btn:hover {
+  background: rgba(255,255,255,0.10);
+  border-color: var(--border-hi);
+  color: var(--text);
+}
+
+/* Add-track now lives in the transport row as a plain .tl-btn (#tl-btn-add-track),
+   so it no longer needs its own strip row — see add-track-dev.md Phase A. */
 
 /* ══════════════════════════════════════════════════════════════════════
    FULLSCREEN BUTTON — always-visible, top-right corner

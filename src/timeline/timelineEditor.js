@@ -119,6 +119,12 @@ const ZONE_LAYOUTS = [
     },
 ];
 
+// ─── Add-track (multi-track) ───────────────────────────────────────────────────
+// Full Screen layout only for now — add-track-dev.md Phase A. Each track is a
+// slave WebGL engine, so cap the stack; raise only after measuring.
+const ADD_TRACK_MAX = 4;
+const TRACK_COLORS  = ['#7c6fcd', '#5a8a7c', '#8a6a5a', '#5a7a8a', '#cd9f5a', '#5a8acd'];
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class TimelineEditor {
@@ -158,6 +164,7 @@ export class TimelineEditor {
         // UI state
         this._stripVisible  = true;
         this._isFullscreen  = false;
+        this._uiHidden      = false;   // windowed "show the canvas" mode (hide strip/transport/player, keep topbar)
 
         // Quick-edit
         this._qeEntryId    = null;
@@ -212,6 +219,7 @@ export class TimelineEditor {
         this._btnLoop       = document.getElementById('tl-btn-loop');
         this._btnZones      = document.getElementById('tl-btn-zones');
         this._timeDisp      = document.getElementById('tl-time-display');
+        this._btnAddTrack   = document.getElementById('tl-btn-add-track');
         this._zoomInput     = document.getElementById('tl-zoom');
         this._snapInput     = document.getElementById('tl-snap');
 
@@ -351,6 +359,7 @@ export class TimelineEditor {
         this._btnSkipNext?.addEventListener('click', () => this._skipToNextBlock());
         this._btnLoop.addEventListener('click',     () => this._toggleLoop());
         this._btnZones?.addEventListener('click',   () => this._openZoneMgr());
+        this._btnAddTrack?.addEventListener('click', () => this._addTrack());
 
         this._zoomInput.addEventListener('input', () => {
             this._pxPerSec = parseInt(this._zoomInput.value, 10);
@@ -555,6 +564,9 @@ export class TimelineEditor {
             if (!this._colorPickerEl.hidden && !this._colorPickerEl.contains(e.target) && !this._qeSwatch.contains(e.target))
                 this._closeColorPicker();
         }, { capture: true });
+
+        // Hide-panels toggle — windowed full-canvas view (keeps topbar so it's reachable)
+        document.getElementById('tl-btn-hideui')?.addEventListener('click', () => this.toggleHideUI());
 
         // Fullscreen button — enter only; exit is via click-on-canvas or Esc
         const fsBtn = document.getElementById('tl-fullscreen-btn');
@@ -771,6 +783,10 @@ export class TimelineEditor {
         // Remove canvases + covers for zones no longer in the layout
         for (const [id, zd] of this._zoneMap) {
             if (!zoneIds.has(id) && id !== 'full') {
+                // Stop the orphaned slave's render loop so a removed track stops
+                // burning a rAF on a detached canvas. (Audio nodes are shared with
+                // the primary engine, so don't destroy() — just halt the loop.)
+                if (zd.engine && zd.engine !== this._primaryEngine) zd.engine.stopRenderLoop?.();
                 zd.canvas.remove();
                 this._zoneMap.delete(id);
                 const cover = this._zoneCovers.get(id);
@@ -843,6 +859,33 @@ export class TimelineEditor {
 
         if (style === 'cut') durationSec = 0;
 
+        // Transparent-gap tracks (stacked overlays) hide by fading the CANVAS to
+        // transparent — revealing the track beneath — instead of raising a black
+        // cover that would paint over everything below (add-track Phase A3). The
+        // `opacity` arg is the cover target (1 = hide, 0 = reveal); the canvas
+        // target is its inverse, scaled by the layer's base opacity.
+        const zone = (this._tl?.zones || []).find(z => z.id === zoneId);
+        if (zone?.gapBehavior === 'transparent') {
+            const zd = this._zoneMap.get(zoneId);
+            if (zd?.canvas) {
+                const target = (1 - opacity) * (zone.opacity ?? 1);
+                if (durationSec > 0) {
+                    zd.canvas.style.transition = `opacity ${durationSec}s ease`;
+                    zd.canvas.offsetHeight;  // force reflow so the transition takes
+                    zd.canvas.style.opacity = String(target);
+                } else {
+                    zd.canvas.style.transition = 'none';
+                    zd.canvas.style.opacity = String(target);
+                }
+            }
+            // This zone's black cover stays out of the way permanently.
+            cover.style.transition = 'none';
+            cover.style.opacity = '0';
+            this._coverDur[zoneId] = durationSec;
+            this._scheduleOutputSync();
+            return;
+        }
+
         // Cover colour follows the transition style. Safe to swap while the cover
         // is transparent (the state between blocks) — a colour change at opacity 0
         // is invisible; the two calls of a single transition share one style.
@@ -891,7 +934,9 @@ export class TimelineEditor {
         // must sit BELOW the next zone's canvas so it can't black out an overlay.
         canvas.style.zIndex    = (zone.zIndex ?? 0) * 2;
         canvas.style.mixBlendMode = zone.blendMode || 'normal';
-        canvas.style.opacity   = String(zone.opacity ?? 1);
+        // Transparent-gap tracks own their canvas opacity via _fadeZoneCover (it is
+        // the hide/reveal channel). Don't clobber a mid-gap fade on resize/sync.
+        if (zone.gapBehavior !== 'transparent') canvas.style.opacity = String(zone.opacity ?? 1);
         canvas.width  = w;
         canvas.height = h;
     }
@@ -1148,16 +1193,25 @@ export class TimelineEditor {
             if (!zone.output || zone.output._offline) continue;
             const zd = this._zoneMap.get(zone.id);
             if (!zd?.canvas) continue;
-            const cover = this._zoneCovers.get(zone.id);
-            const coverOp = cover ? (parseFloat(cover.style.opacity) || 0) : 0;
             const dur = this._coverDur[zone.id] || 0;
             this._coverDur[zone.id] = 0;   // consume: applied to this push only
+            // Transparent-gap tracks carry their visibility in the canvas opacity;
+            // black-cover tracks carry it in the cover. Read the right source so the
+            // mirrored output reveals beneath identically to the operator screen.
+            let layerOpacity;
+            if (zone.gapBehavior === 'transparent') {
+                layerOpacity = parseFloat(zd.canvas.style.opacity) || 0;
+            } else {
+                const cover = this._zoneCovers.get(zone.id);
+                const coverOp = cover ? (parseFloat(cover.style.opacity) || 0) : 0;
+                layerOpacity = (zone.opacity ?? 1) * (1 - coverOp);
+            }
             const displayId = zone.output.displayId;
             if (!byDisplay.has(displayId)) byDisplay.set(displayId, []);
             byDisplay.get(displayId).push({
                 id: zone.id,
                 canvas: zd.canvas,
-                opacity: (zone.opacity ?? 1) * (1 - coverOp),
+                opacity: layerOpacity,
                 blendMode: zone.blendMode || 'normal',
                 zIndex: zone.zIndex ?? 0,
                 transitionMs: Math.round(dur * 1000),
@@ -1210,8 +1264,12 @@ export class TimelineEditor {
                 canvas: zd.canvas,
                 zIndex: zone.zIndex ?? 0,
                 blendMode: zone.blendMode || 'normal',
-                // live (read each frame): base × (1 − animated cover opacity)
+                // live (read each frame). Transparent-gap tracks carry visibility in
+                // the canvas opacity; black-cover tracks in base × (1 − cover opacity).
                 getOpacity: () => {
+                    if (zone.gapBehavior === 'transparent') {
+                        return parseFloat(getComputedStyle(zd.canvas).opacity) || 0;
+                    }
                     const co = cover ? (parseFloat(getComputedStyle(cover).opacity) || 0) : 0;
                     return (zone.opacity ?? 1) * (1 - co);
                 },
@@ -1918,11 +1976,107 @@ export class TimelineEditor {
 
         const hasEntries = entries.length > 0;
 
-        for (const zone of zones) {
+        // Top row = front layer (highest zIndex). Base 'full' (zIndex 0) sits at the
+        // bottom, so the strip reads like the composite — Photoshop convention.
+        const ordered  = [...zones].sort((a, b) => (b.zIndex ?? 0) - (a.zIndex ?? 0));
+        const baseZone = ordered[ordered.length - 1];
+
+        for (const zone of ordered) {
             const zoneEntries = entries.filter(e => e.zoneId === zone.id);
-            const row = this._createZoneRow(zone, zoneEntries, !hasEntries && zones.indexOf(zone) === 0);
+            const row = this._createZoneRow(zone, zoneEntries, !hasEntries && zone === baseZone);
             this._tracksEl.appendChild(row);
         }
+
+        // Add-track lives in the transport row (saves vertical strip space).
+        this._updateAddTrackBtn();
+    }
+
+    // Show the transport "+ Add Track" button only for the Full Screen layout
+    // (Phase A); disable it at the soft cap.
+    _updateAddTrackBtn() {
+        if (!this._btnAddTrack) return;
+        const show = this._allFullFrame();
+        this._btnAddTrack.style.display = show ? '' : 'none';
+        if (show) {
+            const atCap = (this._tl?.zones?.length || 0) >= ADD_TRACK_MAX;
+            this._btnAddTrack.disabled = atCap;
+            this._btnAddTrack.title = atCap
+                ? `Maximum ${ADD_TRACK_MAX} tracks`
+                : 'Add a track on top of the stack';
+        }
+    }
+
+    // ─── Multi-track (add/remove) — add-track-dev.md Phase A ────────────────────
+
+    _isFullFrameZone(zone) {
+        const r = zone?.region;
+        return !!r && r.x === 0 && r.y === 0 && r.width === 1 && r.height === 1;
+    }
+
+    // The Full Screen layout: every zone is a full-frame layer (base + stacked
+    // tracks). This is the only layout that supports add-track today (Phase A).
+    _allFullFrame() {
+        const zones = this._tl?.zones || [];
+        return zones.length > 0 && zones.every(z => this._isFullFrameZone(z));
+    }
+
+    _canAddTrack() {
+        const zones = this._tl?.zones || [];
+        return this._allFullFrame() && zones.length < ADD_TRACK_MAX;
+    }
+
+    _addTrack() {
+        if (!this._tl || !this._canAddTrack()) return;
+        const zones = this._tl.zones;
+        const maxZ  = zones.reduce((m, z) => Math.max(m, z.zIndex ?? 0), 0);
+        const n     = zones.length + 1;
+        const zone  = {
+            id: generateId(),
+            name: `Track ${n}`,
+            color: TRACK_COLORS[(n - 1) % TRACK_COLORS.length],
+            region: { x: 0, y: 0, width: 1, height: 1 },
+            opacity: 1,
+            blendMode: 'normal',
+            zIndex: maxZ + 1,            // lands on top of the stack (front layer)
+            gapBehavior: 'transparent',  // empty = reveal the track beneath, not black
+            output: null,
+        };
+        zones.push(zone);
+        this._setDirty();
+        this._syncZoneCanvases();        // builds the slave engine + canvas + cover
+        // A fresh transparent track starts hidden (revealing the base) until a clip
+        // plays. Must run AFTER _syncZoneCanvases creates the canvas.
+        this._fadeZoneCover(zone.id, 1, 0);
+        if (this._playing) {
+            // play() starts every engine's loop up front; a track born mid-playback
+            // missed that, so start its loop before the reschedule loads into it.
+            const zd = this._zoneMap.get(zone.id);
+            if (zd && !zd.engine.isRunning) zd.engine.startRenderLoop();
+            this._rescheduleIfPlaying();
+        } else {
+            this._scrubTo(this._currentTime);
+        }
+        this._renderStrip();
+        this._toast(`Added ${zone.name}`);
+    }
+
+    _removeTrack(zoneId) {
+        if (!this._tl) return;
+        if (zoneId === 'full') return;          // base/primary engine is not removable
+        const zones = this._tl.zones;
+        if (zones.length <= 1) return;          // never remove the last track
+        const idx = zones.findIndex(z => z.id === zoneId);
+        if (idx === -1) return;
+
+        zones.splice(idx, 1);
+        this._tl.entries = this._tl.entries.filter(e => e.zoneId !== zoneId);
+        this._currentZonePreset.delete(zoneId);
+        this._setDirty();
+        this._syncZoneCanvases();               // tears down its canvas + cover, halts its loop
+        if (this._playing) this._rescheduleIfPlaying();
+        else this._scrubTo(this._currentTime);
+        this._renderStrip();
+        this._toast('Track removed');
     }
 
     _createZoneRow(zone, entries, showEmpty) {
@@ -1949,19 +2103,37 @@ export class TimelineEditor {
         });
 
         // Output routing chip — neutral grey, brighter when an output is live.
-        const outChip = document.createElement('button');
-        outChip.className = 'tl-zone-out-chip';
-        outChip.type = 'button';
-        if (this._zoneOutputLive(zone)) outChip.classList.add('is-live');
-        outChip.textContent = this._zoneOutTag(zone);
-        outChip.title = zone.output?.displayLabel ? `Output: ${zone.output.displayLabel}` : 'Send this zone to a display';
-        outChip.addEventListener('click', e => {
-            e.stopPropagation();
-            this._openOutputMgr();
-        });
-        labelEl.appendChild(outChip);
+        // Suppressed in the Full Screen layout: one region = one program output,
+        // so per-track routing is meaningless there (add-track Phase A5).
+        if (!this._allFullFrame()) {
+            const outChip = document.createElement('button');
+            outChip.className = 'tl-zone-out-chip';
+            outChip.type = 'button';
+            if (this._zoneOutputLive(zone)) outChip.classList.add('is-live');
+            outChip.textContent = this._zoneOutTag(zone);
+            outChip.title = zone.output?.displayLabel ? `Output: ${zone.output.displayLabel}` : 'Send this zone to a display';
+            outChip.addEventListener('click', e => {
+                e.stopPropagation();
+                this._openOutputMgr();
+            });
+            labelEl.appendChild(outChip);
+        }
 
         labelEl.appendChild(addBtn);
+
+        // Remove-track — added tracks only (base 'full' is never removable).
+        if (this._allFullFrame() && zone.id !== 'full') {
+            const rmBtn = document.createElement('button');
+            rmBtn.className = 'tl-zone-remove-btn';
+            rmBtn.type = 'button';
+            rmBtn.title = `Remove ${zone.name}`;
+            rmBtn.textContent = '×';
+            rmBtn.addEventListener('click', e => {
+                e.stopPropagation();
+                this._removeTrack(zone.id);
+            });
+            labelEl.appendChild(rmBtn);
+        }
 
         // Track content
         const trackEl = document.createElement('div');
@@ -2547,7 +2719,17 @@ export class TimelineEditor {
     _playZone(zoneId, fromTime = 0, blend = 0) {
         const entries = this._zoneEntriesFor(zoneId);
         const zd      = this._zoneMap.get(zoneId);
-        if (!zd || !entries.length) return;
+        if (!zd) return;
+        // No clips on this track — hide it. Engines never stop in VJ mode, so a
+        // track that just lost its last clip would otherwise keep painting the
+        // stale preset (over the base, for a transparent added track). Hiding =
+        // black cover for the base, canvas→transparent for an overlay track.
+        if (!entries.length) {
+            this._fadeZoneCover(zoneId, 1, 0);
+            this._currentZonePreset.delete(zoneId);
+            this._zoneTimers.set(zoneId, []);
+            return;
+        }
 
         const zone = (this._tl.zones || []).find(z => z.id === zoneId);
         const shouldBlackout = !zone || zone.gapBehavior !== 'hold';
@@ -2965,6 +3147,8 @@ export class TimelineEditor {
     _showOverlays() {
         this._overlays.forEach(el => el.classList.remove('tl-hidden'));
         if (this._stripVisible) this._stripEl.style.opacity = '';
+        // Re-assert windowed hide-panels mode if active (e.g. after a fullscreen exit).
+        if (this._uiHidden) this._applyHideUI();
     }
 
     _hideOverlays() {
@@ -3039,6 +3223,29 @@ export class TimelineEditor {
     }
 
 
+    // ─── Hide panels (windowed full-canvas view) ───────────────────────────────
+    // Hides the strip, transport, and audio mini-player but KEEPS the topbar, so
+    // the user can see (almost) the whole canvas without entering true fullscreen,
+    // and the toggle stays reachable. Esc also restores it.
+
+    toggleHideUI() {
+        this._uiHidden = !this._uiHidden;
+        this._applyHideUI();
+    }
+
+    _applyHideUI() {
+        const hide = this._uiHidden;
+        document.getElementById('tl-transport')?.classList.toggle('tl-hidden', hide);
+        document.getElementById('mini-player')?.classList.toggle('tl-hidden', hide);
+        this._stripEl.style.opacity      = hide ? '0' : (this._stripVisible ? '' : '0');
+        this._stripEl.style.pointerEvents = hide ? 'none' : (this._stripVisible ? '' : 'none');
+        const btn = document.getElementById('tl-btn-hideui');
+        if (btn) {
+            btn.classList.toggle('is-active', hide);
+            btn.title = hide ? 'Show panels' : 'Hide panels';
+        }
+    }
+
     // ─── Strip toggle ─────────────────────────────────────────────────────────
 
     toggleStrip() {
@@ -3064,6 +3271,7 @@ export class TimelineEditor {
         if (!this._entryDeleteModal.hidden) { this._pendingDeleteId = null; this._entryDeleteModal.hidden = true; return; }
         if (!this._deleteModal.hidden) { this._deleteModal.hidden = true; return; }
         if (this._isFullscreen)        { this._exitFullscreen();    return; }
+        if (this._uiHidden)            { this.toggleHideUI();       return; }
         if (this._playing)             { this.stop();               return; }
     }
 

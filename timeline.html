@@ -111,7 +111,7 @@
         <div class="tl-topbar-actions">
             <button id="tl-btn-new"    class="tl-btn"           type="button">+ New</button>
             <button id="tl-btn-save"   class="tl-btn tl-btn--primary" type="button">Save</button>
-            <button id="tl-btn-export" class="tl-btn tl-btn--icon" type="button" title="Export timeline as JSON file">
+            <button id="tl-btn-export" class="tl-btn tl-btn--icon" type="button" title="Export timeline">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                     <polyline points="7 10 12 15 17 10"/>
@@ -119,7 +119,7 @@
                 </svg>
                 Export
             </button>
-            <button id="tl-btn-import" class="tl-btn tl-btn--icon" type="button" title="Import timeline from JSON file">
+            <button id="tl-btn-import" class="tl-btn tl-btn--icon" type="button" title="Import timeline">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                     <polyline points="7 10 12 5 17 10"/>
@@ -137,7 +137,15 @@
             <button id="tl-btn-help" class="tl-btn tl-btn--icon" type="button" title="Keyboard Shortcuts (?)">
                 <span style="font-size: 15px; font-weight: bold; font-family: var(--font-mono); color: inherit;">?</span>
             </button>
-            <button id="tl-fullscreen-btn" class="tl-btn tl-btn--icon" type="button" title="Fullscreen — press Esc or F to exit">
+            <button id="tl-btn-hideui" class="tl-btn tl-btn--icon" type="button" title="Hide panels">
+                <svg class="hideui-off" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>
+                </svg>
+                <svg class="hideui-on" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-10-7-10-7a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>
+                </svg>
+            </button>
+            <button id="tl-fullscreen-btn" class="tl-btn tl-btn--icon" type="button" title="Fullscreen (F)">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>
                     <line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
@@ -168,6 +176,8 @@
         <div class="tl-transport-sep"></div>
 
         <span id="tl-time-display">00:00 / 00:00</span>
+
+        <button id="tl-btn-add-track" class="tl-btn" type="button" title="Add a track on top of the stack">+ Add Track</button>
 
         <div class="tl-spacer"></div>
 
