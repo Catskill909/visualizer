@@ -18,6 +18,19 @@ This is fundamentally a **`zone.zIndex` ↔ row-order** mapping (the same zIndex
 
 ---
 
+## 💡 Considered & parked 2026-05-24 — "Overlay" layout + transparent gaps
+
+While validating transparent-bg presets in the timeline (see [`transparent-dev.md`](transparent-dev.md)), we explored a dedicated **full-screen "Overlay" layout**: two full-screen zones (`Base` + `Overlay`) where the top zone's **gaps are transparent** — so when the top track has no clip, the base shows through instead of a black square.
+
+**Parked, deliberately.** Reasoning:
+- An empty zone showing **black is correct** — that's how every zone already behaves, and the user confirmed it reads right.
+- "Transparent gap" is only meaningful for a zone *stacked over another full-screen zone*. That's exactly what add-tracks generalises, so it belongs **here**, not as a one-off fixed layout that we'd have to special-case.
+- The mechanism is small when we do build it: a zone flag (`gapBehavior: 'transparent'`) honored in **one place** — [`_fadeZoneCover`](src/timeline/timelineEditor.js) — where "hide" fades the *canvas* to transparent (revealing the base) instead of raising the black cover. Plus an output-mirror tweak (the NDI/program-out stack reads cover opacity; a transparent zone would need it to read canvas opacity instead).
+
+**So when add-tracks lands:** an upper/overlay track should default `gapBehavior: 'transparent'`; base/bottom tracks stay `'black'`. That single flag + the `_fadeZoneCover` branch is the whole feature.
+
+---
+
 ## Open questions (the brainstorm — this is the hard part, hence the placeholder)
 
 - **Add / remove / reorder UI.** How does a user add a track — a `+` on the strip? a dedicated track-manager? Reorder by drag? Delete from the row header? (Today: `⊞ Zones` modal picks one of 6 fixed layouts.)

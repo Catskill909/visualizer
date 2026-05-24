@@ -106,7 +106,7 @@ const ZONE_LAYOUTS = [
         svg: '<rect x="1" y="1" width="34" height="22" rx="2" fill="rgba(124,111,205,0.15)" stroke="#7c6fcd" stroke-width="1.5"/><rect x="7" y="5" width="22" height="14" rx="2" fill="rgba(205,159,90,0.3)" stroke="#cd9f5a" stroke-width="1.5"/>',
         zones: [
             mkZone('full',  'Frame', '#7c6fcd', {x:0,   y:0,   width:1,  height:1  }, 0),
-            mkZone('center','Center','#cd9f5a', {x:0.15,y:0.15,width:0.7,height:0.7}, 1, 'screen'),
+            mkZone('center','Center','#cd9f5a', {x:0.15,y:0.15,width:0.7,height:0.7}, 1),
         ],
     },
     {
@@ -114,7 +114,7 @@ const ZONE_LAYOUTS = [
         svg: '<rect x="1" y="1" width="34" height="22" rx="2" fill="rgba(124,111,205,0.15)" stroke="#7c6fcd" stroke-width="1.5"/><rect x="1" y="1" width="34" height="6" rx="2" fill="rgba(90,138,205,0.3)" stroke="#5a8acd" stroke-width="1.5"/>',
         zones: [
             mkZone('full',  'Main',  '#7c6fcd', {x:0,y:0,   width:1,height:1   }, 0),
-            mkZone('banner','Banner','#5a8acd', {x:0,y:0,   width:1,height:0.22}, 1, 'screen'),
+            mkZone('banner','Banner','#5a8acd', {x:0,y:0,   width:1,height:0.22}, 1),
         ],
     },
 ];
@@ -806,7 +806,7 @@ export class TimelineEditor {
                 const cover = document.createElement('div');
                 Object.assign(cover.style, {
                     position: 'absolute', background: '#000',
-                    zIndex: '10', pointerEvents: 'none',
+                    pointerEvents: 'none',
                     opacity: '1', transition: 'none',
                 });
                 this._canvasContainer.appendChild(cover);
@@ -814,10 +814,13 @@ export class TimelineEditor {
             }
             const cover = this._zoneCovers.get(zone.id);
             const r = zone.region;
-            // Only update position/size - DO NOT reset opacity to black
+            // Only update position/size/z — DO NOT reset opacity to black. zIndex sits
+            // one above this zone's canvas (canvas at zIndex*2) so the gap-cover hides
+            // only its own zone, never an overlay zone stacked above it.
             Object.assign(cover.style, {
                 left: `${r.x * 100}%`, top: `${r.y * 100}%`,
                 width: `${r.width * 100}%`, height: `${r.height * 100}%`,
+                zIndex: String((zone.zIndex ?? 0) * 2 + 1),
             });
         }
 
@@ -883,7 +886,10 @@ export class TimelineEditor {
         canvas.style.top       = `${r.y      * 100}%`;
         canvas.style.width     = `${r.width  * 100}%`;
         canvas.style.height    = `${r.height * 100}%`;
-        canvas.style.zIndex    = zone.zIndex ?? 0;
+        // Interleave canvases and covers: canvas at zIndex*2, its black gap-cover
+        // at zIndex*2+1 (set in _syncZoneCanvases). A lower zone's full-screen cover
+        // must sit BELOW the next zone's canvas so it can't black out an overlay.
+        canvas.style.zIndex    = (zone.zIndex ?? 0) * 2;
         canvas.style.mixBlendMode = zone.blendMode || 'normal';
         canvas.style.opacity   = String(zone.opacity ?? 1);
         canvas.width  = w;
@@ -1492,6 +1498,13 @@ export class TimelineEditor {
 
         this.stop();
         this._syncZoneCanvases();
+        // Layout switch = hard reset of the stage. stop() is VJ-mode (engines keep
+        // running, covers stay revealed) and early-outs if already stopped, so
+        // explicitly drop per-zone preset memory and re-cover every zone — else the
+        // prior preset stays painted on the surviving 'full' canvas with no block
+        // left to remove it.
+        this._currentZonePreset.clear();
+        for (const [, cover] of this._zoneCovers) cover.style.opacity = '1';
         this._renderStrip();
         this._toast(`Layout: ${layout.name}`);
     }

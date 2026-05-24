@@ -1,24 +1,33 @@
 # Transparent Preset Background — Dev Doc
 
-## ✅ STATUS — 2026-05-24 (Phase 1 + 2 BUILT & VERIFIED, committed)
+## 📊 Status — at a glance
 
-**Phase 1 (engine) + Phase 2 (toggle UI) are done and committed.** Transparency verified in `editor.html` (browser): with *Show layers only* + *Transparent background* on, the canvas goes truly transparent (a Photoshop-style checkerboard shows through; the logo layer floats on it) — confirming **~3602 IS the display comp shader** (the audit's correction was right).
+_Updated 2026-05-24. **This table is the only authority on status.** Everything below it is reference & history (how it was built, the audit, the post-mortem) — none of it overrides this table._
 
-Shipped:
-- Engine: `alpha:true` + `clearColor 0` + comp shader `vec4(ret, vColor.a * ret_a)`; `_buildCompShader` gate `_bgT = _imagesOnly && bgTransparent`, guard `&& !_bgT`, `col_a` tracking, `_buildImageBlock(trackAlpha)` reusing `_t.w*_op`.
-- UI: **Transparent background** toggle beside *Show layers only* (Layers section, now stacked — was cramped); **editor-only checkerboard** indicator on the canvas (canvas CSS bg through alpha; timeline/output zones don't get it → they reveal real content).
-- Persistence: `bgTransparent` round-trips (stored on `currentState`, spread by save/load; `customPresets` stores wholesale). **Bonus fix:** `imagesOnly` never actually persisted (latent bug) — now it does (required, since the gate needs it on load). Backward-compatible (old presets → defaults false).
+| # | Phase | Status |
+|---|-------|--------|
+| 1 | **Engine** — `alpha:true` + comp shader outputs a computed alpha | ✅ Done & committed |
+| 2 | **Toggle UI** — "Transparent background" toggle + editor checkerboard | ✅ Done & committed |
+| 2b | **Persistence** — `bgTransparent` saves/loads (also fixed a latent `imagesOnly` save bug) | ✅ Done & committed |
+| 3 | **Timeline stacking** — a transparent preset stacks over a zone and reveals it | ✅ Verified in browser |
+| G | **Cross-platform** — same checks on the desktop app: macOS `tauri-dev` (WKWebView) → Windows | ⬜ Not started |
 
-**Remaining:**
-- **Phase 3 — timeline validation:** save a transparent preset → drop it in a timeline zone stacked over another zone → confirm the lower zone shows through (the real payoff). The editor checkerboard proves the alpha; the timeline proves the stacking.
-- **§G cross-platform gate:** verify in macOS `tauri-dev` (WKWebView) then Windows — NOT signed off on the browser alone. (De-risked by §H: stacked-alpha video already does per-pixel alpha in WKWebView.)
-- Optional: a transparency checkerboard isn't shown in the timeline editor's zone preview (only the studio canvas) — fine for now.
+**Bottom line:** the feature is built, committed, and working in the browser (editor + timeline). **The single remaining task is confirming it on the desktop app** — macOS WKWebView first, then Windows (the §G checklist below).
+
+### What each ✅ includes
+- **Engine** — `alpha:true` + `clearColor 0` + comp shader `vec4(ret, vColor.a * ret_a)`; `_buildCompShader` gate `_bgT = _imagesOnly && bgTransparent`, the `&& !_bgT` guard, `col_a` alpha tracking, `_buildImageBlock(trackAlpha)` reusing `_t.w*_op`.
+- **Toggle UI** — "Transparent background" toggle beside *Show layers only*; an **editor-only** checkerboard on the canvas (timeline/output zones don't get it — they reveal real content).
+- **Persistence** — `bgTransparent` round-trips on `currentState`; old presets default to `false`. Bonus: `imagesOnly` never actually persisted before — now it does (the gate needs it on load).
+- **Timeline stacking** — verified with `transparentTesty` over a base zone. Needed two timeline fixes found during validation (committed in the timeline — see [`timeline-editor.md`](timeline-editor.md) → Recently Shipped): layouts that defaulted to `screen` blend → `normal`; and the gap-cover z-order so an overlay isn't blacked out by the zone beneath. An empty zone correctly shows **black**; a full-screen "Overlay" layout with transparent gaps was **parked** → [`add-track-dev.md`](add-track-dev.md).
+
+### What's left — §G only
+Verify the editor checkerboard **and** the timeline stacking on the shipping builds: macOS `tauri-dev` (WKWebView), then Windows. Not signed off on the browser alone. De-risked by §H (stacked-alpha video already does per-pixel alpha in WKWebView). Full checklist in **§G** below.
 
 ---
 
-## 🔍 Audit & re-plan — 2026-05-23 (read this FIRST; supersedes older details below)
+## 🔍 Reference — the pre-build audit (2026-05-23)
 
-Re-audited against the **current code** + everything learned building the output/NDI pipeline today (see [`output-dev.md`](output-dev.md) / [`native-output-dev.md`](native-output-dev.md)). The older sections (spec, phases, **post-mortem, guardrails**) are still valuable — the post-mortem + guardrails especially. **Where this audit and the older text disagree, this audit wins** (line numbers + which shader to edit have been corrected).
+> 📜 **History/reference, not status.** This is the audit that guided the build (now done — see the table at the top). Keep it for the verified line-number anchors (§B), the alpha-reach table (§D), the **§G cross-platform checklist** (the one open task), and the reuse notes (§H). Where this audit and the *older* spec sections further down disagree, **this audit is the accurate record** of what was built.
 
 ### A. Clean slate confirmed
 `bgTransparent` appears **nowhere** in `src/` or `editor.html` — the wiped attempt left no residue. `butterchurn.js` is **6,819 lines** (committed-clean; the "12,379 lines" in Mistake 1 was the reformatting damage, since reverted). Start fresh.
@@ -228,11 +237,11 @@ No `bgMode` enum needed. One boolean. Simpler.
 
 ---
 
-## Implementation phases
+## Implementation phases (historical build plan)
 
-> ⚠️ **Use the Audit §E re-scoped plan (top of doc) as the running order.** The numbered steps here are mostly right but predate today's findings — in particular Phase 1 step 3 names the wrong shader line (see Audit §B) and the early-return guard fix (§B) must be included. Phase 3 "output window / virtual camera" is now answered by Audit §D (the `<video>`/JPEG paths drop alpha → blend-mode fallback; the real alpha test is the operator screen + Approach-A projector).
+> 📜 **All of Phase 1/2/3 below are DONE — see the status table at the top.** This is the original step-by-step plan, kept as the build record. It predates the final findings: Phase 1 step 3 named the wrong shader line (see Audit §B) and the early-return guard fix (§B) was required and added. Phase 3 "output window / virtual camera" was answered by Audit §D (the `<video>`/JPEG paths drop alpha → blend-mode fallback; the real alpha test is the operator screen + Approach-A projector).
 
-### Phase 1 — Engine ✗ NOT DONE — code was wiped (May 2026)
+### Phase 1 — Engine ✅ DONE (built & committed 2026-05-24)
 1. `butterchurn.js` ~6609: `alpha: false → true`
 2. `butterchurn.js` ~2413: `clearColor(0,0,0,1) → clearColor(0,0,0,0)`
 3. `butterchurn.js` comp shader `main()`: `float ret_a = 1.0;` declared before fragShaderText; `fragColor = vec4(ret, ret_a) * vColor;`
@@ -246,12 +255,12 @@ __editorInspector._buildCompShader();
 __editorInspector._applyToEngine();
 ```
 
-### Phase 2 — UI
+### Phase 2 — UI ✅ DONE (built & committed 2026-05-24)
 1. Add `bgTransparent` field to preset schema defaults (`customPresets.js`)
 2. Add Transparent BG toggle chip to Palette tab (`inspector.js`)
 3. Wire toggle → `_buildCompShader()` + `_applyToEngine()` rebuild
 
-### Phase 3 — Timeline validation
+### Phase 3 — Timeline validation ✅ DONE in browser (2026-05-24); desktop verify = §G
 1. Verify transparent preset zones composite correctly via CSS z-index + mixBlendMode
 2. Test output window / virtual camera with transparent canvas zones
 
@@ -365,14 +374,15 @@ This section documents every mistake made during the first implementation attemp
 
 ---
 
-### State of codebase after May 22 session (HISTORICAL — superseded by the ✅ STATUS block at the very top, 2026-05-24: Phase 1+2 now built & committed)
+### State of codebase after May 22 session (HISTORICAL — all of this was resolved; see the status table at the very top. Phase 1+2+3 now built & committed.)
 
-| File | Status |
+> This table describes the **wiped first attempt** (May 22). It is kept only as the record of that failure. Every "must be re-implemented" below **was** re-implemented and committed 2026-05-24.
+
+| File | Status *(as of the wipe — now resolved)* |
 |---|---|
-| `src/vendor/butterchurn.js` | Clean committed state. Phase 1 changes (alpha:true, clearColor, ret_a) were wiped. Must be re-implemented. |
-| `src/editor/inspector.js` | Clean committed state. Phase 2 changes were wiped. Must be re-implemented. |
-| `editor.html` | Clean committed state. Toggle chip HTML was wiped. Must be re-implemented. |
-| `transparent-dev.md` | Up to date. Phase 1 correctly marked NOT DONE. |
+| `src/vendor/butterchurn.js` | Was clean/wiped → **now has** the Phase 1 changes (alpha:true, clearColor, ret_a), committed. |
+| `src/editor/inspector.js` | Was clean/wiped → **now has** the Phase 2 changes, committed. |
+| `editor.html` | Was clean/wiped → **now has** the toggle chip HTML, committed. |
 
 ---
 
