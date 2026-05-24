@@ -1321,12 +1321,15 @@ export class TimelineEditor {
             this._outputMonitorsEl.innerHTML = '<div class="tl-output-empty">No monitors detected.</div>';
             return;
         }
-        for (const m of mons) {
+        for (let i = 0; i < mons.length; i++) {
+            const m = mons[i];
             const card = document.createElement('div');
             card.className = 'tl-output-display-card';
             const label = document.createElement('span');
             label.className = 'tl-od-label';
-            label.textContent = (m.name || 'Display') + (m.current ? ' · this one' : '');
+            // macOS reports a numeric monitor id, not a marketing name — use a
+            // friendly index + "this one" so the projector is easy to pick out.
+            label.textContent = `Display ${i + 1}` + (m.current ? ' · this one' : '');
             const res = document.createElement('span');
             res.className = 'tl-od-res';
             res.textContent = `${m.w}×${m.h}`;
