@@ -485,6 +485,8 @@ These are the entry points. Each one references its focused subdocs in `docs/`.
 | [`live-input-dev.md`](live-input-dev.md) | ✅ Built | Live audio input dev notes. |
 | [`docs/spectral-flux-dev.md`](docs/spectral-flux-dev.md) | ✅ Shipped 2026-05-15 | Spectral Flux audio source — DIY onset detection from existing AnalyserNode, q31 bridge to GLSL, all three source dropdowns. |
 | [`midi-dev.md`](midi-dev.md) | 📋 Planning | MIDI controller integration — action registry, MIDI learn UX, phased plan. |
+| [`add-track-dev.md`](add-track-dev.md) | 📋 Placeholder | Timeline multi-track — add/remove/reorder tracks (beyond the fixed 6 layouts); fixes the counter-intuitive track↔z-order. Brainstorming doc; no code yet. |
+| [`transparent-dev.md`](transparent-dev.md) | ✅ Phase 1+2 shipped 2026-05-24 | Transparent preset background — layers float on a transparent canvas (alpha comp shader). Verified in editor; Phase 3 (timeline) + cross-platform pending. |
 | [`docs/user-guide-redesign.md`](docs/user-guide-redesign.md) | 📋 Planning | In-app user guide redesign — searchable help centre, contextual `?` deep links. |
 
 ### Handoff Docs ([`docs/`](docs/))
