@@ -9,10 +9,11 @@ _Updated 2026-05-24. **This table is the only authority on status.** Everything 
 | 1 | **Engine** — `alpha:true` + comp shader outputs a computed alpha | ✅ Done & committed |
 | 2 | **Toggle UI** — "Transparent background" toggle + editor checkerboard | ✅ Done & committed |
 | 2b | **Persistence** — `bgTransparent` saves/loads (also fixed a latent `imagesOnly` save bug) | ✅ Done & committed |
-| 3 | **Timeline stacking** — a transparent preset stacks over a zone and reveals it | ✅ Verified in browser |
-| G | **Cross-platform** — same checks on the desktop app: macOS `tauri-dev` (WKWebView) → Windows | ⬜ Not started |
+| 3 | **Timeline stacking** — a transparent preset stacks over a zone and reveals it | ✅ Verified (browser + macOS + Windows) |
+| G-mac | **macOS desktop app** (WKWebView) — transparent stacking in a real build | ✅ Verified 2026-05-24 |
+| G-win | **Windows desktop app** (WebView2) — transparent **video** layer stacked in Center+Frame | ✅ Verified 2026-05-24 |
 
-**Bottom line:** the feature is built, committed, and working in the browser (editor + timeline). **The single remaining task is confirming it on the desktop app** — macOS WKWebView first, then Windows (the §G checklist below).
+**Bottom line: DONE on every platform.** Built and working in the browser, and confirmed in packaged **macOS** (WKWebView) and **Windows** (WebView2) builds — transparent presets (incl. a transparent-**video** layer) stack over a base zone and reveal it correctly. The feature is fully cross-platform verified. *(One known polish bug — see "Open bug" below: a placeholder image flashes in a zone before a transparent video finishes loading.)*
 
 ### What each ✅ includes
 - **Engine** — `alpha:true` + `clearColor 0` + comp shader `vec4(ret, vColor.a * ret_a)`; `_buildCompShader` gate `_bgT = _imagesOnly && bgTransparent`, the `&& !_bgT` guard, `col_a` alpha tracking, `_buildImageBlock(trackAlpha)` reusing `_t.w*_op`.
@@ -20,8 +21,10 @@ _Updated 2026-05-24. **This table is the only authority on status.** Everything 
 - **Persistence** — `bgTransparent` round-trips on `currentState`; old presets default to `false`. Bonus: `imagesOnly` never actually persisted before — now it does (the gate needs it on load).
 - **Timeline stacking** — verified with `transparentTesty` over a base zone. Needed two timeline fixes found during validation (committed in the timeline — see [`timeline-editor.md`](timeline-editor.md) → Recently Shipped): layouts that defaulted to `screen` blend → `normal`; and the gap-cover z-order so an overlay isn't blacked out by the zone beneath. An empty zone correctly shows **black**; a full-screen "Overlay" layout with transparent gaps was **parked** → [`add-track-dev.md`](add-track-dev.md).
 
-### What's left — §G only
-Verify the editor checkerboard **and** the timeline stacking on the shipping builds: macOS `tauri-dev` (WKWebView), then Windows. Not signed off on the browser alone. De-risked by §H (stacked-alpha video already does per-pixel alpha in WKWebView). Full checklist in **§G** below.
+### What's left — nothing for core; one polish bug
+All platforms verified (browser + macOS WKWebView + Windows WebView2, 2026-05-24). The core feature is done.
+
+**Open bug (polish):** in a timeline zone, **before a transparent video finishes loading, a placeholder image flashes** in the zone (seen on the Center zone of Center+Frame). It should show nothing / be transparent until the video's first frame is ready. Reported 2026-05-24 (Windows build). Diagnosis pending — likely a poster/fallback texture shown during video load.
 
 ---
 
@@ -69,7 +72,9 @@ Stacking already **shipped today** (A3) — via **blend modes**, because canvase
 3. **Verify on the paths that matter** — operator-screen reveal; **Approach-A fullscreen-on-projector reveal** (the real test, once the projector's here). Confirm web-window/NDI degrade to blend-mode (no black-box regression). **Then run the §G cross-platform gate** (browser → macOS `tauri-dev` → Windows) — this is the shipping platform; don't sign off on browser alone.
 
 ### G. Cross-platform (Tauri webview) compatibility — VERIFY on the desktop builds, not just the browser
-The feature is *built* in the browser (dev), but the *shipping* product is the **desktop app** — and today proved desktop webviews differ from Chrome (WKWebView video taint; `captureStream` popups dead in Tauri). **Do not assume browser parity.** Gate Phase 3 as ✅ browser → ✅ macOS `tauri-dev` → ✅ Windows:
+**Gate progress: ✅ COMPLETE** — ✅ browser → ✅ **macOS** (packaged build, 2026-05-24 — transparent stack in WKWebView) → ✅ **Windows** (packaged build, 2026-05-24 — transparent **video** layer stacked in Center+Frame, WebView2).
+
+The feature is *built* in the browser (dev), but the *shipping* product is the **desktop app** — and earlier work proved desktop webviews differ from Chrome (WKWebView video taint; `captureStream` popups dead in Tauri). **Do not assume browser parity** — which is why both desktop builds were eyeballed in real packaged apps. Both passed. The reference notes below are kept as the record of what to watch for:
 - **macOS (WKWebView):** confirm `getContext('webgl2',{alpha:true})` + `clearColor(0,0,0,0)` + the comp-shader alpha actually render transparent *in `tauri-dev`*. WKWebView has historical straight-vs-premultiplied-alpha quirks — `premultipliedAlpha:false` is already set (`butterchurn.js:6574`), which is the right setting, but it MUST be eyeballed on the real build. Re-test the operator-screen + **Approach-A projector** reveal here specifically.
 - **Keep the Tauri window OPAQUE.** `tauri.conf.json` windows have **no** `transparent:true` (verified) — keep it. Transparency must composite *inside* the webview (canvas-over-canvas, or canvas-over-app-background), never bleed to the OS desktop. On the projector (Approach A), empty areas must read **black** (the app bg), not the macOS wallpaper. If they show the desktop, the window got transparent — revert.
 - **Global engine change:** `alpha:false → true` is on **every** butterchurn canvas on **every** platform (player, editor, timeline zones). Regression-check that existing **MilkDrop presets look unchanged** in `tauri-dev` on macOS (and Windows), not only in the browser — the "zero impact" claim relies on the comp shader still outputting `alpha = 1.0` there too.
