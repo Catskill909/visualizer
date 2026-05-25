@@ -195,7 +195,11 @@ function sizeCanvas() {
     if (!engine) return;
     const panelW  = 340;
     const topbarH = document.querySelector('.editor-topbar')?.offsetHeight ?? 40;
-    const w = Math.max(120, window.innerWidth - panelW);
+    // In focus mode the panel collapses to width:0, so the canvas fills the full
+    // window. Subtracting panelW there left the drawing buffer 340px too narrow and
+    // the canvas got CSS-stretched → horizontal distortion. Only subtract the panel
+    // when it's actually present.
+    const w = focusMode ? window.innerWidth : Math.max(120, window.innerWidth - panelW);
     engine.setSize(w, window.innerHeight - topbarH);
 }
 

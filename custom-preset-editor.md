@@ -116,6 +116,7 @@ Up to **5 image layers** in a collapsible smart-accordion stack. Adding a new la
 | **Skew Y** | −1 to +1 | Vertical shear — slides the right edge up/down relative to the left. Combine with Skew X for diamond / rhombus tile grids. |
 | **Tile Width** | 0.25–4.0 | Tile cell width multiplier. 1.0 = native image aspect (default). Values <1 narrow the cells; >1 widen them. Hidden when Tile is OFF. |
 | **Tile Height** | 0.25–4.0 | Tile cell height multiplier. 1.0 = native image aspect (default). Values <1 shorten the cells; >1 stretch them. Hidden when Tile is OFF. |
+| **Aspect** | Lock / Fluid | **Lock (default)** keeps the layer's true shape on *any* canvas — resizing or going full screen reveals more/fewer tiles instead of distorting. **Fluid** = legacy behavior: the layer adapts/squishes to the canvas (only differs from Lock on a portrait canvas; identical in landscape). Per layer; persisted as `entry.aspectMode`. Drives the `aspectPreScale` factor: Lock `aspect.y / aspect.x`, Fluid `aspect.y`. Non-grid only — grid uses Fit/Fill. See `aspect-ratio.md`. |
 | **Edge / Sobel** | Off / On | Replaces the image with a Sobel edge-detected outline — neon line art mode. Pairs well with Tint + Hue Spin. |
 | **Luma Key Lo** | 0–1 | Pixels darker than this luminance become transparent. Use to cut out dark/black backgrounds. Under "Luma Key" sub-header. |
 | **Luma Key Hi** | 0–1 | Pixels brighter than this luminance become transparent. Use to cut out white/light backgrounds. |
@@ -128,7 +129,7 @@ Up to **5 image layers** in a collapsible smart-accordion stack. Adding a new la
 | **Film Grain** | 0–1 | Animated hash-based noise overlay. Cinematic analog film texture. |
 | **Reactivity Source** | Bass / Mid / Treble / Volume | Which audio band drives all reactive controls (Pulse, Bounce, Beat Fade) on this layer. Default: Bass. A subtitle in the UI reads "Drives Pulse · Bounce · Beat Fade" as a reminder. |
 | **Reactivity Curve** | Linear / Squared / Cubed / Gate | Transform applied to the raw signal before driving reactive controls. Gate = hard on/off at 30% threshold. Default: Linear. |
-| **Aspect-correct tiling** | Automatic | Portrait, square, and landscape images tile without distortion. The GLSL pre-scales `_u.x` by `imgAsp × aspect.y` before the tile UV pipeline, so tile cells match the image’s native aspect ratio in screen pixels. No cropping, no letterboxing. |
+| **Aspect-correct tiling** | Automatic + Aspect mode | Portrait, square, and landscape images tile without distortion. The GLSL pre-scales `_u.x` in `aspectPreScale` before the tile UV pipeline so tile cells match the image's native aspect in screen pixels. The factor depends on the **Aspect** control: **Lock** (default) uses `imgAsp × aspect.y / aspect.x` → correct on *every* canvas orientation; **Fluid** uses `imgAsp × aspect.y` (legacy, correct in landscape, squishes in portrait). No cropping, no letterboxing. (Grid mode skips `aspectPreScale` — uses Fit/Fill instead — but its cell-rotation + Fit padding got the same `aspect.y → aspect.y/aspect.x` portrait fix in Phase 3, 2026-05-25, so grid is portrait-correct too. The Lock/Fluid toggle is hidden in grid since Fit/Fill is its shape control.) |
 | Images Only | Toggle (header) | Hides base visualizer — black background + images only |
 | **Canvas Mirror** | None / ↔ H / ↕ V / ⊞ Quad / ✦ Kaleido | Folds the entire rendered scene (warp buffer + all image layers) along one or both axes. Kaleido = 6-slice polar radial fold. |
 
@@ -195,6 +196,12 @@ A small icon button in the topbar (right side) hides the editor panel for a full
 - CSS: `.editor-shell.focus-mode` sets `editor-panel` width to 0 with a 0.3s ease transition; mini-player fades out
 - Click anywhere on the canvas, click the button again, or press `\` to restore
 - `sizeCanvas()` fires after 320ms so the WebGL canvas fills the full width correctly
+- **Screen-draw rule (load-bearing):** the WebGL **drawing buffer must match the canvas's actual
+  display size** or the whole layered scene is CSS-stretched (and the `aspect` uniform goes wrong).
+  `sizeCanvas()` is the sole sizing authority (`visualizer.js` has no resize listener), so it must
+  use the **real** display width — `focusMode ? innerWidth : innerWidth − panelW`. Fixed 2026-05-25:
+  it previously always subtracted the 340px panel, so hiding the panel left the buffer 340px narrow
+  and stretched the canvas. Full rationale: `aspect-ratio.md` §9.
 
 ### File-type guard
 

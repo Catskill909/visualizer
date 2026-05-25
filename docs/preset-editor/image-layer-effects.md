@@ -40,6 +40,7 @@
 | **Skew X / Y** | −1 to +1 | 2D shear. Applied after rotation, before sizing. All pipeline paths. |
 | **Persp X / Y** | −1 to +1 | Projective warp — lines converge to vanishing point. Applied after skew. Singularity clamped to 0.1. |
 | **Tile Width / Height** | 0.25–4.0 (squared curve) | Independent tile cell shape. 1.0 = native aspect. Tile-mode only. |
+| **Aspect** | Lock / Fluid | Lock (default) keeps the layer's true shape on any canvas (resize reveals more/fewer tiles, no distortion); Fluid = legacy canvas-adaptive (differs only in portrait). `entry.aspectMode`; sets `aspectPreScale` factor. Non-grid only. See `aspect-ratio.md`. |
 
 ### Per-layer Controls — Per-Cell (Tile-mode only)
 
@@ -257,8 +258,14 @@ Difficulty: 🟢 < 1 hr · 🟡 2–4 hrs · 🔴 4+ hrs (structural)
 
 ## Implementation Notes — Key Traps & Decisions
 
-### Portrait image tiling
-Pre-divide `_u.x` by `imgAsp * aspect.y` **before** `applyTileUV` — sets tile cell shape to match image aspect ratio. Fixing distortion after `fract()` does not work (cell shape is already wrong). `imgAsp` baked at shader build time; `aspect.y` is a runtime uniform.
+### Portrait image tiling / Aspect mode (Lock vs Fluid)
+Pre-divide `_u.x` in `aspectPreScale` **before** `applyTileUV` — sets tile cell shape to match image aspect ratio. Fixing distortion after `fract()` does not work (cell shape is already wrong). `imgAsp` baked at shader build time; `aspect` is a runtime uniform.
+
+The divisor factor is gated by `entry.aspectMode` (added 2026-05-25):
+- **Lock** (default): `imgAsp * (aspect.y / max(aspect.x, 0.01))` — orientation-independent; the layer holds its true shape on landscape **and** portrait canvases.
+- **Fluid** (opt-in legacy): `imgAsp * aspect.y` — the original one-sided correction; correct in landscape, squishes in portrait (kept as a deliberate canvas-adaptive effect).
+
+`aspect.x = 1` in landscape, so Lock == Fluid there — the modes only diverge on a portrait canvas. Grid mode skips `aspectPreScale` (uses Fit/Fill), but its `cellAspectExpr` + Fit `_cellAR` got the same `aspect.y → aspect.y/max(aspect.x,0.01)` fix in Phase 3 (2026-05-25), so grid is portrait-correct too; the Lock/Fluid toggle is hidden in grid. Full rationale + the screen-draw sizing rule: `aspect-ratio.md`.
 
 ### butterchurn field name traps
 | Correct | Wrong |

@@ -3714,6 +3714,13 @@ export class EditorInspector {
                 <button class="lseg lseg-tilefit${entry.tileFit === 'fit' ? ' active' : ''}" data-tile-fit="fit">Fit</button>
               </div>
             </div>
+            <div class="layer-row-inline layer-aspect-row" style="margin-top:4px${entry.tile && (entry.tileMode || 'density') === 'grid' ? ';display:none' : ''}">
+              <span class="layer-ctrl-label" data-tooltip="Lock: keep this layer's true shape on any canvas. Fluid: let it adapt to the canvas (legacy).">Aspect</span>
+              <div class="layer-aspect-seg" role="group" aria-label="Aspect mode">
+                <button class="lseg lseg-aspect${(entry.aspectMode || 'lock') === 'lock' ? ' active' : ''}" data-aspect-mode="lock">Lock</button>
+                <button class="lseg lseg-aspect${(entry.aspectMode || 'lock') === 'fluid' ? ' active' : ''}" data-aspect-mode="fluid">Fluid</button>
+              </div>
+            </div>
             ${entry.type === 'video' ? `
             <div class="layer-slider-row layer-vid-scale-row"${entry.tile && (entry.tileMode || 'density') === 'grid' ? ' style="display:none"' : ''}>
               <span class="layer-ctrl-label" data-tooltip="Horizontal scale multiplier">Width</span>
@@ -4384,6 +4391,7 @@ export class EditorInspector {
         const tileModeRow = card.querySelector('.layer-tilemode-row');
         const gridDetailRows = card.querySelectorAll('.layer-grid-row');
         const sizeRow = card.querySelector('.layer-size-row');
+        const aspectRow = card.querySelector('.layer-aspect-row');
         const syncGridVisibility = () => {
             const tileOn = entry.tile;
             const gridOn = tileOn && (entry.tileMode || 'density') === 'grid';
@@ -4393,6 +4401,9 @@ export class EditorInspector {
             tileScaleRows.forEach(r => { r.style.display = (tileOn && !gridOn) ? '' : 'none'; });
             // Video W/H is inert in grid mode (Cols:Rows is the shape control) — hide it there
             vidScaleRows.forEach(r => { r.style.display = gridOn ? 'none' : ''; });
+            // Lock/Fluid aspect mode drives aspectPreScale, which grid mode skips — grid's
+            // shape control is Fit/Fill, so the toggle is inert in grid. Hide it there.
+            if (aspectRow) aspectRow.style.display = gridOn ? 'none' : '';
         };
 
         if (tileCb) tileCb.addEventListener('change', () => {
@@ -4429,6 +4440,15 @@ export class EditorInspector {
                 card.querySelectorAll('.layer-tilefit-seg .lseg-tilefit').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 entry.tileFit = btn.dataset.tileFit;
+                refresh();
+            });
+        });
+        // Aspect mode (Lock/Fluid) segmented toggle — keep true shape vs adapt to canvas
+        card.querySelectorAll('.layer-aspect-seg .lseg-aspect').forEach(btn => {
+            btn.addEventListener('click', () => {
+                card.querySelectorAll('.layer-aspect-seg .lseg-aspect').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                entry.aspectMode = btn.dataset.aspectMode;
                 refresh();
             });
         });
@@ -6541,7 +6561,9 @@ export class EditorInspector {
         // Cell aspect ratio for per-cell rotation. Density cells are aspect-pre-scaled
         // square, so `aspect.y` is right; a Grid cell is canvasAR × Rows/Cols, so
         // rotation must correct by that or non-square grids shear as they rotate.
-        const cellAspectExpr = useGrid ? `(aspect.y * ${gridRows}.0 / ${gridCols}.0)` : 'aspect.y';
+        // Phase 3 (aspect-ratio.md): grid uses aspect.y/aspect.x (not bare aspect.y) so the
+        // correction is orientation-independent — no-op in landscape, portrait-correct too.
+        const cellAspectExpr = useGrid ? `(aspect.y / max(aspect.x, 0.01) * ${gridRows}.0 / ${gridCols}.0)` : 'aspect.y';
 
         let blendLine;
         switch (img.blendMode) {
@@ -6715,7 +6737,7 @@ export class EditorInspector {
                 }
                 // Fit mode: preserve the image aspect inside each cell, transparent pad.
                 if (tileFitMode === 'fit') {
-                    s += `    { float _cellAR = aspect.y * ${gridRows}.0 / ${gridCols}.0;\n`;
+                    s += `    { float _cellAR = aspect.y / max(aspect.x, 0.01) * ${gridRows}.0 / ${gridCols}.0;\n`;
                     s += `      float _sf = ${imgAsp} / _cellAR;\n`;
                     s += `      ${varName}.x = (${varName}.x - 0.5) * max(1.0 / _sf, 1.0) + 0.5;\n`;
                     s += `      ${varName}.y = (${varName}.y - 0.5) * max(_sf, 1.0) + 0.5;\n`;
@@ -6882,8 +6904,15 @@ export class EditorInspector {
         // Must be applied to each UV variable (or copy) just before its applyTileUV call.
         const tscXIsDefault = parseFloat(tileScaleX) === 1.0;
         const tscYIsDefault = parseFloat(tileScaleY) === 1.0;
+        // Aspect mode (aspect-ratio.md): 'lock' (default) keeps the layer's true shape
+        // on any canvas via factor aspect.y/aspect.x — a no-op on landscape (aspect.x=1),
+        // un-squishing only on portrait. 'fluid' = legacy one-sided aspect.y (today's
+        // behavior; lets the layer adapt/squish to the canvas in portrait).
+        const aspFactor = img.aspectMode === 'fluid'
+            ? 'aspect.y'
+            : '(aspect.y / max(aspect.x, 0.01))';
         const aspectPreScale = (varName) => {
-            let s = `    ${varName}.x /= ${imgAsp} * aspect.y`;
+            let s = `    ${varName}.x /= ${imgAsp} * ${aspFactor}`;
             if (!tscXIsDefault) s += ` * ${tileScaleX}`;
             s += `;\n`;
             if (!tscYIsDefault) s += `    ${varName}.y /= ${tileScaleY};\n`;
@@ -7029,7 +7058,7 @@ export class EditorInspector {
             // Phase 3: Grid Fit — preserve image aspect inside the cell. Padding
             // pixels land outside [0,1] and are dropped by the coverage test below.
             if (useGrid && tileFitMode === 'fit') {
-                s += `      { float _cellAR = aspect.y * ${gridRows}.0 / ${gridCols}.0;\n`;
+                s += `      { float _cellAR = aspect.y / max(aspect.x, 0.01) * ${gridRows}.0 / ${gridCols}.0;\n`;
                 s += `        float _sf = ${imgAsp} / _cellAR;\n`;
                 s += `        _luv.x = (_luv.x - 0.5) * max(1.0 / _sf, 1.0) + 0.5;\n`;
                 s += `        _luv.y = (_luv.y - 0.5) * max(_sf, 1.0) + 0.5; }\n`;
@@ -7615,6 +7644,8 @@ export class EditorInspector {
             strobeAmp: 0.00, strobeThr: 0.40,
             chromaticAberration: 0.00, chromaticSpeed: 1.0,
             tileScaleX: 1.00, tileScaleY: 1.00,
+            aspectMode: 'lock',   // 'lock' = keep true shape on any canvas (default); 'fluid' = legacy canvas-adaptive
+
             angle: 0.00, skewX: 0.00, skewY: 0.00, shakeAmp: 0.00, posterize: 0, depthOffset: 0.00, edgeSobel: false, lumaKeyLo: 0.00, lumaKeyHi: 0.00, waveAmp: 0.00, waveFreq: 4.0, invertMix: 0.00, solarizeMix: 0.00, thresholdCutoff: 0.00, pixelate: 0.00, scanLines: 0.00, filmGrain: 0.00, perspX: 0.00, perspY: 0.00,
             vignette: 0, vignetteCX: 0.5, vignetteCY: 0.5, vignetteW: 0.5, vignetteH: 0.5, vignetteCorner: 0.3, vignetteStrength: 0.5, vignetteFeather: 0.3, vignetteColor: '#000000',
             audioPulse: 0.00, pulseInvert: false,
