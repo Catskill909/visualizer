@@ -923,8 +923,148 @@
           }
         });
       }
+
+      // ── Download Stats Modal ──
+      const statsModal = document.getElementById('stats-modal');
+      const statsModalClose = document.getElementById('stats-modal-close');
+      const macCountEl = document.getElementById('mac-count');
+      const windowsCountEl = document.getElementById('windows-count');
+      const totalCountEl = document.getElementById('total-count');
+
+      // Secret keyboard shortcut: Ctrl+Shift+S (or Cmd+Shift+S on Mac)
+      document.addEventListener('keydown', e => {
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'S') {
+          e.preventDefault();
+          openStatsModal();
+        }
+        // Close on Escape
+        if (e.key === 'Escape' && statsModal.classList.contains('is-open')) {
+          closeStatsModal();
+        }
+      });
+
+      function openStatsModal() {
+        loadAndDisplayStats();
+        statsModal.classList.add('is-open');
+        document.body.classList.add('beta-modal-open');
+      }
+
+      function closeStatsModal() {
+        statsModal.classList.remove('is-open');
+        document.body.classList.remove('beta-modal-open');
+      }
+
+      if (statsModalClose) {
+        statsModalClose.addEventListener('click', closeStatsModal);
+      }
+
+      // Close on backdrop click
+      if (statsModal) {
+        statsModal.addEventListener('click', e => {
+          if (e.target === statsModal) closeStatsModal();
+        });
+      }
+
+      // Fetch and display stats
+      async function loadAndDisplayStats() {
+        try {
+          const response = await fetch('./downloads.json?v=' + Date.now());
+          if (!response.ok) throw new Error('Failed to load stats');
+          const data = await response.json();
+          const mac = data.macos || 0;
+          const windows = data.windows || 0;
+          macCountEl.textContent = mac.toLocaleString();
+          windowsCountEl.textContent = windows.toLocaleString();
+          totalCountEl.textContent = (mac + windows).toLocaleString();
+        } catch (err) {
+          macCountEl.textContent = '-';
+          windowsCountEl.textContent = '-';
+          totalCountEl.textContent = '-';
+          console.log('Stats not available yet');
+        }
+      }
+
+      // ── CountAPI download tracking (free, no signup required) ──
+      // Namespace: discocast-visualizer (change this to something unique if you want)
+      const COUNT_API_NS = 'discocast-visualizer';
+      const downloadBtns = document.querySelectorAll('a[download]');
+
+      downloadBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const isMac = btn.href.includes('.dmg');
+          const key = isMac ? 'mac-downloads' : 'windows-downloads';
+          // Increment count (fire-and-forget, works even offline)
+          fetch(`https://api.countapi.xyz/hit/${COUNT_API_NS}/${key}`)
+            .catch(() => { /* Silently fail if offline */ });
+        });
+      });
+
+      // Load counts from CountAPI when opening modal
+      async function loadCountsFromAPI() {
+        try {
+          const [macRes, winRes] = await Promise.all([
+            fetch(`https://api.countapi.xyz/get/${COUNT_API_NS}/mac-downloads`),
+            fetch(`https://api.countapi.xyz/get/${COUNT_API_NS}/windows-downloads`)
+          ]);
+          const macData = await macRes.json();
+          const winData = await winRes.json();
+          const mac = macData.value || 0;
+          const windows = winData.value || 0;
+          macCountEl.textContent = mac.toLocaleString();
+          windowsCountEl.textContent = windows.toLocaleString();
+          totalCountEl.textContent = (mac + windows).toLocaleString();
+        } catch (err) {
+          // Fallback to showing dashes if API fails
+          macCountEl.textContent = '-';
+          windowsCountEl.textContent = '-';
+          totalCountEl.textContent = '-';
+        }
+      }
+
+      // Override the load function to use CountAPI instead of local JSON
+      window.loadAndDisplayStats = loadCountsFromAPI;
+
     });
   </script>
+
+  <!-- ── Download Stats Modal (secret access) ── -->
+  <div class="promo-modal-backdrop" id="stats-modal" role="dialog" aria-modal="true" aria-labelledby="stats-modal-title">
+    <div class="promo-modal-card stats-modal-card">
+      <div class="promo-modal-header">
+        <div class="promo-modal-eyebrow">Download Analytics</div>
+        <h2 id="stats-modal-title">Download Stats</h2>
+      </div>
+      <div class="stats-modal-content">
+        <div class="stats-grid-modal">
+          <div class="stat-card">
+            <div class="stat-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+              </svg>
+            </div>
+            <div class="stat-number" id="mac-count">0</div>
+            <div class="stat-label-modal">macOS Downloads</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M3 12V6.75l6-1.32v6.48L3 12zm17-9v8.75l-10 .15V5.21L20 3zM3 13l6 .09v6.81l-6-1.15V13zm17 .25V22l-10-1.91V13.1l10 .15z"/>
+              </svg>
+            </div>
+            <div class="stat-number" id="windows-count">0</div>
+            <div class="stat-label-modal">Windows Downloads</div>
+          </div>
+        </div>
+        <div class="stats-total">
+          <span class="stats-total-label">Total Downloads</span>
+          <span class="stats-total-number" id="total-count">0</span>
+        </div>
+      </div>
+      <div class="promo-modal-footer">
+        <button type="button" class="btn btn-primary promo-modal-button" id="stats-modal-close">Close</button>
+      </div>
+    </div>
+  </div>
 
   <!-- ── Lightbox Overlay ── -->
   <div id="lightbox" role="dialog" aria-modal="true" aria-label="Image viewer">
