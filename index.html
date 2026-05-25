@@ -930,8 +930,7 @@
                   Drop any resolution — 1080p and 4K videos auto-transcode to 720p with progress feedback.</li>
                 <li><strong>Playback controls</strong> — Play/pause button, loop toggle, speed slider (0.25×–4×),
                   and scrub bar for seeking within the video.</li>
-                <li><strong>No tiling</strong> — Videos are single-instance (no tile mode). Use Scale (0.1–2.0)
-                  for coverage %, or apply Mirror (H/V/Quad/Kaleido) to create duplicates.</li>
+                <li><strong>Tiling</strong> — Videos tile like image layers. Turn on <strong>Tile</strong> for <strong>Density</strong> or <strong>Grid</strong> mode with the full per-cell toolkit — Offset, Cell Rotate, Popcorn, Size/Jitter/Opacity Var + Seed, Spacing, Group spin, per-tile Mirror, and Tunnel. With Tile <em>on</em>, the Scale slider becomes the tile <strong>Size</strong> (density); with Tile <em>off</em>, Scale (0.1–2.0) sets single-instance coverage. Tiling works for transparent videos too.</li>
                 <li><strong>Width &amp; Height</strong> — Independent non-uniform scaling sliders (0.25×–4× each). Stretch or squash the video on one axis without affecting the other. The video’s position never drifts when adjusting these.</li>
                 <li><strong>Border</strong> — Colored ring drawn just outside the video edge. Set Width, Color (color picker), and Feather (soft glow vs hard line). Found in its own Border section below Tint.</li>
                 <li><strong>All effects work</strong> — Spin, Orbit, Bounce, Chromatic Aberration, Luma Key, Wave Distort,
@@ -948,7 +947,7 @@
               <ul class="welcome-list">
                 <li><strong>Sammie Roto workflow</strong> — <a href="https://sammieroto.com" target="_blank" rel="noopener">Sammie Roto</a> is an AI rotoscoping tool: point and click to cut out any subject (a dancer, a logo, an object, an animal) and export as transparent WebM. Drop that WebM into DiscoCast and it renders with perfect alpha over your visuals.</li>
                 <li><strong>Works on every platform</strong> — Web, Windows, and macOS all support transparent WebM. On macOS the app automatically converts incoming transparent WebMs to a format Apple’s WebKit can decode (one-time, per-clip, with a live progress toast).</li>
-                <li><strong>All effects still apply</strong> — Spin, Orbit, Wave Distort, Luma Key, Pulse, Mirror, Chromatic Aberration, audio-reactive opacity — every effect that works on a regular video layer works on the transparent one. The alpha channel survives the full pipeline.</li>
+                <li><strong>All effects still apply — including Tiling</strong> — Spin, Orbit, Wave Distort, Luma Key, Pulse, Mirror, Chromatic Aberration, audio-reactive opacity, and full <strong>Tile / Grid</strong> with the per-cell stack — every effect that works on a regular video layer works on the transparent one. The alpha channel survives the full pipeline, so each tile keeps its cutout.</li>
                 <li><strong>Use Alpha Mode = Preserve</strong> for a clean cutout look (default for transparent imports), or set it to Fade to dissolve the cutout into the background by audio reactivity.</li>
                 <li><strong>No other VJ tool does this end-to-end</strong> — point-and-click AI cutout → transparent video → live audio-reactive VJ effects, all in one workflow.</li>
               </ul>

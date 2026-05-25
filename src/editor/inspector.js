@@ -2933,7 +2933,8 @@ export class EditorInspector {
     }
 
     // ─── Add a video layer ─────────────────────────────────────────────────────
-    // Videos are single-instance (no tiling), with playback controls and color grading.
+    // Videos support tiling (video-tiling-dev.md): default single-instance, with
+    // playback controls and color grading; Tile toggles Density/Grid like images.
     // Auto-transcodes oversized videos to 720p using FFmpeg.wasm.
     //
     // Invariant: every video stored in this app MUST be audio-free. Oversized
@@ -3146,13 +3147,23 @@ export class EditorInspector {
             mirror: 'none',        // Duplication via mirror only
             mirrorScope: 'field',    // Always whole-image for videos
             kaleidoSpeed: 0.00,
-            // Tile-related properties (disabled for videos, but needed for template)
+            // Tile-related properties — opaque video can tile (video-tiling-dev.md Phase A);
+            // defaults keep a freshly-added video single-instance until Tile is turned on.
             tile: false,
             spacing: 0,
             tileScaleX: 1.0,
             tileScaleY: 1.0,
             groupSpin: false,
             radius: 0,
+            // Per-cell + grid fields (shared with image/text tiling) — all no-ops at default
+            tileOffsetAxis: 'none', tileOffsetAmount: 0.00,
+            tileRotateVariance: 0.00, tileRotateSnap: false,
+            tilePopcornAmount: 0.00,
+            tileSizeVariance: 0.00, tileJitterX: 0.00, tileJitterY: 0.00,
+            tileOpacityVariance: 0.00, tileDepthVariance: 0.00,
+            tileVarianceSeed: 0, tileVarianceSeedLocked: true,
+            tileMode: 'density', tileCols: 3, tileRows: 3, tileFit: 'fill', tileGridScale: 1.0,
+            tileSubdivide: 1, tileOuterGap: 0,
             isGif: false,
             alphaMode: isStackedAlpha ? 'preserve' : 'fade',
             // Color grading (new for video)
@@ -3649,11 +3660,11 @@ export class EditorInspector {
                 <option value="additive"${(entry.blendMode || 'overlay') === 'additive' ? ' selected' : ''}>Additive</option>
                 <option value="multiply"${(entry.blendMode || 'overlay') === 'multiply' ? ' selected' : ''}>Multiply</option>
               </select>
-              ${entry.type !== 'video' ? `<span class="layer-ctrl-label" style="margin-left:8px">Tile</span>
+              <span class="layer-ctrl-label" style="margin-left:8px">Tile</span>
               <label class="toggle-switch toggle-switch--sm">
                 <input type="checkbox" class="layer-tile" ${entry.tile ? 'checked' : ''} />
                 <span class="toggle-track"><span class="toggle-thumb"></span></span>
-              </label>` : ''}
+              </label>
             </div>
             <div class="layer-slider-row">
               <span class="layer-ctrl-label">Opacity</span>
@@ -3661,13 +3672,12 @@ export class EditorInspector {
                 value="${entry.opacity}" style="--pct:${pct(entry.opacity, 0, 1)}">
               <span class="lsv">${entry.opacity.toFixed(2)}</span>
             </div>
-            <div class="layer-slider-row layer-size-row"${entry.tile && entry.type !== 'video' && (entry.tileMode || 'density') === 'grid' ? ' style="display:none"' : ''}>
-              <span class="layer-ctrl-label">${entry.type === 'video' ? 'Scale' : 'Size'}</span>
+            <div class="layer-slider-row layer-size-row"${entry.tile && (entry.tileMode || 'density') === 'grid' ? ' style="display:none"' : ''}>
+              <span class="layer-ctrl-label layer-size-label">${entry.type === 'video' ? (entry.tile ? 'Size' : 'Scale') : 'Size'}</span>
               <input type="range" class="slider layer-size-sl" min="0" max="1" step="0.01"
                 value="${entry.type === 'video' ? Math.sqrt((entry.scale - 0.1) / 1.9).toFixed(3) : Math.sqrt((entry.size - 0.05) / 1.45).toFixed(3)}" style="--pct:${entry.type === 'video' ? (Math.sqrt((entry.scale - 0.1) / 1.9) * 100).toFixed(1) : (Math.sqrt((entry.size - 0.05) / 1.45) * 100).toFixed(1)}%">
               <span class="lsv layer-size-val">${entry.type === 'video' ? entry.scale.toFixed(2) : entry.size.toFixed(2)}</span>
             </div>
-            ${entry.type !== 'video' ? `
             <div class="layer-row-inline layer-tilemode-row"${entry.tile ? '' : ' style="display:none"'}>
               <span class="layer-ctrl-label" data-tooltip="Density: Size sets the count. Grid: explicit Cols×Rows">Mode</span>
               <div class="layer-tilemode-seg" role="group" aria-label="Tile mode">
@@ -3703,15 +3713,15 @@ export class EditorInspector {
                 <button class="lseg lseg-tilefit${(entry.tileFit || 'fill') === 'fill' ? ' active' : ''}" data-tile-fit="fill">Fill</button>
                 <button class="lseg lseg-tilefit${entry.tileFit === 'fit' ? ' active' : ''}" data-tile-fit="fit">Fit</button>
               </div>
-            </div>` : ''}
+            </div>
             ${entry.type === 'video' ? `
-            <div class="layer-slider-row">
+            <div class="layer-slider-row layer-vid-scale-row"${entry.tile && (entry.tileMode || 'density') === 'grid' ? ' style="display:none"' : ''}>
               <span class="layer-ctrl-label" data-tooltip="Horizontal scale multiplier">Width</span>
               <input type="range" class="slider layer-vid-sx-sl" min="0" max="1" step="0.01"
                 value="${Math.sqrt((entry.tileScaleX - 0.25) / 3.75).toFixed(3)}" style="--pct:${(Math.sqrt((entry.tileScaleX - 0.25) / 3.75) * 100).toFixed(1)}%">
               <span class="lsv layer-vid-sx-val">${entry.tileScaleX.toFixed(2)}</span>
             </div>
-            <div class="layer-slider-row">
+            <div class="layer-slider-row layer-vid-scale-row"${entry.tile && (entry.tileMode || 'density') === 'grid' ? ' style="display:none"' : ''}>
               <span class="layer-ctrl-label" data-tooltip="Vertical scale multiplier">Height</span>
               <input type="range" class="slider layer-vid-sy-sl" min="0" max="1" step="0.01"
                 value="${Math.sqrt((entry.tileScaleY - 0.25) / 3.75).toFixed(3)}" style="--pct:${(Math.sqrt((entry.tileScaleY - 0.25) / 3.75) * 100).toFixed(1)}%">
@@ -3724,7 +3734,7 @@ export class EditorInspector {
                 value="${(entry.radius || 0).toFixed(2)}" style="--pct:${pct(entry.radius || 0, 0, 0.5)}">
               <span class="lsv layer-radius-val">${(entry.radius || 0).toFixed(2)}</span>
             </div>
-            <div class="layer-slider-row layer-spacing-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
+            <div class="layer-slider-row layer-spacing-row"${entry.tile ? '' : ' style="display:none"'}>
               <span class="layer-ctrl-label">Spacing</span>
               <input type="range" class="slider layer-spacing-sl" min="0" max="0.8" step="0.01"
                 value="${entry.spacing}" style="--pct:${pct(entry.spacing, 0, 0.8)}">
@@ -3747,7 +3757,7 @@ export class EditorInspector {
               <input type="range" class="slider layer-slider-inline layer-spin-sl" min="-3" max="3" step="0.05"
                 value="${entry.spinSpeed}" style="--pct:${pct(entry.spinSpeed, -3, 3)}">
               <span class="lsv layer-spin-val">${entry.spinSpeed.toFixed(2)}</span>
-              <span class="layer-group-spin-wrap"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
+              <span class="layer-group-spin-wrap"${entry.tile ? '' : ' style="display:none"'}>
                 <span class="layer-ctrl-label" style="margin-left:8px;width:auto" data-tooltip="Rotate the whole tile grid instead of each tile">Group</span>
                 <label class="toggle-switch toggle-switch--sm">
                   <input type="checkbox" class="layer-group-spin" />
@@ -3816,27 +3826,27 @@ export class EditorInspector {
                 value="${entry.lissPhase}" style="--pct:${pct(entry.lissPhase, 0, 1)}">
               <span class="lsv layer-liss-ph-val">${entry.lissPhase.toFixed(2)}</span>
             </div>
-            <div class="layer-slider-row layer-tunnel-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
+            <div class="layer-slider-row layer-tunnel-row"${entry.tile ? '' : ' style="display:none"'}>
               <span class="layer-ctrl-label">Tunnel</span>
               <input type="range" class="slider layer-tunnel-sl" min="-2" max="2" step="0.05"
                 value="${entry.tunnelSpeed}" style="--pct:${pct(entry.tunnelSpeed, -2, 2)}">
               <span class="lsv layer-tunnel-val">${entry.tunnelSpeed.toFixed(2)}</span>
             </div>
-            <div class="layer-slider-row layer-tunnel-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
+            <div class="layer-slider-row layer-tunnel-row"${entry.tile ? '' : ' style="display:none"'}>
               <span class="layer-ctrl-label" data-tooltip="Shift this layer's zoom phase — offset two layers to get genuine parallax depth">Depth</span>
               <input type="range" class="slider layer-depth-sl" min="0" max="1" step="0.01"
                 value="${(entry.depthOffset || 0).toFixed(2)}" style="--pct:${pct(entry.depthOffset || 0, 0, 1)}">
               <span class="lsv layer-depth-val">${(entry.depthOffset || 0).toFixed(2)}</span>
             </div>
-            <div class="layer-slider-row layer-tunnel-row layer-percell-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
+            <div class="layer-slider-row layer-tunnel-row layer-percell-row"${entry.tile ? '' : ' style="display:none"'}>
               <span class="layer-ctrl-label" data-tooltip="Per-cell depth scale — parallax depth field with tunnel, static zoom depth without">Phase Var</span>
               <input type="range" class="slider layer-depthvar-sl" min="0" max="1" step="0.01"
                 value="${(entry.tileDepthVariance || 0).toFixed(2)}" style="--pct:${pct(entry.tileDepthVariance || 0, 0, 1)}">
               <span class="lsv layer-depthvar-val">${(entry.tileDepthVariance || 0).toFixed(2)}</span>
             </div>
-            <div class="layer-section-divider layer-percell-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}></div>
-            <p class="layer-section-label layer-percell-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>Per-Cell</p>
-            <div class="layer-row-inline layer-percell-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
+            <div class="layer-section-divider layer-percell-row"${entry.tile ? '' : ' style="display:none"'}></div>
+            <p class="layer-section-label layer-percell-row"${entry.tile ? '' : ' style="display:none"'}>Per-Cell</p>
+            <div class="layer-row-inline layer-percell-row"${entry.tile ? '' : ' style="display:none"'}>
               <span class="layer-ctrl-label" data-tooltip="Stagger alternating rows or columns">Offset</span>
               <div class="layer-offset-axis-seg" role="group" aria-label="Offset axis">
                 <button class="lseg lseg-offset${(entry.tileOffsetAxis || 'none') === 'none' ? ' active' : ''}" data-offset-axis="none">Off</button>
@@ -3844,13 +3854,13 @@ export class EditorInspector {
                 <button class="lseg lseg-offset${entry.tileOffsetAxis === 'col' ? ' active' : ''}" data-offset-axis="col">Col</button>
               </div>
             </div>
-            <div class="layer-slider-row layer-percell-row layer-offset-amt-row"${entry.tile && entry.type !== 'video' && (entry.tileOffsetAxis && entry.tileOffsetAxis !== 'none') ? '' : ' style="display:none"'}>
+            <div class="layer-slider-row layer-percell-row layer-offset-amt-row"${entry.tile && (entry.tileOffsetAxis && entry.tileOffsetAxis !== 'none') ? '' : ' style="display:none"'}>
               <span class="layer-ctrl-label" data-tooltip="Stagger amount">Amount</span>
               <input type="range" class="slider layer-offset-amt-sl" min="0" max="1" step="0.01"
                 value="${(entry.tileOffsetAmount || 0).toFixed(2)}" style="--pct:${pct(entry.tileOffsetAmount || 0, 0, 1)}">
               <span class="lsv layer-offset-amt-val">${(entry.tileOffsetAmount || 0).toFixed(2)}</span>
             </div>
-            <div class="layer-row-inline layer-percell-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
+            <div class="layer-row-inline layer-percell-row"${entry.tile ? '' : ' style="display:none"'}>
               <span class="layer-ctrl-label" data-tooltip="Random rotation per cell">Cell Rotate</span>
               <input type="range" class="slider layer-slider-inline layer-rotvar-sl" min="0" max="1" step="0.01"
                 value="${(entry.tileRotateVariance || 0).toFixed(2)}" style="--pct:${pct(entry.tileRotateVariance || 0, 0, 1)}">
@@ -3861,37 +3871,37 @@ export class EditorInspector {
                 <span class="toggle-track"><span class="toggle-thumb"></span></span>
               </label>
             </div>
-            <div class="layer-slider-row layer-percell-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
+            <div class="layer-slider-row layer-percell-row"${entry.tile ? '' : ' style="display:none"'}>
               <span class="layer-ctrl-label" data-tooltip="Per-cell audio pulse">Popcorn</span>
               <input type="range" class="slider layer-popcorn-sl" min="0" max="1" step="0.01"
                 value="${(entry.tilePopcornAmount || 0).toFixed(2)}" style="--pct:${pct(entry.tilePopcornAmount || 0, 0, 1)}">
               <span class="lsv layer-popcorn-val">${(entry.tilePopcornAmount || 0).toFixed(2)}</span>
             </div>
-            <div class="layer-slider-row layer-percell-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
+            <div class="layer-slider-row layer-percell-row"${entry.tile ? '' : ' style="display:none"'}>
               <span class="layer-ctrl-label" data-tooltip="Random size per cell">Size Var</span>
               <input type="range" class="slider layer-sizevar-sl" min="0" max="1" step="0.01"
                 value="${(entry.tileSizeVariance || 0).toFixed(2)}" style="--pct:${pct(entry.tileSizeVariance || 0, 0, 1)}">
               <span class="lsv layer-sizevar-val">${(entry.tileSizeVariance || 0).toFixed(2)}</span>
             </div>
-            <div class="layer-slider-row layer-percell-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
+            <div class="layer-slider-row layer-percell-row"${entry.tile ? '' : ' style="display:none"'}>
               <span class="layer-ctrl-label" data-tooltip="Random horizontal offset per cell">Jitter X</span>
               <input type="range" class="slider layer-jitterx-sl" min="0" max="1" step="0.01"
                 value="${(entry.tileJitterX || 0).toFixed(2)}" style="--pct:${pct(entry.tileJitterX || 0, 0, 1)}">
               <span class="lsv layer-jitterx-val">${(entry.tileJitterX || 0).toFixed(2)}</span>
             </div>
-            <div class="layer-slider-row layer-percell-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
+            <div class="layer-slider-row layer-percell-row"${entry.tile ? '' : ' style="display:none"'}>
               <span class="layer-ctrl-label" data-tooltip="Random vertical offset per cell">Jitter Y</span>
               <input type="range" class="slider layer-jittery-sl" min="0" max="1" step="0.01"
                 value="${(entry.tileJitterY || 0).toFixed(2)}" style="--pct:${pct(entry.tileJitterY || 0, 0, 1)}">
               <span class="lsv layer-jittery-val">${(entry.tileJitterY || 0).toFixed(2)}</span>
             </div>
-            <div class="layer-slider-row layer-percell-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
+            <div class="layer-slider-row layer-percell-row"${entry.tile ? '' : ' style="display:none"'}>
               <span class="layer-ctrl-label" data-tooltip="Random opacity per cell">Opacity Var</span>
               <input type="range" class="slider layer-opacityvar-sl" min="0" max="1" step="0.01"
                 value="${(entry.tileOpacityVariance || 0).toFixed(2)}" style="--pct:${pct(entry.tileOpacityVariance || 0, 0, 1)}">
               <span class="lsv layer-opacityvar-val">${(entry.tileOpacityVariance || 0).toFixed(2)}</span>
             </div>
-            <div class="layer-row-inline layer-percell-row"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
+            <div class="layer-row-inline layer-percell-row"${entry.tile ? '' : ' style="display:none"'}>
               <span class="layer-ctrl-label" data-tooltip="Shift the randomization pattern — each value gives a different layout">Seed</span>
               <span class="lsv layer-seed-display" style="min-width:36px;text-align:right;margin-right:6px">${entry.tileVarianceSeed || 0}</span>
               <button class="lseg layer-seed-rand" style="padding:0 8px" data-tooltip="Pick a random seed">Rand</button>
@@ -3966,7 +3976,7 @@ export class EditorInspector {
               <button class="lseg" data-mirror="quad">⊞ Quad</button>
               <button class="lseg" data-mirror="kaleido">✦ Kaleido</button>
             </div>
-            <div class="layer-mirror-scope" role="group" aria-label="Mirror scope"${entry.tile && entry.type !== 'video' ? '' : ' style="display:none"'}>
+            <div class="layer-mirror-scope" role="group" aria-label="Mirror scope"${entry.tile ? '' : ' style="display:none"'}>
               <button class="lseg lseg-scope active" data-scope="tile" data-tooltip="Fold inside each tile">Per Tile</button>
               <button class="lseg lseg-scope" data-scope="field" data-tooltip="Fold the whole tiled group">Whole Image</button>
             </div>
@@ -4078,6 +4088,7 @@ export class EditorInspector {
             </div>
             <div class="layer-section-divider"></div>
             ${entry.type === 'video' ? `
+            <div class="layer-vid-border-group"${entry.tile ? ' style="display:none"' : ''}>
             <p class="layer-section-label">Border</p>
             <div class="layer-slider-row">
               <span class="layer-ctrl-label">Width</span>
@@ -4099,6 +4110,7 @@ export class EditorInspector {
               <span class="lsv layer-vid-border-feather-val">${(entry.vidBorderFeather || 0).toFixed(2)}</span>
             </div>
             <div class="layer-section-divider"></div>
+            </div>
             ` : ''}
             <p class="layer-section-label">Visual Effects</p>
             <p class="layer-section-sub">Fluid color effects independent of audio.</p>
@@ -4344,13 +4356,19 @@ export class EditorInspector {
         const groupSpinWrap = card.querySelector('.layer-group-spin-wrap');
         const mirrorScopeRow = card.querySelector('.layer-mirror-scope');
         const tileScaleRows = card.querySelectorAll('.layer-tile-scale-row');
+        // Video tiling (Phase A): the video-only Width/Height rows + the Scale/Size
+        // label that flips meaning when tile is on (Scale=coverage → Size=density).
+        const vidScaleRows = card.querySelectorAll('.layer-vid-scale-row');
+        const sizeLabel = card.querySelector('.layer-size-label');
+        // Video border ring is single-instance only (frames the one video); hide it when tiling.
+        const vidBorderGroup = card.querySelector('.layer-vid-border-group');
         // Phase 1: Per-Cell row visibility helper — referenced by tileCb and the
         // offset-axis segmented buttons. The Amount row is double-gated: tile=on
         // AND offset axis ≠ 'none'.
         const percellRows = card.querySelectorAll('.layer-percell-row');
         const offsetAmtRow = card.querySelector('.layer-offset-amt-row');
         const syncPerCellVisibility = () => {
-            const tileOn = entry.tile && entry.type !== 'video';
+            const tileOn = entry.tile;
             percellRows.forEach(r => {
                 if (r === offsetAmtRow) return;
                 r.style.display = tileOn ? '' : 'none';
@@ -4367,12 +4385,14 @@ export class EditorInspector {
         const gridDetailRows = card.querySelectorAll('.layer-grid-row');
         const sizeRow = card.querySelector('.layer-size-row');
         const syncGridVisibility = () => {
-            const tileOn = entry.tile && entry.type !== 'video';
+            const tileOn = entry.tile;
             const gridOn = tileOn && (entry.tileMode || 'density') === 'grid';
             if (tileModeRow) tileModeRow.style.display = tileOn ? '' : 'none';
             gridDetailRows.forEach(r => { r.style.display = gridOn ? '' : 'none'; });
             if (sizeRow) sizeRow.style.display = gridOn ? 'none' : '';
             tileScaleRows.forEach(r => { r.style.display = (tileOn && !gridOn) ? '' : 'none'; });
+            // Video W/H is inert in grid mode (Cols:Rows is the shape control) — hide it there
+            vidScaleRows.forEach(r => { r.style.display = gridOn ? 'none' : ''; });
         };
 
         if (tileCb) tileCb.addEventListener('change', () => {
@@ -4381,6 +4401,9 @@ export class EditorInspector {
             if (spacingRow) spacingRow.style.display = entry.tile ? '' : 'none';
             if (groupSpinWrap) groupSpinWrap.style.display = entry.tile ? '' : 'none';
             if (mirrorScopeRow) mirrorScopeRow.style.display = (entry.mirror !== 'none') ? '' : 'none';
+            // Video: the Scale slider becomes a density (Size) control when tiling
+            if (sizeLabel && entry.type === 'video') sizeLabel.textContent = entry.tile ? 'Size' : 'Scale';
+            if (vidBorderGroup) vidBorderGroup.style.display = entry.tile ? 'none' : '';
             syncGridVisibility();
             syncPerCellVisibility();
             if (entry.type === 'text') this.engine._loadTextTexture(entry.texName, entry);
@@ -6324,6 +6347,11 @@ export class EditorInspector {
      */
     _buildImageBlock(img, trackAlpha = false) {
         const isVideo = img.type === 'video';
+        // Phase B (video-tiling-dev.md): stacked-alpha video tiling. A stacked-alpha
+        // clip is a 2×-tall texture (RGB top, alpha-as-luma bottom); every tiled sample
+        // must recombine the halves. `stackedTiled` also disables the texture-resample
+        // FX (chromatic/blur/sobel), which would read the raw 2× texture — deferred (§B.2).
+        const stackedTiled = isVideo && !!img.isStackedAlpha && img.tile;
         // Videos use 'scale' (0.1-2.0 coverage), images use 'size' (tile density)
         const sz = isVideo ? (img.scale || 0.6).toFixed(4) : img.size.toFixed(4);
         const sp = img.spinSpeed.toFixed(4);
@@ -6333,7 +6361,7 @@ export class EditorInspector {
         const orb = (img.orbitRadius || 0).toFixed(4);
         const bnc = (img.bounceAmp || 0).toFixed(4);
         const ts = Math.abs(img.tunnelSpeed || 0).toFixed(4);
-        const spc = isVideo ? '0.0' : (img.spacing || 0).toFixed(4);  // Videos have no spacing
+        const spc = (isVideo && !img.tile) ? '0.0' : (img.spacing || 0).toFixed(4);  // Single-instance video has no spacing; tiled video uses it
         const cx = (img.cx !== undefined ? img.cx : 0.5).toFixed(4);
         const cy = (img.cy !== undefined ? img.cy : 0.5).toFixed(4);
         const swayAmt = (img.swayAmt || 0).toFixed(4);
@@ -6345,8 +6373,8 @@ export class EditorInspector {
         const panSy = (img.panSpeedY || 0).toFixed(4);
         const panRng = (img.panRange !== undefined ? img.panRange : 0.2).toFixed(4);
         const mirror = img.mirror || 'none';
-        // Videos always use 'field' mirror scope (single instance), images use stored scope
-        const mirrorScope = isVideo ? 'field' : (img.mirrorScope || 'tile');
+        // Single-instance video uses 'field' scope; tiled video + images use stored scope
+        const mirrorScope = (isVideo && !img.tile) ? 'field' : (img.mirrorScope || 'tile');
         const kspd = (img.kaleidoSpeed || 0).toFixed(4);
         const tintR = (img.tintR !== undefined ? img.tintR : 1.0).toFixed(4);
         const tintG = (img.tintG !== undefined ? img.tintG : 1.0).toFixed(4);
@@ -6361,7 +6389,7 @@ export class EditorInspector {
         const hasStrobe = parseFloat(stbAmp) !== 0;
         const chromAmt = (img.chromaticAberration || 0).toFixed(4);
         const chromSpd = (img.chromaticSpeed !== undefined ? img.chromaticSpeed : 1.0).toFixed(4);
-        const hasChromatic = parseFloat(chromAmt) > 0.001;
+        const hasChromatic = parseFloat(chromAmt) > 0.001 && !stackedTiled;
         // All layer types now support independent width/height scaling via tileScaleX/Y
         const tileScaleX = (img.tileScaleX !== undefined ? img.tileScaleX : 1.0).toFixed(4);
         const tileScaleY = (img.tileScaleY !== undefined ? img.tileScaleY : 1.0).toFixed(4);
@@ -6381,7 +6409,7 @@ export class EditorInspector {
         const hasPersp = Math.abs(img.perspX || 0) > 0.001 || Math.abs(img.perspY || 0) > 0.001;
         const rad = (img.radius || 0).toFixed(4);
         const hasRadius = parseFloat(rad) > 0.001;
-        const hasEdge = !!img.edgeSobel;
+        const hasEdge = !!img.edgeSobel && !stackedTiled;
         const lumaKeyLo = (img.lumaKeyLo || 0).toFixed(4);
         const lumaKeyHi = (img.lumaKeyHi || 0).toFixed(4);
         const hasLumaKey = parseFloat(lumaKeyLo) > 0.001 || parseFloat(lumaKeyHi) > 0.001;
@@ -6401,7 +6429,7 @@ export class EditorInspector {
         const filmGrainAmt = (img.filmGrain || 0).toFixed(4);
         const hasFilmGrain = parseFloat(filmGrainAmt) > 0.001;
         const blurAmt = (img.blur || 0.0).toFixed(4);
-        const hasBlur = parseFloat(blurAmt) > 0.001;
+        const hasBlur = parseFloat(blurAmt) > 0.001 && !stackedTiled;
         // Pixel step for Sobel and Blur: 1/texW × 1/texH, falling back to 1/512
         const edgeStepX = img.texW ? (1.0 / img.texW).toFixed(6) : '0.001953';
         const edgeStepY = img.texH ? (1.0 / img.texH).toFixed(6) : '0.001953';
@@ -6433,25 +6461,25 @@ export class EditorInspector {
         // Brick / half-drop offset: stagger alternating rows or columns.
         const offsetAxis = img.tileOffsetAxis || 'none';
         const offsetAmount = (img.tileOffsetAmount || 0).toFixed(4);
-        const hasOffset = !isVideo && img.tile && offsetAxis !== 'none' && parseFloat(offsetAmount) > 0.001;
+        const hasOffset = img.tile && offsetAxis !== 'none' && parseFloat(offsetAmount) > 0.001;
         // Per-cell rotation variance — adds hashed rotation to each cell's spin.
         const rotVar = (img.tileRotateVariance || 0).toFixed(4);
         const rotSnap = !!img.tileRotateSnap;
-        const hasRotVar = !isVideo && img.tile && parseFloat(rotVar) > 0.001;
+        const hasRotVar = img.tile && parseFloat(rotVar) > 0.001;
         // Per-cell audio popcorn — each cell pulses on different beat phases.
         const popcornAmt = (img.tilePopcornAmount || 0).toFixed(4);
-        const hasPopcorn = !isVideo && img.tile && parseFloat(popcornAmt) > 0.001;
+        const hasPopcorn = img.tile && parseFloat(popcornAmt) > 0.001;
         // Phase 2: Variance suite flags
         const sizeVar = (img.tileSizeVariance || 0).toFixed(4);
-        const hasSizeVar = !isVideo && img.tile && parseFloat(sizeVar) > 0.001;
+        const hasSizeVar = img.tile && parseFloat(sizeVar) > 0.001;
         const jitterX = (img.tileJitterX || 0).toFixed(4);
-        const hasJitterX = !isVideo && img.tile && parseFloat(jitterX) > 0.001;
+        const hasJitterX = img.tile && parseFloat(jitterX) > 0.001;
         const jitterY = (img.tileJitterY || 0).toFixed(4);
-        const hasJitterY = !isVideo && img.tile && parseFloat(jitterY) > 0.001;
+        const hasJitterY = img.tile && parseFloat(jitterY) > 0.001;
         const opacityVar = (img.tileOpacityVariance || 0).toFixed(4);
-        const hasOpacityVar = !isVideo && img.tile && parseFloat(opacityVar) > 0.001;
+        const hasOpacityVar = img.tile && parseFloat(opacityVar) > 0.001;
         const depthVar = (img.tileDepthVariance || 0).toFixed(4);
-        const hasDepthVar = !isVideo && img.tile && parseFloat(depthVar) > 0.001;
+        const hasDepthVar = img.tile && parseFloat(depthVar) > 0.001;
         const varSeed = (img.tileVarianceSeed || 0);
         // Seed threads through all per-cell hashes. seed=0 → vec2(0,0) added → identical to Phase 1.
         const seedVec = `vec2(${varSeed}.0, ${varSeed}.0)`;
@@ -6463,7 +6491,7 @@ export class EditorInspector {
         const hasLissajous = hasOrbit && orbitMode === 'lissajous';
         const hasBounce = parseFloat(bnc) !== 0;
         // Videos never have tunnel (no tiles), images respect tile setting
-        const hasTunnel = !isVideo && parseFloat(ts) !== 0 && img.tile;
+        const hasTunnel = parseFloat(ts) !== 0 && img.tile;
         const hasSway = parseFloat(swayAmt) !== 0;
         const hasWander = parseFloat(wanderAmt) !== 0;
         const hasPanDrift = panMode === 'drift' && (parseFloat(panSx) !== 0 || parseFloat(panSy) !== 0);
@@ -6475,9 +6503,9 @@ export class EditorInspector {
         // Videos are never tiled, so no group spin vs per-tile spin distinction.
         // Group spin only when there's a real angular velocity/angle (rotVar by itself
         // is per-cell, never a whole-grid rotation).
-        const groupSpin = !isVideo && img.tile && (parseFloat(sp) !== 0 || hasAngle) && !!img.groupSpin;
+        const groupSpin = img.tile && (parseFloat(sp) !== 0 || hasAngle) && !!img.groupSpin;
         // perTileSpin emits when any rotation source exists and groupSpin is off.
-        const perTileSpin = !isVideo && img.tile && hasSpin && !img.groupSpin;
+        const perTileSpin = img.tile && hasSpin && !img.groupSpin;
         const fwd = (img.tunnelSpeed || 0) >= 0;
 
         // Phase 2.5: Scatter sampling — free per-cell jitter + tile overlap via
@@ -6486,7 +6514,7 @@ export class EditorInspector {
         // scatter path lets a fragment sample neighbouring cells' images, so tiles
         // move freely past cell edges and overlap. Gated to jitter-active,
         // non-tunnel, real tile layers — every other preset keeps the fract() path.
-        const useScatter = (hasJitterX || hasJitterY) && img.tile && !isVideo && !hasTunnel;
+        const useScatter = (hasJitterX || hasJitterY) && img.tile && !hasTunnel;
 
         // Phase 3: Grid mode — an explicit COLS×ROWS grid as an alternative to
         // density-driven tiling. Inert when tunnel is active (a finite grid cannot
@@ -6498,7 +6526,7 @@ export class EditorInspector {
         // Grid scale: 1 = grid fills the canvas; < 1 = grid sits smaller, centred,
         // with transparent margin. Clamped ≥ 0.1 to keep the divisor safe.
         const gridScale = Math.max(0.1, img.tileGridScale !== undefined ? img.tileGridScale : 1.0).toFixed(4);
-        const useGrid = !isVideo && img.tile && tileModeVal === 'grid' && !hasTunnel;
+        const useGrid = img.tile && tileModeVal === 'grid' && !hasTunnel;
         // Phase 4: Recursive grids — each grid cell → S×S inner cells, with a
         // separate gap BETWEEN the outer cells (clusters). Grid-mode only.
         // useRecursion only when it changes the output: S>1 OR an outer gap is set
@@ -6907,6 +6935,22 @@ export class EditorInspector {
             );
         };
 
+        // Phase B (video-tiling-dev.md): stacked-alpha-aware texture sample for the
+        // TILED paths. A stacked-alpha video is a 2×-tall texture — RGB in the top
+        // half, alpha-as-luma in the bottom half — so we sample twice (top for colour,
+        // bottom .r for alpha) and recombine into one vec4. The y-derivative is halved
+        // because the sampled v is uv.y*0.5. For every other layer this is a plain
+        // textureGrad. The non-tiled branch keeps its own inline composite (untouched).
+        const sampleGrad = (uvE, dxE, dyE) => {
+            if (!img.isStackedAlpha) return `textureGrad(${tex}, ${uvE}, ${dxE}, ${dyE})`;
+            return (
+                `vec4(textureGrad(${tex}, vec2((${uvE}).x, (${uvE}).y * 0.5), ` +
+                `vec2((${dxE}).x, (${dxE}).y * 0.5), vec2((${dyE}).x, (${dyE}).y * 0.5)).rgb, ` +
+                `textureGrad(${tex}, vec2((${uvE}).x, (${uvE}).y * 0.5 + 0.5), ` +
+                `vec2((${dxE}).x, (${dxE}).y * 0.5), vec2((${dyE}).x, (${dyE}).y * 0.5)).r)`
+            );
+        };
+
         // Phase 2.5: Scatter sample — neighbour-accumulation tile renderer.
         // Replaces the single-cell fract() sample. `_u` arrives in field UV; this
         // converts it to continuous grid coordinates (1 unit = 1 cell), then every
@@ -7007,7 +7051,8 @@ export class EditorInspector {
                 s += `        _cov *= 1.0 - smoothstep(-0.004, 0.004, _rd2); }\n`;
             }
             // Sample — mip derivatives scaled by this cell's zoom factor
-            s += `      vec4 _sc = textureGrad(${tex}, clamp(_luv, 0.0, 1.0), _sdx * _szF, _sdy * _szF);\n`;
+            s += `      vec2 _suvc = clamp(_luv, 0.0, 1.0); vec2 _sdxz = _sdx * _szF; vec2 _sdyz = _sdy * _szF;\n`;
+            s += `      vec4 _sc = ${sampleGrad('_suvc', '_sdxz', '_sdyz')};\n`;
             s += `      vec3 _scol = _sc.xyz;\n`;
             s += `      float _a = _sc.w * _cov;\n`;
             // Phase 3: Grid mode is finite — drop neighbour cells outside the grid.
@@ -7061,8 +7106,8 @@ export class EditorInspector {
                 applyMirrorUV('_uB') +
                 applyRadius('_uB', '_gapMaskB');
             sampleLine =
-                `    vec4 _tA = textureGrad(${tex}, _uA, _dxA, _dyA);\n` +
-                `    vec4 _tB = textureGrad(${tex}, _uB, _dxB, _dyB);\n` +
+                `    vec4 _tA = ${sampleGrad('_uA', '_dxA', '_dyA')};\n` +
+                `    vec4 _tB = ${sampleGrad('_uB', '_dxB', '_dyB')};\n` +
                 `    vec4 _t = mix(_tA, _tB, _tf);\n` +
                 `    float _gapMask = mix(_gapMaskA, _gapMaskB, _tf);\n`;
         } else if (useScatter) {
@@ -7076,9 +7121,9 @@ export class EditorInspector {
                 (useGrid ? '' : aspectPreScale('_u')) +
                 buildScatterSample();
             sampleLine = '';
-        } else if (!isVideo && img.tile) {
+        } else if (img.tile) {
             // Plain tiled — group spin rotates field first, then tile (with optional per-tile spin)
-            // Videos skip this path entirely (always single instance)
+            // Opaque video tiles here too (Phase A); stacked-alpha video tiling is Phase B.
             pipeline = groupSpinLines +
                 applySkew('_u') +
                 applyPersp('_u') +
@@ -7087,7 +7132,7 @@ export class EditorInspector {
                 applyTileUV('_u', sizeBase, '_gapMask', '_dx', '_dy') +
                 applyMirrorUV('_u') +
                 applyRadius('_u', '_gapMask');
-            sampleLine = `    vec4 _t = textureGrad(${tex}, _u, _dx, _dy);\n`;
+            sampleLine = `    vec4 _t = ${sampleGrad('_u', '_dx', '_dy')};\n`;
         } else {
             // Non-tiled: show single instance (no fract wrapping)
             // aspectPreScale handles aspect ratio + tileScaleX/Y (width/height for videos)
@@ -7397,8 +7442,10 @@ export class EditorInspector {
             // the SAME coverage the RGB blend used (_t.w*_op for normal; _op for the
             // others, which already fold _t.w into _op). "over" compositing.
             (trackAlpha ? `    col_a = col_a + (${img.blendMode === 'normal' ? '_t.w * _op' : '_op'}) * (1.0 - col_a);\n` : '') +
-            // Video border ring: drawn outside video edge using signed distance _rd
-            (isVideo && (img.vidBorderWidth || 0) > 0.001 ? (() => {
+            // Video border ring: drawn outside video edge using signed distance _rd.
+            // _rd only exists in the single-instance (non-tiled) branch, so the border
+            // is single-instance only — a per-tile border is video-tiling-dev.md §7 backlog.
+            (isVideo && !img.tile && (img.vidBorderWidth || 0) > 0.001 ? (() => {
                 const bw = (img.vidBorderWidth || 0).toFixed(4);
                 const bf = `max(${(img.vidBorderFeather || 0).toFixed(4)} * 0.04, 0.002)`;
                 const hex = img.vidBorderColor || '#ffffff';

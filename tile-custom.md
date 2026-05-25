@@ -1,7 +1,7 @@
 # Tile Custom — Tiling Enhancement Audit & Phased Dev Plan
 
 **Last updated:** 2026-05-17 — doc audited handoff-ready; Phase 4 (recursive grids) full buildable spec written at §13
-**Scope:** Image and GIF layers in Preset Studio. Videos stay single-instance.
+**Scope:** Image, GIF and text layers in Preset Studio. **Video tiling shipped 2026-05-24** — see [video-tiling-dev.md](video-tiling-dev.md) (opaque + native-alpha transparent on web, stacked-alpha transparent on macOS, both verified). It reuses this per-cell/grid shader stack.
 **Audience:** Anyone implementing this — including a future developer joining cold. §12 is the handoff reference.
 
 ---
