@@ -984,41 +984,28 @@
         }
       }
 
-      // ── LocalStorage download tracking (works immediately, zero setup) ──
-      // Note: This tracks per-browser. For global counts, add a backend later.
-      const STORAGE_KEY = 'discocast-downloads';
+      // ── Simple PHP backend tracking ──
+      const TRACK_URL = './track.php';
       const downloadBtns = document.querySelectorAll('a[download]');
 
-      function getCounts() {
-        try {
-          const saved = localStorage.getItem(STORAGE_KEY);
-          return saved ? JSON.parse(saved) : { macos: 0, windows: 0 };
-        } catch (e) {
-          return { macos: 0, windows: 0 };
-        }
-      }
-
-      function saveCounts(counts) {
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(counts));
-        } catch (e) {
-          console.log('Could not save counts');
-        }
-      }
-
       downloadBtns.forEach(btn => {
-        btn.addEventListener('click', (e) => {
+        btn.addEventListener('click', async (e) => {
           e.preventDefault();
           const isMac = btn.href.includes('.dmg');
           const url = btn.href;
 
-          // Track
-          const counts = getCounts();
-          if (isMac) counts.macos++;
-          else counts.windows++;
-          saveCounts(counts);
+          // Track first
+          try {
+            await fetch(TRACK_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ platform: isMac ? 'macos' : 'windows' })
+            });
+          } catch (err) {
+            console.log('Track failed');
+          }
 
-          // Trigger download
+          // Then download
           const a = document.createElement('a');
           a.href = url;
           a.download = '';
@@ -1029,11 +1016,18 @@
       });
 
       // Load counts when opening modal
-      function loadCounts() {
-        const counts = getCounts();
-        macCountEl.textContent = counts.macos.toLocaleString();
-        windowsCountEl.textContent = counts.windows.toLocaleString();
-        totalCountEl.textContent = (counts.macos + counts.windows).toLocaleString();
+      async function loadCounts() {
+        try {
+          const res = await fetch(TRACK_URL);
+          const data = await res.json();
+          macCountEl.textContent = (data.macos || 0).toLocaleString();
+          windowsCountEl.textContent = (data.windows || 0).toLocaleString();
+          totalCountEl.textContent = ((data.macos || 0) + (data.windows || 0)).toLocaleString();
+        } catch (err) {
+          macCountEl.textContent = '0';
+          windowsCountEl.textContent = '0';
+          totalCountEl.textContent = '0';
+        }
       }
 
       window.loadAndDisplayStats = loadCounts;
