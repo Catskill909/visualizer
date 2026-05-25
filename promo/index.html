@@ -984,45 +984,59 @@
         }
       }
 
-      // ── CountAPI download tracking (free, no signup required) ──
-      // Namespace: discocast-visualizer (change this to something unique if you want)
-      const COUNT_API_NS = 'discocast-visualizer';
+      // ── LocalStorage download tracking (works immediately, zero setup) ──
+      // Note: This tracks per-browser. For global counts, add a backend later.
+      const STORAGE_KEY = 'discocast-downloads';
       const downloadBtns = document.querySelectorAll('a[download]');
 
-      downloadBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-          const isMac = btn.href.includes('.dmg');
-          const key = isMac ? 'mac-downloads' : 'windows-downloads';
-          // Increment count (fire-and-forget, works even offline)
-          fetch(`https://api.countapi.xyz/hit/${COUNT_API_NS}/${key}`)
-            .catch(() => { /* Silently fail if offline */ });
-        });
-      });
-
-      // Load counts from CountAPI when opening modal
-      async function loadCountsFromAPI() {
+      function getCounts() {
         try {
-          const [macRes, winRes] = await Promise.all([
-            fetch(`https://api.countapi.xyz/get/${COUNT_API_NS}/mac-downloads`),
-            fetch(`https://api.countapi.xyz/get/${COUNT_API_NS}/windows-downloads`)
-          ]);
-          const macData = await macRes.json();
-          const winData = await winRes.json();
-          const mac = macData.value || 0;
-          const windows = winData.value || 0;
-          macCountEl.textContent = mac.toLocaleString();
-          windowsCountEl.textContent = windows.toLocaleString();
-          totalCountEl.textContent = (mac + windows).toLocaleString();
-        } catch (err) {
-          // Fallback to showing dashes if API fails
-          macCountEl.textContent = '-';
-          windowsCountEl.textContent = '-';
-          totalCountEl.textContent = '-';
+          const saved = localStorage.getItem(STORAGE_KEY);
+          return saved ? JSON.parse(saved) : { macos: 0, windows: 0 };
+        } catch (e) {
+          return { macos: 0, windows: 0 };
         }
       }
 
-      // Override the load function to use CountAPI instead of local JSON
-      window.loadAndDisplayStats = loadCountsFromAPI;
+      function saveCounts(counts) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(counts));
+        } catch (e) {
+          console.log('Could not save counts');
+        }
+      }
+
+      downloadBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const isMac = btn.href.includes('.dmg');
+          const url = btn.href;
+
+          // Track
+          const counts = getCounts();
+          if (isMac) counts.macos++;
+          else counts.windows++;
+          saveCounts(counts);
+
+          // Trigger download
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = '';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        });
+      });
+
+      // Load counts when opening modal
+      function loadCounts() {
+        const counts = getCounts();
+        macCountEl.textContent = counts.macos.toLocaleString();
+        windowsCountEl.textContent = counts.windows.toLocaleString();
+        totalCountEl.textContent = (counts.macos + counts.windows).toLocaleString();
+      }
+
+      window.loadAndDisplayStats = loadCounts;
 
     });
   </script>
