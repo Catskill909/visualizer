@@ -40,7 +40,8 @@ The GIF feature is wired through three files:
 - Uses `texSubImage2D` (in-place GPU write, no realloc).
 - Speed multiplier: `frameDelay = delays[frameIndex] / speed`.
 - **Stability blending** — `stability` (0–1) lerps each frame delay between its native value and `avgDelay / speed`, smoothing uneven cadence without changing overall pace.
-- **Deadline-based timing** — `nextFrameAt += frameDelay` (not `now + frameDelay`) to prevent accumulated drift. Catch-up guard: if `nextFrameAt < now` (e.g. after tab background), snap to `now + frameDelay`.
+- **Deadline-based timing** — `nextFrameAt += frameDelay` (not `now + frameDelay`) to prevent accumulated drift.
+- **Bounded frame-skip catch-up (added 2026-05-25)** — the tick now advances *up to* `MAX_ADVANCE = 8` frames per render tick in a `while` loop, uploading only the final frame. **Why:** the old single-advance pinned playback to one frame per rAF (~60fps), so for a ~30fps GIF the speed slider saturated at ~2× — everything from 2×–8× looked identical (the upper slider was dead). Skipping intermediate frames lets the speed multiplier exceed the 60fps ceiling, so the slider is honest across its whole range. At normal speeds the loop runs exactly once → identical to the old behaviour (the smooth/low-jitter feel is preserved). The `MAX_ADVANCE` cap doubles as the catch-up guard: after the loop, if still behind (e.g. tab backgrounded for seconds), `nextFrameAt` snaps to `now + frameDelay` so it can't spiral replaying the whole timeline. Tradeoff: at high speed frames are dropped (inherent to playing faster than the display refresh). **GIF-only** — lives entirely in `_tickGifAnimations`; video/transparent video use the separate `_tickVideoAnimations`/`playbackRate` path and are untouched.
 - Pixel-store state fully saved and restored around each upload — `UNPACK_FLIP_Y_WEBGL`, `UNPACK_PREMULTIPLY_ALPHA_WEBGL`, `UNPACK_ALIGNMENT`, `UNPACK_COLORSPACE_CONVERSION_WEBGL` — Butterchurn dirties at least some of these between frames.
 - Both the standard decode path and the GIF Optimizer path use `TEXTURE_WRAP_S/T = REPEAT`.
 
@@ -51,7 +52,8 @@ The GIF feature is wired through three files:
 
 ### Inspector / UI — [src/editor/inspector.js](src/editor/inspector.js)
 - Upload path detects `image/gif` and skips canvas resizing (canvas `drawImage` freezes on frame 1 for animated GIFs).
-- Layer entry stores `isGif: true, gifSpeed: 2.0, gifStability: 0.0, alphaMode: 'preserve'` for new GIF layers (static images default `alphaMode: 'fade'`).
+- Layer entry stores `isGif: true, gifSpeed: 1.0, gifStability: 0.0, alphaMode: 'preserve'` for new GIF layers (static images default `alphaMode: 'fade'`). **Speed default changed 2026-05-25:** was `gifSpeed: 2.0` — new GIFs started at double speed, which read as frantic/"changes constantly" on uneven-delay source GIFs. Now native pace. The speed default **is applied at load** (`setUserTexture`→`_loadGifTexture` passes `gifSpeed`). Only affects newly added GIFs; existing presets keep their stored values.
+- **⚠️ Stability default is intentionally `0.0`, not because 0 is ideal but because a non-zero default would be a no-op.** `anim.stability` is hardcoded to `0` at texture creation (`_loadGifTexture`) and is **only** updated live by the stability slider (`setGifAnimationStability`) — there is **no load-time sync** of `entry.gifStability` into the engine (unlike `gifSpeed`). So setting the entry default to e.g. `0.5` would show `0.5` on the slider while the engine actually ran `0` until the user dragged it (displayed ≠ effective). Keep the default at `0` so the slider matches reality. If smoothing-by-default is ever wanted, the correct fix is to plumb `gifStability` through `setUserTexture`→`_loadGifTexture` like `gifSpeed`, not just to bump the entry default.
 - **Speed slider** — perceptual (log-curve) mapping; slider position `pos ∈ [0,1]` maps to `speed = 0.25 × 32^pos`. 1× native lands at ~40% travel; 2× at ~60%; 8× at 100%.
 - **Stability slider** (0–1) — 0 = native per-frame delays, 1 = perfectly even cadence. Live-updates via `engine.setGifAnimationStability(texName, v)`, no reload.
 - **Alpha Mode** (Fade / Preserve) — segmented button. Preserve uses `step(0.1, _t.w)` silhouette in the comp shader so the whole image fades uniformly instead of soft edges disappearing first. Fade is the original `_t.w` multiplication (default for static images).
@@ -281,8 +283,20 @@ Modern Chromium / Safari 17+ exposes `new ImageDecoder({ data, type: 'image/gif'
 - **Verdict:** good future upgrade; does not improve anything that isn't already working.
 
 ### GIF → MP4/WebM at upload, render via `<video>` texture
-- **Cons:** ffmpeg.wasm is ~25MB. Multi-second upload latency. iOS Safari restricts unmuted video autoplay. Chroma subsampling loses colour fidelity.
-- **Verdict:** wrong tradeoff.
+- **Cons (as originally written):** ffmpeg.wasm is ~25MB. Multi-second upload latency. iOS Safari restricts unmuted video autoplay. Chroma subsampling loses colour fidelity.
+- **Verdict:** ~~wrong tradeoff~~ **STALE — re-evaluate.** Three of the four cons no longer hold:
+  - **~25MB ffmpeg.wasm** is *already shipped* and lazy-loaded for video transcoding ([videoTranscoder.js](../../src/videoTranscoder.js)). Cost already paid; a GIF reuses the same loader.
+  - **iOS autoplay** is moot — these are muted, looping background textures (muted autoplay is allowed; the video feature already relies on this).
+  - **Departure from pipeline / alpha** — *not* a departure: the transparent-video **stacked-alpha render path is platform-neutral** (acts only on the `isStackedAlpha` flag — verified, no `__TAURI__` gate). A converted GIF drops straight into it.
+- **The only remaining real con is colour fidelity** (256-colour dithered GIFs → 4:2:0 chroma subsampling can muddy dither/pixel-art). Mitigation: make conversion **opt-in**, keep the native GIF path as default for colour-critical GIFs.
+- **Why GIF is *easier* than the transparent-WebM feature we already shipped:** that feature's entire difficulty was VP9-alpha *decode* (FFmpeg.wasm #621, ogv.js #590, HEVC — all dead). GIF alpha decodes trivially in FFmpeg.wasm, so a GIF can be converted to **stacked-alpha H.264 in-browser on every platform** and needs **no native sidecar**.
+
+#### ✅ Empirical feasibility test — 2026-05-25 (verify-before-coding)
+Ran the exact sidecar filter graph ([src-tauri/src/main.rs:302](../../src-tauri/src/main.rs#L302)) on a synthesized genuinely-transparent animated GIF (alpha YMIN=0):
+- **Native ffmpeg:** GIF → valid 200×400 (2× tall, stacked) H.264 MP4, exit 0. Bottom half confirmed = alpha mask (YMIN 16 / YMAX 235 limited-range), top half = RGB. Graph works end-to-end on real GIF input.
+- **App's exact wasm build (`@ffmpeg/core@0.12.9`, fetched from unpkg, 32MB valid wasm):** string-presence check confirmed `alphaextract`, `vstack`, `gif`, `libx264`, `yuva420p` are all compiled in. (`libx264` execution in this build is already production-proven via `transcodeTo720p`.)
+- **Residual unknown (negligible):** executing *this specific graph* inside the wasm at runtime — best confirmed by the first real in-app conversion, but all components are verified present + the graph is verified valid.
+- **Two-lane plan:** opaque GIF → plain H.264 720p (existing `transcodeTo720p`); transparent GIF → stacked-alpha H.264 (same graph, run in FFmpeg.wasm — one universal format, renders on all platforms via the existing `isStackedAlpha` path).
 
 ### Pre-built sprite atlas
 All frames in one texture; advance via UV offset in shader.

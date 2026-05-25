@@ -2796,8 +2796,8 @@ export class EditorInspector {
             muted: false,       // Phase 4: hide this layer unless another layer is solo'd
             name: file.name.replace(/\.[^.]+$/, '') || 'Layer',  // Phase 4: user-editable display name
             isGif: resized.isGif || false,
-            gifSpeed: 2.0,      // playback multiplier: 2 = twice as fast, 0.5 = half speed
-            gifStability: 0.0,  // timing smoothing: 0 = native delays, 1 = perfectly even cadence
+            gifSpeed: 1.0,      // playback multiplier: 2 = twice as fast, 0.5 = half speed (default = native pace; applied at load via setUserTexture→_loadGifTexture)
+            gifStability: 0.0,  // timing smoothing: 0 = native delays, 1 = perfectly even cadence. NOTE: only applied live via the slider (setGifAnimationStability) — NOT synced at load, so a non-zero default here would be a no-op until the slider is touched. Keep 0 so UI matches engine.
             alphaMode: (resized.isGif || false) ? 'preserve' : 'fade',  // 'fade' = raw alpha (default for stills), 'preserve' = silhouette stays solid while opacity fades
             reactSource: 'bass',   // Phase 5: 'bass' | 'mid' | 'treb' | 'vol'
             reactCurve: 'linear',  // Phase 5: 'linear' | 'squared' | 'cubed' | 'threshold'

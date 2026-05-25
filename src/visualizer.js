@@ -1387,20 +1387,33 @@ export class VisualizerEngine {
   _tickGifAnimations() {
     if (this._gifAnimations.size === 0) return;
     const now = performance.now();
+    // Advance at most this many frames per render tick. This lets GIF speed exceed the
+    // ~60fps one-frame-per-tick ceiling by SKIPPING (not uploading) intermediate frames —
+    // only the final frame each tick is uploaded. At normal speeds the loop runs exactly
+    // once, so behaviour is identical to the old single-advance. The cap also stops a
+    // backgrounded-tab catch-up from rapid-firing the whole animation.
+    const MAX_ADVANCE = 8;
     for (const [, anim] of this._gifAnimations) {
       if (now < anim.nextFrameAt) continue;
-      anim.frameIndex = (anim.frameIndex + 1) % anim.frames.length;
       const _spd = anim.speed || 1.0;
-      const _nativeDelay = anim.delays[anim.frameIndex] / _spd;
       const _stab = anim.stability || 0;
-      const frameDelay = _stab > 0
-        ? _nativeDelay * (1 - _stab) + (anim.avgDelay / _spd) * _stab
-        : _nativeDelay;
-      // Deadline-based: advance from the previous deadline to prevent accumulated drift.
-      // If we're more than one frame-period behind (e.g. tab was backgrounded), snap to
-      // now so we don't rapid-fire frames trying to catch up.
-      anim.nextFrameAt += frameDelay;
+      // Catch up to `now` across every missed deadline, bounded by MAX_ADVANCE.
+      // Deadline-based (`nextFrameAt += frameDelay`) prevents accumulated drift.
+      let frameDelay = 0;
+      let advanced = 0;
+      while (now >= anim.nextFrameAt && advanced < MAX_ADVANCE) {
+        anim.frameIndex = (anim.frameIndex + 1) % anim.frames.length;
+        const _nativeDelay = anim.delays[anim.frameIndex] / _spd;
+        frameDelay = _stab > 0
+          ? _nativeDelay * (1 - _stab) + (anim.avgDelay / _spd) * _stab
+          : _nativeDelay;
+        anim.nextFrameAt += frameDelay;
+        advanced++;
+      }
+      // Still behind after the cap (e.g. tab backgrounded for seconds) → snap to now so
+      // we don't spiral replaying the whole timeline.
       if (anim.nextFrameAt < now) anim.nextFrameAt = now + frameDelay;
+      if (advanced === 0) continue;
       const { gl, texture, width, height } = anim;
       // Save pixel-store state — Butterchurn may have dirtied these between frames,
       // causing colour cycling when speed > 1×. Restore after upload.
