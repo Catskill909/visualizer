@@ -28,7 +28,7 @@
   --ruler-h:    26px;
   --marker-lane-h: 20px;
   --track-h:    68px;
-  --zone-col-w: 150px;
+  --zone-col-w: 196px;
   --strip-h: calc(var(--ruler-h) + var(--marker-lane-h) + var(--track-h) + 2px);
 }
 
@@ -1567,21 +1567,24 @@ body.tl-fullscreen #tl-canvas-container { cursor: pointer; }
 /* Zone-row output chip (neutral grey; brighter when an output is live) */
 .tl-zone-out-chip {
   flex-shrink: 0;
-  padding: 3px 6px;
-  font: 600 10px var(--font);
-  color: var(--text-3);
-  background: rgba(255,255,255,0.05);
-  border: 1px solid var(--border);
+  min-width: 28px;
+  height: 22px;
+  padding: 0 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font: 600 11.5px var(--font);
+  color: var(--text-2);
+  background: rgba(255,255,255,0.08);
+  border: 1px solid var(--border-hi);
   border-radius: 6px;
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
-.tl-zone-out-chip:hover { background: rgba(255,255,255,0.12); color: var(--text-2); }
+.tl-zone-out-chip:hover { background: rgba(255,255,255,0.16); color: var(--text); border-color: rgba(255,255,255,0.32); }
 .tl-zone-out-chip.is-live {
   color: var(--text);
-  background: rgba(255,255,255,0.14);
-  border-color: var(--border-hi);
+  background: rgba(255,255,255,0.18);
+  border-color: rgba(255,255,255,0.35);
 }
 .tl-zone-out-chip.is-offline {
   border-style: dashed;
@@ -1606,8 +1609,55 @@ body.tl-fullscreen #tl-canvas-container { cursor: pointer; }
   color: var(--text);
 }
 
-/* Add-track now lives in the transport row as a plain .tl-btn (#tl-btn-add-track),
-   so it no longer needs its own strip row — see add-track-dev.md Phase A. */
+/* Single-region (Full Screen) add-track lives in the transport row as a plain
+   .tl-btn (#tl-btn-add-track). Multi-region layouts (Left/Right etc.) use the
+   per-region inline button below — placed on each region's front-layer row so
+   no extra strip row is consumed. add-track-dev.md Phase A + B. */
+
+/* ─── Per-region "+ Track" — inline on each region's front-layer row ─── */
+.tl-zone-track-btn {
+  flex-shrink: 0;
+  height: 22px;
+  padding: 0 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-2);
+  font: 600 10.5px var(--font);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.tl-zone-track-btn:hover:not(:disabled) {
+  background: rgba(255,255,255,0.12);
+  border-color: var(--border-hi);
+  color: var(--text);
+}
+.tl-zone-track-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* "·N tracks" tag next to a region name in the Output Manager */
+.tl-or-stack-tag {
+  margin-left: 6px;
+  color: var(--text-3);
+  font: 500 10.5px var(--font);
+  letter-spacing: 0.02em;
+}
+
+/* Per-track stack-control row inside a region — slight indent so the visual
+   grouping reads as "region header, then its tracks." */
+.tl-output-route--track {
+  margin-left: 18px;
+  opacity: 0.92;
+}
+.tl-or-name--track {
+  color: var(--text-2);
+  font-weight: 500;
+}
 
 /* ══════════════════════════════════════════════════════════════════════
    FULLSCREEN BUTTON — always-visible, top-right corner

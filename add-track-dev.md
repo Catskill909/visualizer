@@ -1,6 +1,6 @@
 # Add Tracks — Timeline Multi-Track (Design & Dev)
 
-**Status:** ✅ **PHASE A SHIPPED & VERIFIED 2026-05-24.** Full Screen multi-track works: add/remove track, transparent gaps (empty upper track reveals beneath), top-row=front z-order — **and the stacked tracks composite correctly to the main/program output** (verified live). Next code work: [Phase B](#phase-b-task-checklist-regions--do-not-start-until-a-is-verified) (per-region output for multi-region layouts). Design rationale is in [Design Decisions](#design-decisions).
+**Status:** ✅ **PHASE A SHIPPED & VERIFIED 2026-05-24.** ✅ **PHASE B SHIPPED & VERIFIED 2026-05-26.** Multi-region layouts (Left/Right, quadrants, etc.) support per-region track stacking with per-region output routing; tracks added inside a region share that region's rectangle and inherit its output assignment. Operator-screen compositing also gained a defensive guard: `mix-blend-mode` is only written for non-`normal` blend modes (an explicit `'normal'` was forcing every canvas into an isolated group composite, harmless on opaque MilkDrop bases but a foot-gun for straight-alpha canvases). Next code work: [Phase C](#phase-c-task-checklist-polish--independent-of-b) (polish). Design rationale is in [Design Decisions](#design-decisions).
 
 ---
 
@@ -20,13 +20,13 @@
 ## 📋 Phase Board
 
 > **To re-prioritize: reorder phases. The top unchecked phase is what gets built next.**
-> **Current phase:** ✅ **Phase A shipped & verified.** Next code work: **Phase B** (top unchecked phase).
+> **Current phase:** ✅ **Phase B shipped & verified.** Next code work: **Phase C** (polish).
 
 | Phase | Scope | Status |
 |-------|-------|--------|
 | **A** | Full Screen multi-track — add/remove track, transparent gaps, z-order convention | ✅ Shipped & verified 2026-05-24 |
-| **B** | Regions — per-region output routing for Left/Right & other multi-region layouts; tracks inherit region output | ⬜ Not started (next) |
-| **C** | Polish — per-track rename / color / solo-mute, drag-to-reorder z-order | ⬜ Not started |
+| **B** | Regions — per-region output routing for Left/Right & other multi-region layouts; tracks inherit region output | ✅ Shipped & verified 2026-05-26 |
+| **C** | Polish — per-track rename / color / solo-mute, drag-to-reorder z-order | ⬜ Not started (next) |
 
 ### Phase A task checklist (Full Screen only)
 
@@ -37,12 +37,12 @@
 - [x] **A5 — Suppress output chip on Full Screen.** ✅ `_createZoneRow` hides the output chip when `_allFullFrame()` (every zone full-frame = the Full Screen layout).
 - [x] **A6 — Verify (live).** ✅ **Verified 2026-05-24.** Stacking works on the operator screen **and** the stacked tracks composite to the main/program output. Empty upper track reveals beneath (not black); strip row order matches the composite. This unlocks "run multiple tracks to the main out."
 
-### Phase B task checklist (regions — do NOT start until A is verified)
+### Phase B task checklist (regions)
 
-- [ ] **B1 — `regionId` field** on each zone; tracks sharing a `regionId` share rectangle + output.
-- [ ] **B2 — Per-region output routing.** Move routing from per-zone to per-region in `_renderOutputRoutes` / `_assignZoneOutput`: assign once, all tracks in the region inherit `zone.output`.
-- [ ] **B3 — Add-track within a region.** The `+` inside Left/Right/etc. stacks a new track in that region (same rect, next zIndex within the region).
-- [ ] **B4 — Verify** on Left/Right and 4 Quadrants: per-region output, per-region stacking, output mirror correct.
+- [x] **B1 — `regionId` field** on each zone (`mkZone` now takes `regionId`; baked into all `ZONE_LAYOUTS` as `'main'`/`'left'`/`'right'`/`'top'`/`'bottom'`/`'q1'`..`'q4'`/`'frame'`/`'center'`/`'banner'`). Migration `_migrateZoneRegionIds` backfills pre-Phase-B saves from `zone.id` (with `'full'` → `'main'`), called from `_loadTimeline`, `_newTimeline`, and the import path. `defaultZone()` in `timelineStorage.js` also bakes `regionId`. No storage schema bump.
+- [x] **B2 — Per-region output routing.** `_renderOutputRoutes` now iterates regions, one display picker per region (with a `·N tracks` tag when stacked). `_assignRegionOutput(regionId, display)` writes `zone.output` to every track in the region. Per-track blend+opacity stack controls appear once per track underneath the region row when the region has 2+ tracks. The legacy `_assignZoneOutput` (no callers) was deleted.
+- [x] **B3 — Add-track within a region.** `_addTrack(regionId)` copies the region's seed zone's `region` (rect), assigns the next-highest zIndex *within that region*, inherits the region's `output` so the new track joins the existing route immediately. `_canAddTrack(regionId)` enforces the `ADD_TRACK_MAX=4` cap **per region**. The strip's new **`+ Track`** button is **inline on each region's front-layer row** (multi-region layouts only — no extra strip rows; transport `+ Add Track` is the Full-Screen-only shortcut). Removal: the per-row `×` now appears on any non-foundational zone in any stacked region (Left/Right tracks are removable too). `_removeTrack` blocks removing a region's only zone so the rect/route survive.
+- [x] **B4 — Verified live 2026-05-26** on Left/Right with stacked tracks. Per-region stacking confirmed; transparent-bg foreground passes through cleanly (a false-alarm "washed-out faces" report turned out to be the preset author's own alpha design — verified against Preset Studio, identical output). Output Manager per-region rows pick the display correctly; the foundational-zone output chip stays put even after stacking.
 
 ### Phase C task checklist (polish — independent of B)
 
@@ -51,6 +51,8 @@
 
 ### Changelog (newest first)
 
+- **2026-05-26** — **Phase B SHIPPED & VERIFIED** (B1–B4). Live-confirmed: Left/Right multi-region stacking with per-region output. Same-session polish on top of the initial build: (1) output chip now anchors to each region's foundational zone instead of vanishing whenever a region gains a second track — it's always visible at a glance, with "shared by N tracks" in the tooltip; (2) chip enlarged (28×22px, font 11.5px, brighter border) for legibility; (3) zone label column widened 150→196px to breathe with `dot · name · ▸ · + · + Track`; (4) `mix-blend-mode` defensive fix — only write the property for non-`normal` blend modes (an explicit `'normal'` forces an isolated group composite that round-trips a straight-alpha canvas through a premultiplied surface, harmless on opaque MilkDrop bases but a foot-gun for any future straight-alpha source). Applied in both `_positionCanvas`/`_applyZoneStyle` (operator screen) and `outputWindow.js` (mirror windows). A reported "washed-out foreground" symptom turned out to be the preset author's own alpha design (verified by loading the same preset in Preset Studio with `bgTransparent` — identical opacity), not a compositing bug — but the mix-blend-mode guard is a real correctness win regardless.
+- **2026-05-26** — **Phase B built** (B1–B3). Multi-region layouts now support add-track. New: `regionId` on every zone (migration backfills from `id` for old saves); `_regionIds()` / `_zonesInRegion(regionId)` helpers; `_assignRegionOutput(regionId, display)` writes the same `output` to every track in the region; `_renderOutputRoutes` switched to one row per region with per-track blend+opacity stack controls underneath when stacked. Strip UI: per-region **`+ Track`** button inline on each region's front-layer row (no extra strip rows — the constraint was "clean and intuitive, don't waste space"); transport `+ Add Track` shown only when the layout has a single region; per-row output chip suppressed for any zone whose region has 2+ tracks (Phase A's "all full frame" rule generalised). Files: `src/timeline/timelineEditor.js`, `src/timeline/style.css`, `src/timelineStorage.js` (`defaultZone` carries `regionId: 'main'`). New symbols: `_regionIds`, `_zonesInRegion`, `_assignRegionOutput`, `_migrateZoneRegionIds`, `.tl-zone-track-btn`, `.tl-or-stack-tag`, `.tl-output-route--track`. Removed: legacy `_assignZoneOutput` (no callers). `vite build` clean.
 - **2026-05-24** — **UI:** moved **+ Add Track** out of its own strip row into the **transport row, right of the time count** (`#tl-btn-add-track`) — the dedicated row wasted vertical space. Shown only in Full Screen, disabled at the 4-track cap (`_updateAddTrackBtn`). Removed `_createAddTrackRow`, the strip-height reservation, and the `.tl-add-track-row` CSS. `vite build` clean.
 - **2026-05-24** — **Bugfix (Phase A):** removing a track's **last clip while playing** left the preset still painting (over the base, for a transparent track). Cause: `_playZone` early-returned on a zero-entry track and never hid it — and VJ-mode engines never stop rendering. Fix: the zero-entry path now hides the zone (`_fadeZoneCover(zoneId,1,0)` → black cover for base / canvas→transparent for an overlay) + clears preset memory. General correctness fix (the base track shared the latent bug). `vite build` clean.
 - **2026-05-24** — **Phase A SHIPPED & VERIFIED** (A1–A6). Live-confirmed: Full Screen multi-track stacking on the operator screen and composited to the main/program output. "Multiple tracks → main out" now works.

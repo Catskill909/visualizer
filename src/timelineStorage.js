@@ -26,6 +26,7 @@ function defaultZone() {
         blendMode: 'normal',
         zIndex: 0,
         gapBehavior: 'black',
+        regionId: 'main',
     };
 }
 

@@ -54,7 +54,7 @@ function transitionOf(entry) {
 }
 
 // Width of the fixed zone-label column at the left of the strip (px).
-const ZONE_COL_W = 150;   // must match --zone-col-w in style.css
+const ZONE_COL_W = 196;   // must match --zone-col-w in style.css
 
 function fmtTime(totalSec) {
     const s = Math.floor(totalSec);
@@ -63,8 +63,13 @@ function fmtTime(totalSec) {
     return `${m}:${sec}`;
 }
 
-function mkZone(id, name, color, region, zIndex, blendMode = 'normal') {
-    return { id, name, color, region, opacity: 1, blendMode, zIndex, gapBehavior: 'black', output: null };
+// `regionId` tags zones that share a rectangle + an output. Pre-Phase-B layouts
+// had one zone per region with the region's identity baked into the zone id;
+// for added tracks (Phase B onward) regionId is the durable region tag while
+// each track keeps its own unique zone id. Defaults to the zone id for the
+// fixed layouts' base zones so the migration is a no-op.
+function mkZone(id, name, color, region, zIndex, blendMode = 'normal', regionId = null) {
+    return { id, name, color, region, opacity: 1, blendMode, zIndex, gapBehavior: 'black', output: null, regionId: regionId ?? id };
 }
 
 // ─── Predefined zone layouts ──────────────────────────────────────────────────
@@ -73,48 +78,48 @@ const ZONE_LAYOUTS = [
     {
         key: 'full', name: 'Full Screen',
         svg: '<rect x="1" y="1" width="34" height="22" rx="2" fill="rgba(124,111,205,0.3)" stroke="#7c6fcd" stroke-width="1.5"/>',
-        zones: [ mkZone('full','Full','#7c6fcd',{x:0,y:0,width:1,height:1},0) ],
+        zones: [ mkZone('full','Full','#7c6fcd',{x:0,y:0,width:1,height:1},0,'normal','main') ],
     },
     {
         key: 'left-right', name: 'Left | Right',
         svg: '<rect x="1" y="1" width="15" height="22" rx="2" fill="rgba(124,111,205,0.3)" stroke="#7c6fcd" stroke-width="1.5"/><rect x="19" y="1" width="15" height="22" rx="2" fill="rgba(90,138,124,0.3)" stroke="#5a8a7c" stroke-width="1.5"/>',
         zones: [
-            mkZone('full', 'Left',  '#7c6fcd', {x:0,  y:0, width:0.5, height:1}, 0),
-            mkZone('right','Right', '#5a8a7c', {x:0.5,y:0, width:0.5, height:1}, 1),
+            mkZone('full', 'Left',  '#7c6fcd', {x:0,  y:0, width:0.5, height:1}, 0, 'normal', 'left'),
+            mkZone('right','Right', '#5a8a7c', {x:0.5,y:0, width:0.5, height:1}, 1, 'normal', 'right'),
         ],
     },
     {
         key: 'top-bottom', name: 'Top / Bottom',
         svg: '<rect x="1" y="1" width="34" height="9" rx="2" fill="rgba(124,111,205,0.3)" stroke="#7c6fcd" stroke-width="1.5"/><rect x="1" y="14" width="34" height="9" rx="2" fill="rgba(90,138,124,0.3)" stroke="#5a8a7c" stroke-width="1.5"/>',
         zones: [
-            mkZone('full',  'Top',   '#7c6fcd', {x:0,y:0,  width:1,height:0.5}, 0),
-            mkZone('bottom','Bottom','#5a8a7c', {x:0,y:0.5,width:1,height:0.5}, 1),
+            mkZone('full',  'Top',   '#7c6fcd', {x:0,y:0,  width:1,height:0.5}, 0, 'normal', 'top'),
+            mkZone('bottom','Bottom','#5a8a7c', {x:0,y:0.5,width:1,height:0.5}, 1, 'normal', 'bottom'),
         ],
     },
     {
         key: 'quadrants', name: '4 Quadrants',
         svg: '<rect x="1" y="1" width="15" height="9" rx="1" fill="rgba(124,111,205,0.3)" stroke="#7c6fcd" stroke-width="1.5"/><rect x="19" y="1" width="15" height="9" rx="1" fill="rgba(90,138,124,0.3)" stroke="#5a8a7c" stroke-width="1.5"/><rect x="1" y="14" width="15" height="9" rx="1" fill="rgba(138,106,90,0.3)" stroke="#8a6a5a" stroke-width="1.5"/><rect x="19" y="14" width="15" height="9" rx="1" fill="rgba(90,122,138,0.3)" stroke="#5a7a8a" stroke-width="1.5"/>',
         zones: [
-            mkZone('full','Top Left',    '#7c6fcd', {x:0,  y:0,   width:0.5,height:0.5}, 0),
-            mkZone('q2',  'Top Right',   '#5a8a7c', {x:0.5,y:0,   width:0.5,height:0.5}, 1),
-            mkZone('q3',  'Bottom Left', '#8a6a5a', {x:0,  y:0.5, width:0.5,height:0.5}, 2),
-            mkZone('q4',  'Bottom Right','#5a7a8a', {x:0.5,y:0.5, width:0.5,height:0.5}, 3),
+            mkZone('full','Top Left',    '#7c6fcd', {x:0,  y:0,   width:0.5,height:0.5}, 0, 'normal', 'q1'),
+            mkZone('q2',  'Top Right',   '#5a8a7c', {x:0.5,y:0,   width:0.5,height:0.5}, 1, 'normal', 'q2'),
+            mkZone('q3',  'Bottom Left', '#8a6a5a', {x:0,  y:0.5, width:0.5,height:0.5}, 2, 'normal', 'q3'),
+            mkZone('q4',  'Bottom Right','#5a7a8a', {x:0.5,y:0.5, width:0.5,height:0.5}, 3, 'normal', 'q4'),
         ],
     },
     {
         key: 'center-frame', name: 'Center + Frame',
         svg: '<rect x="1" y="1" width="34" height="22" rx="2" fill="rgba(124,111,205,0.15)" stroke="#7c6fcd" stroke-width="1.5"/><rect x="7" y="5" width="22" height="14" rx="2" fill="rgba(205,159,90,0.3)" stroke="#cd9f5a" stroke-width="1.5"/>',
         zones: [
-            mkZone('full',  'Frame', '#7c6fcd', {x:0,   y:0,   width:1,  height:1  }, 0),
-            mkZone('center','Center','#cd9f5a', {x:0.15,y:0.15,width:0.7,height:0.7}, 1),
+            mkZone('full',  'Frame', '#7c6fcd', {x:0,   y:0,   width:1,  height:1  }, 0, 'normal', 'frame'),
+            mkZone('center','Center','#cd9f5a', {x:0.15,y:0.15,width:0.7,height:0.7}, 1, 'normal', 'center'),
         ],
     },
     {
         key: 'top-banner', name: 'Top Banner',
         svg: '<rect x="1" y="1" width="34" height="22" rx="2" fill="rgba(124,111,205,0.15)" stroke="#7c6fcd" stroke-width="1.5"/><rect x="1" y="1" width="34" height="6" rx="2" fill="rgba(90,138,205,0.3)" stroke="#5a8acd" stroke-width="1.5"/>',
         zones: [
-            mkZone('full',  'Main',  '#7c6fcd', {x:0,y:0,   width:1,height:1   }, 0),
-            mkZone('banner','Banner','#5a8acd', {x:0,y:0,   width:1,height:0.22}, 1),
+            mkZone('full',  'Main',  '#7c6fcd', {x:0,y:0,   width:1,height:1   }, 0, 'normal', 'main'),
+            mkZone('banner','Banner','#5a8acd', {x:0,y:0,   width:1,height:0.22}, 1, 'normal', 'banner'),
         ],
     },
 ];
@@ -359,7 +364,12 @@ export class TimelineEditor {
         this._btnSkipNext?.addEventListener('click', () => this._skipToNextBlock());
         this._btnLoop.addEventListener('click',     () => this._toggleLoop());
         this._btnZones?.addEventListener('click',   () => this._openZoneMgr());
-        this._btnAddTrack?.addEventListener('click', () => this._addTrack());
+        // Transport "+ Add Track" is the single-region shortcut (Full Screen).
+        // Multi-region layouts use per-region buttons in the strip instead.
+        this._btnAddTrack?.addEventListener('click', () => {
+            const regions = this._regionIds();
+            if (regions.length === 1) this._addTrack(regions[0]);
+        });
 
         this._zoomInput.addEventListener('input', () => {
             this._pxPerSec = parseInt(this._zoomInput.value, 10);
@@ -658,6 +668,7 @@ export class TimelineEditor {
 
     _newTimeline() {
         this._tl = createTimeline('Untitled Timeline');
+        this._migrateZoneRegionIds(this._tl);
         this._nameInput.value = this._tl.name;
         this._selectEl.value  = '';
         this._syncZoneCanvases();
@@ -670,6 +681,18 @@ export class TimelineEditor {
             if (!confirm('Discard unsaved changes and start a new timeline?')) return;
         }
         this._newTimeline();
+    }
+
+    // Backfill regionId on pre-Phase-B saves. The fixed layouts had one zone per
+    // region, with the region's identity baked into the zone id, so falling back
+    // to id is a faithful migration. `'full'` is the shared primary-engine id —
+    // it maps to 'main' so Full Screen tracks added in Phase A also get a real
+    // regionId regardless of when they were saved.
+    _migrateZoneRegionIds(tl) {
+        for (const zone of (tl.zones || [])) {
+            if (zone.regionId) continue;
+            zone.regionId = zone.id === 'full' ? 'main' : zone.id;
+        }
     }
 
     // Migrate old timelines that stored startTime:0 for all entries.
@@ -693,6 +716,7 @@ export class TimelineEditor {
         if (!tl) return;
         this._tl = JSON.parse(JSON.stringify(tl));
         this._migrateEntryStartTimes(this._tl);
+        this._migrateZoneRegionIds(this._tl);
         this._nameInput.value = this._tl.name;
         this._selectEl.value  = id;
         this.stop();
@@ -933,7 +957,14 @@ export class TimelineEditor {
         // at zIndex*2+1 (set in _syncZoneCanvases). A lower zone's full-screen cover
         // must sit BELOW the next zone's canvas so it can't black out an overlay.
         canvas.style.zIndex    = (zone.zIndex ?? 0) * 2;
-        canvas.style.mixBlendMode = zone.blendMode || 'normal';
+        // Setting mix-blend-mode to anything — even 'normal' — forces the element
+        // into an isolated group composite. For canvases with straight (non-
+        // premultiplied) alpha, the group round-trip desaturates the foreground
+        // (face-pattern preset stacked over a MilkDrop base appeared washed-out
+        // until this guard landed). Only write the property for real blend
+        // modes; leave it empty for 'normal' so the browser does the default
+        // alpha compositing — exactly what the Preset Studio canvas does.
+        canvas.style.mixBlendMode = (zone.blendMode && zone.blendMode !== 'normal') ? zone.blendMode : '';
         // Transparent-gap tracks own their canvas opacity via _fadeZoneCover (it is
         // the hide/reveal channel). Don't clobber a mid-gap fade on resize/sync.
         if (zone.gapBehavior !== 'transparent') canvas.style.opacity = String(zone.opacity ?? 1);
@@ -1039,32 +1070,37 @@ export class TimelineEditor {
 
         const displays = this._displays || [];
 
-        // How many zones share each display → ≥2 means a stack, which gets the
-        // per-layer blend + opacity controls below.
-        const countByDisplay = new Map();
-        for (const z of zones) {
-            if (z.output && !z.output._offline) {
-                countByDisplay.set(z.output.displayId, (countByDisplay.get(z.output.displayId) || 0) + 1);
-            }
-        }
+        // Phase B: routing is per-region (one display picker per region; all
+        // tracks in the region inherit `zone.output`). Per-track blend + opacity
+        // stack controls still appear when a region has 2+ tracks — those are
+        // intra-region layer compositing, not routing.
+        for (const regionId of this._regionIds()) {
+            const region = this._zonesInRegion(regionId);
+            if (!region.length) continue;
+            // The first-inserted zone is the region's foundational zone — its
+            // colour + name read naturally for the region header.
+            const head = region[0];
+            // Reading the route off any region member is safe: _assignRegionOutput
+            // writes the same `output` to every track in the region.
+            const route = head.output;
 
-        for (const zone of zones) {
             const row = document.createElement('div');
             row.className = 'tl-output-route';
 
             const name = document.createElement('span');
             name.className = 'tl-or-name';
+            const stackTag = region.length > 1 ? ` <span class="tl-or-stack-tag">·${region.length} tracks</span>` : '';
             name.innerHTML =
-                `<span class="tl-zone-dot" style="background:${zone.color}"></span>${zone.name}`;
+                `<span class="tl-zone-dot" style="background:${head.color}"></span>${head.name}${stackTag}`;
 
             const sel = document.createElement('select');
             sel.className = 'tl-or-select';
             sel.innerHTML = '<option value="">Off</option>';
 
-            if (zone.output?._offline) {
+            if (route?._offline) {
                 const offlineOpt = document.createElement('option');
                 offlineOpt.value = '__offline';
-                offlineOpt.textContent = `⚠ ${zone.output.displayLabel || 'Saved display'} — not detected`;
+                offlineOpt.textContent = `⚠ ${route.displayLabel || 'Saved display'} — not detected`;
                 sel.appendChild(offlineOpt);
             }
 
@@ -1074,24 +1110,62 @@ export class TimelineEditor {
                 o.textContent = `${d.label} — ${d.w}×${d.h}`;
                 sel.appendChild(o);
             }
-            sel.value = zone.output?._offline ? '__offline' : (zone.output?.displayId ?? '');
+            sel.value = route?._offline ? '__offline' : (route?.displayId ?? '');
             sel.addEventListener('change', () => {
                 if (sel.value === '__offline') return;
                 const d = displays.find(x => x.id === sel.value) || null;
-                this._assignZoneOutput(zone.id, d);
+                this._assignRegionOutput(regionId, d);
             });
 
             row.appendChild(name);
             row.appendChild(sel);
-
-            // Stacked? expose this layer's blend mode + opacity (one source of
-            // truth — the same fields that drive the operator screen).
-            const stacked = zone.output && !zone.output._offline &&
-                (countByDisplay.get(zone.output.displayId) || 0) >= 2;
-            if (stacked) row.appendChild(this._buildStackControls(zone));
-
             this._outputRoutesEl.appendChild(row);
+
+            // Per-track blend + opacity, one row per track when the region has
+            // 2+ tracks. Same fields _positionCanvas/_syncOutputs already read,
+            // so operator screen and mirrored output stay in lockstep.
+            if (region.length > 1) {
+                // Front-layer first matches the strip's Photoshop convention
+                // (top row = front), so reading top-to-bottom in the Output
+                // Manager matches reading top-to-bottom in the strip.
+                const ordered = [...region].sort((a, b) => (b.zIndex ?? 0) - (a.zIndex ?? 0));
+                for (const track of ordered) {
+                    const trackRow = document.createElement('div');
+                    trackRow.className = 'tl-output-route tl-output-route--track';
+                    const trackName = document.createElement('span');
+                    trackName.className = 'tl-or-name tl-or-name--track';
+                    trackName.innerHTML =
+                        `<span class="tl-zone-dot" style="background:${track.color}"></span>${track.name}`;
+                    trackRow.appendChild(trackName);
+                    trackRow.appendChild(this._buildStackControls(track));
+                    this._outputRoutesEl.appendChild(trackRow);
+                }
+            }
         }
+    }
+
+    // Writes `output` to every track in the region, then resyncs. This is the
+    // "assign once, all tracks inherit" rule from add-track-dev.md Phase B.
+    async _assignRegionOutput(regionId, display) {
+        if (!this._tl) return;
+        const region = this._zonesInRegion(regionId);
+        if (!region.length) return;
+        for (const zone of region) {
+            if (!display) {
+                zone.output = null;
+            } else {
+                const zd = this._zoneMap.get(zone.id);
+                if (!zd?.canvas) continue;        // canvas not built yet — skip, retry on next sync
+                zone.output = { displayId: display.id, displayLabel: display.label, fullscreen: false };
+            }
+        }
+        await this._syncOutputs();
+        if (display && this._zoneOutputLive(region[0])) {
+            this._toast(`${region[0].name}${region.length > 1 ? ` (+${region.length - 1})` : ''} → ${display.label}`);
+        }
+        this._setDirty();
+        this._updateOutputChips();
+        this._renderOutputRoutes();
     }
 
     // Per-stacked-layer blend + opacity controls. Writes zone.blendMode/opacity —
@@ -1142,25 +1216,6 @@ export class TimelineEditor {
         return wrap;
     }
 
-    async _assignZoneOutput(zoneId, display) {
-        const zone = (this._tl?.zones || []).find(z => z.id === zoneId);
-        if (!zone) return;
-
-        if (!display) {
-            zone.output = null;
-        } else {
-            const zd = this._zoneMap.get(zoneId);
-            if (!zd?.canvas) { this._toast('Zone has no canvas yet'); return; }
-            zone.output = { displayId: display.id, displayLabel: display.label, fullscreen: false };
-        }
-
-        await this._syncOutputs();
-        if (display && this._zoneOutputLive(zone)) this._toast(`${zone.name} → ${display.label}`);
-        this._setDirty();
-        this._updateOutputChips();
-        this._renderOutputRoutes();
-    }
-
     // Output windows are keyed by DISPLAY, not zone (A3 stacking): many zones →
     // one display compose into one window as layered <video>s. This key is the
     // outId handed to outputManager for a given physical display.
@@ -1176,7 +1231,10 @@ export class TimelineEditor {
     _applyZoneStyle(zone) {
         const zd = this._zoneMap.get(zone.id);
         if (!zd?.canvas) return;
-        zd.canvas.style.mixBlendMode = zone.blendMode || 'normal';
+        // See _positionCanvas — only set mix-blend-mode for non-normal modes; an
+        // explicit 'normal' creates an isolated group composite that desaturates
+        // straight-alpha canvases.
+        zd.canvas.style.mixBlendMode = (zone.blendMode && zone.blendMode !== 'normal') ? zone.blendMode : '';
         zd.canvas.style.opacity = String(zone.opacity ?? 1);
     }
 
@@ -1981,24 +2039,47 @@ export class TimelineEditor {
         const ordered  = [...zones].sort((a, b) => (b.zIndex ?? 0) - (a.zIndex ?? 0));
         const baseZone = ordered[ordered.length - 1];
 
+        // Region sizes for chip-suppression + +Track topmost detection. Counted
+        // once per render to keep _createZoneRow a simple per-row function.
+        const regionSize  = new Map();
+        for (const z of zones) {
+            const rid = z.regionId || z.id;
+            regionSize.set(rid, (regionSize.get(rid) || 0) + 1);
+        }
+        const regionTopSeen = new Set();    // first occurrence in descending-zIndex order = the region's front layer
+
+        const multiRegion = regionSize.size > 1;
+
         for (const zone of ordered) {
+            const rid = zone.regionId || zone.id;
+            const isRegionTop = !regionTopSeen.has(rid);
+            if (isRegionTop) regionTopSeen.add(rid);
+
             const zoneEntries = entries.filter(e => e.zoneId === zone.id);
-            const row = this._createZoneRow(zone, zoneEntries, !hasEntries && zone === baseZone);
+            const row = this._createZoneRow(zone, zoneEntries, !hasEntries && zone === baseZone, {
+                regionSize:   regionSize.get(rid),
+                isRegionTop,
+                multiRegion,
+            });
             this._tracksEl.appendChild(row);
         }
 
-        // Add-track lives in the transport row (saves vertical strip space).
+        // Transport "+ Add Track" is the single-region shortcut. Per-region
+        // buttons live inline on each region's front-layer row (no extra rows).
         this._updateAddTrackBtn();
     }
 
-    // Show the transport "+ Add Track" button only for the Full Screen layout
-    // (Phase A); disable it at the soft cap.
+    // Show the transport "+ Add Track" button only for single-region layouts
+    // (Full Screen). Multi-region layouts get per-region buttons in the strip,
+    // so the transport shortcut is hidden to avoid an ambiguous "which region?"
+    // click.
     _updateAddTrackBtn() {
         if (!this._btnAddTrack) return;
-        const show = this._allFullFrame();
+        const regions = this._regionIds();
+        const show = regions.length === 1;
         this._btnAddTrack.style.display = show ? '' : 'none';
         if (show) {
-            const atCap = (this._tl?.zones?.length || 0) >= ADD_TRACK_MAX;
+            const atCap = !this._canAddTrack(regions[0]);
             this._btnAddTrack.disabled = atCap;
             this._btnAddTrack.title = atCap
                 ? `Maximum ${ADD_TRACK_MAX} tracks`
@@ -2006,50 +2087,74 @@ export class TimelineEditor {
         }
     }
 
-    // ─── Multi-track (add/remove) — add-track-dev.md Phase A ────────────────────
+    // ─── Multi-track (add/remove) — add-track-dev.md Phase A + B ────────────────
 
     _isFullFrameZone(zone) {
         const r = zone?.region;
         return !!r && r.x === 0 && r.y === 0 && r.width === 1 && r.height === 1;
     }
 
-    // The Full Screen layout: every zone is a full-frame layer (base + stacked
-    // tracks). This is the only layout that supports add-track today (Phase A).
+    // The Full Screen layout: a single region, every zone full-frame. Used to
+    // pick the transport-row shortcut button vs. the per-region buttons.
     _allFullFrame() {
         const zones = this._tl?.zones || [];
         return zones.length > 0 && zones.every(z => this._isFullFrameZone(z));
     }
 
-    _canAddTrack() {
+    // Distinct regions in the current layout, preserved in zone-array order so
+    // Left appears before Right in the strip, Top before Bottom, etc.
+    _regionIds() {
         const zones = this._tl?.zones || [];
-        return this._allFullFrame() && zones.length < ADD_TRACK_MAX;
+        const seen  = new Set();
+        const order = [];
+        for (const z of zones) {
+            const rid = z.regionId || z.id;
+            if (!seen.has(rid)) { seen.add(rid); order.push(rid); }
+        }
+        return order;
     }
 
-    _addTrack() {
-        if (!this._tl || !this._canAddTrack()) return;
-        const zones = this._tl.zones;
-        const maxZ  = zones.reduce((m, z) => Math.max(m, z.zIndex ?? 0), 0);
-        const n     = zones.length + 1;
-        const zone  = {
+    _zonesInRegion(regionId) {
+        return (this._tl?.zones || []).filter(z => (z.regionId || z.id) === regionId);
+    }
+
+    _canAddTrack(regionId) {
+        if (!this._tl) return false;
+        const region = this._zonesInRegion(regionId);
+        if (!region.length) return false;
+        // Per-region soft cap matches the Full Screen cap from Phase A. Total
+        // engines = sum across regions; revisit if context exhaustion shows up.
+        return region.length < ADD_TRACK_MAX;
+    }
+
+    _addTrack(regionId) {
+        if (!this._tl || !this._canAddTrack(regionId)) return;
+        const region = this._zonesInRegion(regionId);
+        const seed   = region[0];                                 // copy rect + output from any region member
+        const maxZ   = region.reduce((m, z) => Math.max(m, z.zIndex ?? 0), 0);
+        const zones  = this._tl.zones;
+        const n      = region.length + 1;
+        const zone   = {
             id: generateId(),
-            name: `Track ${n}`,
-            color: TRACK_COLORS[(n - 1) % TRACK_COLORS.length],
-            region: { x: 0, y: 0, width: 1, height: 1 },
+            name: region.length === 1
+                ? `${seed.name} 2`            // first stacked track reads naturally: "Left 2"
+                : `${seed.name} ${n}`,
+            color: TRACK_COLORS[(zones.length) % TRACK_COLORS.length],
+            region: { ...seed.region },        // share the region's rect
             opacity: 1,
             blendMode: 'normal',
-            zIndex: maxZ + 1,            // lands on top of the stack (front layer)
-            gapBehavior: 'transparent',  // empty = reveal the track beneath, not black
-            output: null,
+            zIndex: maxZ + 1,                  // lands on top of the region's stack
+            gapBehavior: 'transparent',        // empty = reveal the track beneath
+            output: seed.output ? { ...seed.output } : null,  // inherit region's output assignment
+            regionId,
         };
         zones.push(zone);
         this._setDirty();
-        this._syncZoneCanvases();        // builds the slave engine + canvas + cover
-        // A fresh transparent track starts hidden (revealing the base) until a clip
-        // plays. Must run AFTER _syncZoneCanvases creates the canvas.
+        this._syncZoneCanvases();              // builds the slave engine + canvas + cover
+        // A fresh transparent track starts hidden (revealing what's beneath)
+        // until a clip plays. Must run AFTER _syncZoneCanvases creates the canvas.
         this._fadeZoneCover(zone.id, 1, 0);
         if (this._playing) {
-            // play() starts every engine's loop up front; a track born mid-playback
-            // missed that, so start its loop before the reschedule loads into it.
             const zd = this._zoneMap.get(zone.id);
             if (zd && !zd.engine.isRunning) zd.engine.startRenderLoop();
             this._rescheduleIfPlaying();
@@ -2057,6 +2162,9 @@ export class TimelineEditor {
             this._scrubTo(this._currentTime);
         }
         this._renderStrip();
+        // _syncOutputs picks up the inherited route so the new track joins its
+        // region's output window immediately (no second click required).
+        if (zone.output) this._syncOutputs();
         this._toast(`Added ${zone.name}`);
     }
 
@@ -2064,9 +2172,12 @@ export class TimelineEditor {
         if (!this._tl) return;
         if (zoneId === 'full') return;          // base/primary engine is not removable
         const zones = this._tl.zones;
-        if (zones.length <= 1) return;          // never remove the last track
         const idx = zones.findIndex(z => z.id === zoneId);
         if (idx === -1) return;
+        // Preserve every region's foundational zone so the layout's rectangle
+        // structure (and the region's saved output route) survives.
+        const region = this._zonesInRegion(zones[idx].regionId || zones[idx].id);
+        if (region.length <= 1) return;
 
         zones.splice(idx, 1);
         this._tl.entries = this._tl.entries.filter(e => e.zoneId !== zoneId);
@@ -2079,7 +2190,7 @@ export class TimelineEditor {
         this._toast('Track removed');
     }
 
-    _createZoneRow(zone, entries, showEmpty) {
+    _createZoneRow(zone, entries, showEmpty, regionInfo = { regionSize: 1, isRegionTop: true, multiRegion: false }) {
         const row = document.createElement('div');
         row.className = 'tl-zone-row';
         row.dataset.zoneId = zone.id;
@@ -2091,7 +2202,7 @@ export class TimelineEditor {
             `<div class="tl-zone-dot" style="background:${zone.color}"></div>` +
             `<span class="tl-zone-name">${zone.name}</span>`;
 
-        // "+" add button within the zone label
+        // "+" add-preset button within the zone label
         const addBtn = document.createElement('button');
         addBtn.className = 'tl-zone-add-btn';
         addBtn.type = 'button';
@@ -2102,16 +2213,23 @@ export class TimelineEditor {
             this._openPicker(zone.id);
         });
 
-        // Output routing chip — neutral grey, brighter when an output is live.
-        // Suppressed in the Full Screen layout: one region = one program output,
-        // so per-track routing is meaningless there (add-track Phase A5).
-        if (!this._allFullFrame()) {
+        // Output routing chip. Anchored to the region's foundational zone so the
+        // region's output assignment is always visible at a glance — even when
+        // the region is stacked (the chip used to vanish whenever you added a
+        // track, leaving no per-region anchor in the strip). Suppressed in
+        // single-region layouts (Full Screen) where the topbar Outputs button
+        // covers the lone program output.
+        const regionId = zone.regionId || zone.id;
+        const region   = this._zonesInRegion(regionId);
+        const isFoundational = region[0]?.id === zone.id;
+        if (regionInfo.multiRegion && isFoundational) {
             const outChip = document.createElement('button');
             outChip.className = 'tl-zone-out-chip';
             outChip.type = 'button';
             if (this._zoneOutputLive(zone)) outChip.classList.add('is-live');
             outChip.textContent = this._zoneOutTag(zone);
-            outChip.title = zone.output?.displayLabel ? `Output: ${zone.output.displayLabel}` : 'Send this zone to a display';
+            const baseTip = zone.output?.displayLabel ? `Output: ${zone.output.displayLabel}` : 'Send this region to a display';
+            outChip.title = region.length > 1 ? `${baseTip} (shared by all ${region.length} tracks in ${zone.name})` : baseTip;
             outChip.addEventListener('click', e => {
                 e.stopPropagation();
                 this._openOutputMgr();
@@ -2121,8 +2239,33 @@ export class TimelineEditor {
 
         labelEl.appendChild(addBtn);
 
-        // Remove-track — added tracks only (base 'full' is never removable).
-        if (this._allFullFrame() && zone.id !== 'full') {
+        // Per-region "+ Track" — inline on the region's front-layer row only, so
+        // no extra strip row is consumed. Hidden in single-region layouts (the
+        // transport-row shortcut covers Full Screen). Disabled at the per-region
+        // soft cap. The new track lands on top, so after a click the button
+        // moves up with the new front layer.
+        if (regionInfo.multiRegion && regionInfo.isRegionTop) {
+            const trackBtn = document.createElement('button');
+            trackBtn.className = 'tl-zone-track-btn';
+            trackBtn.type = 'button';
+            const atCap = !this._canAddTrack(regionId);
+            trackBtn.disabled = atCap;
+            trackBtn.title = atCap
+                ? `Maximum ${ADD_TRACK_MAX} tracks in this region`
+                : `Add a track on top of ${zone.name}`;
+            trackBtn.textContent = '+ Track';
+            trackBtn.addEventListener('click', e => {
+                e.stopPropagation();
+                this._addTrack(regionId);
+            });
+            labelEl.appendChild(trackBtn);
+        }
+
+        // Remove-track — added tracks only (the region's foundational zone is
+        // never removable). _removeTrack also blocks removal of the primary
+        // 'full' zone for engine-safety; here we just gate the button.
+        const canRemove = !isFoundational && zone.id !== 'full' && region.length > 1;
+        if (canRemove) {
             const rmBtn = document.createElement('button');
             rmBtn.className = 'tl-zone-remove-btn';
             rmBtn.type = 'button';
@@ -3324,6 +3467,7 @@ export class TimelineEditor {
             this._timelines[imported.id] = imported;
             this._tl    = JSON.parse(JSON.stringify(imported));
             this._migrateEntryStartTimes(this._tl);
+            this._migrateZoneRegionIds(this._tl);
             this._nameInput.value = this._tl.name;
             this._refreshSelector();
             this._selectEl.value = this._tl.id;

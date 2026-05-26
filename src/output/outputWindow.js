@@ -30,7 +30,13 @@ function makeVideo() {
 function applyStyle(v, L, instant) {
   // Position/size come from CSS (full-frame). zIndex/blend are cheap, always set.
   v.style.zIndex = String(L.zIndex ?? 0);
-  v.style.mixBlendMode = L.blendMode || 'normal';
+  // Setting mix-blend-mode to anything — even 'normal' — forces the element into
+  // an isolated group composite, which round-trips through a premultiplied surface
+  // and desaturates straight-alpha sources (a stacked transparent-bg preset's
+  // foreground looked washed-out until this guard landed). Only set the property
+  // for real blend modes; leave it empty for 'normal' so the browser does default
+  // alpha compositing.
+  v.style.mixBlendMode = (L.blendMode && L.blendMode !== 'normal') ? L.blendMode : '';
 
   // Opacity is the timeline-driven part. A new layer snaps; an existing one
   // crossfades over transitionMs (the operator cover's fade) so a clip ending

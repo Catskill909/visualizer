@@ -26,10 +26,22 @@
       <div id="beta-modal-copy" class="promo-modal-scroll-area">
         <p class="promo-modal-subtitle">What's new:</p>
         <ul class="promo-modal-list">
+          <li><strong>Timeline — Multi-Track Stacking ✨ NEW</strong> — Stack multiple presets <em>inside</em> a single
+            zone — the Timeline is now a real layer compositor. In <strong>Full Screen</strong>, the transport row's
+            <strong>+ Add Track</strong> button drops a new track on top of the stack (up to 4 deep). In
+            <strong>Left/Right</strong>, <strong>Quadrants</strong>, and the other multi-zone layouts, each zone gets
+            its own inline <strong>+ Track</strong> button on its front-layer row — no extra strip rows wasted. Strip
+            order is Photoshop-style: <strong>top row = front layer</strong>, so the strip reads like the composite.
+            Added tracks default to transparent gaps (empty space reveals the track beneath instead of painting black),
+            and paired with a Transparent Background preset, the upper preset's own transparent pixels reveal beneath
+            too — true per-pixel layer compositing. Output routing is <strong>per zone</strong>: one
+            <strong>▸</strong> chip on each zone's foundational row picks the display for every track in that zone, and
+            stacked zones expose per-track blend mode + opacity in the Outputs panel.
+          </li>
           <li><strong>Aspect Lock — layers hold their shape ✨ NEW</strong> — Every image, video, GIF, and text
             layer now has an <strong>Aspect</strong> control, set to <strong>Lock</strong> by default: the layer keeps
             its true shape on <em>any</em> canvas, so resizing the window or going full screen <strong>reveals more of
-            the scene instead of stretching it</strong>. Flip to <strong>Fluid</strong> for the old canvas-adaptive
+              the scene instead of stretching it</strong>. Flip to <strong>Fluid</strong> for the old canvas-adaptive
             behaviour. Single, tiled, and grid layers are all covered — and the editor canvas no longer distorts when
             you hide the panel for a full-width preview.</li>
           <li><strong>Transparent Preset Backgrounds — Timeline Stacking ✨ NEW</strong> — A whole preset can now go
@@ -46,9 +58,12 @@
             base — taking the variety from a dozen surface combinations to <strong>1,144 starting points</strong>.
             Click it again to reroll. The footer is now five big Material-Symbols icon buttons with instant tooltips:
             <strong>＋ New</strong>, <strong>🎲 Random</strong>, <strong>🎨 Remix</strong> (renamed from
-            Surprise — same one-click re-roll of palette + motion + wave on whatever's loaded), <strong>💾 Save</strong>,
-            <strong>↺ Reset</strong>. The Wave tab also gets two real engine upgrades via a vendored fork of Butterchurn:
-            a continuous <strong>Thickness slider (0–8)</strong> replaces the old on/off toggle (smoothly scales the wave
+            Surprise — same one-click re-roll of palette + motion + wave on whatever's loaded), <strong>💾
+              Save</strong>,
+            <strong>↺ Reset</strong>. The Wave tab also gets two real engine upgrades via a vendored fork of
+            Butterchurn:
+            a continuous <strong>Thickness slider (0–8)</strong> replaces the old on/off toggle (smoothly scales the
+            wave
             line from hairline to bold), and a new <strong>Rotation slider (±180°)</strong> spins the wave shape around
             its own anchor. Both apply to every shape mode including Ripple, both compose cleanly with the existing
             Reactivity panel, and double-click on any slider label resets it to its default.
@@ -107,21 +122,11 @@
             overlapping each other for organic, scattered layouts. A <strong>Seed</strong> control reshuffles the
             random pattern. Composes with the existing Spin, Group, and Angle.
           </li>
-          <li><strong>Video Layers</strong> — Drop MP4/WebM files into presets with full playback controls (play/pause,
-            loop, speed, scrub), independent Width &amp; Height scaling, colored Border ring (width, color, feather),
-            full color grading (12 controls: Brightness, Contrast, Gamma, Fade, Color Temperature, Sepia, Blur, Shadows,
-            Highlights, Lift, Gain, Tint M/G). Auto conversion to 720p on upload. <strong>✨ NEW: videos tile</strong> —
-            Density or Grid mode with the full per-cell stack (Offset, Cell Rotate, Popcorn, Size/Jitter/Opacity Var, Seed),
-            and it works on transparent videos too.</li>
           <li><strong>Transparent Video Layers ✨ NEW</strong> — Drop a WebM with an alpha channel (e.g. an AI-rotoscoped
             subject from <a href="https://sammieroto.com" target="_blank" rel="noopener">Sammie Roto</a>) and the
             subject
             floats over the visualizer with full transparency. Works on web, Windows, and macOS (Mac auto-converts on
             first import). All VJ effects, audio reactivity, and motion controls apply to every frame.</li>
-          <li><strong>Spectral Flux audio source</strong> — a fifth reactivity source in the Preset Studio. Flux detects
-            transients (snare hits, claps, plucks) by measuring frame-to-frame change in the frequency spectrum. It
-            fires on the sharp edge of each attack and stays quiet during sustained notes — useful when Bass smears
-            across the beat and you want only the precise hit.</li>
           <li><strong>Various bug fixes</strong></li>
         </ul>
 
@@ -244,7 +249,8 @@
           <p>Make a whole preset see-through, not just one layer. <strong>Show layers only</strong> +
             <strong>Transparent background</strong> drop the canvas to transparent so your layers float on nothing —
             then stack transparent presets in the Timeline and each one reveals the zone beneath it. Web, Windows, and
-            macOS.</p>
+            macOS.
+          </p>
         </div>
         <div class="feature-card fade-in">
           <h3>Animated GIF Layers</h3>
@@ -399,7 +405,8 @@
               <div class="il-item"><span class="il-dot"></span>Scale 10%–200% coverage · Mirror (H / V / Quad /
                 Kaleidoscope)</div>
               <div class="il-item"><span class="il-dot"></span><strong>Tile &amp; Grid ✨</strong> — Density or explicit
-                Cols×Rows, full per-cell stack (Offset, Cell Rotate, Popcorn, variance, Seed); works on transparent video</div>
+                Cols×Rows, full per-cell stack (Offset, Cell Rotate, Popcorn, variance, Seed); works on transparent
+                video</div>
               <div class="il-item"><span class="il-dot"></span>Width &amp; Height — independent non-uniform scaling
                 (0.25×–4×) per axis</div>
               <div class="il-item"><span class="il-dot"></span>Border — colored ring outside video edge (width, color,
@@ -564,45 +571,60 @@
           <div class="il-category">
             <div class="il-category-title">Motion Presets ✨</div>
             <div class="image-layers-grid">
-              <div class="il-item"><span class="il-dot"></span>Six one-click motion looks at the top of the Motion tab: Vortex, Calm Drift, Earthquake, Tunnel In, Spin Lock, Hyperspace</div>
-              <div class="il-item"><span class="il-dot"></span>↺ Reset button snaps all motion parameters back to defaults in one click</div>
+              <div class="il-item"><span class="il-dot"></span>Six one-click motion looks at the top of the Motion tab:
+                Vortex, Calm Drift, Earthquake, Tunnel In, Spin Lock, Hyperspace</div>
+              <div class="il-item"><span class="il-dot"></span>↺ Reset button snaps all motion parameters back to
+                defaults in one click</div>
             </div>
           </div>
 
           <div class="il-category">
             <div class="il-category-title">Wave Audio Reactivity ✨</div>
             <div class="image-layers-grid">
-              <div class="il-item"><span class="il-dot"></span>Source + Curve + Size / Opacity / Shape / Orbit sliders drive the wave overlay from any audio band</div>
-              <div class="il-item"><span class="il-dot"></span>Per-slider source pill — e.g. bass pumps wave size while treble morphs shape, independently</div>
+              <div class="il-item"><span class="il-dot"></span>Source + Curve + Size / Opacity / Shape / Orbit sliders
+                drive the wave overlay from any audio band</div>
+              <div class="il-item"><span class="il-dot"></span>Per-slider source pill — e.g. bass pumps wave size while
+                treble morphs shape, independently</div>
             </div>
           </div>
 
           <div class="il-category">
             <div class="il-category-title">Palette Workflow ✨</div>
             <div class="image-layers-grid">
-              <div class="il-item"><span class="il-dot"></span>Hover any of the 12 chips to preview colors live on the canvas before committing</div>
-              <div class="il-item"><span class="il-dot"></span>Lock individual channels (Wave / Glow / Accent) to protect them from palette changes</div>
-              <div class="il-item"><span class="il-dot"></span>"+ Save current mix" pins your active triplet as a 13th "My Mix" chip</div>
+              <div class="il-item"><span class="il-dot"></span>Hover any of the 12 chips to preview colors live on the
+                canvas before committing</div>
+              <div class="il-item"><span class="il-dot"></span>Lock individual channels (Wave / Glow / Accent) to
+                protect them from palette changes</div>
+              <div class="il-item"><span class="il-dot"></span>"+ Save current mix" pins your active triplet as a 13th
+                "My Mix" chip</div>
             </div>
           </div>
 
           <div class="il-category">
             <div class="il-category-title">🎲 Random &amp; 🎨 Remix ✨</div>
             <div class="image-layers-grid">
-              <div class="il-item"><span class="il-dot"></span>Redesigned icon footer — five big buttons: ＋ New, 🎲 Random, 🎨 Remix, 💾 Save, ↺ Reset</div>
-              <div class="il-item"><span class="il-dot"></span>🎲 Random loads any of the 1,144-preset library straight into the Studio as your editing base</div>
-              <div class="il-item"><span class="il-dot"></span>🎨 Remix (formerly Surprise) rolls a coherent random variation + palette + motion + wave in one click</div>
-              <div class="il-item"><span class="il-dot"></span>Double-click any slider label to reset it to its default value</div>
+              <div class="il-item"><span class="il-dot"></span>Redesigned icon footer — five big buttons: ＋ New, 🎲
+                Random, 🎨 Remix, 💾 Save, ↺ Reset</div>
+              <div class="il-item"><span class="il-dot"></span>🎲 Random loads any of the 1,144-preset library straight
+                into the Studio as your editing base</div>
+              <div class="il-item"><span class="il-dot"></span>🎨 Remix (formerly Surprise) rolls a coherent random
+                variation + palette + motion + wave in one click</div>
+              <div class="il-item"><span class="il-dot"></span>Double-click any slider label to reset it to its default
+                value</div>
             </div>
           </div>
 
           <div class="il-category">
             <div class="il-category-title">Wave Thickness &amp; Rotation ✨</div>
             <div class="image-layers-grid">
-              <div class="il-item"><span class="il-dot"></span>Thickness — continuous 0–8 slider replaces the old on/off toggle; scales the wave from hairline to bold</div>
-              <div class="il-item"><span class="il-dot"></span>Rotation — ±180° slider spins the wave shape around its own anchor</div>
-              <div class="il-item"><span class="il-dot"></span>Both apply to every shape mode including Ripple, and compose cleanly with the Wave Reactivity panel</div>
-              <div class="il-item"><span class="il-dot"></span>Shipped via a vendored fork of the Butterchurn engine</div>
+              <div class="il-item"><span class="il-dot"></span>Thickness — continuous 0–8 slider replaces the old on/off
+                toggle; scales the wave from hairline to bold</div>
+              <div class="il-item"><span class="il-dot"></span>Rotation — ±180° slider spins the wave shape around its
+                own anchor</div>
+              <div class="il-item"><span class="il-dot"></span>Both apply to every shape mode including Ripple, and
+                compose cleanly with the Wave Reactivity panel</div>
+              <div class="il-item"><span class="il-dot"></span>Shipped via a vendored fork of the Butterchurn engine
+              </div>
             </div>
           </div>
         </div>
@@ -637,37 +659,59 @@
               <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              Real-time live editing — drag, resize, edit, duplicate, or delete blocks while the timeline is playing; changes take effect instantly with no flash
+              Real-time live editing — drag, resize, edit, duplicate, or delete blocks while the timeline is playing;
+              changes take effect instantly with no flash
             </li>
             <li>
               <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              Double-click to cue — double-click any block to crossfade into it and seek the playhead to its start; instant live VJ control
+              Double-click to cue — double-click any block to crossfade into it and seek the playhead to its start;
+              instant live VJ control
             </li>
             <li>
               <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              Per-block menu — a hamburger icon opens a compact action menu: a Transition picker, a 16-colour block colour picker, Duplicate, and Delete
+              Per-block menu — a hamburger icon opens a compact action menu: a Transition picker, a 16-colour block
+              colour picker, Duplicate, and Delete
             </li>
             <li>
               <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              Block transitions — set how each block enters: Fade (crossfade), dip through Black or White, or a hard Cut — a creative choice per block
+              Block transitions — set how each block enters: Fade (crossfade), dip through Black or White, or a hard Cut
+              — a creative choice per block
             </li>
             <li>
               <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              Markers &amp; loop regions — press M or click the dedicated marker lane to drop a marker; set one to Loop and it becomes a draggable loop region that wraps playback with a 1-second crossfade
+              Markers &amp; loop regions — press M or click the dedicated marker lane to drop a marker; set one to Loop
+              and it becomes a draggable loop region that wraps playback with a 1-second crossfade
             </li>
             <li>
               <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              Multi-track strip — resize any block to any length (the strip auto-scrolls as you drag), drag-to-reorder, snap-to-grid, BPM grid overlay
+              Multi-track strip — resize any block to any length (the strip auto-scrolls as you drag), drag-to-reorder,
+              snap-to-grid, BPM grid overlay
+            </li>
+            <li>
+              <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              <strong>Stack tracks inside any zone ✨</strong> — Full Screen gets a transport-row <strong>+ Add
+                Track</strong>; Left/Right, Quadrants, Center+Frame, and Top Banner each get an inline <strong>+
+                Track</strong> button on the zone's front-layer row. Up to 4 tracks per zone, each a real engine
+            </li>
+            <li>
+              <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              <strong>Top row = front layer ✨</strong> — Photoshop convention; strip reads like the composite. New
+              tracks land on top with transparent gaps by default, so empty space on an upper track reveals the track
+              beneath instead of painting black
             </li>
             <li>
               <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -685,7 +729,16 @@
               <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              Stack transparent presets — a transparent-background preset on a zone reveals the zone beneath it (true per-pixel alpha), so a cutout or logo composites over a full-screen visual
+              <strong>Per-zone output routing ✨</strong> — one <strong>▸</strong> chip on each zone's foundational row
+              picks the display for every track in that zone; stacked zones expose per-track blend mode + opacity in the
+              Outputs panel for fine-grained compositing on the output window
+            </li>
+            <li>
+              <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              Stack transparent presets — a transparent-background preset on a zone reveals the zone beneath it (true
+              per-pixel alpha), so a cutout or logo composites over a full-screen visual
             </li>
             <li>
               <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
