@@ -1988,9 +1988,17 @@ export class EditorInspector {
                 const result = await window.__TAURI__.invoke('pick_image_file');
                 if (!result) return;
                 const bytes = Uint8Array.from(atob(result.data), c => c.charCodeAt(0));
-                const file = new File([bytes], result.name);
-                // Handle based on file extension
+                // Native picker drops the MIME type; restore it from the extension so
+                // downstream `file.type === 'image/gif'` checks (resizeImageFile etc.) work.
                 const ext = result.name.split('.').pop()?.toLowerCase();
+                const mimeMap = {
+                    gif: 'image/gif',
+                    png: 'image/png',
+                    jpg: 'image/jpeg', jpeg: 'image/jpeg',
+                    webp: 'image/webp',
+                    mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime',
+                };
+                const file = new File([bytes], result.name, { type: mimeMap[ext] || '' });
                 if (ext === 'mp4' || ext === 'webm' || ext === 'mov') {
                     const isMacTauri = !!window.__TAURI__ && navigator.userAgent.includes('Mac');
                     if (isMacTauri && ext === 'webm') {
