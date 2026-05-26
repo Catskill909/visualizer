@@ -595,7 +595,7 @@ body.tl-fullscreen #tl-canvas-container { cursor: pointer; }
 .tl-zone-label {
   width: var(--zone-col-w);
   flex-shrink: 0;
-  display: flex; align-items: center; gap: 6px;
+  display: flex; align-items: center; gap: 9px;
   padding: 0 10px;
   border-right: 1px solid var(--border);
   background: var(--bg-2);
@@ -1565,26 +1565,31 @@ body.tl-fullscreen #tl-canvas-container { cursor: pointer; }
 }
 
 /* Zone-row output chip (neutral grey; brighter when an output is live) */
+/* Output-routing chip — icon-only square that matches the + add-preset button's
+   footprint exactly so the row reads as a consistent strip of square controls. */
 .tl-zone-out-chip {
   flex-shrink: 0;
-  min-width: 28px;
-  height: 22px;
-  padding: 0 8px;
+  width: 28px; height: 28px;
+  padding: 0;
   display: inline-flex; align-items: center; justify-content: center;
-  font: 600 11.5px var(--font);
-  color: var(--text-2);
-  background: rgba(255,255,255,0.08);
-  border: 1px solid var(--border-hi);
-  border-radius: 6px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--text-3);
   cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  transition: background 0.12s, color 0.12s, border-color 0.12s, box-shadow 0.12s;
 }
-.tl-zone-out-chip:hover { background: rgba(255,255,255,0.16); color: var(--text); border-color: rgba(255,255,255,0.32); }
+.tl-zone-out-chip .tl-zone-out-icon { width: 14px; height: 14px; display: block; }
+.tl-zone-out-chip:hover {
+  background: rgba(255,255,255,0.14);
+  border-color: var(--border-hi);
+  color: var(--text);
+}
 .tl-zone-out-chip.is-live {
   color: var(--text);
   background: rgba(255,255,255,0.18);
   border-color: rgba(255,255,255,0.35);
+  box-shadow: 0 0 6px rgba(255,255,255,0.15);
 }
 .tl-zone-out-chip.is-offline {
   border-style: dashed;

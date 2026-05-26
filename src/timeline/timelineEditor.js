@@ -1513,11 +1513,14 @@ export class TimelineEditor {
         }
     }
 
-    _zoneOutTag(zone) {
-        if (!zone?.output) return '▸';
-        if (zone.output._offline) return '▸!';
-        const n = Number(zone.output.displayId);
-        return '▸' + (Number.isFinite(n) ? n + 1 : '•');
+    // Square icon-style chip matching the + add-preset button's footprint. State
+    // (unassigned / routed-live / offline) lives in CSS classes + tooltip; the
+    // glyph itself is a constant monitor icon so the strip stays calm.
+    _zoneOutIconHtml() {
+        return '<svg class="tl-zone-out-icon" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+            + '<rect x="1.25" y="2" width="11.5" height="7.5" rx="1"/>'
+            + '<path d="M4.5 12.5h5M7 9.5v3"/>'
+            + '</svg>';
     }
 
     _updateOutputChips() {
@@ -1528,7 +1531,7 @@ export class TimelineEditor {
             const zone = (this._tl?.zones || []).find(z => z.id === row.dataset.zoneId);
             chip.classList.toggle('is-live', this._zoneOutputLive(zone));
             chip.classList.toggle('is-offline', !!zone?.output?._offline);
-            chip.textContent = this._zoneOutTag(zone);
+            if (!chip.querySelector('.tl-zone-out-icon')) chip.innerHTML = this._zoneOutIconHtml();
             chip.title = zone?.output?._offline
                 ? `Output offline — ${zone.output.displayLabel} not detected`
                 : zone?.output?.displayLabel ? `Output: ${zone.output.displayLabel}` : 'Send this zone to a display';
@@ -2227,7 +2230,8 @@ export class TimelineEditor {
             outChip.className = 'tl-zone-out-chip';
             outChip.type = 'button';
             if (this._zoneOutputLive(zone)) outChip.classList.add('is-live');
-            outChip.textContent = this._zoneOutTag(zone);
+            if (zone.output?._offline) outChip.classList.add('is-offline');
+            outChip.innerHTML = this._zoneOutIconHtml();
             const baseTip = zone.output?.displayLabel ? `Output: ${zone.output.displayLabel}` : 'Send this region to a display';
             outChip.title = region.length > 1 ? `${baseTip} (shared by all ${region.length} tracks in ${zone.name})` : baseTip;
             outChip.addEventListener('click', e => {
