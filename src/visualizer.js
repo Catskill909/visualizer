@@ -860,7 +860,10 @@ export class VisualizerEngine {
   setUserTexture(name, texObj) {
     if (!this.visualizer) return;
     if (texObj.isGif && texObj.data) {
-      // Pass pre-processed frame data if available from optimizer
+      // Already decoded and running — unrelated slider drags trigger _applyToEngine
+      // which calls setUserTexture for every cached layer. Re-decoding here would
+      // reset frameIndex to 0 and clobber the live speed set via setGifAnimationSpeed.
+      if (this._gifAnimations.has(name)) return;
       const optimizedData = texObj.optimizedGifData || null;
       this._loadGifTexture(name, texObj.data, texObj.gifSpeed || 1.0, optimizedData);
       return;
