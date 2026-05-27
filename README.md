@@ -497,6 +497,7 @@ Session handoffs — pick up exactly where the last conversation ended.
 | Doc | What it covers |
 |-----|---------------|
 | [`docs/handoff-milkdrop-research-may2026.md`](docs/handoff-milkdrop-research-may2026.md) | May 2026 — MilkDrop external editor research, full gap analysis, Phase 7-12 plan. Start here for next control additions. |
+| [`docs/handoff-animation-may2026.md`](docs/handoff-animation-may2026.md) | May 26–27, 2026 — Animation system (P0 + A1 Gate 1+2 + A2 + A3 shipped). Architecture you must not forget (q-pipe, GSAP `_gsapProxy` trap), file map, quick mental model, recommended next session (Gate 3 or A4). |
 
 ### Bug Docs ([`docs/bugs/`](docs/bugs/))
 
