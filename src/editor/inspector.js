@@ -35,7 +35,21 @@ const HD_MAX_DIM = 2048;    // "HD" toggle max dimension
 // neutral on load). UI to set this lands in Phase A.
 const DEFAULT_ANIMATION = {
     entrance: 'none', entranceDuration: 0.7, entranceEase: 'expo.out',
+    // Phase A1 Gate 2 — per-preset tunable params. Defaults match the
+    // pre-Gate-2 hard-coded values so existing presets stay byte-identical.
+    entranceDistance: 1.2,      // slide-*: UV offset distance
+    entranceScaleUpFrom: 0.3,   // scale-up: starting scale (small)
+    entranceScaleDownFrom: 1.8, // scale-down: starting scale (large)
+    entrancePopFrom: 0.0,       // pop: starting scale before elastic
+    entranceBlurStart: 0.6,     // blur: starting blur amount
+
     exit:     'none', exitDuration:     0.5, exitEase:     'expo.in',
+    exitDistance: 1.2,
+    exitScaleUpFrom: 1.5,       // scale-up exit: ends large
+    exitScaleDownFrom: 0.0,     // scale-down exit: ends tiny
+    exitPopFrom: 0.0,           // pop exit: ends tiny
+    exitBlurStart: 0.6,         // blur exit: ends blurry
+
     idle:     'none', idleSpeed:        1.0,
     beatSteps: []
 };
@@ -2493,10 +2507,33 @@ export class EditorInspector {
                 const tgt = this._animateModalEntry;
                 if (!tgt) return;
                 tgt.animation.entrance = chip.dataset.preset;
-                this._syncAnimateModal();
+                this._syncAnimateModal();   // also re-syncs Gate-2 param visibility
                 tgt._refreshAnimateDot?.();
                 this.onchange?.();
             });
+
+            // Gate 2 — contextual param sliders (entrance + exit). Generic
+            // delegate by `data-bind` to keep this from blowing up to one
+            // listener per slider. Each slider's data-bind matches a field on
+            // entry.animation; we read step from the slider for the precision.
+            const wireParams = (containerSel) => {
+                const container = document.querySelector(containerSel);
+                if (!container) return;
+                container.addEventListener('input', (e) => {
+                    const sl = e.target.closest('.animate-param-slider');
+                    if (!sl) return;
+                    const tgt = this._animateModalEntry;
+                    if (!tgt) return;
+                    const key = sl.dataset.bind;
+                    const v = parseFloat(sl.value);
+                    tgt.animation[key] = v;
+                    const valEl = sl.parentNode.querySelector(`.animate-param-val[data-bind="${key}"]`);
+                    if (valEl) valEl.textContent = v.toFixed(2);
+                    this.onchange?.();
+                });
+            };
+            wireParams('.animate-params[data-tab="entrance"]');
+            wireParams('.animate-params[data-tab="exit"]');
 
             // Exit chip row + duration + ease (Phase A2) — mirror of entrance.
             const exitChips = document.getElementById('animate-exit-chips');
@@ -2615,6 +2652,15 @@ export class EditorInspector {
         modal.hidden = false;
     }
 
+    // Gate 2: show only the param row(s) whose `data-for-preset` includes the
+    // currently-selected preset. Generic for both entrance and exit panels.
+    _syncAnimateParamRows(panelSel, selectedPreset) {
+        document.querySelectorAll(`.animate-params[data-tab="${panelSel}"] .animate-param-row`).forEach(row => {
+            const applies = (row.dataset.forPreset || '').split(/\s+/).includes(selectedPreset);
+            row.hidden = !applies;
+        });
+    }
+
     // Push the current entry.animation values into the modal controls.
     // Called on open and after any chip-select to keep the active highlight in sync.
     _syncAnimateModal() {
@@ -2636,6 +2682,21 @@ export class EditorInspector {
         const ease = document.getElementById('animate-ease');
         if (ease) ease.value = a.entranceEase || 'expo.out';
 
+        // Gate 2 — sync entrance param sliders + show only the relevant row
+        this._syncAnimateParamRows('entrance', a.entrance);
+        const syncSlider = (key, fallback) => {
+            const sl = document.querySelector(`.animate-param-slider[data-bind="${key}"]`);
+            const v = a[key] ?? fallback;
+            if (sl) sl.value = v;
+            const valEl = document.querySelector(`.animate-param-val[data-bind="${key}"]`);
+            if (valEl) valEl.textContent = Number(v).toFixed(2);
+        };
+        syncSlider('entranceDistance',      1.2);
+        syncSlider('entranceScaleUpFrom',   0.3);
+        syncSlider('entranceScaleDownFrom', 1.8);
+        syncSlider('entrancePopFrom',       0.0);
+        syncSlider('entranceBlurStart',     0.6);
+
         // Exit (Phase A2) — mirror of entrance
         document.querySelectorAll('#animate-exit-chips .animate-chip').forEach(c => {
             c.classList.toggle('active', c.dataset.preset === (a.exit || 'none'));
@@ -2646,6 +2707,14 @@ export class EditorInspector {
         if (exitDurLabel) exitDurLabel.textContent = `${Number(a.exitDuration ?? 0.5).toFixed(2)}s`;
         const exitEaseEl = document.getElementById('animate-exit-ease');
         if (exitEaseEl) exitEaseEl.value = a.exitEase || 'expo.in';
+
+        // Gate 2 — same for exit
+        this._syncAnimateParamRows('exit', a.exit || 'none');
+        syncSlider('exitDistance',      1.2);
+        syncSlider('exitScaleUpFrom',   1.5);
+        syncSlider('exitScaleDownFrom', 0.0);
+        syncSlider('exitPopFrom',       0.0);
+        syncSlider('exitBlurStart',     0.6);
 
         // Idle (Phase A3)
         document.querySelectorAll('#animate-idle-chips .animate-chip').forEach(c => {

@@ -986,6 +986,23 @@ html, body {
 }
 .animate-modal input[type=range] { height: 6px; }
 
+/* Contextual per-preset param rows (Phase A1 Gate 2) */
+.animate-modal .animate-param-row {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 6px;
+}
+.animate-modal .animate-param-row[hidden] { display: none; }
+.animate-modal .animate-param-label {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 12px; color: var(--text-2); margin-bottom: 6px;
+}
+.animate-modal .animate-param-val { color: var(--text-1); font-variant-numeric: tabular-nums; }
+.animate-modal .animate-param-slider {
+  width: 100%; accent-color: var(--accent);
+}
+
 /* Tab bar */
 .animate-modal .animate-tab {
   padding: 8px 14px;

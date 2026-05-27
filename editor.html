@@ -898,6 +898,30 @@
                         <button type="button" class="animate-chip" data-preset="blur">Blur</button>
                     </div>
 
+                    <!-- Contextual params (Phase A1 Gate 2). Show/hide based on selected chip. -->
+                    <div class="animate-params" data-tab="entrance" style="margin-bottom:18px;">
+                        <div class="animate-param-row" data-for-preset="slide-left slide-right slide-up slide-down" hidden>
+                            <label class="animate-param-label"><span>Distance</span><span class="animate-param-val" data-bind="entranceDistance">1.20</span></label>
+                            <input class="animate-param-slider" type="range" min="0.3" max="2.0" step="0.05" value="1.2" data-bind="entranceDistance">
+                        </div>
+                        <div class="animate-param-row" data-for-preset="scale-up" hidden>
+                            <label class="animate-param-label"><span>Start size</span><span class="animate-param-val" data-bind="entranceScaleUpFrom">0.30</span></label>
+                            <input class="animate-param-slider" type="range" min="0.0" max="0.7" step="0.01" value="0.3" data-bind="entranceScaleUpFrom">
+                        </div>
+                        <div class="animate-param-row" data-for-preset="scale-down" hidden>
+                            <label class="animate-param-label"><span>Start size</span><span class="animate-param-val" data-bind="entranceScaleDownFrom">1.80</span></label>
+                            <input class="animate-param-slider" type="range" min="1.2" max="3.0" step="0.05" value="1.8" data-bind="entranceScaleDownFrom">
+                        </div>
+                        <div class="animate-param-row" data-for-preset="pop" hidden>
+                            <label class="animate-param-label"><span>Pop from</span><span class="animate-param-val" data-bind="entrancePopFrom">0.00</span></label>
+                            <input class="animate-param-slider" type="range" min="0.0" max="0.5" step="0.01" value="0.0" data-bind="entrancePopFrom">
+                        </div>
+                        <div class="animate-param-row" data-for-preset="blur" hidden>
+                            <label class="animate-param-label"><span>Start blur</span><span class="animate-param-val" data-bind="entranceBlurStart">0.60</span></label>
+                            <input class="animate-param-slider" type="range" min="0.1" max="1.0" step="0.01" value="0.6" data-bind="entranceBlurStart">
+                        </div>
+                    </div>
+
                     <div style="display:flex;gap:18px;margin-bottom:18px;">
                         <div style="flex:1;">
                             <label style="display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--text-2);margin-bottom:6px;">
@@ -937,6 +961,30 @@
                         <button type="button" class="animate-chip" data-preset="slide-down">Slide Down</button>
                         <button type="button" class="animate-chip" data-preset="pop">Pop</button>
                         <button type="button" class="animate-chip" data-preset="blur">Blur</button>
+                    </div>
+
+                    <!-- Contextual params (Phase A1 Gate 2) — mirror of entrance. -->
+                    <div class="animate-params" data-tab="exit" style="margin-bottom:18px;">
+                        <div class="animate-param-row" data-for-preset="slide-left slide-right slide-up slide-down" hidden>
+                            <label class="animate-param-label"><span>Distance</span><span class="animate-param-val" data-bind="exitDistance">1.20</span></label>
+                            <input class="animate-param-slider" type="range" min="0.3" max="2.0" step="0.05" value="1.2" data-bind="exitDistance">
+                        </div>
+                        <div class="animate-param-row" data-for-preset="scale-up" hidden>
+                            <label class="animate-param-label"><span>End size</span><span class="animate-param-val" data-bind="exitScaleUpFrom">1.50</span></label>
+                            <input class="animate-param-slider" type="range" min="1.1" max="3.0" step="0.05" value="1.5" data-bind="exitScaleUpFrom">
+                        </div>
+                        <div class="animate-param-row" data-for-preset="scale-down" hidden>
+                            <label class="animate-param-label"><span>End size</span><span class="animate-param-val" data-bind="exitScaleDownFrom">0.00</span></label>
+                            <input class="animate-param-slider" type="range" min="0.0" max="0.7" step="0.01" value="0.0" data-bind="exitScaleDownFrom">
+                        </div>
+                        <div class="animate-param-row" data-for-preset="pop" hidden>
+                            <label class="animate-param-label"><span>Pop to</span><span class="animate-param-val" data-bind="exitPopFrom">0.00</span></label>
+                            <input class="animate-param-slider" type="range" min="0.0" max="0.5" step="0.01" value="0.0" data-bind="exitPopFrom">
+                        </div>
+                        <div class="animate-param-row" data-for-preset="blur" hidden>
+                            <label class="animate-param-label"><span>End blur</span><span class="animate-param-val" data-bind="exitBlurStart">0.60</span></label>
+                            <input class="animate-param-slider" type="range" min="0.1" max="1.0" step="0.01" value="0.6" data-bind="exitBlurStart">
+                        </div>
                     </div>
 
                     <div style="display:flex;gap:18px;margin-bottom:18px;">

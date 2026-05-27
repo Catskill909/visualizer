@@ -29,20 +29,26 @@ export const ENTRANCE_EASES = [
 const NEUTRAL = { opacity: 1.0, scale: 1.0, cxOffset: 0.0, cyOffset: 0.0, blur: 0.0 };
 
 // Every preset starts with opacity:0 so the image is INVISIBLE on frame 0 — no
-// "appear at neutral then animate" flash. Slide offsets are ±1.2 so the centre
-// lands well off-canvas (canvas spans 0..1 in UV; image extends ± its size from
-// the centre, so the centre must clear the edge by more than the layer's size).
-function startState(preset) {
+// "appear at neutral then animate" flash. cfg holds Gate-2 per-preset params
+// (entranceDistance / entranceScaleUpFrom / entranceScaleDownFrom / entrancePopFrom
+// / entranceBlurStart). Each falls back to the pre-Gate-2 hard-coded default so
+// presets created before Gate 2 behave identically.
+function startState(preset, cfg) {
+    const dist  = cfg?.entranceDistance     ?? 1.2;
+    const sUp   = cfg?.entranceScaleUpFrom  ?? 0.3;
+    const sDown = cfg?.entranceScaleDownFrom ?? 1.8;
+    const pop   = cfg?.entrancePopFrom      ?? 0.0;
+    const blur  = cfg?.entranceBlurStart    ?? 0.6;
     switch (preset) {
         case 'fade':         return { ...NEUTRAL, opacity: 0 };
-        case 'scale-up':     return { ...NEUTRAL, opacity: 0, scale: 0.3 };
-        case 'scale-down':   return { ...NEUTRAL, opacity: 0, scale: 1.8 };
-        case 'slide-left':   return { ...NEUTRAL, opacity: 0, cxOffset:  1.2 };
-        case 'slide-right':  return { ...NEUTRAL, opacity: 0, cxOffset: -1.2 };
-        case 'slide-up':     return { ...NEUTRAL, opacity: 0, cyOffset:  1.2 };
-        case 'slide-down':   return { ...NEUTRAL, opacity: 0, cyOffset: -1.2 };
-        case 'pop':          return { ...NEUTRAL, opacity: 0, scale: 0.0 }; // elastic.out gives overshoot
-        case 'blur':         return { ...NEUTRAL, opacity: 0, blur: 0.6 };
+        case 'scale-up':     return { ...NEUTRAL, opacity: 0, scale: sUp };
+        case 'scale-down':   return { ...NEUTRAL, opacity: 0, scale: sDown };
+        case 'slide-left':   return { ...NEUTRAL, opacity: 0, cxOffset:  dist };
+        case 'slide-right':  return { ...NEUTRAL, opacity: 0, cxOffset: -dist };
+        case 'slide-up':     return { ...NEUTRAL, opacity: 0, cyOffset:  dist };
+        case 'slide-down':   return { ...NEUTRAL, opacity: 0, cyOffset: -dist };
+        case 'pop':          return { ...NEUTRAL, opacity: 0, scale: pop }; // elastic.out gives overshoot on top
+        case 'blur':         return { ...NEUTRAL, opacity: 0, blur };
         default:             return null;
     }
 }
@@ -60,7 +66,7 @@ export function playEntranceAnimation(entry, cfg) {
         if (!entry?._anim) return resolve();
         const preset = cfg?.entrance || 'none';
         if (preset === 'none') return resolve();
-        const from = startState(preset);
+        const from = startState(preset, cfg);
         if (!from) return resolve();
 
         // CRITICAL: tween a THROWAWAY target, not entry._anim directly.
@@ -131,17 +137,27 @@ export function playEntranceAnimation(entry, cfg) {
 // mode) snaps `_anim` back to neutral so the layer pops back into view —
 // useful for tuning. Real-delete callers pass `resetAfter:false`.
 
-function exitToState(preset) {
+// Exit poses mirror entrance from-states with their own Gate-2 params.
+// `scale-up` exit = grow + fade (default end 1.5); `scale-down` exit = shrink
+// + fade (default end 0.0). Slide directions intentionally MIRROR entrance:
+// slide-left exit moves the layer AWAY to the left (cxOffset → -dist), the
+// natural opposite of slide-left entrance which arrives FROM the left.
+function exitToState(preset, cfg) {
+    const dist  = cfg?.exitDistance     ?? 1.2;
+    const sUp   = cfg?.exitScaleUpFrom  ?? 1.5;
+    const sDown = cfg?.exitScaleDownFrom ?? 0.0;
+    const pop   = cfg?.exitPopFrom      ?? 0.0;
+    const blur  = cfg?.exitBlurStart    ?? 0.6;
     switch (preset) {
         case 'fade':         return { ...NEUTRAL, opacity: 0 };
-        case 'scale-up':     return { ...NEUTRAL, opacity: 0, scale: 1.5 };
-        case 'scale-down':   return { ...NEUTRAL, opacity: 0, scale: 0.0 };
-        case 'slide-left':   return { ...NEUTRAL, opacity: 0, cxOffset: -1.2 };
-        case 'slide-right':  return { ...NEUTRAL, opacity: 0, cxOffset:  1.2 };
-        case 'slide-up':     return { ...NEUTRAL, opacity: 0, cyOffset: -1.2 };
-        case 'slide-down':   return { ...NEUTRAL, opacity: 0, cyOffset:  1.2 };
-        case 'pop':          return { ...NEUTRAL, opacity: 0, scale: 0.0 };
-        case 'blur':         return { ...NEUTRAL, opacity: 0, blur: 0.6 };
+        case 'scale-up':     return { ...NEUTRAL, opacity: 0, scale: sUp };
+        case 'scale-down':   return { ...NEUTRAL, opacity: 0, scale: sDown };
+        case 'slide-left':   return { ...NEUTRAL, opacity: 0, cxOffset: -dist };
+        case 'slide-right':  return { ...NEUTRAL, opacity: 0, cxOffset:  dist };
+        case 'slide-up':     return { ...NEUTRAL, opacity: 0, cyOffset: -dist };
+        case 'slide-down':   return { ...NEUTRAL, opacity: 0, cyOffset:  dist };
+        case 'pop':          return { ...NEUTRAL, opacity: 0, scale: pop };
+        case 'blur':         return { ...NEUTRAL, opacity: 0, blur };
         default:             return null;
     }
 }
@@ -151,7 +167,7 @@ export function playExitAnimation(entry, cfg, { resetAfter = false } = {}) {
         if (!entry?._anim) return resolve();
         const preset = cfg?.exit || 'none';
         if (preset === 'none') return resolve();
-        const to = exitToState(preset);
+        const to = exitToState(preset, cfg);
         if (!to) return resolve();
 
         if (!entry._gsapProxy) {
