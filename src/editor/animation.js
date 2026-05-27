@@ -22,6 +22,17 @@ export const ENTRANCE_EASES = [
     { id: 'none',                label: 'Linear' },
 ];
 
+// Exit eases mirror the entrance set but use `.in` variants — accelerate away
+// from rest. Linger (back.in) pulls back slightly before exit; Wobble
+// (elastic.in) wiggles before exit.
+export const EXIT_EASES = [
+    { id: 'expo.in',             label: 'Smooth' },
+    { id: 'power3.in',           label: 'Snappy' },
+    { id: 'back.in',             label: 'Linger' },
+    { id: 'elastic.in(1, 0.5)',  label: 'Wobble' },
+    { id: 'none',                label: 'Linear' },
+];
+
 // Each entrance preset describes the OFFSET from neutral that we tween FROM.
 // Tween target is always neutral (1, 1, 0, 0, 0). On complete, _anim is reset
 // to NEUTRAL_ANIM so the q-register pipe carries identity values — exactly the

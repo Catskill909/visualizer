@@ -21,7 +21,7 @@ import {
 } from './gifOptimizer.js';
 import { transcodeTo720p, needsTranscode, stripAudio } from '../videoTranscoder.js';
 import { gsap } from 'gsap';
-import { playEntranceAnimation, playExitAnimation, startIdleAnimation, stopIdleAnimation } from './animation.js';
+import { playEntranceAnimation, playExitAnimation, startIdleAnimation, stopIdleAnimation, ENTRANCE_EASES, EXIT_EASES } from './animation.js';
 
 // ─── Phase 1: layer limits + upload resize ───────────────────────────────────
 // Cap surface area for Phase 1. Internals (shader builder, state array) are
@@ -63,6 +63,160 @@ function formatTime(seconds) {
     const m = Math.floor(seconds / 60);
     const s = Math.floor(seconds % 60);
     return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+// ─── Animate-modal custom controls (animation-dev.md Phase A1 Gate 3) ────────
+// Two small DOM widgets used inside the Animate modal — kept here so the
+// rest of the modal wiring stays co-located. Both replace native form
+// controls (range / select) per the doc's "no default browser form controls"
+// rule. Each returns a handle with setValue/getValue so the modal's
+// `_syncAnimateModal` can push state in without re-binding listeners.
+
+// Visual time scrubber. Used for entrance duration, exit duration, idle speed.
+// Hydrates an empty <div class="anim-scrub" data-min data-max data-step
+// data-value data-format data-label> into a full track + handle + readout.
+function _hydrateScrubber(el, { onInput } = {}) {
+    const min  = parseFloat(el.dataset.min);
+    const max  = parseFloat(el.dataset.max);
+    const step = parseFloat(el.dataset.step);
+    const fmt  = el.dataset.format || '';
+    const label = el.dataset.label || '';
+    let value = parseFloat(el.dataset.value);
+
+    el.innerHTML = `
+      <div class="anim-scrub-head">
+        <span class="anim-scrub-label">${label}</span>
+        <span class="anim-scrub-value"></span>
+      </div>
+      <div class="anim-scrub-track" tabindex="0" role="slider"
+           aria-label="${label}" aria-valuemin="${min}" aria-valuemax="${max}">
+        <div class="anim-scrub-rail"><div class="anim-scrub-fill"></div></div>
+        <div class="anim-scrub-ticks"></div>
+        <div class="anim-scrub-handle"></div>
+      </div>`;
+
+    const valEl     = el.querySelector('.anim-scrub-value');
+    const track     = el.querySelector('.anim-scrub-track');
+    const fill      = el.querySelector('.anim-scrub-fill');
+    const handle    = el.querySelector('.anim-scrub-handle');
+    const ticksWrap = el.querySelector('.anim-scrub-ticks');
+
+    // Eleven evenly-spaced ticks (every other one "major"). Spec-driven exact
+    // positioning would require knowing units; this generic pattern reads as a
+    // ruler regardless of range.
+    for (let i = 0; i < 11; i++) {
+        const t = document.createElement('span');
+        t.className = 'anim-scrub-tick' + (i % 2 === 0 ? ' major' : '');
+        ticksWrap.appendChild(t);
+    }
+
+    const fmtVal = (v) => fmt === 's' ? `${v.toFixed(2)}s`
+                       : fmt === 'x' ? `${v.toFixed(2)}×`
+                       : v.toFixed(2);
+    const snap = (v) => {
+        const stepped = Math.round((v - min) / step) * step + min;
+        return Math.max(min, Math.min(max, parseFloat(stepped.toFixed(4))));
+    };
+    const render = () => {
+        const pct = ((value - min) / (max - min)) * 100;
+        fill.style.width = `${pct}%`;
+        handle.style.left = `${pct}%`;
+        valEl.textContent = fmtVal(value);
+        track.setAttribute('aria-valuenow', value);
+    };
+    const setValue = (v, fire = false) => {
+        const next = snap(v);
+        if (next === value) { if (fire) onInput?.(value); return; }
+        value = next;
+        render();
+        if (fire) onInput?.(value);
+    };
+
+    let dragging = false;
+    const updateFromClientX = (clientX) => {
+        const r = track.getBoundingClientRect();
+        const t = r.width > 0 ? Math.max(0, Math.min(1, (clientX - r.left) / r.width)) : 0;
+        setValue(min + t * (max - min), true);
+    };
+    track.addEventListener('pointerdown', (e) => {
+        dragging = true;
+        el.classList.add('dragging');
+        try { track.setPointerCapture(e.pointerId); } catch {}
+        updateFromClientX(e.clientX);
+    });
+    track.addEventListener('pointermove', (e) => {
+        if (!dragging) return;
+        updateFromClientX(e.clientX);
+    });
+    const endDrag = (e) => {
+        if (!dragging) return;
+        dragging = false;
+        el.classList.remove('dragging');
+        try { track.releasePointerCapture(e.pointerId); } catch {}
+    };
+    track.addEventListener('pointerup', endDrag);
+    track.addEventListener('pointercancel', endDrag);
+    track.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowDown')  { setValue(value - step, true); e.preventDefault(); }
+        if (e.key === 'ArrowRight' || e.key === 'ArrowUp')   { setValue(value + step, true); e.preventDefault(); }
+        if (e.key === 'Home') { setValue(min, true); e.preventDefault(); }
+        if (e.key === 'End')  { setValue(max, true); e.preventDefault(); }
+    });
+
+    render();
+    return { setValue: (v) => setValue(v, false), getValue: () => value };
+}
+
+// Ease picker — chip row + SVG curve preview. Samples the GSAP ease function
+// directly so elastic / bounce overshoots render correctly (no cubic-bezier
+// approximation). Chips define the value; the SVG is read-only.
+function _hydrateEasePicker(el, options, { initial, onInput } = {}) {
+    // Build chip row + SVG once. `options` is [{ id, label }, ...].
+    el.innerHTML = `
+      <div class="anim-ease-chips">
+        ${options.map(o => `<button type="button" class="anim-ease-chip" data-ease="${o.id}">${o.label}</button>`).join('')}
+      </div>
+      <svg class="anim-ease-preview" viewBox="-4 -18 108 108" preserveAspectRatio="none" aria-hidden="true">
+        <line class="anim-ease-axis" x1="0" y1="0"   x2="100" y2="0"></line>
+        <line class="anim-ease-axis" x1="0" y1="80"  x2="100" y2="80"></line>
+        <polyline class="anim-ease-curve" points=""></polyline>
+      </svg>`;
+    const chipsWrap = el.querySelector('.anim-ease-chips');
+    const curve     = el.querySelector('.anim-ease-curve');
+    let current = initial;
+
+    // ViewBox is -4..104 horizontal, -18..90 vertical. Map t∈[0,1] → x∈[0,100],
+    // v∈[0,1] → y∈[80,0] (flipped). Overshoot/undershoot stay visible because
+    // the viewBox has padding above (-18) and below (90 vs 80 baseline).
+    const samplePoints = (easeName) => {
+        let fn;
+        try { fn = gsap.parseEase(easeName); }
+        catch { fn = (t) => t; }
+        const N = 80;
+        const pts = new Array(N + 1);
+        for (let i = 0; i <= N; i++) {
+            const t = i / N;
+            const v = fn(t);
+            pts[i] = `${(t * 100).toFixed(2)},${(80 - v * 80).toFixed(2)}`;
+        }
+        return pts.join(' ');
+    };
+    const setActive = (name) => {
+        current = name;
+        el.querySelectorAll('.anim-ease-chip').forEach(c => {
+            c.classList.toggle('active', c.dataset.ease === name);
+        });
+        curve.setAttribute('points', samplePoints(name));
+    };
+    chipsWrap.addEventListener('click', (e) => {
+        const chip = e.target.closest('.anim-ease-chip');
+        if (!chip) return;
+        setActive(chip.dataset.ease);
+        onInput?.(chip.dataset.ease);
+    });
+
+    setActive(initial);
+    return { setActive, getValue: () => current };
 }
 
 /**
@@ -2446,11 +2600,67 @@ export class EditorInspector {
         if (!this._animateModalBound) {
             this._animateModalBound = true;
             const chipsWrap   = document.getElementById('animate-entrance-chips');
-            const durSlider   = document.getElementById('animate-duration');
-            const easeSelect  = document.getElementById('animate-ease');
             const previewBtn  = document.getElementById('animate-modal-preview');
             const closeBtn    = document.getElementById('animate-modal-close');
             const header      = document.getElementById('animate-modal-header');
+
+            // ── Gate 3 — hydrate custom scrubbers + ease pickers. Each helper
+            // returns a handle stored on `this` so `_syncAnimateModal` can push
+            // values without re-binding listeners.
+            this._animateScrubEntrance = _hydrateScrubber(document.getElementById('animate-duration'), {
+                onInput: (v) => {
+                    const tgt = this._animateModalEntry;
+                    if (!tgt) return;
+                    tgt.animation.entranceDuration = v;
+                    this.onchange?.();
+                },
+            });
+            this._animateEaseEntrance = _hydrateEasePicker(
+                document.getElementById('animate-ease'), ENTRANCE_EASES,
+                {
+                    initial: 'expo.out',
+                    onInput: (id) => {
+                        const tgt = this._animateModalEntry;
+                        if (!tgt) return;
+                        tgt.animation.entranceEase = id;
+                        this.onchange?.();
+                    },
+                });
+            this._animateScrubExit = _hydrateScrubber(document.getElementById('animate-exit-duration'), {
+                onInput: (v) => {
+                    const tgt = this._animateModalEntry;
+                    if (!tgt) return;
+                    tgt.animation.exitDuration = v;
+                    this.onchange?.();
+                },
+            });
+            this._animateEaseExit = _hydrateEasePicker(
+                document.getElementById('animate-exit-ease'), EXIT_EASES,
+                {
+                    initial: 'expo.in',
+                    onInput: (id) => {
+                        const tgt = this._animateModalEntry;
+                        if (!tgt) return;
+                        tgt.animation.exitEase = id;
+                        this.onchange?.();
+                    },
+                });
+            this._animateScrubIdleSpeed = _hydrateScrubber(document.getElementById('animate-idle-speed'), {
+                onInput: (v) => {
+                    const tgt = this._animateModalEntry;
+                    if (!tgt) return;
+                    tgt.animation.idleSpeed = v;
+                    // Re-apply idle so the new speed takes effect immediately —
+                    // mirror of the old <input>'s onInput behaviour.
+                    if (tgt.animation.idle && tgt.animation.idle !== 'none') {
+                        startIdleAnimation(tgt, tgt.animation, () => {
+                            this._buildCompShader();
+                            this._applyToEngine();
+                        });
+                    }
+                    this.onchange?.();
+                },
+            });
 
             // Tab switching — Entrance + Exit functional; Idle has its own loop (no preview).
             modal.querySelectorAll('.animate-tab').forEach(tab => {
@@ -2535,10 +2745,9 @@ export class EditorInspector {
             wireParams('.animate-params[data-tab="entrance"]');
             wireParams('.animate-params[data-tab="exit"]');
 
-            // Exit chip row + duration + ease (Phase A2) — mirror of entrance.
+            // Exit chip row (Phase A2). Duration + ease are scrubber + ease
+            // picker (hydrated above) — same source-of-truth as entrance.
             const exitChips = document.getElementById('animate-exit-chips');
-            const exitDur   = document.getElementById('animate-exit-duration');
-            const exitEase  = document.getElementById('animate-exit-ease');
             exitChips?.addEventListener('click', (e) => {
                 const chip = e.target.closest('.animate-chip');
                 if (!chip) return;
@@ -2549,24 +2758,9 @@ export class EditorInspector {
                 tgt._refreshAnimateDot?.();
                 this.onchange?.();
             });
-            exitDur?.addEventListener('input', () => {
-                const tgt = this._animateModalEntry;
-                if (!tgt) return;
-                tgt.animation.exitDuration = parseFloat(exitDur.value);
-                const label = document.getElementById('animate-exit-duration-val');
-                if (label) label.textContent = `${tgt.animation.exitDuration.toFixed(2)}s`;
-                this.onchange?.();
-            });
-            exitEase?.addEventListener('change', () => {
-                const tgt = this._animateModalEntry;
-                if (!tgt) return;
-                tgt.animation.exitEase = exitEase.value;
-                this.onchange?.();
-            });
 
-            // Idle chip row + speed slider (Phase A3) — distinct from entrance.
+            // Idle chip row (Phase A3). Speed is the scrubber hydrated above.
             const idleChips = document.getElementById('animate-idle-chips');
-            const idleSpeed = document.getElementById('animate-idle-speed');
             idleChips?.addEventListener('click', (e) => {
                 const chip = e.target.closest('.animate-chip');
                 if (!chip) return;
@@ -2580,35 +2774,6 @@ export class EditorInspector {
                     this._buildCompShader();
                     this._applyToEngine();
                 });
-                this.onchange?.();
-            });
-            idleSpeed?.addEventListener('input', () => {
-                const tgt = this._animateModalEntry;
-                if (!tgt) return;
-                tgt.animation.idleSpeed = parseFloat(idleSpeed.value);
-                const label = document.getElementById('animate-idle-speed-val');
-                if (label) label.textContent = `${tgt.animation.idleSpeed.toFixed(2)}×`;
-                // Re-apply idle so the new speed takes effect immediately.
-                if (tgt.animation.idle && tgt.animation.idle !== 'none') {
-                    startIdleAnimation(tgt, tgt.animation, () => {
-                        this._buildCompShader();
-                        this._applyToEngine();
-                    });
-                }
-                this.onchange?.();
-            });
-            durSlider?.addEventListener('input', () => {
-                const tgt = this._animateModalEntry;
-                if (!tgt) return;
-                tgt.animation.entranceDuration = parseFloat(durSlider.value);
-                const label = document.getElementById('animate-duration-val');
-                if (label) label.textContent = `${tgt.animation.entranceDuration.toFixed(2)}s`;
-                this.onchange?.();
-            });
-            easeSelect?.addEventListener('change', () => {
-                const tgt = this._animateModalEntry;
-                if (!tgt) return;
-                tgt.animation.entranceEase = easeSelect.value;
                 this.onchange?.();
             });
             previewBtn?.addEventListener('click', () => {
@@ -2671,16 +2836,12 @@ export class EditorInspector {
         const titleEl = document.getElementById('animate-modal-layer-name');
         if (titleEl) titleEl.textContent = entry.name || entry.fileName || 'Layer';
 
-        // Entrance
+        // Entrance — chip highlight + Gate-3 scrubber/ease handles.
         document.querySelectorAll('#animate-entrance-chips .animate-chip').forEach(c => {
             c.classList.toggle('active', c.dataset.preset === a.entrance);
         });
-        const dur = document.getElementById('animate-duration');
-        if (dur) dur.value = a.entranceDuration;
-        const durLabel = document.getElementById('animate-duration-val');
-        if (durLabel) durLabel.textContent = `${Number(a.entranceDuration).toFixed(2)}s`;
-        const ease = document.getElementById('animate-ease');
-        if (ease) ease.value = a.entranceEase || 'expo.out';
+        this._animateScrubEntrance?.setValue(a.entranceDuration);
+        this._animateEaseEntrance?.setActive(a.entranceEase || 'expo.out');
 
         // Gate 2 — sync entrance param sliders + show only the relevant row
         this._syncAnimateParamRows('entrance', a.entrance);
@@ -2697,16 +2858,12 @@ export class EditorInspector {
         syncSlider('entrancePopFrom',       0.0);
         syncSlider('entranceBlurStart',     0.6);
 
-        // Exit (Phase A2) — mirror of entrance
+        // Exit (Phase A2) — chip highlight + Gate-3 scrubber/ease handles.
         document.querySelectorAll('#animate-exit-chips .animate-chip').forEach(c => {
             c.classList.toggle('active', c.dataset.preset === (a.exit || 'none'));
         });
-        const exitDurEl = document.getElementById('animate-exit-duration');
-        if (exitDurEl) exitDurEl.value = a.exitDuration ?? 0.5;
-        const exitDurLabel = document.getElementById('animate-exit-duration-val');
-        if (exitDurLabel) exitDurLabel.textContent = `${Number(a.exitDuration ?? 0.5).toFixed(2)}s`;
-        const exitEaseEl = document.getElementById('animate-exit-ease');
-        if (exitEaseEl) exitEaseEl.value = a.exitEase || 'expo.in';
+        this._animateScrubExit?.setValue(a.exitDuration ?? 0.5);
+        this._animateEaseExit?.setActive(a.exitEase || 'expo.in');
 
         // Gate 2 — same for exit
         this._syncAnimateParamRows('exit', a.exit || 'none');
@@ -2716,14 +2873,11 @@ export class EditorInspector {
         syncSlider('exitPopFrom',       0.0);
         syncSlider('exitBlurStart',     0.6);
 
-        // Idle (Phase A3)
+        // Idle (Phase A3) — chip highlight + Gate-3 speed scrubber.
         document.querySelectorAll('#animate-idle-chips .animate-chip').forEach(c => {
             c.classList.toggle('active', c.dataset.idle === (a.idle || 'none'));
         });
-        const idleSpeed = document.getElementById('animate-idle-speed');
-        if (idleSpeed) idleSpeed.value = a.idleSpeed ?? 1.0;
-        const idleSpeedLabel = document.getElementById('animate-idle-speed-val');
-        if (idleSpeedLabel) idleSpeedLabel.textContent = `${Number(a.idleSpeed ?? 1.0).toFixed(2)}×`;
+        this._animateScrubIdleSpeed?.setValue(a.idleSpeed ?? 1.0);
     }
 
     // ─── Images Only ───────────────────────────────────────────────────────────

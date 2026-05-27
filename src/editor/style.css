@@ -1037,6 +1037,117 @@ html, body {
 .animate-modal .animate-coming-soon p {
   margin: 0;
 }
+
+/* ── Phase A1 Gate 3 — visual scrubber ──
+   Custom duration / speed control. Replaces <input type=range> so the look is
+   consistent across platforms and the touch target is generous.  */
+.animate-modal .anim-scrub {
+  user-select: none;
+  margin-bottom: 18px;
+}
+.animate-modal .anim-scrub-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 13px; color: var(--text-2); margin-bottom: 6px;
+}
+.animate-modal .anim-scrub-value {
+  color: var(--text-1); font-variant-numeric: tabular-nums; font-weight: 500;
+}
+.animate-modal .anim-scrub-track {
+  position: relative; height: 28px;
+  cursor: pointer;
+  touch-action: none;
+}
+.animate-modal .anim-scrub-track:focus-visible { outline: none; }
+.animate-modal .anim-scrub-track:focus-visible .anim-scrub-handle {
+  box-shadow: 0 1px 4px rgba(0,0,0,0.6), 0 0 0 6px rgba(108, 204, 255, 0.20);
+}
+.animate-modal .anim-scrub-rail {
+  position: absolute; left: 0; right: 0; top: 50%;
+  height: 4px; transform: translateY(-50%);
+  background: rgba(255,255,255,0.08);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.animate-modal .anim-scrub-fill {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: 0;
+  background: rgba(255,255,255,0.45);
+  border-radius: 2px;
+}
+.animate-modal .anim-scrub-ticks {
+  position: absolute; left: 0; right: 0; top: 50%;
+  height: 12px; transform: translateY(-50%);
+  pointer-events: none;
+  display: flex; justify-content: space-between;
+}
+.animate-modal .anim-scrub-tick {
+  width: 1px; height: 6px; align-self: center;
+  background: rgba(255,255,255,0.13);
+}
+.animate-modal .anim-scrub-tick.major {
+  height: 10px;
+  background: rgba(255,255,255,0.22);
+}
+.animate-modal .anim-scrub-handle {
+  position: absolute; top: 50%; left: 0;
+  width: 16px; height: 16px;
+  transform: translate(-50%, -50%);
+  background: #fff; border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.55), 0 0 0 4px rgba(255,255,255,0.05);
+  transition: box-shadow 0.12s;
+  pointer-events: none;
+}
+.animate-modal .anim-scrub-track:hover .anim-scrub-handle {
+  box-shadow: 0 1px 4px rgba(0,0,0,0.55), 0 0 0 7px rgba(255,255,255,0.08);
+}
+.animate-modal .anim-scrub.dragging .anim-scrub-handle {
+  box-shadow: 0 1px 6px rgba(0,0,0,0.7), 0 0 0 9px rgba(255,255,255,0.13);
+}
+
+/* ── Phase A1 Gate 3 — ease picker (chips + bezier preview) ──
+   Replaces the <select> for entrance/exit ease. SVG curve samples the GSAP
+   ease function so elastic / bounce overshoots render correctly. */
+.animate-modal .anim-ease-picker {
+  margin-bottom: 18px;
+}
+.animate-modal .anim-ease-head {
+  font-size: 13px; color: var(--text-2); margin-bottom: 8px;
+}
+.animate-modal .anim-ease-chips {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-bottom: 10px;
+}
+.animate-modal .anim-ease-chip {
+  background: var(--bg-1); border: 1px solid var(--border);
+  border-radius: 14px; color: var(--text-2);
+  padding: 6px 12px; font-size: 12px; font-weight: 500;
+  cursor: pointer; transition: all 0.12s;
+}
+.animate-modal .anim-ease-chip:hover { border-color: var(--border-hi); color: var(--text-1); }
+.animate-modal .anim-ease-chip.active {
+  background: rgba(255,255,255,0.14);
+  border-color: rgba(255,255,255,0.35);
+  color: #fff;
+}
+.animate-modal .anim-ease-preview {
+  width: 100%; height: 72px;
+  display: block;
+  background: rgba(255,255,255,0.03);
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+.animate-modal .anim-ease-axis {
+  stroke: rgba(255,255,255,0.10);
+  stroke-width: 1;
+}
+.animate-modal .anim-ease-curve {
+  fill: none;
+  stroke: rgba(255,255,255,0.80);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: stroke 0.12s;
+}
 /* Delete button — text style, destructive tint on hover */
 .layer-remove {
   background: transparent;
