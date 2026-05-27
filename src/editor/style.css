@@ -986,14 +986,34 @@ html, body {
 }
 .animate-modal input[type=range] { height: 6px; }
 
-/* Contextual per-preset param rows (Phase A1 Gate 2) */
+/* Contextual per-preset param rows (Phase A1 Gate 2).
+   Phase A4-6: smooth expand/collapse on chip change. Override the UA
+   `[hidden] { display: none }` so max-height / padding / opacity can
+   transition. 100px max-height is a generous cap for any single row. */
 .animate-modal .animate-param-row {
   margin-bottom: 12px;
   padding: 10px 12px;
   background: rgba(255,255,255,0.03);
   border-radius: 6px;
+  overflow: hidden;
+  max-height: 100px;
+  opacity: 1;
+  transition:
+    max-height 0.22s ease,
+    padding-top 0.18s ease,
+    padding-bottom 0.18s ease,
+    margin-bottom 0.18s ease,
+    opacity 0.16s ease;
 }
-.animate-modal .animate-param-row[hidden] { display: none; }
+.animate-modal .animate-param-row[hidden] {
+  display: block;
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  margin-bottom: 0;
+  opacity: 0;
+  pointer-events: none;
+}
 .animate-modal .animate-param-label {
   display: flex; justify-content: space-between; align-items: center;
   font-size: 12px; color: var(--text-2); margin-bottom: 6px;
@@ -1147,6 +1167,43 @@ html, body {
   stroke-linecap: round;
   stroke-linejoin: round;
   transition: stroke 0.12s;
+}
+
+/* ─── Phase A4 — UI polish (animation-dev.md) ─────────────────────────────── */
+
+/* A4-1: layer card mount. Fires on every card insertion (single user upload
+   OR all cards in a loaded preset). Pure CSS — no JS hook. Transform +
+   opacity only; cards below don't reflow, so it reads as a soft pop. */
+@keyframes layer-card-mount {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.image-layer-card {
+  animation: layer-card-mount 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* A4-2: layer card unmount. JS adds `.card-removing` then awaits
+   `animationend` before `card.remove()` so the slide-up actually plays.
+   max-height collapse is what makes cards below slide up to fill the gap. */
+@keyframes layer-card-unmount {
+  from { opacity: 1; max-height: 800px; margin-bottom: 8px; transform: translateY(0); }
+  to   { opacity: 0; max-height: 0;     margin-bottom: 0;   transform: translateY(-6px); }
+}
+.image-layer-card.card-removing {
+  overflow: hidden;
+  pointer-events: none;
+  animation: layer-card-unmount 0.22s ease-in forwards;
+}
+
+/* A4-4: Animate-modal tab cross-fade. JS toggles `hidden` then re-applies
+   `.animate-fade-in` to force-restart the keyframe (display:none → block
+   doesn't reliably re-trigger CSS animations across all browsers). */
+@keyframes animate-panel-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-modal .animate-panel.animate-fade-in {
+  animation: animate-panel-fade-in 0.16s ease-out;
 }
 /* Delete button — text style, destructive tint on hover */
 .layer-remove {

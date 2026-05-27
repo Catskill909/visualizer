@@ -24,7 +24,9 @@
 
 **A1 Gate 3 ✅ shipped & user-verified 2026-05-27.** Custom visual scrubber replaces the duration / idle-speed `<input type=range>` (drag handle, tick marks, value readout, keyboard arrows). Ease picker replaces the `<select>` with a chip row + live SVG bezier preview that samples the actual GSAP ease function (so elastic / bounce overshoots draw correctly). No `<select>` or default `<input type=range>` remains in the modal's Duration / Ease rows.
 
-**Remaining:** A4 (CSS UI polish — card add/remove transitions, modal scale-in, chip cross-fades).
+**A4 🔧 built 2026-05-27 — awaiting test.** All six items live: layer card mount slides down + fades in; card removal slides up + collapses height so cards below fill the gap; tab switch in the Animate modal cross-fades (force-restarted via `.animate-fade-in` class toggle); contextual param rows expand/collapse smoothly when the entrance/exit preset chip changes (max-height + padding transition replaces the old instant `[hidden]` swap); modal scale-in pop and chip filled-highlight transition were already in place from A1.
+
+**Remaining:** none in v1. Future phases (B1 beat-step, B2 keyframes, C1 performance triggering) are not part of the v1 setup tool.
 
 ### 🎯 Up Next — priority order
 
@@ -36,13 +38,20 @@
 | 2 | **A1** — Modal shell + Entrance | Modal trigger on layer card, entrance chip picker, duration scrubber, bezier easing editor, Preview button | ✅ Gate 1 / ✅ Gate 2 (contextual panels) / ✅ Gate 3 (visual scrubber + ease bezier) |
 | 3 | **A2** — Exit tab | Mirror of entrance; layer waits for exit tween before hiding | ✅ |
 | 4 | **A3** — Idle tab | Hybrid: Sway/Spin/Drift = shader props; Float/Pulse/Breathe = GSAP yoyo on `_anim`. Chip row + speed slider. | ✅ |
-| 5 | **A4** — UI polish | Layer card add/remove transitions, modal open animation, chip/tab cross-fades | ⬜ |
+| 5 | **A4** — UI polish | Layer card add/remove transitions, modal open animation, chip/tab cross-fades | 🔧 built, awaiting test |
 | 6 | **B1** — Beat-step locomotion | Step sequence per layer, beat clock advances states, stutter-motion feel | ⏸ design first |
 | 7 | **B2** — Keyframe sequences | Per-layer GSAP Timeline from serialised keyframe array | ⏸ |
 | 8 | **C1** — Performance triggering | Keyboard / MIDI / OSC fire animations live | ⏸ |
 
 ### Recently shipped
 
+- **2026-05-27 — A4 UI polish 🔧 built (awaiting test).** All six items from the A4 table:
+  - **A4-1 (card mount).** Pure CSS — `@keyframes layer-card-mount` on `.image-layer-card` runs once on every insertion (single upload OR all cards in a loaded preset). Transform + opacity only; cards below don't reflow, so it reads as a soft pop.
+  - **A4-2 (card unmount).** `@keyframes layer-card-unmount` collapses max-height + margin so cards below slide up into the gap. JS hook in `_performDeleteLayer` adds `.card-removing`, awaits `animationend` (with a 320ms safety timeout in case the event never fires), then calls `card.remove()`. Runs after the GSAP exit tween, not in parallel — the card's role is to show the list compacting, separate from the canvas-side fade.
+  - **A4-3 (modal scale-in).** Already in place from A1 — `.animate-modal-card` has `animate-modal-pop` with a back-out curve.
+  - **A4-4 (tab cross-fade).** `@keyframes animate-panel-fade-in` runs on the newly visible panel. Tab-click handler in `_showAnimateModal` removes + reflow + re-adds `.animate-fade-in` to force-restart the keyframe — `display:none → block` alone doesn't reliably re-trigger CSS animations across browsers.
+  - **A4-5 (chip highlight).** Already in place from A1 — `.animate-chip` had `transition: all 0.12s` from day one, so background/border/colour swap to active was already smooth.
+  - **A4-6 (contextual param row reveal).** The Gate-2 rows used `[hidden]` which kills transitions (display:none). Replaced with an override: `.animate-param-row[hidden] { display: block; max-height: 0; padding: 0; margin: 0; opacity: 0 }` + transition on `.animate-param-row` for max-height / padding / margin / opacity. 100px max-height cap is comfortably above any actual row height.
 - **2026-05-27 — A1 Gate 3 ✅ shipped & user-verified.** Two reusable custom controls replace the native form widgets in the Animate modal's Duration / Ease rows:
   - **`_hydrateScrubber(el, { onInput })`** — visual time scrubber. Hydrates a `<div class="anim-scrub" data-min data-max data-step data-value data-format data-label>` into a track with tick marks, draggable handle, value readout, and keyboard arrow / Home / End support. Pointer-capture drag (so the handle stays followed even outside the track). Same component drives entrance duration (0.1–10 s), exit duration (0.1–10 s), and idle speed (0.25×–4×). Returns `{ setValue, getValue }` — sync uses `setValue` (no event fired), drag uses internal `onInput` fire path.
   - **`_hydrateEasePicker(el, options, { initial, onInput })`** — chip row + live SVG bezier preview. The SVG samples `gsap.parseEase(name)` at 80 points and draws a polyline, so elastic / bounce / back overshoots render correctly (no cubic-bezier approximation — the curve IS the actual ease that will play). ViewBox padded above / below the 0..1 baseline so overshoots stay visible. Used twice: entrance (`ENTRANCE_EASES` — 5 `.out` variants) and exit (`EXIT_EASES` — 5 `.in` variants, newly exported from [animation.js](src/editor/animation.js) for shared truth).

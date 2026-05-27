@@ -2670,6 +2670,15 @@ export class EditorInspector {
                     modal.querySelectorAll('.animate-panel').forEach(p => {
                         p.hidden = p.dataset.panel !== which;
                     });
+                    // A4-4: re-trigger the fade-in keyframe on the newly visible panel.
+                    // display:none → block doesn't reliably restart `animation` across
+                    // browsers, so we remove + reflow + re-add the class explicitly.
+                    const activePanel = modal.querySelector(`.animate-panel[data-panel="${which}"]`);
+                    if (activePanel) {
+                        activePanel.classList.remove('animate-fade-in');
+                        void activePanel.offsetWidth;
+                        activePanel.classList.add('animate-fade-in');
+                    }
                     // Preview is meaningful on entrance + exit (replays the tween).
                     // Idle is a continuous loop — picking a chip is its own preview.
                     if (previewBtn) previewBtn.style.display = which === 'idle' ? 'none' : '';
@@ -3039,6 +3048,16 @@ export class EditorInspector {
         this.engine.removeVideoAnimation(texName);
         this._buildCompShader();
         this._applyToEngine();
+        // A4-2: slide-up + fade the card before pulling it from the DOM. The
+        // canvas-side layer already disappeared (above); this just makes the
+        // card list compact gracefully instead of a hard pop. ~220ms.
+        await new Promise(resolve => {
+            card.classList.add('card-removing');
+            let done = false;
+            const finish = () => { if (done) return; done = true; resolve(); };
+            card.addEventListener('animationend', finish, { once: true });
+            setTimeout(finish, 320); // safety: never hang if animationend doesn't fire
+        });
         card.remove();
         this._updateLayersBar();
         this._updateLayerIndices();
