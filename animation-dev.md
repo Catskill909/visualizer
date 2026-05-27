@@ -1,6 +1,6 @@
 # Animation System — Design & Planning Doc
 
-**Last updated:** 2026-05-23
+**Last updated:** 2026-05-27
 
 ---
 
@@ -20,7 +20,9 @@
 
 ### Current status
 
-**Nothing built yet.** This doc is in the research/planning phase. Phase 0 (infrastructure) is the next thing to build — no UI, no GSAP, just the WebGL uniform foundation.
+**P0 ✅ + A1 Gate 1 ✅ + A3 ✅ shipped & user-verified 2026-05-27.** Entrance + Idle pipelines both work in the live editor. Idle is **hybrid** — Sway / Spin / Drift use the existing shader-side motion props (compose naturally with entrance); Float / Pulse / Breathe use GSAP yoyo on `_anim` (pause for entrance, auto-resume after).
+
+**Remaining:** A2 (Exit tab), A1 Gate 2 (contextual per-chip controls), A1 Gate 3 (custom visual scrubber + bezier editor). A4 (UI polish) is last.
 
 ### 🎯 Up Next — priority order
 
@@ -28,10 +30,10 @@
 
 | # | Phase | What | Status |
 |---|-------|------|--------|
-| 1 | **P0** — Infrastructure | `_anim` object on entries + 5 animation uniforms + rAF upload + save/load | ⬜ |
-| 2 | **A1** — Modal shell + Entrance | Modal trigger on layer card, entrance chip picker, duration scrubber, bezier easing editor, Preview button | ⬜ |
+| 1 | **P0** — Infrastructure | `_anim` object on entries + 5 q-register slots per layer + per-frame eq line + save/load | ✅ |
+| 2 | **A1** — Modal shell + Entrance | Modal trigger on layer card, entrance chip picker, duration scrubber, bezier easing editor, Preview button | ✅ Gate 1 / ⬜ Gate 2 (contextual panels) / ⬜ Gate 3 (visual scrubber + bezier) |
 | 3 | **A2** — Exit tab | Mirror of entrance; layer waits for exit tween before hiding | ⬜ |
-| 4 | **A3** — Idle tab | Re-skin of existing shader motion (spinSpeed / swayAmt / bounceAmp) as named presets with speed slider | ⬜ |
+| 4 | **A3** — Idle tab | Hybrid: Sway/Spin/Drift = shader props; Float/Pulse/Breathe = GSAP yoyo on `_anim`. Chip row + speed slider. | ✅ |
 | 5 | **A4** — UI polish | Layer card add/remove transitions, modal open animation, chip/tab cross-fades | ⬜ |
 | 6 | **B1** — Beat-step locomotion | Step sequence per layer, beat clock advances states, stutter-motion feel | ⏸ design first |
 | 7 | **B2** — Keyframe sequences | Per-layer GSAP Timeline from serialised keyframe array | ⏸ |
@@ -39,7 +41,17 @@
 
 ### Recently shipped
 
-*Nothing yet.*
+- **2026-05-27 — A3 Idle tab ✅ shipped & user-verified.** New exports `startIdleAnimation(entry, cfg, refresh)` and `stopIdleAnimation(entry, refresh)` in [src/editor/animation.js](src/editor/animation.js). The doc's plan was contradictory ("re-skin existing shader motion" vs the example code at top showing GSAP yoyo); resolved as a **hybrid** because not every preset has an existing shader prop. Mapping: **Sway** → `swayAmt`/`swaySpeed` (shader), **Spin** → `spinSpeed` (shader), **Drift** → `panMode='bounce'` two-axis with distinct per-axis rates (shader), **Float** → GSAP yoyo `cyOffset` ±0.05 / 3s (pipe), **Pulse** → GSAP yoyo `scale` 1.0 ↔ 1.08 / 2s (pipe), **Breathe** → GSAP yoyo `opacity` 1.0 ↔ 0.55 / 3s (pipe). Speed slider scales the period inversely for GSAP paths and scales the rate for shader paths. Lifecycle: idle stops before entrance (`playEntranceAnimation` calls `stopIdleAnimation`), stops on layer delete (`_performDeleteLayer`), stops on `_clearForLoad` (preset swap), and auto-fires on `loadPresetData` after entrance settles. UI: idle controls in the modal's Idle tab; Preview button hidden on Idle (loop is its own preview).
+  - **First-test fix (2026-05-27):** Drift was implemented with `panMode: 'drift'` (one-way continuous translation), which slid single-image layers off-canvas forever — only sensible for tiled layers where the tile repeat behind. Switched to `panMode: 'bounce'` with two distinct per-axis rates (0.15 / 0.11 cycles/sec scaled by speed, ±0.08 UV amplitude). Image now oscillates around its anchor with the desync the doc's "two independent loops, different durations" intended. Added `panRange` to `IDLE_SHADER_KEYS` so stop also resets it.
+  - **Second-test fix (2026-05-27):** Breathe (and Float / Pulse) appeared to stop after using entrance Preview. Root cause: `playEntranceAnimation` was calling the full `stopIdleAnimation`, which (a) was overkill — shader-side idle (Sway / Spin / Drift) composes naturally with entrance because they touch different state (shader props vs `_anim`) — and (b) once entrance completed, the Preview button didn't restart the GSAP-side idle. Fixes: entrance now only does `gsap.killTweensOf(_gsapProxy)` inline (no shader-prop reset), and the Preview button's handler restarts idle in the `.then()` of the entrance promise. Same pattern was already in `loadPresetData` for auto-fire. Net effect: Sway / Spin / Drift keep running through an entrance tween; Float / Pulse / Breathe pause for the entrance and auto-resume after.
+- **2026-05-26 — A1 Gate 1 (animations work; UX fixes in flight).** GSAP installed. New module [src/editor/animation.js](src/editor/animation.js) exports `playEntranceAnimation(entry, cfg)` with 9 presets (fade, scale-up/down, slide L/R/U/D, pop, blur). `✦` button on layer card header opens a focused modal (#animate-modal in editor.html) with Entrance chip row + Duration slider + Ease dropdown + Preview button. Tween targets `entry._anim.*` and snaps back to neutral on complete. Auto-fires for any loaded preset's layers whose entrance ≠ none.
+  - **First user feedback (2026-05-26):** effects work, but (1) the modal used the `.save-modal` full-page backdrop which blocked the canvas, (2) duration capped at 3s — too short for musical / group-entrance pacing, (3) easings appeared inert because the open-modal path was clone-replacing the controls each open, which silently reset `<select>.value` on reopen. Fixes: dropped `.save-modal`, added a floating non-blocking `.animate-modal` class (no backdrop), duration extended to 0.1–10.0s in HTML / 15s clamp in the engine, listeners are now bound ONCE and operate on `this._animateModalEntry` so the dropdown keeps its state across opens. Pop no longer force-overrides the user's ease.
+  - **Critical bug (2026-05-26 — fixed):** after a Preview animation ran, **every** layer-card control (size / opacity / colour / audio reactivity / etc.) went dead. Root cause: `gsap.to(entry._anim, ...)` pollutes its tween target with a `_gsap` Tween reference whose internals are circular. `deepClone(state)` inside `_buildRuntimePreset` (called on every `refresh()` from a slider input) used `JSON.parse(JSON.stringify(...))`, which throws on circular refs. The throw killed the whole shader-rebuild path, making every slider appear inert. Fix: tween a separate `entry._gsapProxy` (non-enumerable so it's invisible to `JSON.stringify`), and copy values into the plain `entry._anim` via `onUpdate`. `_anim` stays a flat 5-prop object that clones safely.
+  - **Modal polish (2026-05-26):** modal is now draggable by its header (pointer events, position persists for session). Default position anchors top-right of canvas, well clear of the layer being animated. Exit/Idle tabs now switch instead of being grayed out — each shows a clean informational placeholder describing what lands in A2 / A3 (per doc spec).
+  - **Entrance felt wrong, fixed (2026-05-26):** slide-in animations were "appearing then animating" instead of starting off-canvas. Two causes: (1) slide offset was only ±0.4 — image centre still 10% inside the canvas edge so the image stayed visible; (2) `gsap.to` lazy-resolves the from-state, so frame 0 could briefly render at the neutral pose before the tween took over. Fixes: bumped slide offsets to ±1.2 (centre well past the canvas edge), added `opacity:0` to every preset's from-state (frame 0 is always invisible), switched to `gsap.fromTo(..., { immediateRender: true })` so the start pose is synchronous and the very first rendered frame is already the off-canvas / faded state.
+  - **Easings — entrance ease audit (2026-05-26):** at long durations (e.g. 9s) the layer would stay invisible for ~6s then rush in over the last 3s — the user picked "Ease In" (`expo.in`). `.in` eases are mathematically back-loaded (slow start, fast end) and are categorically wrong for entrance animations. Entrances must decelerate into rest, which is `.out`. Audit removed `expo.in` and `expo.inOut` from the entrance dropdown and renamed the remaining options to plain-English labels: **Smooth** (`expo.out`, default), **Snappy** (`power3.out`), **Spring** (`elastic.out(1, 0.5)`), **Bounce** (`bounce.out`), **Linear** (`none`). All five front-load the visible motion so picking 9s does what you'd expect. Exit animations (A2) will ship with their own dropdown of `.in` eases since accelerating-away is correct for exits.
+  - Gate 2 (contextual panels per chip) and Gate 3 (visual scrubber + bezier editor) still ⬜.
+- **2026-05-26 — P0 infrastructure.** `_anim` on every entry, q1..q25 wired through comp shader as multipliers/offsets on baked opacity/size/cx/cy/blur, per-frame eq line pulls from `window.__dcAnim` global written by visualizer's rAF loop. Verified: mutating `_anim.opacity` blanks the layer next frame with no rebuild. Existing layer behaviour unchanged at neutral defaults.
 
 ---
 
@@ -491,25 +503,61 @@ If GSAP tweens `entry.cx` from 0.6 to 0.5 over 700ms, **nothing happens on scree
 
 **GSAP tweening entry properties directly = will not work for smooth animation.**
 
-### The right architecture: animation uniforms
+### Architecture correction (2026-05-26) — q-register pipe, not raw uniforms
 
-The correct approach is to add a small set of **animation-only WebGL uniforms** — properties that can be updated each frame via `gl.uniform*()` calls without recompiling anything. The existing baked values stay untouched; the animation uniforms are offsets/multipliers on top.
+Direct `gl.uniform1f(...)` from the rAF loop **cannot work** here. Butterchurn owns the comp program — we never call `getUniformLocation` / `useProgram` on it; we hand it a GLSL string (`currentState.comp`) and it compiles. The existing comment at [inspector.js:6233–6238](src/editor/inspector.js#L6233-L6238) is explicit: *"All per-image parameters are baked as float literals so no custom uniforms are needed."*
 
-Proposed animation uniforms (added to the comp shader once, during normal build):
+**The actual bridge that does work** is Butterchurn's q-register pipe — the same pipe spectral flux already uses ([inspector.js:6218](src/editor/inspector.js#L6218)):
 
-| Uniform | Type | Purpose | Neutral value |
-|---|---|---|---|
-| `u_anim_opacity` | `float` | Multiplies the baked opacity | 1.0 |
-| `u_anim_scale` | `float` | Multiplies the baked size | 1.0 |
-| `u_anim_cx_offset` | `float` | Adds to baked cx | 0.0 |
-| `u_anim_cy_offset` | `float` | Adds to baked cy | 0.0 |
-| `u_anim_blur` | `float` | Additional blur for blur-in effect | 0.0 |
+```js
+// existing pattern, see fluxLine
+runtime.frame_eqs_str += 'a.q31 = (typeof __dcFlux !== "undefined" ? __dcFlux : 0);';
+// then in comp shader_body: `float x = q31;` — bare identifier, no declaration needed
+```
 
-At render time (every rAF tick), the loop calls `gl.uniform1f(u_anim_opacity, entry._anim.opacity)` etc. — no shader recompile, just uniform upload. The shader computes `final_opacity = baked_opacity * u_anim_opacity`.
+The frame_eqs_str runs as real JS each frame (Butterchurn translates MilkDrop eqs to JS at parse time), so it can read any `window.*` global and assign to `a.q{n}`. The `q1..q32` namespace is then visible inside the comp `shader_body { }` block as bare identifiers.
 
-GSAP then tweens `entry._anim.opacity` from 0 → 1 for a fade-in. The rAF loop uploads it as a uniform every frame. **Smooth 60fps, zero recompiles during animation.**
+### The right architecture: q-register slots per layer
 
-When the tween completes, all animation uniforms return to their neutral values (1.0 / 0.0). The baked values reassert. No permanent state change.
+The existing baked values stay untouched; q-registers are offsets/multipliers stacked on top, identical in spirit to the original "animation uniforms" plan — just routed through Butterchurn's eq pipe instead of raw `gl.uniform*` calls.
+
+**Slot map.** 5 animation channels × max 5 layers (`MAX_LAYERS`) = 25 q-registers. Reserved range **q1..q25**. q31 stays with flux. q26..q30 free for future.
+
+| Layer index | Slot base | Channels (offset 0..4) |
+|---|---|---|
+| 0 | q1 | opacity, scale, cxOffset, cyOffset, blur |
+| 1 | q6 | same |
+| 2 | q11 | same |
+| 3 | q16 | same |
+| 4 | q21 | same |
+
+| Channel (per-layer offset) | Purpose | Neutral |
+|---|---|---|
+| +0 | Multiplies baked opacity | 1.0 |
+| +1 | Multiplies baked size | 1.0 |
+| +2 | Adds to baked cx | 0.0 |
+| +3 | Adds to baked cy | 0.0 |
+| +4 | Adds to existing blur | 0.0 |
+
+**Data flow each frame:**
+
+```
+GSAP / direct mutation
+  ↓ writes
+entry._anim.{ opacity, scale, cxOffset, cyOffset, blur }
+  ↓ rAF tick reads into a flat global
+window.__dcAnim = [{op,sc,dx,dy,bl}, ...]   // one slot per layer index
+  ↓ Butterchurn runs frame_eqs_str
+a.q1 = __dcAnim[0]?.op ?? 1.0;  a.q2 = __dcAnim[0]?.sc ?? 1.0;  ...
+  ↓ comp shader_body uses bare q-identifiers
+float _op = ${bakedOp} * q1;   // layer 0
+float _sz = ${bakedSz} * q2;
+vec2  _center = vec2(${bakedCx} + q3, ${bakedCy} + q4);
+```
+
+**Why this is byte-equivalent to direct uniforms at neutral values:** with all `_anim` at defaults, every q-slot resolves to its identity (1.0 or 0.0), and `bakedOp * 1.0 == bakedOp`. The shader output is unchanged until something writes a non-neutral value to `_anim`.
+
+**Zero recompile during tween.** Same guarantee as the original plan. GSAP mutates `_anim`, rAF copies into the global, eq pulls into q-registers, comp shader reads q-registers — no string rebuild anywhere.
 
 ### What this means for the "Idle" tab
 
@@ -543,46 +591,78 @@ All of this must pass before any GSAP or modal code is written. These are infras
 
 #### P0-A — Add `_anim` to all entry defaults
 
-| Layer type | File | Line | Add |
-|---|---|---|---|
-| Image | inspector.js | 2716 | `_anim: { opacity: 1.0, scale: 1.0, cxOffset: 0.0, cyOffset: 0.0, blur: 0.0 }` |
-| Video | inspector.js | 3095 | same |
-| Text | inspector.js | 3246 | same |
+| Layer type | File | Insertion point (actual, verified 2026-05-26) |
+|---|---|---|
+| Image | inspector.js | end of entry literal at **2874** (after `tileOuterGap: 0,`) |
+| Video | inspector.js | end of entry literal at **3240** (after `isStackedAlpha,`) |
+| Text  | inspector.js | end of entry literal at **3413** (after `tileOuterGap: 0,`) |
 
-#### P0-B — Add animation uniforms to the comp shader
+Add: `_anim: { opacity: 1.0, scale: 1.0, cxOffset: 0.0, cyOffset: 0.0, blur: 0.0 }`
 
-In `_buildImageBlock()` (inspector.js:6293), add 5 new uniform declarations to the GLSL source string and use them to offset the baked values:
+#### P0-B — Wire q-registers into the comp shader
 
-```glsl
-uniform float u_anim_opacity;    // multiplier: baked_op * u_anim_opacity
-uniform float u_anim_scale;      // multiplier: baked_size * u_anim_scale
-uniform float u_anim_cx_offset;  // adder: baked_cx + u_anim_cx_offset
-uniform float u_anim_cy_offset;  // adder: baked_cy + u_anim_cy_offset
-uniform float u_anim_blur;       // adder to any existing blur
-```
+**Replaces the original "uniform declarations" plan.** No `uniform float u_anim_*;` is added — Butterchurn would ignore them anyway. Instead, multiply/offset the baked literals in `_buildImageBlock()` ([inspector.js:6376](src/editor/inspector.js#L6376)) with the layer's q-slot identifiers.
 
-In `_buildCompShader()` (inspector.js:6162), look up the uniform locations after shader link and store them on the program object.
-
-#### P0-C — Upload uniforms each frame
-
-In the rAF loop (visualizer.js:599), before the render call at line 640, add a loop over active entries that calls `gl.uniform1f()` for each of the 5 animation uniforms from `entry._anim`. This runs every frame with zero shader recompilation.
+The layer's slot base = `layerIndex * 5 + 1`. Pass the index into `_buildImageBlock` from the loop at [inspector.js:6348](src/editor/inspector.js#L6348).
 
 ```js
-// before visualizer.render() at line 640
-for (const entry of activeEntries) {
-  gl.uniform1f(locs.u_anim_opacity,    entry._anim.opacity);
-  gl.uniform1f(locs.u_anim_scale,      entry._anim.scale);
-  gl.uniform1f(locs.u_anim_cx_offset,  entry._anim.cxOffset);
-  gl.uniform1f(locs.u_anim_cy_offset,  entry._anim.cyOffset);
-  gl.uniform1f(locs.u_anim_blur,       entry._anim.blur);
+// inside _buildImageBlock(img, trackAlpha, layerIdx):
+const qBase = layerIdx * 5 + 1;        // q1, q6, q11, q16, q21
+const qOp   = `q${qBase + 0}`;
+const qSc   = `q${qBase + 1}`;
+const qDx   = `q${qBase + 2}`;
+const qDy   = `q${qBase + 3}`;
+const qBlur = `q${qBase + 4}`;
+
+// then in the GLSL string:
+//   opacity:  was `${op}`         → `(${op} * ${qOp})`
+//   size:     was `${sz}`         → `(${sz} * ${qSc})`
+//   cx:       was `${cx}`         → `(${cx} + ${qDx})`
+//   cy:       was `${cy}`         → `(${cy} + ${qDy})`
+//   blur:     was `${blurAmt}`    → `(${blurAmt} + ${qBlur})`
+```
+
+No location lookup; no `_buildCompShader` change beyond passing the index.
+
+#### P0-C — Per-frame eq line + global bridge
+
+Two changes, neither touches `gl.*`:
+
+**1. Inspector — extend the eq injection.** In `_buildRuntimePreset` ([inspector.js:6213](src/editor/inspector.js#L6213)) — the same place the flux line is injected — append one line per layer slot that copies `window.__dcAnim[i]` into the layer's 5 q-registers, neutral on absence:
+
+```js
+// alongside fluxLine
+const animLines = [];
+for (let i = 0; i < MAX_LAYERS; i++) {
+  const b = i * 5 + 1;
+  animLines.push(
+    `a.q${b+0}=(typeof __dcAnim!=="undefined"&&__dcAnim[${i}]?__dcAnim[${i}].op:1);`,
+    `a.q${b+1}=(typeof __dcAnim!=="undefined"&&__dcAnim[${i}]?__dcAnim[${i}].sc:1);`,
+    `a.q${b+2}=(typeof __dcAnim!=="undefined"&&__dcAnim[${i}]?__dcAnim[${i}].dx:0);`,
+    `a.q${b+3}=(typeof __dcAnim!=="undefined"&&__dcAnim[${i}]?__dcAnim[${i}].dy:0);`,
+    `a.q${b+4}=(typeof __dcAnim!=="undefined"&&__dcAnim[${i}]?__dcAnim[${i}].bl:0);`
+  );
+}
+runtime.frame_eqs_str = [baseFrame, injectedMotion, injectedWave, fluxLine, animLines.join('')].filter(Boolean).join('\n').trim();
+```
+
+**2. Visualizer (or inspector) — refresh the global each rAF tick.** Single line before `this.visualizer.render()` at [visualizer.js:640](src/visualizer.js#L640) — or, more local, in the existing per-frame tick paths in the inspector. Read currentState.images and write a flat array:
+
+```js
+// each frame, before visualizer.render():
+const imgs = window.__editorInspector?.currentState?.images;
+if (imgs) {
+  window.__dcAnim = imgs.map(e => e._anim || null);
 }
 ```
 
+(Exact integration point — visualizer.js engine global vs. inspector tick — picked at code time; doc updated when chosen.)
+
 #### P0-D — Serialize / deserialize animation config
 
-In `saveCurrent()` (inspector.js:7484) — add `animation` field to each serialized entry.
+In `saveCurrent()` ([inspector.js:7604](src/editor/inspector.js#L7604)) — add `animation` field to each serialized entry.
 
-In `loadPresetData()` (inspector.js:7615) — on restore, merge `entry.animation = { ...DEFAULT_ANIMATION, ...saved.animation }`. Presets without the field get defaults silently.
+In `loadPresetData()` ([inspector.js:7737](src/editor/inspector.js#L7737)) — on restore, merge `entry.animation = { ...DEFAULT_ANIMATION, ...saved.animation }`. Presets without the field get defaults silently. Also ensure `_anim` is reset to neutral on load (it's runtime state, not persisted).
 
 ```js
 const DEFAULT_ANIMATION = {
@@ -596,11 +676,12 @@ const DEFAULT_ANIMATION = {
 #### P0-E — Manual smoke test (console)
 
 Before touching any UI:
-1. Open editor, add an image layer
-2. In console: `window._inspector._images[0]._anim.opacity = 0` (or whatever the inspector reference is)
-3. Confirm the layer goes invisible on the next frame without calling `refresh()`
+1. Open editor at `/editor.html`, add an image layer
+2. In console: `window.__editorInspector.currentState.images[0]._anim.opacity = 0`
+3. Confirm the layer goes invisible on the next frame **without calling `_buildCompShader()` or `_applyToEngine()`**
 4. Set back to `1.0`, confirm it returns
-5. Only after this passes does GSAP get wired in
+5. Repeat for `scale` (0.5 → half size), `cxOffset` (0.2 → shifts right), `blur` (0.5 → blurry)
+6. Only after this passes does GSAP get wired in
 
 ---
 
@@ -610,13 +691,13 @@ Before touching any UI:
 
 ### Phase 0 — Pre-build infrastructure (no UI, no visible features)
 
-| Step | What | Location |
+| Step | What | Location (verified 2026-05-26) |
 |---|---|---|
-| P0-A | Add `_anim` object to all 3 entry defaults | inspector.js:2716, 3095, 3246 |
-| P0-B | Add 5 animation uniforms to comp shader GLSL + location lookup | inspector.js:6293, 6162 |
-| P0-C | Add per-frame uniform upload in rAF loop | visualizer.js:599 (before :640) |
-| P0-D | Add `animation` field to save/load | inspector.js:7484, 7615 |
-| P0-E | Console smoke test — opacity uniform works without shader rebuild | — |
+| P0-A | Add `_anim` object to all 3 entry defaults | inspector.js:2874, 3240, 3413 |
+| P0-B | Multiply/offset baked literals with per-layer q-slots in `_buildImageBlock` | inspector.js:6376 (loop caller at :6348) |
+| P0-C | Per-layer eq lines in `_buildRuntimePreset` + per-frame global refresh | inspector.js:6213, visualizer.js:639 |
+| P0-D | Add `animation` field to save/load; reset `_anim` to neutral on load | inspector.js:7604, 7737 |
+| P0-E | Console smoke test — `_anim.opacity = 0` blanks layer with no rebuild | — |
 
 **Gate: all 5 steps pass before moving to Phase A1.**
 

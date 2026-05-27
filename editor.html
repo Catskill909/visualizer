@@ -866,6 +866,101 @@
             </div>
         </div>
 
+        <!-- Animate modal (animation-dev.md Phase A1 Gate 1) -->
+        <!-- Floating panel — no backdrop, draggable by header. Canvas stays visible. -->
+        <div id="animate-modal" class="animate-modal" hidden role="dialog" aria-labelledby="animate-modal-title">
+            <div class="animate-modal-card" style="width:min(440px,95vw);max-height:85vh;overflow-y:auto;">
+                <div id="animate-modal-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;cursor:move;user-select:none;">
+                    <h2 id="animate-modal-title" style="margin:0;font-size:15px;font-weight:600;">✦ Animate — <span id="animate-modal-layer-name">Layer</span></h2>
+                    <button id="animate-modal-close" type="button" class="modal-x-btn" aria-label="Close" style="background:transparent;border:none;color:var(--text-2);font-size:22px;line-height:1;cursor:pointer;padding:4px 8px;">×</button>
+                </div>
+
+                <!-- Tab bar — Entrance ships in Gate 1; Exit/Idle show informational placeholders -->
+                <div class="animate-tabbar" style="display:flex;gap:6px;border-bottom:1px solid var(--border);margin-bottom:14px;">
+                    <button type="button" class="animate-tab active" data-tab="entrance">Entrance</button>
+                    <button type="button" class="animate-tab" data-tab="exit">Exit</button>
+                    <button type="button" class="animate-tab" data-tab="idle">Idle</button>
+                </div>
+
+                <!-- Entrance panel -->
+                <div class="animate-panel" data-panel="entrance">
+                    <div style="font-size:12px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Effect</div>
+                    <div id="animate-entrance-chips" class="animate-chip-row" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px;">
+                        <button type="button" class="animate-chip" data-preset="none">None</button>
+                        <button type="button" class="animate-chip" data-preset="fade">Fade</button>
+                        <button type="button" class="animate-chip" data-preset="scale-up">Scale Up</button>
+                        <button type="button" class="animate-chip" data-preset="scale-down">Scale Down</button>
+                        <button type="button" class="animate-chip" data-preset="slide-left">Slide Left</button>
+                        <button type="button" class="animate-chip" data-preset="slide-right">Slide Right</button>
+                        <button type="button" class="animate-chip" data-preset="slide-up">Slide Up</button>
+                        <button type="button" class="animate-chip" data-preset="slide-down">Slide Down</button>
+                        <button type="button" class="animate-chip" data-preset="pop">Pop</button>
+                        <button type="button" class="animate-chip" data-preset="blur">Blur</button>
+                    </div>
+
+                    <div style="display:flex;gap:18px;margin-bottom:18px;">
+                        <div style="flex:1;">
+                            <label style="display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--text-2);margin-bottom:6px;">
+                                <span>Duration</span>
+                                <span id="animate-duration-val" style="color:var(--text-1);">0.70s</span>
+                            </label>
+                            <input id="animate-duration" type="range" min="0.1" max="10.0" step="0.05" value="0.7" style="width:100%;accent-color:var(--accent);">
+                        </div>
+                        <div style="flex:1;">
+                            <label style="display:flex;align-items:center;font-size:13px;color:var(--text-2);margin-bottom:6px;">Ease</label>
+                            <!-- Entrance eases are all `.out` variants (decelerate to rest). `.in`
+                                 eases would back-load the motion ("nothing for 6s then rushes in"
+                                 — see animation-dev.md "Easings — entrance ease audit"). Exit
+                                 animations (Phase A2) will get their own dropdown with `.in` eases. -->
+                            <select id="animate-ease" class="custom-select" style="width:100%;padding:7px 10px;background:var(--bg-1);border:1px solid var(--border);border-radius:6px;color:var(--text-1);font-size:13px;">
+                                <option value="expo.out">Smooth</option>
+                                <option value="power3.out">Snappy</option>
+                                <option value="elastic.out(1, 0.5)">Spring</option>
+                                <option value="bounce.out">Bounce</option>
+                                <option value="none">Linear</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Exit / Idle "Coming soon" placeholders (per animation-dev.md spec) -->
+                <div class="animate-panel" data-panel="exit" hidden>
+                    <div class="animate-coming-soon">
+                        <div class="animate-coming-soon-title">Exit animations — next phase</div>
+                        <p>Same chip + duration + ease UI as Entrance, but reversed. Layers will hold their exit tween to completion before the layer is removed from the composite, so a fade-out actually fades out.</p>
+                    </div>
+                </div>
+                <div class="animate-panel" data-panel="idle" hidden>
+                    <div style="font-size:12px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Motion</div>
+                    <div id="animate-idle-chips" class="animate-chip-row" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px;">
+                        <button type="button" class="animate-chip" data-idle="none">None</button>
+                        <button type="button" class="animate-chip" data-idle="float">Float</button>
+                        <button type="button" class="animate-chip" data-idle="pulse">Pulse</button>
+                        <button type="button" class="animate-chip" data-idle="sway">Sway</button>
+                        <button type="button" class="animate-chip" data-idle="spin">Spin</button>
+                        <button type="button" class="animate-chip" data-idle="drift">Drift</button>
+                        <button type="button" class="animate-chip" data-idle="breathe">Breathe</button>
+                    </div>
+
+                    <div style="margin-bottom:18px;">
+                        <label style="display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--text-2);margin-bottom:6px;">
+                            <span>Speed</span>
+                            <span id="animate-idle-speed-val" style="color:var(--text-1);">1.00×</span>
+                        </label>
+                        <input id="animate-idle-speed" type="range" min="0.25" max="4.0" step="0.05" value="1.0" style="width:100%;accent-color:var(--accent);">
+                    </div>
+
+                    <div style="font-size:11px;color:var(--text-3);line-height:1.5;padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:6px;">
+                        Sway / Spin / Drift use the same shader properties as the layer card sliders — picking a preset will overwrite those values. Float / Pulse / Breathe run on the animation pipe and don't touch the layer card.
+                    </div>
+                </div>
+
+                <div style="display:flex;justify-content:flex-end;gap:10px;border-top:1px solid var(--border);padding-top:14px;">
+                    <button id="animate-modal-preview" type="button" class="primary-btn" style="padding:8px 18px;font-weight:500;">▶ Preview</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Toast -->
         <div id="toast" class="toast" hidden role="status" aria-live="polite"></div>
 

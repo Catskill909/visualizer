@@ -20,6 +20,7 @@ import {
     estimateGpuMemory
 } from './gifOptimizer.js';
 import { transcodeTo720p, needsTranscode, stripAudio } from '../videoTranscoder.js';
+import { playEntranceAnimation, startIdleAnimation, stopIdleAnimation } from './animation.js';
 
 // ─── Phase 1: layer limits + upload resize ───────────────────────────────────
 // Cap surface area for Phase 1. Internals (shader builder, state array) are
@@ -27,6 +28,17 @@ import { transcodeTo720p, needsTranscode, stripAudio } from '../videoTranscoder.
 const MAX_LAYERS = 5;
 const STD_MAX_DIM = 1024;   // Standard upload max dimension (longest side)
 const HD_MAX_DIM = 2048;    // "HD" toggle max dimension
+
+// animation-dev.md P0-D. User-set entrance/exit/idle config — persisted on each
+// layer. `_anim` is the runtime tween state and is NOT persisted (reset to
+// neutral on load). UI to set this lands in Phase A.
+const DEFAULT_ANIMATION = {
+    entrance: 'none', entranceDuration: 0.7, entranceEase: 'expo.out',
+    exit:     'none', exitDuration:     0.5, exitEase:     'expo.in',
+    idle:     'none', idleSpeed:        1.0,
+    beatSteps: []
+};
+const NEUTRAL_ANIM = { opacity: 1.0, scale: 1.0, cxOffset: 0.0, cyOffset: 0.0, blur: 0.0 };
 
 /**
  * Format seconds as MM:SS for video time display.
@@ -1935,6 +1947,11 @@ export class EditorInspector {
      *  and loadPresetData so all three start from the same baseline. Callers then
      *  overlay their own data on top. */
     _clearForLoad() {
+        // animation-dev.md A3 — stop any idle tweens on the old layers before
+        // they're discarded. Otherwise GSAP keeps the detached entries alive.
+        for (const entry of (this.currentState?.images || [])) {
+            stopIdleAnimation(entry);
+        }
         const layersEl = document.getElementById('image-layers');
         if (layersEl) layersEl.innerHTML = '';
         for (const texName of Object.keys(this._imageTextures)) {
@@ -2385,6 +2402,210 @@ export class EditorInspector {
         showToast(`Added optimized GIF: ${processedData.frameCount} frames, ${processedData.width}×${processedData.height}`, false);
     }
 
+    // ─── Animate modal (animation-dev.md Phase A1 Gate 1) ──────────────────────
+    // The modal is a floating panel (no backdrop) that targets ONE layer at a
+    // time. Listeners are bound ONCE on first open and operate on the entry
+    // currently held in `this._animateModalEntry`. Cloning listeners on every
+    // open destroyed runtime `<select>.value` state, so we don't do that.
+
+    _showAnimateModal(entry) {
+        const modal = document.getElementById('animate-modal');
+        if (!modal || !entry) return;
+        // _normalizeImageEntry adds defaults on load; freshly-added layers may
+        // not have run through it. Fill in the gap here so the UI has a stable
+        // object to write into.
+        if (!entry.animation) {
+            entry.animation = {
+                entrance: 'none', entranceDuration: 0.7, entranceEase: 'expo.out',
+                exit:     'none', exitDuration:     0.5, exitEase:     'expo.in',
+                idle:     'none', idleSpeed:        1.0,
+                beatSteps: []
+            };
+        }
+
+        // Make this the active entry. All listeners read/write through it.
+        this._animateModalEntry = entry;
+
+        // First-time setup: bind every control to read/write the *current*
+        // `_animateModalEntry.animation`, NOT a captured one.
+        if (!this._animateModalBound) {
+            this._animateModalBound = true;
+            const chipsWrap   = document.getElementById('animate-entrance-chips');
+            const durSlider   = document.getElementById('animate-duration');
+            const easeSelect  = document.getElementById('animate-ease');
+            const previewBtn  = document.getElementById('animate-modal-preview');
+            const closeBtn    = document.getElementById('animate-modal-close');
+            const header      = document.getElementById('animate-modal-header');
+
+            // Tab switching — Entrance is functional; Exit/Idle show placeholders.
+            modal.querySelectorAll('.animate-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const which = tab.dataset.tab;
+                    modal.querySelectorAll('.animate-tab').forEach(t => t.classList.toggle('active', t === tab));
+                    modal.querySelectorAll('.animate-panel').forEach(p => {
+                        p.hidden = p.dataset.panel !== which;
+                    });
+                    // Preview button only meaningful on Entrance for now.
+                    if (previewBtn) previewBtn.style.display = which === 'entrance' ? '' : 'none';
+                });
+            });
+
+            // Drag the header — vanilla pointer events. Position persists for the
+            // session via `this._animateModalPos`; reset on reload.
+            if (header) {
+                let dragging = false, startX = 0, startY = 0, startLeft = 0, startTop = 0;
+                header.addEventListener('pointerdown', (e) => {
+                    if (e.target.closest('button')) return; // don't start drag from the × button
+                    dragging = true;
+                    const rect = modal.getBoundingClientRect();
+                    // Switch from right-anchored to left-anchored on first drag
+                    // so we can write `left` cleanly.
+                    modal.style.left = rect.left + 'px';
+                    modal.style.top  = rect.top  + 'px';
+                    modal.style.right = 'auto';
+                    startX = e.clientX; startY = e.clientY;
+                    startLeft = rect.left; startTop = rect.top;
+                    header.setPointerCapture(e.pointerId);
+                });
+                header.addEventListener('pointermove', (e) => {
+                    if (!dragging) return;
+                    const nx = Math.max(0, Math.min(window.innerWidth - 100, startLeft + (e.clientX - startX)));
+                    const ny = Math.max(0, Math.min(window.innerHeight - 60, startTop  + (e.clientY - startY)));
+                    modal.style.left = nx + 'px';
+                    modal.style.top  = ny + 'px';
+                });
+                header.addEventListener('pointerup', (e) => {
+                    if (!dragging) return;
+                    dragging = false;
+                    header.releasePointerCapture(e.pointerId);
+                    // Remember position for this session so re-opening lands where you left it.
+                    this._animateModalPos = { left: modal.style.left, top: modal.style.top };
+                });
+            }
+
+            chipsWrap?.addEventListener('click', (e) => {
+                const chip = e.target.closest('.animate-chip');
+                if (!chip) return;
+                const tgt = this._animateModalEntry;
+                if (!tgt) return;
+                tgt.animation.entrance = chip.dataset.preset;
+                this._syncAnimateModal();
+                tgt._refreshAnimateDot?.();
+                this.onchange?.();
+            });
+
+            // Idle chip row + speed slider (Phase A3) — distinct from entrance.
+            const idleChips = document.getElementById('animate-idle-chips');
+            const idleSpeed = document.getElementById('animate-idle-speed');
+            idleChips?.addEventListener('click', (e) => {
+                const chip = e.target.closest('.animate-chip');
+                if (!chip) return;
+                const tgt = this._animateModalEntry;
+                if (!tgt) return;
+                tgt.animation.idle = chip.dataset.idle;
+                this._syncAnimateModal();
+                tgt._refreshAnimateDot?.();
+                // Restart idle with the new preset. Always re-applies cleanly.
+                startIdleAnimation(tgt, tgt.animation, () => {
+                    this._buildCompShader();
+                    this._applyToEngine();
+                });
+                this.onchange?.();
+            });
+            idleSpeed?.addEventListener('input', () => {
+                const tgt = this._animateModalEntry;
+                if (!tgt) return;
+                tgt.animation.idleSpeed = parseFloat(idleSpeed.value);
+                const label = document.getElementById('animate-idle-speed-val');
+                if (label) label.textContent = `${tgt.animation.idleSpeed.toFixed(2)}×`;
+                // Re-apply idle so the new speed takes effect immediately.
+                if (tgt.animation.idle && tgt.animation.idle !== 'none') {
+                    startIdleAnimation(tgt, tgt.animation, () => {
+                        this._buildCompShader();
+                        this._applyToEngine();
+                    });
+                }
+                this.onchange?.();
+            });
+            durSlider?.addEventListener('input', () => {
+                const tgt = this._animateModalEntry;
+                if (!tgt) return;
+                tgt.animation.entranceDuration = parseFloat(durSlider.value);
+                const label = document.getElementById('animate-duration-val');
+                if (label) label.textContent = `${tgt.animation.entranceDuration.toFixed(2)}s`;
+                this.onchange?.();
+            });
+            easeSelect?.addEventListener('change', () => {
+                const tgt = this._animateModalEntry;
+                if (!tgt) return;
+                tgt.animation.entranceEase = easeSelect.value;
+                this.onchange?.();
+            });
+            previewBtn?.addEventListener('click', () => {
+                const tgt = this._animateModalEntry;
+                if (!tgt) return;
+                // Entrance kills any GSAP-side idle (they share _gsapProxy).
+                // Restart it after the tween settles so Float / Pulse / Breathe
+                // resume looping in the background.
+                playEntranceAnimation(tgt, tgt.animation).then(() => {
+                    if (tgt.animation.idle && tgt.animation.idle !== 'none') {
+                        startIdleAnimation(tgt, tgt.animation, () => {
+                            this._buildCompShader();
+                            this._applyToEngine();
+                        });
+                    }
+                });
+            });
+            const close = () => { modal.hidden = true; this._animateModalEntry = null; };
+            closeBtn?.addEventListener('click', close);
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && !modal.hidden) close();
+            });
+        }
+
+        this._syncAnimateModal();
+
+        // Restore last drag position if the user moved it earlier this session.
+        if (this._animateModalPos) {
+            modal.style.left = this._animateModalPos.left;
+            modal.style.top  = this._animateModalPos.top;
+            modal.style.right = 'auto';
+        }
+
+        modal.hidden = false;
+    }
+
+    // Push the current entry.animation values into the modal controls.
+    // Called on open and after any chip-select to keep the active highlight in sync.
+    _syncAnimateModal() {
+        const entry = this._animateModalEntry;
+        if (!entry?.animation) return;
+        const a = entry.animation;
+
+        const titleEl = document.getElementById('animate-modal-layer-name');
+        if (titleEl) titleEl.textContent = entry.name || entry.fileName || 'Layer';
+
+        // Entrance
+        document.querySelectorAll('#animate-entrance-chips .animate-chip').forEach(c => {
+            c.classList.toggle('active', c.dataset.preset === a.entrance);
+        });
+        const dur = document.getElementById('animate-duration');
+        if (dur) dur.value = a.entranceDuration;
+        const durLabel = document.getElementById('animate-duration-val');
+        if (durLabel) durLabel.textContent = `${Number(a.entranceDuration).toFixed(2)}s`;
+        const ease = document.getElementById('animate-ease');
+        if (ease) ease.value = a.entranceEase || 'expo.out';
+
+        // Idle (Phase A3)
+        document.querySelectorAll('#animate-idle-chips .animate-chip').forEach(c => {
+            c.classList.toggle('active', c.dataset.idle === (a.idle || 'none'));
+        });
+        const idleSpeed = document.getElementById('animate-idle-speed');
+        if (idleSpeed) idleSpeed.value = a.idleSpeed ?? 1.0;
+        const idleSpeedLabel = document.getElementById('animate-idle-speed-val');
+        if (idleSpeedLabel) idleSpeedLabel.textContent = `${Number(a.idleSpeed ?? 1.0).toFixed(2)}×`;
+    }
+
     // ─── Images Only ───────────────────────────────────────────────────────────
 
     _bindImagesOnly() {
@@ -2512,6 +2733,9 @@ export class EditorInspector {
     }
 
     _performDeleteLayer(entry, card, texName) {
+        // animation-dev.md A3 — stop any idle GSAP tween before the entry is
+        // removed, else GSAP keeps mutating a detached object once per frame.
+        stopIdleAnimation(entry);
         const idx = this.currentState.images.indexOf(entry);
         if (idx !== -1) this.currentState.images.splice(idx, 1);
         // Clean up video blob URL if present
@@ -2871,6 +3095,10 @@ export class EditorInspector {
             // Phase 4: Recursive grids (grid mode only)
             tileSubdivide: 1,           // each grid cell → S×S inner cells (1=off, integer 1–6)
             tileOuterGap: 0,            // gap between outer cells, 0–0.5 (0=collapses to flat grid)
+            // Animation system (animation-dev.md P0). Neutral values are the
+            // identity for the q-register pipe: opacity*1, size*1, cx+0, cy+0,
+            // blur+0 — byte-equivalent to no animation. Mutated by GSAP later.
+            _anim: { opacity: 1.0, scale: 1.0, cxOffset: 0.0, cyOffset: 0.0, blur: 0.0 },
         };
         this.currentState.images.push(entry);
 
@@ -3237,6 +3465,8 @@ export class EditorInspector {
             texH: isStackedAlpha ? Math.floor(finalVideo.videoHeight / 2) : finalVideo.videoHeight,
             isHd: false,  // Videos don't use HD toggle
             isStackedAlpha,
+            // Animation system (animation-dev.md P0). Neutral values; see _addImageLayer.
+            _anim: { opacity: 1.0, scale: 1.0, cxOffset: 0.0, cyOffset: 0.0, blur: 0.0 },
         };
 
         this.currentState.images.push(entry);
@@ -3410,6 +3640,8 @@ export class EditorInspector {
             // Phase 4: Recursive grids
             tileSubdivide: 1,
             tileOuterGap: 0,
+            // Animation system (animation-dev.md P0). Neutral values; see _addImageLayer.
+            _anim: { opacity: 1.0, scale: 1.0, cxOffset: 0.0, cyOffset: 0.0, blur: 0.0 },
         };
         this.currentState.images.push(entry);
 
@@ -3470,6 +3702,8 @@ export class EditorInspector {
                         aria-pressed="false" data-tooltip="Mute (hide this layer)">Mute</button>
                 <button class="layer-action-btn layer-copy" type="button"
                         data-tooltip="Duplicate this layer">Dupe</button>
+                <button class="layer-action-btn layer-animate" type="button"
+                        data-tooltip="Animate this layer (entrance / exit / idle)" aria-label="Animate this layer">✦<span class="layer-animate-dot" hidden></span></button>
                 <button class="layer-action-btn layer-reset" type="button"
                         data-tooltip="Reset this layer (undoable)">Reset</button>
                 <button class="layer-remove" type="button" data-tooltip="Delete layer">Delete</button>
@@ -5972,6 +6206,23 @@ export class EditorInspector {
             e.stopPropagation();
             this._duplicateImageLayer(entry);
         });
+        // animation-dev.md A1 — animate button opens the modal scoped to this entry.
+        const animateBtn = card.querySelector('.layer-animate');
+        if (animateBtn) {
+            animateBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._showAnimateModal(entry);
+            });
+            // Dot indicator reflects whether any animation is configured.
+            const dot = animateBtn.querySelector('.layer-animate-dot');
+            const refreshDot = () => {
+                const a = entry.animation || {};
+                const active = (a.entrance && a.entrance !== 'none') || (a.exit && a.exit !== 'none') || (a.idle && a.idle !== 'none');
+                if (dot) dot.hidden = !active;
+            };
+            refreshDot();
+            entry._refreshAnimateDot = refreshDot; // called by the modal on change
+        }
 
         // ── Double-click label to reset slider ──────────────────────────────
         // Stamp each range input with its initial pos+val so we can restore without
@@ -6216,7 +6467,25 @@ export class EditorInspector {
         const injectedWave = buildWaveReactFrameEqs(state.waveReact);
         const baseFrame = runtime.frame_eqs_str || '';
         const fluxLine = 'a.q31=(typeof __dcFlux!=="undefined"?__dcFlux:0);';
-        runtime.frame_eqs_str = [baseFrame, injectedMotion, injectedWave, fluxLine].filter(Boolean).join('\n').trim();
+        // animation-dev.md P0-C: pull `window.__dcAnim[i]` into per-layer q-slots
+        // each frame. Neutral defaults (1,1,0,0,0) when the global or the entry is
+        // missing — byte-equivalent to the un-animated baked literals.
+        // Each statement is a standalone `a.qN = expr;` to match the fluxLine
+        // precedent (Butterchurn translates this through its eq evaluator).
+        const animParts = [];
+        for (let i = 0; i < MAX_LAYERS; i++) {
+            const b = i * 5 + 1;
+            const has = `(typeof __dcAnim!=="undefined"&&__dcAnim[${i}])`;
+            animParts.push(
+                `a.q${b+0}=${has}?__dcAnim[${i}].opacity:1;`,
+                `a.q${b+1}=${has}?__dcAnim[${i}].scale:1;`,
+                `a.q${b+2}=${has}?__dcAnim[${i}].cxOffset:0;`,
+                `a.q${b+3}=${has}?__dcAnim[${i}].cyOffset:0;`,
+                `a.q${b+4}=${has}?__dcAnim[${i}].blur:0;`
+            );
+        }
+        const animLines = animParts.join('');
+        runtime.frame_eqs_str = [baseFrame, injectedMotion, injectedWave, fluxLine, animLines].filter(Boolean).join('\n').trim();
         return runtime;
     }
 
@@ -6346,7 +6615,9 @@ export class EditorInspector {
             if (_satHue) body += _satHue;
         }
         for (const img of visibleImages) {
-            body += this._buildImageBlock(img, _bgT);
+            // animation-dev.md P0-B: pass the layer's index in the FULL images array
+            // so its q-slot base (idx*5+1) is stable regardless of solo/mute state.
+            body += this._buildImageBlock(img, _bgT, images.indexOf(img));
         }
         body += '  ret = col;\n';
         if (_bgT) body += '  ret_a = col_a;\n';
@@ -6373,8 +6644,18 @@ export class EditorInspector {
      * Orbit:        image centre follows a circular path even when spin=0.
      * Bounce:       bass pushes the image upward on every beat.
      */
-    _buildImageBlock(img, trackAlpha = false) {
+    _buildImageBlock(img, trackAlpha = false, layerIdx = 0) {
         const isVideo = img.type === 'video';
+        // animation-dev.md P0-B: per-layer q-register slot identifiers. Used as
+        // multipliers on opacity/size and adders on cx/cy/blur in the emitted
+        // GLSL below. Default neutral values in the JS eq pipe (1.0 / 0.0) make
+        // the un-animated case byte-equivalent to the pre-animation shader.
+        const _qBase = layerIdx * 5 + 1;       // 1, 6, 11, 16, 21
+        const _qOp   = `q${_qBase + 0}`;
+        const _qSc   = `q${_qBase + 1}`;
+        const _qDx   = `q${_qBase + 2}`;
+        const _qDy   = `q${_qBase + 3}`;
+        const _qBlur = `q${_qBase + 4}`;
         // Phase B (video-tiling-dev.md): stacked-alpha video tiling. A stacked-alpha
         // clip is a 2×-tall texture (RGB top, alpha-as-luma bottom); every tiled sample
         // must recombine the halves. `stackedTiled` also disables the texture-resample
@@ -6597,9 +6878,11 @@ export class EditorInspector {
         }
 
         // Image centre (anchor + orbit + bounce + sway + wander)
-        let cxExpr = cx;
-        let cyExpr = cy;
-        if (hasSway) cxExpr = `${cx} + sin(time * ${swaySpd}) * ${swayAmt}`;
+        // P0-B: cx/cy carry the q-offset so every downstream cxExpr/cyExpr usage
+        // automatically picks it up. qDx/qDy default to 0 → no-op when unanimated.
+        let cxExpr = `(${cx} + ${_qDx})`;
+        let cyExpr = `(${cy} + ${_qDy})`;
+        if (hasSway) cxExpr = `(${cx} + ${_qDx}) + sin(time * ${swaySpd}) * ${swayAmt}`;
         if (hasWander) {
             cxExpr = `(${cxExpr}) + (sin(time*${wanderSpd}*0.7+1.3)*0.6 + sin(time*${wanderSpd}*1.3+2.7)*0.4) * ${wanderAmt}`;
             cyExpr = `${cyExpr} + (sin(time*${wanderSpd}*0.9+0.5)*0.6 + sin(time*${wanderSpd}*1.7+3.1)*0.4) * ${wanderAmt}`;
@@ -6927,9 +7210,10 @@ export class EditorInspector {
             return s;
         };
 
+        // P0-B: sz wrapped with qSc multiplier (1.0 neutral → no-op when unanimated).
         const sizeBase = hasStrobe
-            ? `${sz} * (1.0 ${pulseSign} _r * ${pu}) * mix(1.0, _strobeWave, ${stbAmp})`
-            : `${sz} * (1.0 ${pulseSign} _r * ${pu})`;
+            ? `(${sz} * ${_qSc}) * (1.0 ${pulseSign} _r * ${pu}) * mix(1.0, _strobeWave, ${stbAmp})`
+            : `(${sz} * ${_qSc}) * (1.0 ${pulseSign} _r * ${pu})`;
         // Phase 3: audio size-modulation factor (Pulse + Strobe), extracted from
         // sizeBase without the base `sz`. Density divides _u by sizeBase; Grid mode
         // has no such divisor, so it folds this factor into the grid scale instead.
@@ -7319,7 +7603,8 @@ export class EditorInspector {
             // Blur: 5-tap cross re-sample using texture-space pixel step baked at build time
             (hasBlur && !useScatter ? (() => {
                 const bsuv = hasTunnel ? `mix(_uA, _uB, _tf)` : `_u`;
-                const bscale = `${blurAmt} * 15.0`;
+                // P0-B: blurAmt + qBlur (0.0 neutral → no-op when unanimated).
+                const bscale = `(${blurAmt} + ${_qBlur}) * 15.0`;
                 return (
                     `    { vec2 _bluv = ${bsuv};\n` +
                     `      float _bx = ${edgeStepX} * ${bscale}; float _by = ${edgeStepY} * ${bscale};\n` +
@@ -7471,9 +7756,10 @@ export class EditorInspector {
                 lk += `    }\n`;
                 return lk;
             })() : '') +
+            // P0-B: op multiplied by qOp (1.0 neutral → no-op when unanimated).
             (img.alphaMode === 'preserve'
-                ? `    float _alphaMask = step(0.1, _t.w);\n    float _op = _alphaMask * _gapMask * clamp(${op} + _r * ${opa}, 0.0, 1.0);\n`
-                : `    float _op = _t.w * _gapMask * clamp(${op} + _r * ${opa}, 0.0, 1.0);\n`) +
+                ? `    float _alphaMask = step(0.1, _t.w);\n    float _op = _alphaMask * _gapMask * clamp((${op} * ${_qOp}) + _r * ${opa}, 0.0, 1.0);\n`
+                : `    float _op = _t.w * _gapMask * clamp((${op} * ${_qOp}) + _r * ${opa}, 0.0, 1.0);\n`) +
             `    ${blendLine}\n` +
             // Transparent-bg (§H): accumulate this layer's alpha into col_a using
             // the SAME coverage the RGB blend used (_t.w*_op for normal; _op for the
@@ -7673,8 +7959,15 @@ export class EditorInspector {
             tileMode: 'density', tileCols: 3, tileRows: 3, tileFit: 'fill', tileGridScale: 1.0,
             // Phase 4: Recursive grids — defaults are no-ops → old presets unchanged
             tileSubdivide: 1, tileOuterGap: 0,
+            // P0-D: forward-compat — old presets without an animation config get
+            // neutral defaults so future GSAP code can read .animation safely.
+            animation: { ...DEFAULT_ANIMATION },
         };
-        return { ...D, ...entry };
+        const merged = { ...D, ...entry };
+        // P0-D: _anim is RUNTIME tween state. Always reset to neutral on load —
+        // a preset saved mid-tween must not deserialize into that frozen pose.
+        merged._anim = { ...NEUTRAL_ANIM };
+        return merged;
     }
 
     // ─── Public: load a bundled library preset into the editor ───────────────
@@ -7868,6 +8161,25 @@ export class EditorInspector {
         const bgToggle = document.getElementById('toggle-bg-transparent');
         if (bgToggle) bgToggle.checked = !!this.currentState.bgTransparent;
         this.engine?.canvas?.classList.toggle('bg-transparent-checker', !!this.currentState.bgTransparent);
+
+        // animation-dev.md A1 + A3 — replay entrance + start idle for any loaded
+        // layer that has one configured. _anim was reset to neutral in
+        // _normalizeImageEntry, so entrance starts from its preset's offset
+        // state. Idle starts AFTER entrance so the idle loop doesn't fight the
+        // entrance tween (playEntranceAnimation calls stopIdleAnimation before
+        // launching, but that's only relevant if idle is already running).
+        const refreshCb = () => { this._buildCompShader(); this._applyToEngine(); };
+        for (const entry of this.currentState.images) {
+            const a = entry.animation;
+            if (!a) continue;
+            if (a.entrance && a.entrance !== 'none') {
+                playEntranceAnimation(entry, a).then(() => {
+                    if (a.idle && a.idle !== 'none') startIdleAnimation(entry, a, refreshCb);
+                });
+            } else if (a.idle && a.idle !== 'none') {
+                startIdleAnimation(entry, a, refreshCb);
+            }
+        }
 
         this.originalState = deepClone(this.currentState);
     }

@@ -938,6 +938,88 @@ html, body {
 /* Solo active = warm accent, Mute active = cooler */
 .layer-action-btn.layer-solo.active  { background: rgba(255, 200, 60, 0.22); border-color: rgba(255, 200, 60, 0.55); color: #ffe29a; }
 .layer-action-btn.layer-mute.active  { background: rgba(160, 160, 160, 0.18); border-color: rgba(200, 200, 200, 0.35); color: #ccc; }
+/* Animate (✦) button — dot indicator appears when any animation is set */
+.layer-action-btn.layer-animate { position: relative; font-size: 13px; padding: 4px 8px; }
+.layer-animate-dot {
+  position: absolute; top: 3px; right: 3px;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent, #6cf);
+  box-shadow: 0 0 4px var(--accent, #6cf);
+}
+
+/* Animate modal — floating, draggable panel; no backdrop so canvas stays visible & live.
+   Default position: anchored to the right side near the inspector panel, well clear
+   of the canvas center. Drag the header to move; position persists for the session. */
+.animate-modal {
+  position: fixed;
+  top: 90px; right: 360px;
+  z-index: 200;
+  pointer-events: none;            /* container is transparent; only the card catches clicks */
+}
+.animate-modal[hidden] { display: none; }
+.animate-modal-card {
+  pointer-events: auto;
+  background: rgba(20, 20, 22, 0.92);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--border-hi);
+  border-radius: var(--r-l);
+  padding: 18px 22px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04);
+  animation: animate-modal-pop 0.18s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes animate-modal-pop {
+  from { transform: scale(0.95); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+.animate-modal .animate-chip {
+  background: var(--bg-1); border: 1px solid var(--border);
+  border-radius: 14px; color: var(--text-2);
+  padding: 6px 12px; font-size: 12px; font-weight: 500;
+  cursor: pointer; transition: all 0.12s;
+}
+.animate-modal .animate-chip:hover { border-color: var(--border-hi); color: var(--text-1); }
+.animate-modal .animate-chip.active {
+  background: rgba(255,255,255,0.14);
+  border-color: rgba(255,255,255,0.35);
+  color: #fff;
+}
+.animate-modal input[type=range] { height: 6px; }
+
+/* Tab bar */
+.animate-modal .animate-tab {
+  padding: 8px 14px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 13px;
+  transition: color 0.12s, border-color 0.12s;
+}
+.animate-modal .animate-tab:hover { color: var(--text-2); }
+.animate-modal .animate-tab.active {
+  color: var(--text-1);
+  border-bottom-color: var(--accent, #6cf);
+}
+
+/* "Coming soon" placeholders for Exit / Idle (Phases A2 / A3) */
+.animate-modal .animate-coming-soon {
+  padding: 18px 4px 22px;
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.animate-modal .animate-coming-soon-title {
+  font-weight: 600;
+  color: var(--text-1);
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+.animate-modal .animate-coming-soon p {
+  margin: 0;
+}
 /* Delete button — text style, destructive tint on hover */
 .layer-remove {
   background: transparent;

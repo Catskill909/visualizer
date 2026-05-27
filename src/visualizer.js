@@ -637,6 +637,21 @@ export class VisualizerEngine {
 
       this._tickGifAnimations();
       this._tickVideoAnimations();
+
+      // animation-dev.md P0-C: publish per-layer _anim state to window.__dcAnim
+      // each frame. Read by the per-frame eq line in _buildRuntimePreset, which
+      // pulls each layer's slot into its q-register tuple (q{i*5+1..i*5+5}).
+      // Safe on non-editor pages (no inspector → no-op).
+      const _insp = (typeof window !== 'undefined') ? window.__editorInspector : null;
+      const _imgs = _insp?.currentState?.images;
+      if (_imgs) {
+        const out = [];
+        for (let i = 0; i < _imgs.length; i++) {
+          out[i] = _imgs[i]?._anim || null;
+        }
+        window.__dcAnim = out;
+      }
+
       this.visualizer.render();
 
       // Capture hook: resolve immediately after render() while buffer is live
