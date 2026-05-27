@@ -26,6 +26,19 @@
       <div id="beta-modal-copy" class="promo-modal-scroll-area">
         <p class="promo-modal-subtitle">What's new:</p>
         <ul class="promo-modal-list">
+          <li><strong>Layer Animation — Entrance / Exit / Idle ✨ NEW</strong> — Every image, video, GIF, and text layer
+            now has a <strong>✦ Animate</strong> button that opens a focused modal — a creative planning tool for how
+            each layer arrives, leaves, and breathes on screen. Three tabs: <strong>Entrance</strong> (Fade, Scale Up /
+            Down, Slide L/R/U/D, Pop, Blur — auto-fires on preset load), <strong>Exit</strong> (same chip set with
+            mirrored end-states, plays when the layer is removed), and <strong>Idle</strong> (Float, Pulse, Sway, Spin,
+            Drift, Breathe — continuous motion with a speed multiplier). Duration is a custom <strong>visual
+              scrubber</strong> with tick marks; ease is a <strong>chip row with a live SVG curve preview</strong> that
+            samples the actual ease so elastic and bounce overshoots draw correctly. Each preset reveals one contextual
+            parameter (Distance, Start size, Pop from, Start blur) so the controls morph to the choice instead of a
+            fixed form. The modal is a draggable floating panel — the canvas stays live behind it while you tune. Layer
+            cards now also animate themselves in and out of the list, and the contextual rows expand smoothly when you
+            switch preset chips.
+          </li>
           <li><strong>Timeline — Multi-Track Stacking ✨ NEW</strong> — Stack multiple presets <em>inside</em> a single
             zone — the Timeline is now a real layer compositor. In <strong>Full Screen</strong>, the transport row's
             <strong>+ Add Track</strong> button drops a new track on top of the stack (up to 4 deep). In
@@ -256,6 +269,12 @@
           <h3>Animated GIF Layers</h3>
           <p>Drop any animated GIF into a preset layer. Perceptual speed control (0.25×–8×), Alpha Mode for silhouette
             cutouts, and a GIF Optimizer for large files.</p>
+        </div>
+        <div class="feature-card fade-in">
+          <h3>Layer Animation ✨</h3>
+          <p>Every layer gets a <strong>✦ Animate</strong> button: nine entrance presets (Fade, Scale, Slide, Pop,
+            Blur), mirrored exits, and six idle loops (Float, Pulse, Sway, Spin, Drift, Breathe). Tuned with a custom
+            visual scrubber and a live SVG bezier curve preview.</p>
         </div>
 
         <!-- More layers + performance -->
@@ -565,6 +584,36 @@
                 source files</div>
               <div class="il-item"><span class="il-dot"></span>GIF Optimizer — frame reduction, resize, and GPU savings
                 preview before adding to preset</div>
+            </div>
+          </div>
+
+          <div class="il-category">
+            <div class="il-category-title">Layer Animation ✨</div>
+            <div class="image-layers-grid">
+              <div class="il-item"><span class="il-dot"></span><strong>✦ Animate</strong> button on every layer card
+                opens a focused, draggable floating modal — the canvas stays live behind it while you tune</div>
+              <div class="il-item"><span class="il-dot"></span><strong>Entrance</strong> — Fade, Scale Up, Scale Down,
+                Slide L/R/U/D, Pop, Blur; auto-fires whenever a preset loads</div>
+              <div class="il-item"><span class="il-dot"></span><strong>Exit</strong> — same chip set with mirrored
+                end-states; plays when the layer is removed (the delete waits for the tween)</div>
+              <div class="il-item"><span class="il-dot"></span><strong>Idle</strong> — continuous loop while the layer
+                is visible: Float (vertical bob), Pulse (scale breathing), Sway, Spin, Drift, Breathe (opacity)</div>
+              <div class="il-item"><span class="il-dot"></span><strong>Contextual params</strong> — each preset reveals
+                one tunable: Slide = Distance, Scale = Start size, Pop = Pop from, Blur = Start blur</div>
+              <div class="il-item"><span class="il-dot"></span><strong>Visual duration scrubber</strong> — custom drag
+                handle, tick marks, live readout, keyboard-arrow nudging (0.1–10s for entrance / exit; 0.25×–4× for
+                idle speed)</div>
+              <div class="il-item"><span class="il-dot"></span><strong>Ease bezier preview</strong> — chip row +
+                live SVG curve that samples the actual ease, so elastic / bounce / back overshoots draw correctly.
+                Entrance: Smooth / Snappy / Spring / Bounce / Linear. Exit: Smooth / Snappy / Linger / Wobble / Linear
+              </div>
+              <div class="il-item"><span class="il-dot"></span><strong>▶ Preview</strong> button replays the tween on
+                the live canvas without committing — tune duration, ease, or chip and re-preview cleanly</div>
+              <div class="il-item"><span class="il-dot"></span><strong>Composes with audio reactivity</strong> —
+                animation is "when"; reactivity is "how it behaves moment-to-moment." Both run independently on the
+                same layer</div>
+              <div class="il-item"><span class="il-dot"></span><strong>Accent dot</strong> on the ✦ button when any
+                animation is active — see at a glance which layers are animated</div>
             </div>
           </div>
 
