@@ -22,7 +22,7 @@
 
 **P0 ✅ + A1 Gate 1 ✅ + A1 Gate 2 ✅ + A2 ✅ + A3 ✅ shipped & user-verified 2026-05-27.** Entrance + Exit + Idle pipelines all live in the editor. Per-preset tunable params (Distance / Start size / Pop from / Start blur). Modal is draggable, tab-aware, layer delete commits the exit.
 
-**A1 Gate 3 🔧 built 2026-05-27 — awaiting test.** Custom visual scrubber replaces the duration / idle-speed `<input type=range>` (drag handle, tick marks, value readout, keyboard arrows). Ease picker replaces the `<select>` with a chip row + live SVG bezier preview that samples the actual GSAP ease function (so elastic / bounce overshoots draw correctly). No `<select>` or default `<input type=range>` remains in the modal's Duration / Ease rows.
+**A1 Gate 3 ✅ shipped & user-verified 2026-05-27.** Custom visual scrubber replaces the duration / idle-speed `<input type=range>` (drag handle, tick marks, value readout, keyboard arrows). Ease picker replaces the `<select>` with a chip row + live SVG bezier preview that samples the actual GSAP ease function (so elastic / bounce overshoots draw correctly). No `<select>` or default `<input type=range>` remains in the modal's Duration / Ease rows.
 
 **Remaining:** A4 (CSS UI polish — card add/remove transitions, modal scale-in, chip cross-fades).
 
@@ -33,7 +33,7 @@
 | # | Phase | What | Status |
 |---|-------|------|--------|
 | 1 | **P0** — Infrastructure | `_anim` object on entries + 5 q-register slots per layer + per-frame eq line + save/load | ✅ |
-| 2 | **A1** — Modal shell + Entrance | Modal trigger on layer card, entrance chip picker, duration scrubber, bezier easing editor, Preview button | ✅ Gate 1 / ✅ Gate 2 (contextual panels) / 🔧 Gate 3 (visual scrubber + ease bezier — built, awaiting test) |
+| 2 | **A1** — Modal shell + Entrance | Modal trigger on layer card, entrance chip picker, duration scrubber, bezier easing editor, Preview button | ✅ Gate 1 / ✅ Gate 2 (contextual panels) / ✅ Gate 3 (visual scrubber + ease bezier) |
 | 3 | **A2** — Exit tab | Mirror of entrance; layer waits for exit tween before hiding | ✅ |
 | 4 | **A3** — Idle tab | Hybrid: Sway/Spin/Drift = shader props; Float/Pulse/Breathe = GSAP yoyo on `_anim`. Chip row + speed slider. | ✅ |
 | 5 | **A4** — UI polish | Layer card add/remove transitions, modal open animation, chip/tab cross-fades | ⬜ |
@@ -43,7 +43,7 @@
 
 ### Recently shipped
 
-- **2026-05-27 — A1 Gate 3 🔧 built (awaiting test).** Two reusable custom controls replace the native form widgets in the Animate modal's Duration / Ease rows:
+- **2026-05-27 — A1 Gate 3 ✅ shipped & user-verified.** Two reusable custom controls replace the native form widgets in the Animate modal's Duration / Ease rows:
   - **`_hydrateScrubber(el, { onInput })`** — visual time scrubber. Hydrates a `<div class="anim-scrub" data-min data-max data-step data-value data-format data-label>` into a track with tick marks, draggable handle, value readout, and keyboard arrow / Home / End support. Pointer-capture drag (so the handle stays followed even outside the track). Same component drives entrance duration (0.1–10 s), exit duration (0.1–10 s), and idle speed (0.25×–4×). Returns `{ setValue, getValue }` — sync uses `setValue` (no event fired), drag uses internal `onInput` fire path.
   - **`_hydrateEasePicker(el, options, { initial, onInput })`** — chip row + live SVG bezier preview. The SVG samples `gsap.parseEase(name)` at 80 points and draws a polyline, so elastic / bounce / back overshoots render correctly (no cubic-bezier approximation — the curve IS the actual ease that will play). ViewBox padded above / below the 0..1 baseline so overshoots stay visible. Used twice: entrance (`ENTRANCE_EASES` — 5 `.out` variants) and exit (`EXIT_EASES` — 5 `.in` variants, newly exported from [animation.js](src/editor/animation.js) for shared truth).
   - Custom-mode draggable bezier handles deferred — every shipped ease (incl. Spring / Bounce / elastic) is parametric, not user-tunable cubic-bezier, so the dragger would have nothing to drag. If a "Custom" cubic-bezier ease is added later, the handles plug into the same SVG.
