@@ -7,6 +7,8 @@ import { gsap } from 'gsap';
 
 export const ENTRANCE_PRESETS = ['none', 'fade', 'scale-up', 'scale-down', 'slide-left', 'slide-right', 'slide-up', 'slide-down', 'pop', 'blur'];
 
+export const EXIT_PRESETS = ENTRANCE_PRESETS;
+
 export const IDLE_PRESETS = ['none', 'float', 'pulse', 'sway', 'spin', 'drift', 'breathe'];
 
 // Entrance eases are all `.out` variants (decelerate to rest). `.in` eases
@@ -116,6 +118,78 @@ export function playEntranceAnimation(entry, cfg) {
             },
             onComplete: () => {
                 Object.assign(entry._anim, NEUTRAL); // snap to exact identity
+                resolve();
+            },
+        });
+    });
+}
+
+// ─── Exit (Phase A2) ──────────────────────────────────────────────────────────
+// Mirror of entrance. Layer starts at NEUTRAL (visible) and tweens TO the exit
+// pose (off-canvas / invisible / blurred). Caller awaits the returned Promise
+// before removing the layer from the composite. `resetAfter:true` (Preview
+// mode) snaps `_anim` back to neutral so the layer pops back into view —
+// useful for tuning. Real-delete callers pass `resetAfter:false`.
+
+function exitToState(preset) {
+    switch (preset) {
+        case 'fade':         return { ...NEUTRAL, opacity: 0 };
+        case 'scale-up':     return { ...NEUTRAL, opacity: 0, scale: 1.5 };
+        case 'scale-down':   return { ...NEUTRAL, opacity: 0, scale: 0.0 };
+        case 'slide-left':   return { ...NEUTRAL, opacity: 0, cxOffset: -1.2 };
+        case 'slide-right':  return { ...NEUTRAL, opacity: 0, cxOffset:  1.2 };
+        case 'slide-up':     return { ...NEUTRAL, opacity: 0, cyOffset: -1.2 };
+        case 'slide-down':   return { ...NEUTRAL, opacity: 0, cyOffset:  1.2 };
+        case 'pop':          return { ...NEUTRAL, opacity: 0, scale: 0.0 };
+        case 'blur':         return { ...NEUTRAL, opacity: 0, blur: 0.6 };
+        default:             return null;
+    }
+}
+
+export function playExitAnimation(entry, cfg, { resetAfter = false } = {}) {
+    return new Promise(resolve => {
+        if (!entry?._anim) return resolve();
+        const preset = cfg?.exit || 'none';
+        if (preset === 'none') return resolve();
+        const to = exitToState(preset);
+        if (!to) return resolve();
+
+        if (!entry._gsapProxy) {
+            Object.defineProperty(entry, '_gsapProxy', {
+                value: { ...NEUTRAL },
+                enumerable: false,
+                writable: true,
+                configurable: true,
+            });
+        }
+        // Kill any in-flight tween (entrance or GSAP-side idle). Shader-side
+        // idle keeps running and composes — same composability as entrance.
+        gsap.killTweensOf(entry._gsapProxy);
+
+        // Start from current _anim (whatever state the layer is in — usually
+        // neutral) so the exit feels continuous, not snapped.
+        Object.assign(entry._gsapProxy, entry._anim);
+
+        const dur = Math.max(0.05, Math.min(15.0, cfg?.exitDuration ?? 0.5));
+        const ease = cfg?.exitEase || 'expo.in';
+
+        gsap.to(entry._gsapProxy, {
+            ...to,
+            duration: dur,
+            ease,
+            onUpdate: () => {
+                entry._anim.opacity  = entry._gsapProxy.opacity;
+                entry._anim.scale    = entry._gsapProxy.scale;
+                entry._anim.cxOffset = entry._gsapProxy.cxOffset;
+                entry._anim.cyOffset = entry._gsapProxy.cyOffset;
+                entry._anim.blur     = entry._gsapProxy.blur;
+            },
+            onComplete: () => {
+                if (resetAfter) {
+                    // Preview: snap back to neutral so the layer reappears.
+                    Object.assign(entry._anim, NEUTRAL);
+                    Object.assign(entry._gsapProxy, NEUTRAL);
+                }
                 resolve();
             },
         });

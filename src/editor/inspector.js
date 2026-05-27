@@ -20,7 +20,8 @@ import {
     estimateGpuMemory
 } from './gifOptimizer.js';
 import { transcodeTo720p, needsTranscode, stripAudio } from '../videoTranscoder.js';
-import { playEntranceAnimation, startIdleAnimation, stopIdleAnimation } from './animation.js';
+import { gsap } from 'gsap';
+import { playEntranceAnimation, playExitAnimation, startIdleAnimation, stopIdleAnimation } from './animation.js';
 
 // ─── Phase 1: layer limits + upload resize ───────────────────────────────────
 // Cap surface area for Phase 1. Internals (shader builder, state array) are
@@ -2437,7 +2438,7 @@ export class EditorInspector {
             const closeBtn    = document.getElementById('animate-modal-close');
             const header      = document.getElementById('animate-modal-header');
 
-            // Tab switching — Entrance is functional; Exit/Idle show placeholders.
+            // Tab switching — Entrance + Exit functional; Idle has its own loop (no preview).
             modal.querySelectorAll('.animate-tab').forEach(tab => {
                 tab.addEventListener('click', () => {
                     const which = tab.dataset.tab;
@@ -2445,10 +2446,13 @@ export class EditorInspector {
                     modal.querySelectorAll('.animate-panel').forEach(p => {
                         p.hidden = p.dataset.panel !== which;
                     });
-                    // Preview button only meaningful on Entrance for now.
-                    if (previewBtn) previewBtn.style.display = which === 'entrance' ? '' : 'none';
+                    // Preview is meaningful on entrance + exit (replays the tween).
+                    // Idle is a continuous loop — picking a chip is its own preview.
+                    if (previewBtn) previewBtn.style.display = which === 'idle' ? 'none' : '';
+                    this._activeAnimateTab = which;
                 });
             });
+            this._activeAnimateTab = 'entrance';
 
             // Drag the header — vanilla pointer events. Position persists for the
             // session via `this._animateModalPos`; reset on reload.
@@ -2491,6 +2495,35 @@ export class EditorInspector {
                 tgt.animation.entrance = chip.dataset.preset;
                 this._syncAnimateModal();
                 tgt._refreshAnimateDot?.();
+                this.onchange?.();
+            });
+
+            // Exit chip row + duration + ease (Phase A2) — mirror of entrance.
+            const exitChips = document.getElementById('animate-exit-chips');
+            const exitDur   = document.getElementById('animate-exit-duration');
+            const exitEase  = document.getElementById('animate-exit-ease');
+            exitChips?.addEventListener('click', (e) => {
+                const chip = e.target.closest('.animate-chip');
+                if (!chip) return;
+                const tgt = this._animateModalEntry;
+                if (!tgt) return;
+                tgt.animation.exit = chip.dataset.preset;
+                this._syncAnimateModal();
+                tgt._refreshAnimateDot?.();
+                this.onchange?.();
+            });
+            exitDur?.addEventListener('input', () => {
+                const tgt = this._animateModalEntry;
+                if (!tgt) return;
+                tgt.animation.exitDuration = parseFloat(exitDur.value);
+                const label = document.getElementById('animate-exit-duration-val');
+                if (label) label.textContent = `${tgt.animation.exitDuration.toFixed(2)}s`;
+                this.onchange?.();
+            });
+            exitEase?.addEventListener('change', () => {
+                const tgt = this._animateModalEntry;
+                if (!tgt) return;
+                tgt.animation.exitEase = exitEase.value;
                 this.onchange?.();
             });
 
@@ -2544,15 +2577,22 @@ export class EditorInspector {
             previewBtn?.addEventListener('click', () => {
                 const tgt = this._animateModalEntry;
                 if (!tgt) return;
-                // Entrance kills any GSAP-side idle (they share _gsapProxy).
-                // Restart it after the tween settles so Float / Pulse / Breathe
-                // resume looping in the background.
-                playEntranceAnimation(tgt, tgt.animation).then(() => {
+                const refreshCb = () => { this._buildCompShader(); this._applyToEngine(); };
+                const isExit = this._activeAnimateTab === 'exit';
+                // Preview is JUST a preview — never a trigger. Both entrance
+                // and exit return the layer to the NEUTRAL rest pose when the
+                // tween completes so the user can re-tune (change ease, change
+                // duration, switch chip) and re-preview cleanly. Real delete
+                // (`_performDeleteLayer`) is the only place that commits to the
+                // exit pose by actually splicing the entry.
+                const tween = isExit
+                    ? playExitAnimation(tgt, tgt.animation, { resetAfter: true })
+                    : playEntranceAnimation(tgt, tgt.animation);
+                tween.then(() => {
+                    // GSAP-side idle was killed by the preview tween (shared
+                    // _gsapProxy). Restart it so Float/Pulse/Breathe resume.
                     if (tgt.animation.idle && tgt.animation.idle !== 'none') {
-                        startIdleAnimation(tgt, tgt.animation, () => {
-                            this._buildCompShader();
-                            this._applyToEngine();
-                        });
+                        startIdleAnimation(tgt, tgt.animation, refreshCb);
                     }
                 });
             });
@@ -2595,6 +2635,17 @@ export class EditorInspector {
         if (durLabel) durLabel.textContent = `${Number(a.entranceDuration).toFixed(2)}s`;
         const ease = document.getElementById('animate-ease');
         if (ease) ease.value = a.entranceEase || 'expo.out';
+
+        // Exit (Phase A2) — mirror of entrance
+        document.querySelectorAll('#animate-exit-chips .animate-chip').forEach(c => {
+            c.classList.toggle('active', c.dataset.preset === (a.exit || 'none'));
+        });
+        const exitDurEl = document.getElementById('animate-exit-duration');
+        if (exitDurEl) exitDurEl.value = a.exitDuration ?? 0.5;
+        const exitDurLabel = document.getElementById('animate-exit-duration-val');
+        if (exitDurLabel) exitDurLabel.textContent = `${Number(a.exitDuration ?? 0.5).toFixed(2)}s`;
+        const exitEaseEl = document.getElementById('animate-exit-ease');
+        if (exitEaseEl) exitEaseEl.value = a.exitEase || 'expo.in';
 
         // Idle (Phase A3)
         document.querySelectorAll('#animate-idle-chips .animate-chip').forEach(c => {
@@ -2732,10 +2783,27 @@ export class EditorInspector {
         window.addEventListener('keydown', onKey);
     }
 
-    _performDeleteLayer(entry, card, texName) {
-        // animation-dev.md A3 — stop any idle GSAP tween before the entry is
-        // removed, else GSAP keeps mutating a detached object once per frame.
-        stopIdleAnimation(entry);
+    async _performDeleteLayer(entry, card, texName) {
+        // animation-dev.md A2 — if an exit animation is configured, await it
+        // before removing the layer. The layer remains rendered (and visible
+        // for the duration of the tween) by virtue of still being in
+        // currentState.images. We freeze the card visually (pointer-events:none
+        // + dim) so the user can't double-click delete during the tween.
+        const exitConfigured = entry.animation?.exit && entry.animation.exit !== 'none';
+        if (exitConfigured) {
+            card.style.pointerEvents = 'none';
+            card.style.opacity = '0.5';
+            await playExitAnimation(entry, entry.animation, { resetAfter: false });
+        }
+        // animation-dev.md A2/A3 — discard path. We DON'T call stopIdleAnimation
+        // here because it would reset _anim to NEUTRAL. The compiled comp shader
+        // doesn't swap mid-frame; if the OLD comp renders one more frame after
+        // we splice the entry, its q-registers default to neutral (because the
+        // entry is gone from __dcAnim) and the layer would flash visible. By
+        // leaving _anim at its exit pose (opacity:0 etc.), even if the old comp
+        // renders one extra frame, the entry stays invisible. We only need to
+        // kill GSAP tweens so they don't keep mutating a detached object.
+        if (entry._gsapProxy) gsap.killTweensOf(entry._gsapProxy);
         const idx = this.currentState.images.indexOf(entry);
         if (idx !== -1) this.currentState.images.splice(idx, 1);
         // Clean up video blob URL if present
