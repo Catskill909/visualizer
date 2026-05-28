@@ -378,9 +378,52 @@ export class ControlPanel {
     els.welcomeGuide.addEventListener('click', (e) => {
       if (e.target === els.welcomeGuide) this.closeWelcomeGuide();
     });
+
+    // Rail navigation with expandable sections
     els.welcomeGuide.querySelectorAll('.welcome-rail-btn').forEach((btn) => {
-      btn.addEventListener('click', () => this.selectWelcomeSection(btn.dataset.section));
+      btn.addEventListener('click', (e) => {
+        const section = btn.dataset.section;
+        const expandTarget = btn.dataset.expand;
+
+        // Toggle expandable children
+        if (expandTarget && btn.classList.contains('has-children')) {
+          const children = document.getElementById(expandTarget);
+          if (children) {
+            const isExpanded = children.classList.toggle('expanded');
+            btn.classList.toggle('expanded', isExpanded);
+            // Don't switch section when just expanding
+            if (!isExpanded && section) {
+              this.selectWelcomeSection(section);
+            }
+            return;
+          }
+        }
+
+        if (section) this.selectWelcomeSection(section);
+      });
     });
+
+    // Child subsection navigation
+    els.welcomeGuide.querySelectorAll('.welcome-rail-child').forEach((child) => {
+      child.addEventListener('click', () => {
+        const section = child.dataset.section;
+        const subsection = child.dataset.subsection;
+        if (section) this.selectWelcomeSection(section, subsection);
+      });
+    });
+
+    // Search functionality
+    const searchInput = els.welcomeGuide.querySelector('#help-search');
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => this.handleHelpSearch(e.target.value));
+      searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          searchInput.value = '';
+          this.handleHelpSearch('');
+          searchInput.blur();
+        }
+      });
+    }
 
     // --- Audio Tuning ---
     els.btnAudioTuning.addEventListener('click', () => this.toggleTuningPanel());
@@ -1014,17 +1057,116 @@ export class ControlPanel {
     if (modal) modal.classList.add('hidden');
   }
 
-  selectWelcomeSection(name) {
+  selectWelcomeSection(name, subsection = null) {
     if (!name) return;
     const root = this.els.welcomeGuide;
+
+    // Update rail button states
     root.querySelectorAll('.welcome-rail-btn').forEach((btn) => {
-      btn.classList.toggle('active', btn.dataset.section === name);
+      const isMatch = btn.dataset.section === name;
+      btn.classList.toggle('active', isMatch);
     });
+
+    // Update child button states
+    root.querySelectorAll('.welcome-rail-child').forEach((child) => {
+      const isMatch = child.dataset.section === name && child.dataset.subsection === subsection;
+      child.classList.toggle('active', isMatch);
+    });
+
+    // Show the correct section
     root.querySelectorAll('.welcome-section').forEach((sec) => {
       sec.classList.toggle('active', sec.dataset.section === name);
     });
+
     const content = root.querySelector('.welcome-content');
-    if (content) content.scrollTop = 0;
+    if (content) {
+      content.scrollTop = 0;
+
+      // Scroll to subsection if specified
+      if (subsection) {
+        const target = content.querySelector(`[data-subsection="${subsection}"]`);
+        if (target) {
+          setTimeout(() => {
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // Expand the target if it's collapsible
+            if (target.classList.contains('collapsible')) {
+              target.classList.add('expanded');
+            }
+          }, 50);
+        }
+      }
+    }
+
+    // Clear search when navigating
+    this.clearHelpSearch();
+  }
+
+  handleHelpSearch(query) {
+    const root = this.els.welcomeGuide;
+    const content = root.querySelector('.welcome-content');
+    const sections = root.querySelectorAll('.welcome-section');
+
+    if (!query.trim()) {
+      content.classList.remove('search-active');
+      sections.forEach(sec => sec.style.display = '');
+      root.querySelectorAll('.welcome-feature').forEach(f => {
+        f.classList.remove('search-match');
+        f.style.display = '';
+      });
+      return;
+    }
+
+    content.classList.add('search-active');
+    const lowerQuery = query.toLowerCase();
+    let hasMatches = false;
+
+    sections.forEach(sec => {
+      const features = sec.querySelectorAll('.welcome-feature');
+      let sectionHasMatch = false;
+
+      features.forEach(feature => {
+        const text = feature.textContent.toLowerCase();
+        const isMatch = text.includes(lowerQuery);
+        feature.classList.toggle('search-match', isMatch);
+        if (isMatch) {
+          sectionHasMatch = true;
+          hasMatches = true;
+          // Expand matching collapsible features
+          if (feature.classList.contains('collapsible')) {
+            feature.classList.add('expanded');
+          }
+        }
+      });
+
+      // Show section if it has matches
+      if (sectionHasMatch && sec.classList.contains('active')) {
+        sec.style.display = 'block';
+      }
+    });
+
+    // Show no results message if needed
+    const existingEmpty = content.querySelector('.welcome-search-empty');
+    if (existingEmpty) existingEmpty.remove();
+
+    if (!hasMatches) {
+      const empty = document.createElement('div');
+      empty.className = 'welcome-search-empty';
+      empty.innerHTML = `
+        <div class="welcome-search-empty-icon">🔍</div>
+        <p>No results for "${query}"</p>
+        <p style="font-size: 0.8em; margin-top: 8px;">Try different keywords or browse sections</p>
+      `;
+      content.appendChild(empty);
+    }
+  }
+
+  clearHelpSearch() {
+    const root = this.els.welcomeGuide;
+    const searchInput = root.querySelector('#help-search');
+    if (searchInput) {
+      searchInput.value = '';
+      this.handleHelpSearch('');
+    }
   }
 
   // ===================== TUNING PANEL =====================

@@ -592,17 +592,84 @@
 
       <div class="welcome-body">
         <nav class="welcome-rail" role="tablist" aria-label="Guide sections">
-          <button class="welcome-rail-btn active" type="button" role="tab" data-section="welcome">Welcome</button>
-          <button class="welcome-rail-btn" type="button" role="tab" data-section="sources">Audio Sources</button>
-          <button class="welcome-rail-btn" type="button" role="tab" data-section="presets">Browsing Presets</button>
-          <button class="welcome-rail-btn" type="button" role="tab" data-section="cycling">Auto-Cycling</button>
-          <button class="welcome-rail-btn" type="button" role="tab" data-section="performance">Live Performance</button>
-          <button class="welcome-rail-btn" type="button" role="tab" data-section="output">Output Settings</button>
-          <button class="welcome-rail-btn" type="button" role="tab" data-section="studio">Preset Studio</button>
-          <button class="welcome-rail-btn" type="button" role="tab" data-section="timeline">Timeline Editor</button>
-          <button class="welcome-rail-btn" type="button" role="tab" data-section="reactivity">Reactivity</button>
-          <button class="welcome-rail-btn" type="button" role="tab" data-section="shortcuts">Shortcuts</button>
-          <button class="welcome-rail-btn" type="button" role="tab" data-section="tips">Tips</button>
+          <!-- Search -->
+          <div class="welcome-rail-search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+            </svg>
+            <input type="text" id="help-search" placeholder="Search help..." autocomplete="off">
+          </div>
+
+          <!-- Quick Start -->
+          <div class="welcome-rail-group">
+            <button class="welcome-rail-btn active" type="button" role="tab" data-section="welcome">
+              <span class="rail-icon">👋</span>Welcome
+            </button>
+          </div>
+
+          <!-- Core Features -->
+          <div class="welcome-rail-divider">Core Features</div>
+          <div class="welcome-rail-group">
+            <button class="welcome-rail-btn" type="button" role="tab" data-section="sources">
+              <span class="rail-icon">🎙️</span>Audio Sources
+            </button>
+            <button class="welcome-rail-btn" type="button" role="tab" data-section="performance">
+              <span class="rail-icon">⚡</span>Live Performance
+            </button>
+            <button class="welcome-rail-btn" type="button" role="tab" data-section="reactivity">
+              <span class="rail-icon">🎚️</span>Audio Reactivity
+            </button>
+          </div>
+
+          <!-- Presets -->
+          <div class="welcome-rail-divider">Presets</div>
+          <div class="welcome-rail-group">
+            <button class="welcome-rail-btn" type="button" role="tab" data-section="presets">
+              <span class="rail-icon">🔍</span>Browse & Favorites
+            </button>
+            <button class="welcome-rail-btn" type="button" role="tab" data-section="cycling">
+              <span class="rail-icon">🔄</span>Auto-Cycling
+            </button>
+          </div>
+
+          <!-- Creative Tools -->
+          <div class="welcome-rail-divider">Creative Tools</div>
+          <div class="welcome-rail-group">
+            <button class="welcome-rail-btn has-children" type="button" role="tab" data-section="studio" data-expand="studio-sub">
+              <span class="rail-icon">🎨</span>Preset Studio
+              <span class="rail-expand">›</span>
+            </button>
+            <div class="welcome-rail-children" id="studio-sub">
+              <button class="welcome-rail-child" type="button" data-section="studio" data-subsection="overview">Overview</button>
+              <button class="welcome-rail-child" type="button" data-section="studio" data-subsection="palette">Color & Palette</button>
+              <button class="welcome-rail-child" type="button" data-section="studio" data-subsection="motion">Motion & Wave</button>
+              <button class="welcome-rail-child" type="button" data-section="studio" data-subsection="layers">Layers</button>
+              <button class="welcome-rail-child" type="button" data-section="studio" data-subsection="effects">Effects & Animation</button>
+              <button class="welcome-rail-child" type="button" data-section="studio" data-subsection="text">Text Layers</button>
+            </div>
+            <button class="welcome-rail-btn has-children" type="button" role="tab" data-section="timeline" data-expand="timeline-sub">
+              <span class="rail-icon">🎬</span>Timeline Editor
+              <span class="rail-expand">›</span>
+            </button>
+            <div class="welcome-rail-children" id="timeline-sub">
+              <button class="welcome-rail-child" type="button" data-section="timeline" data-subsection="overview">Overview</button>
+              <button class="welcome-rail-child" type="button" data-section="timeline" data-subsection="blocks">Blocks & Editing</button>
+              <button class="welcome-rail-child" type="button" data-section="timeline" data-subsection="vjmode">VJ Mode</button>
+              <button class="welcome-rail-child" type="button" data-section="timeline" data-subsection="multitrack">Multi-Track & Zones</button>
+              <button class="welcome-rail-child" type="button" data-section="timeline" data-subsection="markers">Markers & Loops</button>
+            </div>
+          </div>
+
+          <!-- Output -->
+          <div class="welcome-rail-divider">Output</div>
+          <div class="welcome-rail-group">
+            <button class="welcome-rail-btn" type="button" role="tab" data-section="output">
+              <span class="rail-icon">🖥️</span>Display Settings
+            </button>
+            <button class="welcome-rail-btn" type="button" role="tab" data-section="shortcuts">
+              <span class="rail-icon">⌨️</span>Keyboard Shortcuts
+            </button>
+          </div>
         </nav>
 
         <div class="welcome-content">
@@ -860,10 +927,22 @@
 
           <!-- Preset Studio -->
           <section class="welcome-section" data-section="studio" role="tabpanel">
-            <h4>Preset Studio</h4>
+            <h4>🎨 Preset Studio</h4>
             <p>From the main screen, click <strong>Preset Studio</strong> under Creative Tools. You'll land on the Studio's own source screen — choose <strong>Live Audio</strong> (mic or audio interface), <strong>Load Track</strong> (MP3, WAV, or FLAC), or <strong>No Audio</strong> to jump straight in. Loading audio is recommended: it activates all the audio-reactive features. Once you're in, a live canvas runs on the left with a tabbed control panel on the right. Every change updates instantly.</p>
-            <div class="welcome-feature">
-              <div class="welcome-feature-title">The four tabs</div>
+
+            <div class="welcome-feature" data-subsection="overview">
+              <div class="welcome-feature-title">Overview <span class="feature-badge feature-badge--pro">Creative</span></div>
+              <p>The Preset Studio is a complete visual preset builder with 4 tabbed sections, undo/redo, A/B comparison, and a library of 1,144 bundled presets to use as starting points.</p>
+              <ul class="welcome-list">
+                <li><strong>Palette</strong> — Color grading, palettes, and scene effects</li>
+                <li><strong>Motion</strong> — Zoom, rotation, warp, and audio reactivity</li>
+                <li><strong>Wave</strong> — Global audio waveform overlay</li>
+                <li><strong>Layers</strong> — Add images, GIFs, video, and text on top</li>
+              </ul>
+            </div>
+
+            <div class="welcome-feature" data-subsection="palette">
+              <div class="welcome-feature-title">Color & Palette</div>
               <ul class="welcome-list">
                 <li><strong>Palette</strong> — 12 one-click palettes with <strong>hover-to-preview</strong> (mouse over a chip to see the colors live on the canvas without committing), plus three independent color swatches (Wave / Glow / Accent) with <strong>per-channel 🔓/🔒 locks</strong> so a palette only writes the unlocked channels. <strong>"+ Save current mix"</strong> pins your active Wave/Glow/Accent triplet as a 13th "My Mix" chip. <strong>Glow Strength</strong> and <strong>Accent Strength</strong> sliders under the chip grid drive border alpha and size together as a single "loudness" axis. Plus Saturation, Hue Rotate, and scene-level toggles (Brighten, Solarize, Invert, etc.). The <strong>Opacity slider</strong> at the top fades the MilkDrop background itself — drag it to zero and only your layers show over a black canvas.</li>
                 <li><strong>Motion</strong> — six one-click <strong>Motion Presets</strong> at the top (Vortex, Calm Drift, Earthquake, Tunnel In, Spin Lock, Hyperspace) with a <strong>↺ Reset</strong> button beside them that snaps every motion field back to defaults — so you can always "go back" after trying a preset. Below: zoom, rotation, warp strength, echo/decay, beat sensitivity, and a full Reactivity panel (Source + Curve + 6 amount sliders + 5 FX amounts) that maps audio to motion. Results vary by preset — some respond dramatically, others run their own equations.</li>
@@ -873,8 +952,8 @@
               <p style="margin-top:12px"><strong>The icon footer (5 big buttons with instant tooltips):</strong> <strong>＋ New</strong> (blank baseline), <strong>🎲 Random</strong> (one-click loads a random preset from the 1,144 bundled library as your editing base — turns the Studio into 1,144 starting points instead of one; click again to reroll), <strong>🎨 Remix</strong> (re-rolls palette + motion + wave on whatever is currently loaded — coherent random in one click), <strong>💾 Save</strong>, <strong>↺ Reset</strong>. Two universal shortcuts: double-click any slider label to reset it to its default value, and combine 🎲 Random with palette swaps for the biggest creative leverage on bundled presets.</p>
             </div>
 
-            <div class="welcome-feature">
-              <div class="welcome-feature-title">Image &amp; Video Layers</div>
+            <div class="welcome-feature" data-subsection="layers">
+              <div class="welcome-feature-title">Image &amp; Video Layers <span class="feature-badge feature-badge--pro">Pro</span></div>
               <p>Add up to 5 image, GIF, or video layers in a collapsible smart-accordion stack. Drag any card to reorder. Each
                 layer has:</p>
               <ul class="welcome-list">
@@ -906,8 +985,8 @@
               </ul>
             </div>
 
-            <div class="welcome-feature">
-              <div class="welcome-feature-title">Layer Animation ✨</div>
+            <div class="welcome-feature" data-subsection="effects">
+              <div class="welcome-feature-title">Layer Animation ✨ <span class="feature-badge feature-badge--new">New</span></div>
               <p>Every layer card now has a <strong>✦ Animate</strong> button in its header that opens a focused modal — a creative planning tool for how each layer arrives, leaves, and breathes on screen. The modal is a draggable floating panel so the canvas stays visible and live while you tune. Three tabs:</p>
               <ul class="welcome-list">
                 <li><strong>Entrance</strong> — how the layer arrives. Pick a chip: <strong>Fade</strong>, <strong>Scale Up</strong>, <strong>Scale Down</strong>, <strong>Slide Left / Right / Up / Down</strong>, <strong>Pop</strong> (overshoot), or <strong>Blur</strong> (focus-in). Each preset reveals one contextual parameter underneath — Slide has <em>Distance</em>, Scale has <em>Start size</em>, Pop has <em>Pop from</em>, Blur has <em>Start blur</em>. Auto-fires whenever a preset loads so it plays for real, not just in preview.</li>
@@ -920,7 +999,7 @@
               <p style="margin-top:12px"><strong>Composes with audio reactivity.</strong> Animation is "when" — entrance / exit / idle. Reactivity is "how it behaves moment-to-moment." Both run independently on the same layer: a layer can fade in (animation) while already pulsing to the kick (reactivity). The accent dot on the ✦ button lights up whenever any animation is active so you can see at a glance which layers are animated.</p>
             </div>
 
-            <div class="welcome-feature">
+            <div class="welcome-feature" data-subsection="layers">
               <div class="welcome-feature-title">Animated GIFs</div>
               <p>Drop a <strong>.gif</strong> file into any image-layer slot and it animates inside the visualizer — not
                 as an overlay, but as a real texture, so every layer effect (tile, mirror, spin, orbit, beat-pulse, hue
@@ -940,8 +1019,8 @@
               </ul>
             </div>
 
-            <div class="welcome-feature">
-              <div class="welcome-feature-title">Video Layers</div>
+            <div class="welcome-feature" data-subsection="layers">
+              <div class="welcome-feature-title">Video Layers <span class="feature-badge feature-badge--new">New</span></div>
               <p>Drop <strong>MP4</strong> or <strong>WebM</strong> video files directly into presets — videos render as
                 real-time GPU textures with full playback controls and effects. <strong>Auto-transcoding:</strong> 1080p and 4K videos are automatically optimized to 720p on upload.</p>
               <ul class="welcome-list">
@@ -960,8 +1039,8 @@
               </ul>
             </div>
 
-            <div class="welcome-feature">
-              <div class="welcome-feature-title">Transparent Video Layers ✨</div>
+            <div class="welcome-feature" data-subsection="layers">
+              <div class="welcome-feature-title">Transparent Video Layers ✨ <span class="feature-badge feature-badge--pro">Pro</span></div>
               <p>Drop a <strong>transparent WebM</strong> (a video with a built-in alpha channel) onto any preset and the subject floats over the MilkDrop visualizer with full transparency — no green screen, no black box, no compositing chops required. This unlocks rotoscoped cutouts, animated logos, talking-head loops, particle accents, and AI-isolated subjects as first-class VJ elements.</p>
               <ul class="welcome-list">
                 <li><strong>Sammie Roto workflow</strong> — <a href="https://sammieroto.com" target="_blank" rel="noopener">Sammie Roto</a> is an AI rotoscoping tool: point and click to cut out any subject (a dancer, a logo, an object, an animal) and export as transparent WebM. Drop that WebM into DiscoCast and it renders with perfect alpha over your visuals.</li>
@@ -972,7 +1051,7 @@
               </ul>
             </div>
 
-            <div class="welcome-feature">
+            <div class="welcome-feature" data-subsection="layers">
               <div class="welcome-feature-title">Transparent Background ✨</div>
               <p>Make the <strong>whole preset</strong> transparent — not just one layer. Instead of your layers sitting on a black canvas, the background becomes truly see-through, so your image, transparent-video, GIF, and text layers float on nothing. This is the foundation for <strong>stacking presets in the Timeline</strong>: a transparent-background preset placed on a zone reveals whatever zone is beneath it.</p>
               <ul class="welcome-list">
@@ -983,8 +1062,8 @@
               </ul>
             </div>
 
-            <div class="welcome-feature">
-              <div class="welcome-feature-title">Text Layers</div>
+            <div class="welcome-feature" data-subsection="text">
+              <div class="welcome-feature-title">Text Layers <span class="feature-badge feature-badge--new">New</span></div>
               <p>Add a live text layer using the <strong>✏️ Text</strong> button in the Layers tab. Text renders as a real GPU texture — every layer effect applies to it.</p>
               <ul class="welcome-list">
                 <li><strong>Typography</strong> — 20 bundled fonts across 5 groups (Standard, Display, Tech/Sci-Fi, Retro/Pixel, Handwritten), weight, size (24–200px), letter spacing, line height, alignment, and color.</li>
@@ -1260,18 +1339,30 @@
 
           <!-- Timeline Editor -->
           <section class="welcome-section" data-section="timeline" role="tabpanel">
-            <h4>Timeline Editor</h4>
+            <h4>🎬 Timeline Editor</h4>
             <p>A dedicated page for scripting a full live show. Arrange presets into timed blocks on a horizontal strip,
               then hit Play — the visualizer runs your sequence automatically. Launch it from the start screen.</p>
 
-            <div class="welcome-feature">
+            <div class="welcome-feature" data-subsection="overview">
+              <div class="welcome-feature-title">Overview <span class="feature-badge feature-badge--pro">Pro</span></div>
+              <p>The Timeline Editor is a complete show sequencer for scripted performances. Create timed blocks, arrange them on a horizontal strip, add transitions, and play back your show with VJ Mode — where stopping only pauses the timeline, not the visuals.</p>
+              <ul class="welcome-list">
+                <li><strong>Blocks</strong> — preset containers with duration and transitions</li>
+                <li><strong>VJ Mode</strong> — stop pauses timeline, visuals keep playing</li>
+                <li><strong>Multi-Zone</strong> — split canvas into multiple regions</li>
+                <li><strong>Multi-Track</strong> — stack presets as layers</li>
+                <li><strong>Markers</strong> — cue points and loop regions</li>
+              </ul>
+            </div>
+
+            <div class="welcome-feature" data-subsection="vjmode">
               <div class="welcome-feature-title">🎛️ VJ Mode — The Show Never Stops</div>
               <p><strong>Stop pauses the timeline, but visuals keep playing.</strong> The last preset stays visible — 
                 no black screens, no awkward silences. Press Play to resume timeline progression. Drag the ruler to 
                 scrub through time while keeping visuals alive. Perfect for live VJ sets where the show must go on.</p>
             </div>
 
-            <div class="welcome-feature">
+            <div class="welcome-feature" data-subsection="blocks">
               <div class="welcome-feature-title">Timelines & Blocks</div>
               <p>A timeline is a playlist of preset blocks, each with a fixed start time, duration, and transition
                 style. Blocks sit on a scrollable strip — drag them to any position, drag the right edge to resize to
@@ -1313,15 +1404,15 @@
                 per-block creative choice — pick Black for a deliberate beat of darkness between two presets.</p>
             </div>
 
-            <div class="welcome-feature">
+            <div class="welcome-feature" data-subsection="multitrack">
               <div class="welcome-feature-title">Multi-Zone Output</div>
               <p>Split the canvas into up to four simultaneous regions, each running its own preset independently.
                 Define rectangular zones and assign timelines to each. The canvas splits to show all active
                 zones — perfect for multi-projector venues. Launch from <strong>Output Settings → Zones</strong>.</p>
             </div>
 
-            <div class="welcome-feature">
-              <div class="welcome-feature-title">Multi-track stacking ✨ NEW</div>
+            <div class="welcome-feature" data-subsection="multitrack">
+              <div class="welcome-feature-title">Multi-Track Stacking ✨ <span class="feature-badge feature-badge--new">New</span></div>
               <p>Stack multiple presets <em>inside</em> a single zone — a layer compositor on the Timeline. In
                 <strong>Full Screen</strong> the transport row has a <strong>+ Add Track</strong> button. In
                 <strong>Left/Right</strong>, <strong>Quadrants</strong>, and the other multi-zone layouts, each zone has
@@ -1342,7 +1433,7 @@
               </ul>
             </div>
 
-            <div class="welcome-feature">
+            <div class="welcome-feature" data-subsection="markers">
               <div class="welcome-feature-title">Markers & Loop Regions</div>
               <p>Markers live in their own lane just below the ruler. Press <kbd>M</kbd> to drop one at the
                 playhead, or click anywhere in the marker lane to drop one there. Click a flag to edit its
