@@ -1432,6 +1432,15 @@ html, body {
 .lseg:hover { border-color: var(--border-hi); color: var(--text); }
 .lseg.active { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.4); color: #fff; }
 
+/* Compact direction/axis chip pairs for beat-reactive sliders (Tilt/Hop/Squash) */
+.layer-tilt-dir, .layer-hop-dir, .layer-squash-axis {
+  display: flex; gap: 2px; flex-shrink: 0;
+}
+.layer-tilt-dir .lseg, .layer-hop-dir .lseg {
+  flex: 0 0 auto; min-width: 22px; padding: 4px 6px; font-size: 11px;
+}
+.layer-squash-axis .lseg { flex: 0 0 auto; min-width: 30px; padding: 4px 7px; }
+
 /* Phase 3: Grid mode — Cols/Rows integer steppers */
 .layer-grid-cols,
 .layer-grid-rows {

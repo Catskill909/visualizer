@@ -890,6 +890,10 @@
                 <li><strong>Beat Shake</strong> — omnidirectional random UV jolt on every beat. Pairs with Bounce for chaotic, energetic motion.</li>
                 <li><strong>Beat Fade / Pulse / Strobe</strong> — audio drives opacity (smooth fade or hard strobe cut)
                   and size on every beat.</li>
+                <li><strong>Tilt / Hop / Hue Pulse / Blur Pulse / Squash ✨</strong> — five more beat-driven effects in
+                  the Audio Reactivity panel: snap-rotate (Tilt), a directional left/right kick (Hop), a hue jump (Hue
+                  Pulse), a focus pull (Blur Pulse), and cartoon squash-and-stretch (Squash). All ride the same Source +
+                  Curve as the rest.</li>
                 <li><strong>Mirror</strong> — Off, Horizontal, Vertical, Quad, or Kaleido (6-slice polar fold). Apply
                   per tile or across the whole field.</li>
                 <li><strong>Canvas Mirror</strong> — folds the entire rendered scene horizontally, vertically, or both.
@@ -1382,8 +1386,9 @@
             <h4>Reactivity &amp; Audio Controls</h4>
             <p>Every image layer has a <strong>Reactivity</strong> panel at the bottom of its card. The two settings
               there — <em>Source</em> and <em>Curve</em> — are the dial behind the dial. They shape the single audio
-              signal that drives <strong>all four reactive controls</strong> on that layer: Pulse, Bounce, Beat Fade,
-              and Strobe.</p>
+              signal that drives <strong>every reactive control</strong> on that layer: Pulse, Bounce, Shake, Beat
+              Fade, Strobe, and the beat-driven effects <strong>Tilt</strong>, <strong>Hop</strong>, <strong>Hue
+              Pulse</strong>, <strong>Blur Pulse</strong>, and <strong>Squash</strong>.</p>
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Step 1 — Pick a Source</div>
@@ -1432,6 +1437,19 @@
                   (before the Curve is applied) and compares it to its own Threshold slider. When the audio crosses the
                   threshold, the layer's opacity hard-cuts to black — instantly. When the beat fades, it returns. This
                   is a true strobe: no smooth ramp, just a sharp on/off flash driven by real beats.</li>
+                <li><strong>Tilt ✨</strong> — snap-rotates the layer on every beat, up to ±15°. A
+                  <strong>←/→</strong> chip sets which way it kicks; it eases back toward upright between hits. Gate
+                  curve makes it a sharp jerk; Linear makes it rock with the groove.</li>
+                <li><strong>Hop ✨</strong> — the sideways cousin of Bounce. Kicks the layer left or right on beat —
+                  pick the direction with the <strong>←/→</strong> chip. Pair Hop with Bounce for a diagonal beat
+                  shove.</li>
+                <li><strong>Hue Pulse ✨</strong> — shifts the layer's hue on every beat (a full colour-wheel sweep at
+                  maximum). Rides on top of any Hue Spin you've set, so the colour jumps with the music.</li>
+                <li><strong>Blur Pulse ✨</strong> — pulls focus on the beat: the layer blurs on each hit and snaps
+                  sharp between them. A cinematic emphasis that breathes with the track.</li>
+                <li><strong>Squash ✨</strong> — cartoon scale on beat. <strong>Wide</strong> stretches the layer
+                  horizontally and crushes it vertically on the hit; <strong>Tall</strong> does the inverse. Reads as
+                  classic squash-and-stretch animation locked to the music.</li>
               </ul>
             </div>
 
@@ -1451,6 +1469,11 @@
                 <li><strong>Multi-layer stack</strong> — put two layers side by side: one on Bass/Squared driving
                   Bounce, one on Treble/Cubed driving Pulse. They react to completely different parts of the music and
                   never compete.</li>
+                <li><strong>Cartoon bop ✨</strong> — Source: Bass · Curve: Gate · Squash: medium (Wide) + a touch of
+                  Tilt. The layer flattens and rocks on every kick like a bouncing logo — squash-and-stretch synced to
+                  the beat.</li>
+                <li><strong>Colour strobe ✨</strong> — Source: Treble · Curve: Cubed · Hue Pulse: high. The layer's
+                  colour jumps on hi-hats and cymbals only, leaving its hue still through the rest of the bar.</li>
               </ul>
             </div>
 

@@ -26,7 +26,19 @@
 
 **A4 ✅ shipped & user-verified 2026-05-27.** All six items live: layer card mount slides down + fades in; card removal slides up + collapses height so cards below fill the gap; tab switch in the Animate modal cross-fades (force-restarted via `.animate-fade-in` class toggle); contextual param rows expand/collapse smoothly when the entrance/exit preset chip changes (max-height + padding transition replaces the old instant `[hidden]` swap); modal scale-in pop and chip filled-highlight transition were already in place from A1.
 
-**v1 complete.** Future phases (B1 beat-step, B2 keyframes, C1 performance triggering) are not part of the v1 setup tool.
+**v1 complete.** Future phases (B2 keyframes, C1 performance triggering) are not part of the v1 setup tool.
+
+**B1′ ✅ beat-reactive sliders shipped & user-verified 2026-05-27.** ("works so well… the audio reactivity is the best out there.") The original B1 "beat-step locomotion" (a per-layer step sequencer) is **cancelled** — see the struck row in Up Next and the superseded §4 below. Decision: a step sequencer is the deep, hard-to-use interface the user explicitly rejected; the right shape for this app is *more reactivity sliders*, living in the layer card's existing AUDIO REACTIVITY block (not the Animate modal). Five new beat-driven effect sliders added to all 3 layer types (image/video/text), each riding the same `_r` envelope (Source × Curve) the existing Pulse/Bounce/Shake/Beat Fade/Strobe sliders use:
+
+| Slider | Field(s) | Shader hook |
+|---|---|---|
+| **Tilt** | `tiltAmp` 0–1, `tiltDir` ±1 (←/→ chip) | `_spinAng += _r * tiltAmp * tiltDir * 0.26` (≈±15°) |
+| **Hop** | `hopAmp` 0–1, `hopDir` ±1 (←/→ chip) | folds into `cxExpr`: `+ _r * hopAmp * hopDir * 0.3` |
+| **Hue Pulse** | `huePulse` 0–1 | hue block angle: `(time*hueSpin + _r*huePulse) * 6.28318` |
+| **Blur Pulse** | `blurPulse` 0–1 | blur `bscale`: `(blurAmt + qBlur + _r*blurPulse) * 15.0` |
+| **Squash** | `squashAmp` 0–1, `squashAxis` wide/tall | `aspectPreScale`: X `*(1+_r*amp*sign)`, Y `*(1-_r*amp*sign)` |
+
+Stored amps are normalised 0–1 (cube-root display curve like Bounce/Shake); the shader applies the per-effect scale. `hasSpin`/`hasTint`/`hasBlur` were each widened to fire when only the new slider is set. Slider wiring uses two helpers (`wireBeatSlider`, `wireChipPair`); the 5 slider classes are also added to the generic-handler `:not()` exclusion chain (Tilt/Hop/Squash live in `.layer-row-inline` so they're not swept, but listed for defence-in-depth). Save = automatic (`saveCurrent` spreads `...currentState`); load backfills via `_normalizeImageEntry`. Build passes; **not yet visually verified with live audio — the user needs to add a layer, play audio, and confirm each effect fires on the beat (and that the Hop ←/→ chip maps to the expected on-screen direction).**
 
 ### 🎯 Up Next — priority order
 
@@ -39,7 +51,8 @@
 | 3 | **A2** — Exit tab | Mirror of entrance; layer waits for exit tween before hiding | ✅ |
 | 4 | **A3** — Idle tab | Hybrid: Sway/Spin/Drift = shader props; Float/Pulse/Breathe = GSAP yoyo on `_anim`. Chip row + speed slider. | ✅ |
 | 5 | **A4** — UI polish | Layer card add/remove transitions, modal open animation, chip/tab cross-fades | ✅ |
-| 6 | **B1** — Beat-step locomotion | Step sequence per layer, beat clock advances states, stutter-motion feel | ⏸ design first |
+| 6 | ~~**B1** — Beat-step locomotion~~ | ~~Step sequence per layer, beat clock advances states, stutter-motion feel~~ | ❌ **cancelled** — sequencer model rejected; replaced by B1′ |
+| 6′ | **B1′** — Beat-reactive sliders | Tilt / Hop / Hue Pulse / Blur Pulse / Squash on the layer card's AUDIO REACTIVITY block | ✅ shipped & user-verified 2026-05-27 |
 | 7 | **B2** — Keyframe sequences | Per-layer GSAP Timeline from serialised keyframe array | ⏸ |
 | 8 | **C1** — Performance triggering | Keyboard / MIDI / OSC fire animations live | ⏸ |
 
@@ -179,7 +192,10 @@ gsap.to(entry, {
 });
 ```
 
-### 4. Beat-step locomotion (phase 2+)
+### 4. Beat-step locomotion (phase 2+) — ❌ CANCELLED 2026-05-27, superseded by B1′
+
+> **This section is historical.** The step-sequencer model below was rejected: the user wanted simple, intuitive sliders for audio-reactive expression, not a stop-motion sequencer that needs a per-step editor. It also lives on the layer card's AUDIO REACTIVITY block, **not** the Animate modal's "Beat" tab (which stays a placeholder / can be removed). The shipped replacement is **B1′ — beat-reactive sliders** (Tilt / Hop / Hue Pulse / Blur Pulse / Squash); see the Status Dashboard. The text below is kept only to explain why the sequencer idea was dropped.
+
 **Not** another reactivity modulator — that already exists (size pulse, opacity flicker, orbit are all covered by the existing audio-reactivity sliders). Beat-step is categorically different: the beat is a **trigger that commits a new position/state**, and the layer holds there until the next beat.
 
 Examples:

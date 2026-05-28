@@ -3349,6 +3349,14 @@ export class EditorInspector {
             lissPhase: 0.25,       // Lissajous X phase offset (0–1 cycles)
             strobeAmp: 0.00,       // Phase 6: hard beat-cut intensity (0=off, 1=full black)
             strobeThr: 0.40,       // audio threshold to trigger strobe
+            tiltAmp: 0.00,         // beat-driven rotation (rad envelope, max ≈15°)
+            tiltDir: 1,            // +1 = tilt right (CW), -1 = tilt left (CCW)
+            hopAmp: 0.00,          // beat-driven X-axis displacement (UV envelope)
+            hopDir: 1,             // +1 = hop right, -1 = hop left
+            huePulse: 0.00,        // beat-driven hue shift (0=off, 1=full 360° on a hit)
+            blurPulse: 0.00,       // beat-driven blur add (0=off, 1=max focus pull)
+            squashAmp: 0.00,       // beat-driven asymmetric scale (0=off, 1=max distort)
+            squashAxis: 'wide',    // 'wide' = X stretch + Y crush; 'tall' = inverse
             chromaticAberration: 0.00,  // RGB split amount (0-1)
             chromaticSpeed: 1.00,       // animation speed multiplier
             tileScaleX: 1.00,      // independent tile cell width multiplier (1 = auto/native aspect)
@@ -3739,6 +3747,11 @@ export class EditorInspector {
             perspX: 0.00, perspY: 0.00,
             tunnelSpeed: 0.00,
             strobeAmp: 0.00, strobeThr: 0.40,
+            tiltAmp: 0.00, tiltDir: 1,
+            hopAmp: 0.00, hopDir: 1,
+            huePulse: 0.00,
+            blurPulse: 0.00,
+            squashAmp: 0.00, squashAxis: 'wide',
             edgeSobel: false,
             lumaKeyLo: 0.00,       // luma key low threshold (0–1): pixels darker than this become transparent
             lumaKeyHi: 0.00,       // luma key high threshold (0–1): pixels brighter than this become transparent
@@ -3907,6 +3920,11 @@ export class EditorInspector {
             shakeAmp: 0.00,
             strobeAmp: 0.00,
             strobeThr: 0.40,
+            tiltAmp: 0.00, tiltDir: 1,
+            hopAmp: 0.00, hopDir: 1,
+            huePulse: 0.00,
+            blurPulse: 0.00,
+            squashAmp: 0.00, squashAxis: 'wide',
             posterize: 0,
             edgeSobel: false,
             lumaKeyLo: 0.00,
@@ -4873,6 +4891,48 @@ export class EditorInspector {
               <span class="lsv layer-beat-fade-val">${entry.opacityPulse.toFixed(2)}</span>
             </div>
             <div class="layer-row-inline">
+              <span class="layer-ctrl-label" data-tooltip="Snap-rotate on each beat — short rotational kick toward the chosen direction">Tilt</span>
+              <input type="range" class="slider layer-slider-inline layer-tilt-sl" min="0" max="1" step="0.01"
+                value="${Math.cbrt(entry.tiltAmp || 0).toFixed(3)}" style="--pct:${(Math.cbrt(entry.tiltAmp || 0) * 100).toFixed(1)}%">
+              <span class="lsv layer-tilt-val">${(entry.tiltAmp || 0).toFixed(2)}</span>
+              <div class="layer-tilt-dir" role="group" aria-label="Tilt direction" style="margin-left:8px">
+                <button class="lseg${(entry.tiltDir || 1) < 0 ? ' active' : ''}" data-tilt-dir="-1" tabindex="-1">←</button>
+                <button class="lseg${(entry.tiltDir || 1) > 0 ? ' active' : ''}" data-tilt-dir="1" tabindex="-1">→</button>
+              </div>
+            </div>
+            <div class="layer-row-inline">
+              <span class="layer-ctrl-label" data-tooltip="Directional X-axis kick on each beat — the side-cousin of Bounce">Hop</span>
+              <input type="range" class="slider layer-slider-inline layer-hop-sl" min="0" max="1" step="0.01"
+                value="${Math.cbrt(entry.hopAmp || 0).toFixed(3)}" style="--pct:${(Math.cbrt(entry.hopAmp || 0) * 100).toFixed(1)}%">
+              <span class="lsv layer-hop-val">${(entry.hopAmp || 0).toFixed(2)}</span>
+              <div class="layer-hop-dir" role="group" aria-label="Hop direction" style="margin-left:8px">
+                <button class="lseg${(entry.hopDir || 1) < 0 ? ' active' : ''}" data-hop-dir="-1" tabindex="-1">←</button>
+                <button class="lseg${(entry.hopDir || 1) > 0 ? ' active' : ''}" data-hop-dir="1" tabindex="-1">→</button>
+              </div>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Hue shift on every beat — rides on top of any Hue Spin you've set">Hue Pulse</span>
+              <input type="range" class="slider layer-huepulse-sl" min="0" max="1" step="0.01"
+                value="${Math.cbrt(entry.huePulse || 0).toFixed(3)}" style="--pct:${(Math.cbrt(entry.huePulse || 0) * 100).toFixed(1)}%">
+              <span class="lsv layer-huepulse-val">${(entry.huePulse || 0).toFixed(2)}</span>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Focus pull on every beat — adds blur on the hit and clears between">Blur Pulse</span>
+              <input type="range" class="slider layer-blurpulse-sl" min="0" max="1" step="0.01"
+                value="${Math.cbrt(entry.blurPulse || 0).toFixed(3)}" style="--pct:${(Math.cbrt(entry.blurPulse || 0) * 100).toFixed(1)}%">
+              <span class="lsv layer-blurpulse-val">${(entry.blurPulse || 0).toFixed(2)}</span>
+            </div>
+            <div class="layer-row-inline">
+              <span class="layer-ctrl-label" data-tooltip="Cartoon scale on every beat — stretches one axis and crushes the other">Squash</span>
+              <input type="range" class="slider layer-slider-inline layer-squash-sl" min="0" max="1" step="0.01"
+                value="${Math.cbrt(entry.squashAmp || 0).toFixed(3)}" style="--pct:${(Math.cbrt(entry.squashAmp || 0) * 100).toFixed(1)}%">
+              <span class="lsv layer-squash-val">${(entry.squashAmp || 0).toFixed(2)}</span>
+              <div class="layer-squash-axis" role="group" aria-label="Squash axis" style="margin-left:8px">
+                <button class="lseg${(entry.squashAxis || 'wide') === 'wide' ? ' active' : ''}" data-squash-axis="wide" tabindex="-1">Wide</button>
+                <button class="lseg${(entry.squashAxis || 'wide') === 'tall' ? ' active' : ''}" data-squash-axis="tall" tabindex="-1">Tall</button>
+              </div>
+            </div>
+            <div class="layer-row-inline">
               <span class="layer-ctrl-label" data-tooltip="Hard opacity cut when audio crosses threshold — instant strobe flash">Strobe</span>
               <input type="range" class="slider layer-slider-inline layer-strobe-sl" min="0" max="1" step="0.01"
                 value="${Math.cbrt(entry.strobeAmp).toFixed(3)}" style="--pct:${(Math.cbrt(entry.strobeAmp) * 100).toFixed(1)}%">
@@ -5224,6 +5284,47 @@ export class EditorInspector {
             refresh();
         });
 
+        // Beat-reactive effects (animation-dev.md B1'). All ride the existing
+        // `_r` envelope (Source × Curve, same as Bounce/Shake/etc.). Stored amp
+        // is normalised 0–1; the comp shader applies the per-effect scale.
+        const wireBeatSlider = (slClass, valClass, key) => {
+            const sl = card.querySelector(`.${slClass}`);
+            const val = card.querySelector(`.${valClass}`);
+            if (!sl || !val) return;
+            sl.addEventListener('input', () => {
+                const pos = parseFloat(sl.value);
+                const stored = pos * pos * pos;
+                entry[key] = stored;
+                val.textContent = stored.toFixed(2);
+                sl.style.setProperty('--pct', `${(pos * 100).toFixed(1)}%`);
+                refresh();
+            });
+        };
+        wireBeatSlider('layer-tilt-sl',      'layer-tilt-val',      'tiltAmp');
+        wireBeatSlider('layer-hop-sl',       'layer-hop-val',       'hopAmp');
+        wireBeatSlider('layer-huepulse-sl',  'layer-huepulse-val',  'huePulse');
+        wireBeatSlider('layer-blurpulse-sl', 'layer-blurpulse-val', 'blurPulse');
+        wireBeatSlider('layer-squash-sl',    'layer-squash-val',    'squashAmp');
+
+        const wireChipPair = (groupClass, dataAttr, key, parseFn) => {
+            const group = card.querySelector(`.${groupClass}`);
+            if (!group) return;
+            group.querySelectorAll('button.lseg').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const v = parseFn(btn.dataset[dataAttr]);
+                    entry[key] = v;
+                    group.querySelectorAll('button.lseg').forEach(b => b.classList.toggle(
+                        'active',
+                        parseFn(b.dataset[dataAttr]) === v
+                    ));
+                    refresh();
+                });
+            });
+        };
+        wireChipPair('layer-tilt-dir',    'tiltDir',    'tiltDir',    v => parseInt(v, 10));
+        wireChipPair('layer-hop-dir',     'hopDir',     'hopDir',     v => parseInt(v, 10));
+        wireChipPair('layer-squash-axis', 'squashAxis', 'squashAxis', v => v);
+
         // Size/Scale slider — squared curve so value 1.0 lands near ~82% of travel
         // Videos use 'scale' (0.1-2.0), images use 'size' (0.05-1.5)
         const sizeSlider = card.querySelector('.layer-size-sl');
@@ -5348,6 +5449,10 @@ export class EditorInspector {
             'layer-outergap-sl',
             // Color FX — own dedicated handler below
             'layer-solarize-sl',
+            // Beat-reactive (animation-dev.md B1') — own dedicated handlers below.
+            // Tilt/Hop/Squash sliders live in .layer-row-inline (not swept), but the
+            // class is listed here too for defence-in-depth if the row class ever changes.
+            'layer-tilt-sl','layer-hop-sl','layer-huepulse-sl','layer-blurpulse-sl','layer-squash-sl',
         ].map(c => `:not(.${c})`).join('');
         card.querySelectorAll(`.layer-slider-row input[type=range]${sliderExclude}`).forEach((sl, i) => {
             const valEl = sl.nextElementSibling;
@@ -7006,6 +7111,20 @@ export class EditorInspector {
         const stbAmp = (img.strobeAmp || 0).toFixed(4);
         const stbThr = (img.strobeThr !== undefined ? img.strobeThr : 0.4).toFixed(4);
         const hasStrobe = parseFloat(stbAmp) !== 0;
+        // Beat-reactive effects (animation-dev.md B1'). Each rides the `_r` envelope.
+        const tiltAmpVal = (img.tiltAmp || 0).toFixed(4);
+        const tiltDirVal = ((img.tiltDir || 1) < 0 ? -1 : 1).toFixed(1);
+        const hasTilt = parseFloat(tiltAmpVal) > 0.0001;
+        const hopAmpVal = (img.hopAmp || 0).toFixed(4);
+        const hopDirVal = ((img.hopDir || 1) < 0 ? -1 : 1).toFixed(1);
+        const hasHop = parseFloat(hopAmpVal) > 0.0001;
+        const huePulseVal = (img.huePulse || 0).toFixed(4);
+        const hasHuePulse = parseFloat(huePulseVal) > 0.0001;
+        const blurPulseVal = (img.blurPulse || 0).toFixed(4);
+        const hasBlurPulse = parseFloat(blurPulseVal) > 0.0001;
+        const squashAmpVal = (img.squashAmp || 0).toFixed(4);
+        const squashSign = ((img.squashAxis || 'wide') === 'tall' ? -1 : 1).toFixed(1);
+        const hasSquash = parseFloat(squashAmpVal) > 0.0001;
         const chromAmt = (img.chromaticAberration || 0).toFixed(4);
         const chromSpd = (img.chromaticSpeed !== undefined ? img.chromaticSpeed : 1.0).toFixed(4);
         const hasChromatic = parseFloat(chromAmt) > 0.001 && !stackedTiled;
@@ -7048,7 +7167,7 @@ export class EditorInspector {
         const filmGrainAmt = (img.filmGrain || 0).toFixed(4);
         const hasFilmGrain = parseFloat(filmGrainAmt) > 0.001;
         const blurAmt = (img.blur || 0.0).toFixed(4);
-        const hasBlur = parseFloat(blurAmt) > 0.001 && !stackedTiled;
+        const hasBlur = (parseFloat(blurAmt) > 0.001 || hasBlurPulse) && !stackedTiled;
         // Pixel step for Sobel and Blur: 1/texW × 1/texH, falling back to 1/512
         const edgeStepX = img.texW ? (1.0 / img.texW).toFixed(6) : '0.001953';
         const edgeStepY = img.texH ? (1.0 / img.texH).toFixed(6) : '0.001953';
@@ -7105,7 +7224,8 @@ export class EditorInspector {
 
         // hasSpin includes hasRotVar so the per-tile spin block emits even when
         // base spin/angle are zero (rotation variance alone needs the block).
-        const hasSpin = parseFloat(sp) !== 0 || hasAngle || hasRotVar;
+        // hasTilt also forces the block so beat-driven tilt has a `_spinAng` to add to.
+        const hasSpin = parseFloat(sp) !== 0 || hasAngle || hasRotVar || hasTilt;
         const hasOrbit = parseFloat(orb) !== 0;
         const hasLissajous = hasOrbit && orbitMode === 'lissajous';
         const hasBounce = parseFloat(bnc) !== 0;
@@ -7118,7 +7238,7 @@ export class EditorInspector {
         const hasMirror = mirror !== 'none';
         const fieldMirror = hasMirror && mirrorScope === 'field';
         const tileMirror = hasMirror && mirrorScope === 'tile';
-        const hasTint = parseFloat(hueSpin) !== 0 || parseFloat(tintR) !== 1 || parseFloat(tintG) !== 1 || parseFloat(tintB) !== 1;
+        const hasTint = parseFloat(hueSpin) !== 0 || parseFloat(tintR) !== 1 || parseFloat(tintG) !== 1 || parseFloat(tintB) !== 1 || hasHuePulse;
         // Videos are never tiled, so no group spin vs per-tile spin distinction.
         // Group spin only when there's a real angular velocity/angle (rotVar by itself
         // is per-cell, never a whole-grid rotation).
@@ -7179,11 +7299,13 @@ export class EditorInspector {
             // Phase 1: when only hasRotVar is set (no spin/angle), default to 0
             // so per-cell rotation variance can add to it.
             const baseSpinPresent = parseFloat(sp) !== 0 || hasAngle;
-            const spinExpr = baseSpinPresent
+            let spinExpr = baseSpinPresent
                 ? (parseFloat(sp) !== 0
                     ? (hasAngle ? `time * ${sp} + ${angleRad}` : `time * ${sp}`)
                     : angleRad)
                 : '0.0';
+            // Tilt: beat-driven rotational kick (~15° max), signed by tiltDir.
+            if (hasTilt) spinExpr = `(${spinExpr}) + _r * ${tiltAmpVal} * ${tiltDirVal} * 0.26`;
             angLines += `    float _spinAng = ${spinExpr};\n`;
         }
 
@@ -7204,6 +7326,9 @@ export class EditorInspector {
             cxExpr = `(${cxExpr}) + sin(time * ${panSx} * 6.28318) * ${panRng}`;
             cyExpr = `(${cyExpr}) + sin(time * ${panSy} * 6.28318) * ${panRng}`;
         }
+        // Hop: beat-driven X-axis kick (cousin of Bounce on cy), signed by hopDir.
+        // Folded into cxExpr so it flows through every centerLines branch.
+        if (hasHop) cxExpr = `(${cxExpr}) + _r * ${hopAmpVal} * ${hopDirVal} * 0.3`;
 
         // Image UV source — either straight uv_m, or uv_m with a whole-group
         // mirror fold applied BEFORE the tile pipeline (so the entire tiled
@@ -7512,11 +7637,19 @@ export class EditorInspector {
         const aspFactor = img.aspectMode === 'fluid'
             ? 'aspect.y'
             : '(aspect.y / max(aspect.x, 0.01))';
+        // Squash: beat-driven asymmetric scale. 'wide' (sign +1) stretches X and
+        // crushes Y on the hit; 'tall' (sign -1) does the inverse. Folded into the
+        // axis divisors so it composes with tileScaleX/Y. No-op when hasSquash=false.
+        const _sqX = hasSquash ? ` * (1.0 + _r * ${squashAmpVal} * ${squashSign})` : '';
+        const _sqY = hasSquash ? ` * (1.0 - _r * ${squashAmpVal} * ${squashSign})` : '';
         const aspectPreScale = (varName) => {
             let s = `    ${varName}.x /= ${imgAsp} * ${aspFactor}`;
             if (!tscXIsDefault) s += ` * ${tileScaleX}`;
+            s += _sqX;
             s += `;\n`;
-            if (!tscYIsDefault) s += `    ${varName}.y /= ${tileScaleY};\n`;
+            if (!tscYIsDefault || hasSquash) {
+                s += `    ${varName}.y /= ${tscYIsDefault ? '1.0' : tileScaleY}${_sqY};\n`;
+            }
             return s;
         };
 
@@ -7914,7 +8047,9 @@ export class EditorInspector {
             (hasBlur && !useScatter ? (() => {
                 const bsuv = hasTunnel ? `mix(_uA, _uB, _tf)` : `_u`;
                 // P0-B: blurAmt + qBlur (0.0 neutral → no-op when unanimated).
-                const bscale = `(${blurAmt} + ${_qBlur}) * 15.0`;
+                // Blur Pulse adds a beat-driven focus pull (`_r * blurPulse`).
+                const _blurPulsePart = hasBlurPulse ? ` + _r * ${blurPulseVal}` : '';
+                const bscale = `(${blurAmt} + ${_qBlur}${_blurPulsePart}) * 15.0`;
                 return (
                     `    { vec2 _bluv = ${bsuv};\n` +
                     `      float _bx = ${edgeStepX} * ${bscale}; float _by = ${edgeStepY} * ${bscale};\n` +
@@ -7947,11 +8082,15 @@ export class EditorInspector {
                 );
             })() : '') +
             (hasTint ? (() => {
-                if (parseFloat(hueSpin) !== 0) {
-                    // Rotate hue over time using RGB rotation matrix approximation
-                    // hue angle in radians
+                if (parseFloat(hueSpin) !== 0 || hasHuePulse) {
+                    // Rotate hue over time using RGB rotation matrix approximation.
+                    // Hue Pulse adds a beat-driven offset (`_r * huePulse`, full 360° at 1.0)
+                    // on top of any continuous Hue Spin.
+                    const _hueAngExpr = hasHuePulse
+                        ? `(time * ${hueSpin} + _r * ${huePulseVal}) * 6.28318`
+                        : `time * ${hueSpin} * 6.28318`;
                     return (
-                        `    { float _ha = time * ${hueSpin} * 6.28318;\n` +
+                        `    { float _ha = ${_hueAngExpr};\n` +
                         `      float _hc = cos(_ha); float _hs = sin(_ha);\n` +
                         `      float _lum = dot(_src, vec3(0.299, 0.587, 0.114));\n` +
                         `      vec3 _tc = vec3(${tintR}, ${tintG}, ${tintB});\n` +
@@ -8246,6 +8385,9 @@ export class EditorInspector {
             reactSource: 'bass', reactCurve: 'linear',
             orbitMode: 'circle', lissFreqX: 0.50, lissFreqY: 0.75, lissPhase: 0.25,
             strobeAmp: 0.00, strobeThr: 0.40,
+            // Beat-reactive effects (animation-dev.md B1') — 0/neutral → old presets unchanged
+            tiltAmp: 0.00, tiltDir: 1, hopAmp: 0.00, hopDir: 1,
+            huePulse: 0.00, blurPulse: 0.00, squashAmp: 0.00, squashAxis: 'wide',
             chromaticAberration: 0.00, chromaticSpeed: 1.0,
             tileScaleX: 1.00, tileScaleY: 1.00,
             aspectMode: 'lock',   // 'lock' = keep true shape on any canvas (default); 'fluid' = legacy canvas-adaptive
