@@ -1,6 +1,6 @@
 # Animation System — Design & Planning Doc
 
-**Last updated:** 2026-05-27
+**Last updated:** 2026-05-28
 
 ---
 
@@ -19,6 +19,8 @@
 | ⏸ | Deferred |
 
 ### Current status
+
+**🎉 Animations now play LIVE in the player & timeline ✅ shipped & user-verified 2026-05-28.** This closes the gap that made the animation modal a setup-only preview: entrance + idle now play during real playback in **index.html (player)** and **timeline.html**, not just in the editor. Previously the GSAP driver and the `__dcAnim` publish bridge lived in `inspector.js`, so only the editor drove animations. Now the shared `VisualizerEngine` (used by all three apps) drives them — using the editor's *exact* same `animation.js` driver, gated so the editor never double-fires. See § "Live playback in player & timeline (2026-05-28)" in Recently shipped for the full mechanism.
 
 **P0 ✅ + A1 Gate 1 ✅ + A1 Gate 2 ✅ + A2 ✅ + A3 ✅ shipped & user-verified 2026-05-27.** Entrance + Exit + Idle pipelines all live in the editor. Per-preset tunable params (Distance / Start size / Pop from / Start blur). Modal is draggable, tab-aware, layer delete commits the exit.
 
@@ -51,6 +53,7 @@ Stored amps are normalised 0–1 (cube-root display curve like Bounce/Shake); th
 | 3 | **A2** — Exit tab | Mirror of entrance; layer waits for exit tween before hiding | ✅ |
 | 4 | **A3** — Idle tab | Hybrid: Sway/Spin/Drift = shader props; Float/Pulse/Breathe = GSAP yoyo on `_anim`. Chip row + speed slider. | ✅ |
 | 5 | **A4** — UI polish | Layer card add/remove transitions, modal open animation, chip/tab cross-fades | ✅ |
+| 5′ | **A5** — Live playback | Entrance + idle play in the player & timeline (not just the editor) via the shared engine | ✅ shipped & user-verified 2026-05-28 |
 | 6 | ~~**B1** — Beat-step locomotion~~ | ~~Step sequence per layer, beat clock advances states, stutter-motion feel~~ | ❌ **cancelled** — sequencer model rejected; replaced by B1′ |
 | 6′ | **B1′** — Beat-reactive sliders | Tilt / Hop / Hue Pulse / Blur Pulse / Squash on the layer card's AUDIO REACTIVITY block | ✅ shipped & user-verified 2026-05-27 |
 | 7 | **B2** — Keyframe sequences | Per-layer GSAP Timeline from serialised keyframe array | ⏸ |
@@ -58,6 +61,14 @@ Stored amps are normalised 0–1 (cube-root display curve like Bounce/Shake); th
 
 ### Recently shipped
 
+- **2026-05-28 — A5 Live playback in player & timeline ✅ shipped & user-verified.** Entrance + idle animations now play during real playback in `index.html` and `timeline.html`, not just the editor. Root cause of the gap: the GSAP driver (`animation.js`) is only *called* from `inspector.js`, and the per-frame `__dcAnim` publish in `visualizer.js` was gated on `window.__editorInspector` — so outside the editor nothing drove the animations and nothing reached the shader. Fix moves the driving + publishing into the shared `VisualizerEngine` (all three apps instantiate it), reusing the editor's exact driver. Four pieces:
+  - **Shared q-register bridge — single source of truth.** New `buildAnimFrameEqs()` in [src/customPresets.js](src/customPresets.js) (+ `MAX_ANIM_LAYERS = 5`, mirrors `MAX_LAYERS`) builds the per-frame `a.q{n}=__dcAnim[i].…` lines that carry `_anim` values into the comp shader. The editor's `_buildRuntimePreset` ([inspector.js](src/editor/inspector.js)) now calls it instead of its old inline loop, and the player/timeline call it too — byte-identical injection, can't drift. Output unchanged from the prior editor inline version (field names `opacity/scale/cxOffset/cyOffset/blur`; neutral fallback `1/1/0/0/0`).
+  - **Bridge injected at preset registration.** `refreshCustomPresets` in [src/visualizer.js](src/visualizer.js) now appends `buildAnimFrameEqs()` to each custom preset's `frame_eqs_str` (alongside the existing motionReact / waveReact injection). Before this, registered presets had the comp's `(op * q1)` baked in but **no** frame_eqs setting q1 in the player — this also hardens custom-layer presets generally (q-slots resolve to neutral instead of relying on Butterchurn's q default).
+  - **Publish bridge opened.** The rAF publish loop now reads `this._animLayers || window.__editorInspector?.currentState?.images`. In the editor `_animLayers` stays null → falls back to the inspector (editor untouched). In the player/timeline the engine owns the list. One global `window.__dcAnim`, but each engine writes it immediately before its own synchronous `visualizer.render()`, so the **multi-engine timeline** (one `VisualizerEngine` per region/zone, each with its own render loop) stays correct.
+  - **Driving on load + swap lifecycle.** `loadPreset` now calls new `_startPresetAnimations(preset)` / `_killPresetAnimations()`. `_start` builds a lightweight `{ _anim }` per layer from `preset.images` and fires entrance + idle via the same `playEntranceAnimation` / `startIdleAnimation` from [animation.js](src/editor/animation.js), mirroring the editor's `loadPresetData` loop. `_kill` runs on every swap to `gsap.killTweensOf` the old layers' `_gsapProxy` and clear the list (no tween leaks / stale values). **Gated on `!window.__editorInspector`** so the editor never double-fires.
+  - **Idle split in the player:** Float/Pulse/Breathe run as GSAP yoyo on `_anim` (driven here). Sway/Spin/Drift are *already baked into the saved comp shader* (they set `swayAmt`/`spinSpeed`/`panMode` and rebuilt at save time), so `startIdleAnimation`'s shader-prop path is a harmless no-op here (no `refresh` cb passed) — the baked motion already runs.
+  - **Exit is NOT fired on preset swap** — deliberately matches the editor, where preset swap is instant (`_clearForLoad`) and exit only plays on explicit layer delete. Exit-on-timeline-transition remains future work.
+  - **Crossfade verified OK (2026-05-28).** The theoretical concern was that all engines share one `window.__dcAnim`, so during a crossfade blend the *outgoing* preset's comp (still rendering through the blend) could briefly inherit the *incoming* preset's entrance start-state. In practice this does **not** produce a visible hard-cut — user-tested: animations play correctly through a crossfade swap. No action needed; noted here only so the shared-global behaviour is understood.
 - **2026-05-27 — A4 UI polish ✅ shipped & user-verified.** All six items from the A4 table:
   - **A4-1 (card mount).** Pure CSS — `@keyframes layer-card-mount` on `.image-layer-card` runs once on every insertion (single upload OR all cards in a loaded preset). Transform + opacity only; cards below don't reflow, so it reads as a soft pop.
   - **A4-2 (card unmount).** `@keyframes layer-card-unmount` collapses max-height + margin so cards below slide up into the gap. JS hook in `_performDeleteLayer` adds `.card-removing`, awaits `animationend` (with a 320ms safety timeout in case the event never fires), then calls `card.remove()`. Runs after the GSAP exit tween, not in parallel — the card's role is to show the list compacting, separate from the canvas-side fade.
@@ -92,6 +103,8 @@ Stored amps are normalised 0–1 (cube-root display curve like Bounce/Shake); th
 ## Scope
 
 **v1 — pre-show setup tool.** The animator modal ships as a creative planning tool: you build your layers, set entrance/exit/idle animations, and the preset saves and plays them. No live triggering. No MIDI. No keyboard shortcuts to fire animations mid-show. That's a separate, later problem.
+
+> **Update 2026-05-28 — playback vs. triggering.** As of A5 the saved animations now **play back during real playback** in the player and timeline, not only in the editor (entrance fires when a preset loads; idle loops while it's shown). This is *playback* — the preset's configured animations run automatically when the preset appears. It is distinct from *live triggering* (keyboard/MIDI/OSC firing an animation on demand mid-show), which is still future work (C1). So: "set it in the editor, it plays everywhere" is now true; "fire it live from a pad" is not.
 
 **Future — performance mode.** Triggering animations live (keyboard, MIDI, OSC, tap tempo) is a big-picture direction — captured at the bottom of this doc. Don't design it now. Build the pre-planning layer first; performance triggering plugs into the same animation engine later.
 

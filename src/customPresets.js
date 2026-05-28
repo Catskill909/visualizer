@@ -492,6 +492,39 @@ export function buildMotionReactFrameEqs(mr) {
     ].join('\n');
 }
 
+// Max number of image/video/text layers a preset can hold. Mirrors MAX_LAYERS
+// in the editor (inspector.js); both must stay equal so q-slots line up.
+export const MAX_ANIM_LAYERS = 5;
+
+/**
+ * Build the frame_eqs_str snippet that copies window.__dcAnim[i] into each
+ * layer's q-register tuple (q{i*5+1 .. i*5+5}). This is the bridge that carries
+ * GSAP-driven entrance / exit / idle animation values (animation.js) into the
+ * comp shader, where the baked literals are wrapped as `(op * q1)`, `(cx + q3)`
+ * etc. (see animation-dev.md § P0-B).
+ *
+ * SINGLE SOURCE OF TRUTH: the editor (inspector._buildRuntimePreset) and the
+ * player / timeline (visualizer.refreshCustomPresets) both call this so the
+ * injected lines are byte-identical and animations play the same way in every
+ * runtime. Missing global or slot → neutral (1.0 multiplier, 0.0 offset), which
+ * is byte-equivalent to an un-animated baked preset.
+ */
+export function buildAnimFrameEqs() {
+    const parts = [];
+    for (let i = 0; i < MAX_ANIM_LAYERS; i++) {
+        const b = i * 5 + 1;
+        const has = `(typeof __dcAnim!=="undefined"&&__dcAnim[${i}])`;
+        parts.push(
+            `a.q${b + 0}=${has}?__dcAnim[${i}].opacity:1;`,
+            `a.q${b + 1}=${has}?__dcAnim[${i}].scale:1;`,
+            `a.q${b + 2}=${has}?__dcAnim[${i}].cxOffset:0;`,
+            `a.q${b + 3}=${has}?__dcAnim[${i}].cyOffset:0;`,
+            `a.q${b + 4}=${has}?__dcAnim[${i}].blur:0;`
+        );
+    }
+    return parts.join('');
+}
+
 /**
  * Build the frame_eqs_str snippet that drives wave-only audio reactivity.
  * Mirrors buildMotionReactFrameEqs but modulates wave_a / wave_scale /

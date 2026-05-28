@@ -13,7 +13,7 @@
  *  All three swatches can be freely overridden after applying a palette.
  */
 
-import { createCustomPreset, saveCustomPreset, getImage, storeImage, generateId, buildMotionReactFrameEqs, buildWaveReactFrameEqs } from '../customPresets.js';
+import { createCustomPreset, saveCustomPreset, getImage, storeImage, generateId, buildMotionReactFrameEqs, buildWaveReactFrameEqs, buildAnimFrameEqs } from '../customPresets.js';
 import {
     parseGifFile, processGifFrames, generateFrameStrip,
     shouldOptimize, getRecommendedSettings, formatBytes,
@@ -6883,23 +6883,10 @@ export class EditorInspector {
         const baseFrame = runtime.frame_eqs_str || '';
         const fluxLine = 'a.q31=(typeof __dcFlux!=="undefined"?__dcFlux:0);';
         // animation-dev.md P0-C: pull `window.__dcAnim[i]` into per-layer q-slots
-        // each frame. Neutral defaults (1,1,0,0,0) when the global or the entry is
-        // missing — byte-equivalent to the un-animated baked literals.
-        // Each statement is a standalone `a.qN = expr;` to match the fluxLine
-        // precedent (Butterchurn translates this through its eq evaluator).
-        const animParts = [];
-        for (let i = 0; i < MAX_LAYERS; i++) {
-            const b = i * 5 + 1;
-            const has = `(typeof __dcAnim!=="undefined"&&__dcAnim[${i}])`;
-            animParts.push(
-                `a.q${b+0}=${has}?__dcAnim[${i}].opacity:1;`,
-                `a.q${b+1}=${has}?__dcAnim[${i}].scale:1;`,
-                `a.q${b+2}=${has}?__dcAnim[${i}].cxOffset:0;`,
-                `a.q${b+3}=${has}?__dcAnim[${i}].cyOffset:0;`,
-                `a.q${b+4}=${has}?__dcAnim[${i}].blur:0;`
-            );
-        }
-        const animLines = animParts.join('');
+        // each frame. Now built by the SHARED helper so the editor and the
+        // player/timeline (visualizer.refreshCustomPresets) inject byte-identical
+        // lines — single source of truth, see customPresets.buildAnimFrameEqs().
+        const animLines = buildAnimFrameEqs();
         runtime.frame_eqs_str = [baseFrame, injectedMotion, injectedWave, fluxLine, animLines].filter(Boolean).join('\n').trim();
         return runtime;
     }

@@ -10,8 +10,13 @@ import butterchurnPresetsImport from 'butterchurn-presets';
 import butterchurnPresetsExtra from 'butterchurn-presets/lib/butterchurnPresetsExtra.min.js';
 import butterchurnPresetsExtra2 from 'butterchurn-presets/lib/butterchurnPresetsExtra2.min.js';
 import butterchurnPresetsMD1 from 'butterchurn-presets/lib/butterchurnPresetsMD1.min.js';
-import { loadAllCustomPresets, CUSTOM_PREFIX, registryKey, getImage, buildMotionReactFrameEqs, buildWaveReactFrameEqs } from './customPresets.js';
+import { loadAllCustomPresets, CUSTOM_PREFIX, registryKey, getImage, buildMotionReactFrameEqs, buildWaveReactFrameEqs, buildAnimFrameEqs } from './customPresets.js';
 import { parseGIF, decompressFrames } from 'gifuct-js';
+// animation-dev.md — drive entrance/exit/idle in the player & timeline (not just
+// the editor). animation.js is the same GSAP driver the editor uses; gsap here is
+// only for killTweensOf on preset swap. animation.js imports gsap (no cycle back).
+import { playEntranceAnimation, startIdleAnimation } from './editor/animation.js';
+import { gsap } from 'gsap';
 
 // Baron pack: bypass the package's runtime `await import()` loop (which would cause
 // 762 sequential network requests). Vite inlines every JSON into a single static chunk.
@@ -348,7 +353,61 @@ export class VisualizerEngine {
       await this._bindCustomPresetImages(preset);
     }
 
+    // animation-dev.md — drive entrance/exit/idle the same way the editor does,
+    // but in the player & timeline. Skipped when the editor is present: the
+    // editor drives its own animations through inspector + __editorInspector, so
+    // we must not double-fire (the publish bridge falls back to the inspector).
+    const inEditor = typeof window !== 'undefined' && window.__editorInspector;
+    if (!inEditor) {
+      this._killPresetAnimations();
+      if (name.startsWith(CUSTOM_PREFIX) && Array.isArray(preset.images) && preset.images.length) {
+        this._startPresetAnimations(preset);
+      }
+    }
+
     return true;
+  }
+
+  /**
+   * animation-dev.md — start the saved entrance/idle animations for a freshly
+   * loaded custom preset, mirroring the editor's loadPresetData loop. Builds a
+   * lightweight per-layer `{ _anim }` list (this._animLayers) that the render
+   * loop publishes to window.__dcAnim each frame; GSAP (animation.js) tweens
+   * those _anim values, which flow through the q-register bridge into the comp
+   * shader. Entrance and Float/Pulse/Breathe idle are pure _anim tweens (no
+   * shader rebuild). Sway/Spin/Drift idle is already baked into the saved comp,
+   * so startIdleAnimation's shader path is a harmless no-op here (no refresh cb).
+   * Exit is NOT fired on preset swap — matches the editor, where swap is instant
+   * and exit only plays on explicit layer delete.
+   */
+  _startPresetAnimations(preset) {
+    this._animLayers = preset.images.map(() => ({
+      _anim: { opacity: 1.0, scale: 1.0, cxOffset: 0.0, cyOffset: 0.0, blur: 0.0 },
+    }));
+    preset.images.forEach((img, i) => {
+      const a = img.animation;
+      if (!a) return;
+      const layer = this._animLayers[i];
+      if (a.entrance && a.entrance !== 'none') {
+        playEntranceAnimation(layer, a).then(() => {
+          if (a.idle && a.idle !== 'none') startIdleAnimation(layer, a);
+        });
+      } else if (a.idle && a.idle !== 'none') {
+        startIdleAnimation(layer, a);
+      }
+    });
+  }
+
+  /** Stop any in-flight layer animations from the previous preset and clear the
+   *  published list so a preset swap can't leak GSAP tweens or carry stale anim
+   *  values forward. */
+  _killPresetAnimations() {
+    if (this._animLayers) {
+      for (const layer of this._animLayers) {
+        if (layer && layer._gsapProxy) gsap.killTweensOf(layer._gsapProxy);
+      }
+    }
+    this._animLayers = null;
   }
 
   loadPresetByIndex(index, blendTime = 2.0) {
@@ -530,7 +589,12 @@ export class VisualizerEngine {
       // Motion-tab and Wave-tab reactivity.
       const mrInjected = buildMotionReactFrameEqs(preset.motionReact);
       const wrInjected = buildWaveReactFrameEqs(preset.waveReact);
-      const reactBlock = [mrInjected, wrInjected].filter(Boolean).join('\n');
+      // animation-dev.md — inject the SAME q-register bridge the editor uses so
+      // entrance/exit/idle animations play here (player & timeline), not just in
+      // the editor. Neutral when no animation runs, so un-animated presets are
+      // byte-identical to before.
+      const animInjected = buildAnimFrameEqs();
+      const reactBlock = [mrInjected, wrInjected, animInjected].filter(Boolean).join('\n');
       if (reactBlock) {
         const base = preset.frame_eqs_str || '';
         preset.frame_eqs_str = base ? `${base}\n${reactBlock}` : reactBlock;
@@ -639,11 +703,15 @@ export class VisualizerEngine {
       this._tickVideoAnimations();
 
       // animation-dev.md P0-C: publish per-layer _anim state to window.__dcAnim
-      // each frame. Read by the per-frame eq line in _buildRuntimePreset, which
-      // pulls each layer's slot into its q-register tuple (q{i*5+1..i*5+5}).
-      // Safe on non-editor pages (no inspector → no-op).
+      // each frame. Read by the per-frame eq line, which pulls each layer's slot
+      // into its q-register tuple (q{i*5+1..i*5+5}).
+      // Prefer this engine's own animated layers (player & timeline, set by
+      // _startPresetAnimations); fall back to the editor inspector for live
+      // editing. One global, but each engine writes it immediately before its own
+      // render() below — publish+render is synchronous, so the multi-engine
+      // timeline stays correct.
       const _insp = (typeof window !== 'undefined') ? window.__editorInspector : null;
-      const _imgs = _insp?.currentState?.images;
+      const _imgs = this._animLayers || _insp?.currentState?.images;
       if (_imgs) {
         const out = [];
         for (let i = 0; i < _imgs.length; i++) {
