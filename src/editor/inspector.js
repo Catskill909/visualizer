@@ -34,6 +34,11 @@ const HD_MAX_DIM = 2048;    // "HD" toggle max dimension
 // layer. `_anim` is the runtime tween state and is NOT persisted (reset to
 // neutral on load). UI to set this lands in Phase A.
 const DEFAULT_ANIMATION = {
+    // animation-dev.md A6 — per-layer schedule WITHIN a preset: when (seconds
+    // after preset load, 0–180) the layer enters / exits. 0 = enter immediately /
+    // no scheduled exit. Separate from the entrance/exit tween DURATION. Drives
+    // playback in the player & timeline; the editor stays a workbench.
+    entranceAt: 0, exitAt: 0,
     entrance: 'none', entranceDuration: 0.7, entranceEase: 'expo.out',
     // Phase A1 Gate 2 — per-preset tunable params. Defaults match the
     // pre-Gate-2 hard-coded values so existing presets stay byte-identical.
@@ -83,6 +88,12 @@ function _hydrateScrubber(el, { onInput } = {}) {
     const label = el.dataset.label || '';
     let value = parseFloat(el.dataset.value);
 
+    // `time` format (Enter at / Exit at, 0:00–3:00): m:ss readout, magnitude-aware
+    // snapping (1s under a minute, 5s above) and labeled landmark ticks so the
+    // long range reads like a timeline ruler. All other formats ('s' duration,
+    // 'x' speed) keep the original fixed-step + 11-even-tick behaviour exactly.
+    const isTime = fmt === 'time';
+
     el.innerHTML = `
       <div class="anim-scrub-head">
         <span class="anim-scrub-label">${label}</span>
@@ -93,32 +104,70 @@ function _hydrateScrubber(el, { onInput } = {}) {
         <div class="anim-scrub-rail"><div class="anim-scrub-fill"></div></div>
         <div class="anim-scrub-ticks"></div>
         <div class="anim-scrub-handle"></div>
-      </div>`;
+      </div>
+      <div class="anim-scrub-labels"></div>`;
 
-    const valEl     = el.querySelector('.anim-scrub-value');
-    const track     = el.querySelector('.anim-scrub-track');
-    const fill      = el.querySelector('.anim-scrub-fill');
-    const handle    = el.querySelector('.anim-scrub-handle');
-    const ticksWrap = el.querySelector('.anim-scrub-ticks');
+    const valEl      = el.querySelector('.anim-scrub-value');
+    const track      = el.querySelector('.anim-scrub-track');
+    const fill       = el.querySelector('.anim-scrub-fill');
+    const handle     = el.querySelector('.anim-scrub-handle');
+    const ticksWrap  = el.querySelector('.anim-scrub-ticks');
+    const labelsWrap = el.querySelector('.anim-scrub-labels');
 
-    // Eleven evenly-spaced ticks (every other one "major"). Spec-driven exact
-    // positioning would require knowing units; this generic pattern reads as a
-    // ruler regardless of range.
-    for (let i = 0; i < 11; i++) {
-        const t = document.createElement('span');
-        t.className = 'anim-scrub-tick' + (i % 2 === 0 ? ' major' : '');
-        ticksWrap.appendChild(t);
+    const posOf = (v) => (max > min) ? (v - min) / (max - min) : 0;
+
+    if (isTime) {
+        // Labeled landmark ticks at meaningful times — reads like a timeline ruler.
+        // Endpoints align inward (translateX 0 / -100%) so they don't clip.
+        const landmarks = [
+            { v: 0,   t: '0:00' }, { v: 30, t: '0:30' }, { v: 60, t: '1:00' },
+            { v: 120, t: '2:00' }, { v: 180, t: '3:00' },
+        ];
+        for (const lm of landmarks) {
+            if (lm.v < min || lm.v > max) continue;
+            const pct = posOf(lm.v) * 100;
+            const tick = document.createElement('span');
+            tick.className = 'anim-scrub-tick major anim-scrub-tick--mark';
+            tick.style.left = `${pct}%`;
+            ticksWrap.appendChild(tick);
+            const lab = document.createElement('span');
+            lab.className = 'anim-scrub-tick-label';
+            lab.style.left = `${pct}%`;
+            lab.style.transform = `translateX(${pct <= 2 ? '0' : pct >= 98 ? '-100%' : '-50%'})`;
+            lab.textContent = lm.t;
+            labelsWrap.appendChild(lab);
+        }
+    } else {
+        // Eleven evenly-spaced ticks (every other one "major"). Reads as a ruler.
+        for (let i = 0; i < 11; i++) {
+            const t = document.createElement('span');
+            t.className = 'anim-scrub-tick' + (i % 2 === 0 ? ' major' : '');
+            ticksWrap.appendChild(t);
+        }
     }
 
-    const fmtVal = (v) => fmt === 's' ? `${v.toFixed(2)}s`
+    const fmtTime = (v) => {
+        const m = Math.floor(v / 60);
+        const s = Math.round(v - m * 60);
+        if (s === 60) return `${m + 1}:00`;
+        return `${m}:${String(s).padStart(2, '0')}`;
+    };
+    const fmtVal = (v) => isTime ? fmtTime(v)
+                       : fmt === 's' ? `${v.toFixed(2)}s`
                        : fmt === 'x' ? `${v.toFixed(2)}×`
                        : v.toFixed(2);
+
+    // Magnitude-aware snap for the time scrubber (coarser as time grows); other
+    // scrubbers keep their fixed step grid anchored at min.
+    const snapStepFor = (v) => isTime ? (v < 60 ? 1 : 5) : step;
     const snap = (v) => {
-        const stepped = Math.round((v - min) / step) * step + min;
-        return Math.max(min, Math.min(max, parseFloat(stepped.toFixed(4))));
+        const s = snapStepFor(v);
+        const snapped = isTime ? Math.round(v / s) * s
+                              : Math.round((v - min) / step) * step + min;
+        return Math.max(min, Math.min(max, parseFloat(snapped.toFixed(4))));
     };
     const render = () => {
-        const pct = ((value - min) / (max - min)) * 100;
+        const pct = posOf(value) * 100;
         fill.style.width = `${pct}%`;
         handle.style.left = `${pct}%`;
         valEl.textContent = fmtVal(value);
@@ -157,8 +206,9 @@ function _hydrateScrubber(el, { onInput } = {}) {
     track.addEventListener('pointerup', endDrag);
     track.addEventListener('pointercancel', endDrag);
     track.addEventListener('keydown', (e) => {
-        if (e.key === 'ArrowLeft' || e.key === 'ArrowDown')  { setValue(value - step, true); e.preventDefault(); }
-        if (e.key === 'ArrowRight' || e.key === 'ArrowUp')   { setValue(value + step, true); e.preventDefault(); }
+        const s = snapStepFor(value);
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowDown')  { setValue(value - s, true); e.preventDefault(); }
+        if (e.key === 'ArrowRight' || e.key === 'ArrowUp')   { setValue(value + s, true); e.preventDefault(); }
         if (e.key === 'Home') { setValue(min, true); e.preventDefault(); }
         if (e.key === 'End')  { setValue(max, true); e.preventDefault(); }
     });
@@ -2615,6 +2665,18 @@ export class EditorInspector {
                     this.onchange?.();
                 },
             });
+            // A6 — "Enter at" time (when the layer enters during playback). Editor
+            // is a workbench (layers stay visible); the schedule plays in the
+            // player & timeline via the engine. Saved by saveCurrent (spreads
+            // currentState.images), so just storing the value + onchange is enough.
+            this._animateScrubEntranceAt = _hydrateScrubber(document.getElementById('animate-entrance-at'), {
+                onInput: (v) => {
+                    const tgt = this._animateModalEntry;
+                    if (!tgt) return;
+                    tgt.animation.entranceAt = v;
+                    this.onchange?.();
+                },
+            });
             this._animateEaseEntrance = _hydrateEasePicker(
                 document.getElementById('animate-ease'), ENTRANCE_EASES,
                 {
@@ -2631,6 +2693,15 @@ export class EditorInspector {
                     const tgt = this._animateModalEntry;
                     if (!tgt) return;
                     tgt.animation.exitDuration = v;
+                    this.onchange?.();
+                },
+            });
+            // A6 — "Exit at" time (when the layer leaves during playback). 0 = none.
+            this._animateScrubExitAt = _hydrateScrubber(document.getElementById('animate-exit-at'), {
+                onInput: (v) => {
+                    const tgt = this._animateModalEntry;
+                    if (!tgt) return;
+                    tgt.animation.exitAt = v;
                     this.onchange?.();
                 },
             });
@@ -2850,6 +2921,7 @@ export class EditorInspector {
             c.classList.toggle('active', c.dataset.preset === a.entrance);
         });
         this._animateScrubEntrance?.setValue(a.entranceDuration);
+        this._animateScrubEntranceAt?.setValue(a.entranceAt ?? 0);   // A6
         this._animateEaseEntrance?.setActive(a.entranceEase || 'expo.out');
 
         // Gate 2 — sync entrance param sliders + show only the relevant row
@@ -2872,6 +2944,7 @@ export class EditorInspector {
             c.classList.toggle('active', c.dataset.preset === (a.exit || 'none'));
         });
         this._animateScrubExit?.setValue(a.exitDuration ?? 0.5);
+        this._animateScrubExitAt?.setValue(a.exitAt ?? 0);   // A6
         this._animateEaseExit?.setActive(a.exitEase || 'expo.in');
 
         // Gate 2 — same for exit

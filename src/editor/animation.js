@@ -360,3 +360,68 @@ export function stopIdleAnimation(entry, refresh) {
     }
     if (shaderChanged) refresh?.();
 }
+
+// ─── Timed scheduling (animation-dev.md A6 — entrance/exit "at" times) ──────────
+// Per-layer schedule WITHIN a preset: each layer can ENTER and EXIT at a chosen
+// time (0..180s) after the preset loads, independent of the entrance/exit tween
+// DURATION. gsap.delayedCall is the clock — it starts when this runs (= preset
+// load), so the schedule resets to zero every load. Drives playback in the
+// player & timeline (engine `_startPresetAnimations`); the editor stays a
+// workbench (it fires entrance immediately so layers are always visible to tune).
+//
+// Before its entrance time a layer is held at opacity 0 (q-pipe → invisible).
+// At entranceAt the entrance plays (or it just appears if entrance==='none').
+// At exitAt the exit plays (or it hard-hides if exit==='none'). Idle starts after
+// the entrance settles, same as the editor's load loop.
+
+const ANIM_MAX_AT = 180; // 3:00 cap, matches the modal's time scrubber range
+
+export function scheduleLayerAnimations(entry, cfg, refresh) {
+    if (!entry?._anim) return;
+    killLayerSchedule(entry);
+
+    const entranceAt = Math.max(0, Math.min(ANIM_MAX_AT, Number(cfg?.entranceAt) || 0));
+    const exitAt     = Math.max(0, Math.min(ANIM_MAX_AT, Number(cfg?.exitAt) || 0));
+    const hasEntrance = cfg?.entrance && cfg.entrance !== 'none';
+    const hasExit     = cfg?.exit && cfg.exit !== 'none';
+    const hasIdle     = cfg?.idle && cfg.idle !== 'none';
+
+    // Non-enumerable so JSON.stringify(currentState) never trips on it.
+    if (!entry._schedule) {
+        Object.defineProperty(entry, '_schedule', { value: [], enumerable: false, writable: true, configurable: true });
+    }
+
+    const fireEntrance = () => {
+        if (hasEntrance) {
+            playEntranceAnimation(entry, cfg).then(() => { if (hasIdle) startIdleAnimation(entry, cfg, refresh); });
+        } else {
+            Object.assign(entry._anim, NEUTRAL);   // no entrance tween → just appear
+            if (hasIdle) startIdleAnimation(entry, cfg, refresh);
+        }
+    };
+
+    if (entranceAt > 0) {
+        entry._anim.opacity = 0;                   // held hidden until its entrance time
+        entry._schedule.push(gsap.delayedCall(entranceAt, fireEntrance));
+    } else {
+        fireEntrance();
+    }
+
+    if (exitAt > 0) {
+        entry._schedule.push(gsap.delayedCall(exitAt, () => {
+            if (hasExit) {
+                playExitAnimation(entry, cfg, { resetAfter: false });  // tween out, stay gone
+            } else {
+                if (entry._gsapProxy) gsap.killTweensOf(entry._gsapProxy);
+                entry._anim.opacity = 0;                                // no exit tween → hard hide
+            }
+        }));
+    }
+}
+
+export function killLayerSchedule(entry) {
+    if (entry?._schedule) {
+        for (const c of entry._schedule) { try { c.kill(); } catch {} }
+        entry._schedule.length = 0;
+    }
+}

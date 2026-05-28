@@ -922,6 +922,11 @@
                         </div>
                     </div>
 
+                    <!-- A6 — when the layer enters (0:00–3:00 after the preset loads). 0:00 = immediately. -->
+                    <div id="animate-entrance-at" class="anim-scrub"
+                         data-min="0" data-max="180" data-step="1"
+                         data-value="0" data-format="time" data-label="Enter at"></div>
+
                     <!-- Phase A1 Gate 3 — custom scrubber + ease picker. JS hydrates these
                          div shells on first modal open. Range = 0.1..10s per Gate-1 audit. -->
                     <div id="animate-duration" class="anim-scrub"
@@ -976,6 +981,11 @@
                         </div>
                     </div>
 
+                    <!-- A6 — when the layer exits (0:00–3:00 after the preset loads). 0:00 = no scheduled exit. -->
+                    <div id="animate-exit-at" class="anim-scrub"
+                         data-min="0" data-max="180" data-step="1"
+                         data-value="0" data-format="time" data-label="Exit at"></div>
+
                     <!-- Phase A1 Gate 3 — see entrance for shape. Exit uses `.in` eases. -->
                     <div id="animate-exit-duration" class="anim-scrub"
                          data-min="0.1" data-max="10.0" data-step="0.05"
@@ -989,7 +999,7 @@
                     </div>
 
                     <div style="font-size:11px;color:var(--text-3);line-height:1.5;padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:6px;">
-                        Exit plays when this layer is deleted. Preview here previews the tween then snaps the layer back to view.
+                        Set <strong>Exit at</strong> to make the layer leave at that time during playback (player &amp; timeline); 0:00 = no scheduled exit. Exit also plays when this layer is deleted in the editor. Preview here previews the tween then snaps the layer back to view.
                     </div>
                 </div>
                 <div class="animate-panel" data-panel="idle" hidden>

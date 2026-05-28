@@ -1125,6 +1125,31 @@ html, body {
   box-shadow: 0 1px 6px rgba(0,0,0,0.7), 0 0 0 9px rgba(255,255,255,0.13);
 }
 
+/* A6 — time scrubber (Enter at / Exit at) landmark ticks + labels. Ticks are
+   absolutely positioned by inline left:%; labels sit in a row below the track and
+   collapse to nothing on the duration/speed scrubbers (empty labels row). */
+.animate-modal .anim-scrub-tick--mark {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+.animate-modal .anim-scrub-labels {
+  position: relative;
+  height: 13px;
+  margin-top: 5px;
+}
+.animate-modal .anim-scrub-labels:empty { display: none; }
+.animate-modal .anim-scrub-tick-label {
+  position: absolute;
+  top: 0;
+  font-size: 10px;
+  line-height: 13px;
+  color: var(--text-2);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
 /* ── Phase A1 Gate 3 — ease picker (chips + bezier preview) ──
    Replaces the <select> for entrance/exit ease. SVG curve samples the GSAP
    ease function so elastic / bounce overshoots render correctly. */

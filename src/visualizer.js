@@ -15,7 +15,7 @@ import { parseGIF, decompressFrames } from 'gifuct-js';
 // animation-dev.md — drive entrance/exit/idle in the player & timeline (not just
 // the editor). animation.js is the same GSAP driver the editor uses; gsap here is
 // only for killTweensOf on preset swap. animation.js imports gsap (no cycle back).
-import { playEntranceAnimation, startIdleAnimation } from './editor/animation.js';
+import { scheduleLayerAnimations, killLayerSchedule } from './editor/animation.js';
 import { gsap } from 'gsap';
 
 // Baron pack: bypass the package's runtime `await import()` loop (which would cause
@@ -384,27 +384,26 @@ export class VisualizerEngine {
     this._animLayers = preset.images.map(() => ({
       _anim: { opacity: 1.0, scale: 1.0, cxOffset: 0.0, cyOffset: 0.0, blur: 0.0 },
     }));
+    // A6: scheduleLayerAnimations handles the entrance/exit "at" timing (a clock
+    // starts now = preset load), entrance + idle firing, and the hidden-until-
+    // entrance state. With entranceAt/exitAt both 0 (default / pre-A6 presets) it
+    // behaves exactly like the A5 immediate-fire load — no regression.
     preset.images.forEach((img, i) => {
       const a = img.animation;
       if (!a) return;
-      const layer = this._animLayers[i];
-      if (a.entrance && a.entrance !== 'none') {
-        playEntranceAnimation(layer, a).then(() => {
-          if (a.idle && a.idle !== 'none') startIdleAnimation(layer, a);
-        });
-      } else if (a.idle && a.idle !== 'none') {
-        startIdleAnimation(layer, a);
-      }
+      scheduleLayerAnimations(this._animLayers[i], a);
     });
   }
 
-  /** Stop any in-flight layer animations from the previous preset and clear the
-   *  published list so a preset swap can't leak GSAP tweens or carry stale anim
-   *  values forward. */
+  /** Stop any in-flight layer animations + scheduled enter/exit timers from the
+   *  previous preset and clear the published list so a preset swap can't leak
+   *  GSAP tweens / delayedCalls or carry stale anim values forward. */
   _killPresetAnimations() {
     if (this._animLayers) {
       for (const layer of this._animLayers) {
-        if (layer && layer._gsapProxy) gsap.killTweensOf(layer._gsapProxy);
+        if (!layer) continue;
+        killLayerSchedule(layer);
+        if (layer._gsapProxy) gsap.killTweensOf(layer._gsapProxy);
       }
     }
     this._animLayers = null;
