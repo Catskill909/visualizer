@@ -37,7 +37,7 @@
             <strong>Curve</strong> (Linear / Squared / Cubed / Gate) as the existing effects, on image, video, GIF,
             and text layers alike.
           </li>
-          <li><strong>Layer Animation — Entrance / Exit / Idle ✨ NEW</strong> — Every image, video, GIF, and text layer
+          <li><strong>Layer Animation — Entrance / Exit / Idle / Timing ✨ NEW</strong> — Every image, video, GIF, and text layer
             now has a <strong>✦ Animate</strong> button that opens a focused modal — a creative planning tool for how
             each layer arrives, leaves, and breathes on screen. Three tabs: <strong>Entrance</strong> (Fade, Scale Up /
             Down, Slide L/R/U/D, Pop, Blur — auto-fires on preset load), <strong>Exit</strong> (same chip set with
@@ -46,9 +46,10 @@
               scrubber</strong> with tick marks; ease is a <strong>chip row with a live SVG curve preview</strong> that
             samples the actual ease so elastic and bounce overshoots draw correctly. Each preset reveals one contextual
             parameter (Distance, Start size, Pop from, Start blur) so the controls morph to the choice instead of a
-            fixed form. The modal is a draggable floating panel — the canvas stays live behind it while you tune. Layer
-            cards now also animate themselves in and out of the list, and the contextual rows expand smoothly when you
-            switch preset chips.
+            fixed form. The modal is a draggable floating panel — the canvas stays live behind it while you tune.
+            New: <strong>Enter at / Exit at</strong> time scrubbers (0:00–3:00) let you schedule exactly <em>when</em>
+            each layer enters and exits within the preset's lifetime — stagger five layers for a cinematic reveal.
+            All animations play live in the <strong>player and timeline</strong>, not just in the editor.
           </li>
           <li><strong>Timeline — Multi-Track Stacking ✨ NEW</strong> — Stack multiple presets <em>inside</em> a single
             zone — the Timeline is now a real layer compositor. In <strong>Full Screen</strong>, the transport row's
@@ -284,8 +285,9 @@
         <div class="feature-card fade-in">
           <h3>Layer Animation ✨</h3>
           <p>Every layer gets a <strong>✦ Animate</strong> button: nine entrance presets (Fade, Scale, Slide, Pop,
-            Blur), mirrored exits, and six idle loops (Float, Pulse, Sway, Spin, Drift, Breathe). Tuned with a custom
-            visual scrubber and a live SVG bezier curve preview.</p>
+            Blur), mirrored exits, and six idle loops (Float, Pulse, Sway, Spin, Drift, Breathe). Per-layer
+            <strong>Enter at / Exit at</strong> timing (0:00–3:00) staggers layers like a director's cut.
+            Plays live in the player &amp; timeline. Tuned with a custom visual scrubber and a live SVG bezier curve preview.</p>
         </div>
 
         <!-- More layers + performance -->
@@ -632,6 +634,9 @@
               </div>
               <div class="il-item"><span class="il-dot"></span><strong>▶ Preview</strong> button replays the tween on
                 the live canvas without committing — tune duration, ease, or chip and re-preview cleanly</div>
+              <div class="il-item"><span class="il-dot"></span><strong>Enter at</strong> — m:ss scrubber (0:00–3:00) on the Entrance tab; layer holds invisible until its scheduled time, then the entrance tween fires</div>
+              <div class="il-item"><span class="il-dot"></span><strong>Exit at</strong> — m:ss scrubber on the Exit tab; exit tween fires at the chosen moment; stagger five layers for a cinematic timed reveal sequence</div>
+              <div class="il-item"><span class="il-dot"></span><strong>Plays live in the player &amp; timeline</strong> — entrance, idle, and timed schedules all run during real playback; cross-fades between presets respect the animation state</div>
               <div class="il-item"><span class="il-dot"></span><strong>Composes with audio reactivity</strong> —
                 animation is "when"; reactivity is "how it behaves moment-to-moment." Both run independently on the
                 same layer</div>
