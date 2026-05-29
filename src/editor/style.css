@@ -973,6 +973,57 @@ html, body {
   from { transform: scale(0.95); opacity: 0; }
   to   { transform: scale(1);    opacity: 1; }
 }
+
+/* Material-style title bar — darker elevated band (no colour). Bleeds to the
+   card edges + top so it reads as a distinct header, not floating text. */
+.animate-modal .animate-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -18px -22px 16px;                          /* span past card padding */
+  padding: 13px 16px 13px 22px;
+  background: rgba(0, 0, 0, 0.45);                   /* darker than the card body */
+  border-bottom: 1px solid var(--border-hi);
+  border-radius: var(--r-l) var(--r-l) 0 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);  /* crisp top highlight */
+  cursor: move;
+  user-select: none;
+}
+
+/* Close — circular icon button with a Material-style hover fill + spin. */
+.animate-modal .animate-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 30px; height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.2s ease;
+}
+.animate-modal .animate-modal-close svg { display: block; }
+.animate-modal .animate-modal-close:hover {
+  background: rgba(255, 255, 255, 0.10);
+  color: var(--text);
+  transform: rotate(90deg);
+}
+.animate-modal .animate-modal-close:active {
+  background: rgba(255, 255, 255, 0.16);
+  transform: rotate(90deg) scale(0.92);
+}
+.animate-modal .animate-modal-close:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--border-hi);
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-modal .animate-modal-close:hover,
+  .animate-modal .animate-modal-close:active { transform: none; }
+}
 .animate-modal .animate-chip {
   background: var(--bg-1); border: 1px solid var(--border);
   border-radius: 14px; color: var(--text-2);

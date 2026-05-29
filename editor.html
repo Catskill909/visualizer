@@ -870,9 +870,13 @@
         <!-- Floating panel — no backdrop, draggable by header. Canvas stays visible. -->
         <div id="animate-modal" class="animate-modal" hidden role="dialog" aria-labelledby="animate-modal-title">
             <div class="animate-modal-card" style="width:min(440px,95vw);max-height:85vh;overflow-y:auto;">
-                <div id="animate-modal-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;cursor:move;user-select:none;">
+                <div id="animate-modal-header" class="animate-modal-header">
                     <h2 id="animate-modal-title" style="margin:0;font-size:15px;font-weight:600;">✦ Animate — <span id="animate-modal-layer-name">Layer</span></h2>
-                    <button id="animate-modal-close" type="button" class="modal-x-btn" aria-label="Close" style="background:transparent;border:none;color:var(--text-2);font-size:22px;line-height:1;cursor:pointer;padding:4px 8px;">×</button>
+                    <button id="animate-modal-close" type="button" class="animate-modal-close" aria-label="Close">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                            <path d="M4 4 L12 12 M12 4 L4 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                        </svg>
+                    </button>
                 </div>
 
                 <!-- Tab bar — Entrance ships in Gate 1; Exit/Idle show informational placeholders -->
