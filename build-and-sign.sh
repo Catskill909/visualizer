@@ -13,9 +13,8 @@
 
 set -e
 
-# Kill any stale vite/tauri processes and clear build cache
-pkill -f vite 2>/dev/null || true
-rm -rf node_modules/.vite node_modules/.vite-temp
+# (Stale-process sweep + cache wipe are consolidated below into kill_stale and
+# the hard cache wipe, once colors/credentials are set up. See Step 0b.)
 
 # App configuration
 APP_NAME="DiscoCast Visualizer"
@@ -41,6 +40,76 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
+
+# ── Hang-proofing: the permanent fix for the recurring Step 1 build wedge ──────
+# We stopped playing whack-a-mole with individual triggers. Two layers:
+#   1. kill_stale — sweep EVERY process/port left by a prior build or dev session
+#                   that could hold a lock, a port, or the dep-optimizer cache and
+#                   silently wedge a fresh build.
+#   2. run_step   — run a build step with stdin detached (no prompt can block it)
+#                   under a HARD time budget. If it overruns, the step is hung:
+#                   kill it, sweep, print a loud diagnostic, and abort non-zero.
+#                   This converts the old silent infinite freeze into a fast,
+#                   explained failure regardless of WHAT triggered it — stdin
+#                   prompt, stale lock, busy port, or a cause we haven't seen yet.
+WATCHDOG_FLAG="$(mktemp -u "/tmp/discocast-build-watchdog.XXXXXX")"
+trap 'rm -f "$WATCHDOG_FLAG"' EXIT
+
+kill_stale() {
+    pkill -9 -f "node.*vite"  2>/dev/null || true
+    pkill -9 -f "vite build"  2>/dev/null || true
+    pkill -9 -f "rolldown"    2>/dev/null || true
+    pkill -9 -f "esbuild"     2>/dev/null || true
+    pkill -9 -f "tauri dev"   2>/dev/null || true
+    pkill -9 -f "tauri-dev"   2>/dev/null || true
+    # Free the Vite dev port if a dev server is still camped on it
+    local pids; pids="$(lsof -ti tcp:5173 2>/dev/null || true)"
+    [ -n "$pids" ] && kill -9 $pids 2>/dev/null || true
+    return 0
+}
+
+# run_step <budget_seconds> <label> <command...>
+run_step() {
+    local budget="$1" label="$2"; shift 2
+
+    # Run the step with stdin detached so no prompt (npm notice, deprecation,
+    # etc.) can ever block it on the inherited TTY.
+    "$@" < /dev/null &
+    local cmd_pid=$!
+
+    # Watchdog: if the step is still alive after its budget, it is hung.
+    ( sleep "$budget"
+      if kill -0 "$cmd_pid" 2>/dev/null; then
+          touch "$WATCHDOG_FLAG"
+          kill -TERM "$cmd_pid" 2>/dev/null || true
+          sleep 2
+          kill -KILL "$cmd_pid" 2>/dev/null || true
+          kill_stale   # nuke the orphaned node/vite/esbuild children too
+      fi ) &
+    local dog_pid=$!
+
+    local rc=0
+    wait "$cmd_pid" 2>/dev/null || rc=$?
+
+    # Step finished on its own — stand down the watchdog.
+    kill "$dog_pid" 2>/dev/null || true
+    wait "$dog_pid" 2>/dev/null || true
+
+    if [ -f "$WATCHDOG_FLAG" ]; then
+        rm -f "$WATCHDOG_FLAG"
+        echo "" >&2
+        echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}" >&2
+        echo -e "${RED}✗ ${label} HUNG — killed after ${budget}s.${NC}" >&2
+        echo -e "${RED}  This is the recurring build wedge: a stale vite/esbuild/${NC}" >&2
+        echo -e "${RED}  rolldown worker, a held dep-optimizer lock, or a busy port.${NC}" >&2
+        echo -e "${RED}  Those workers have just been swept clean.${NC}" >&2
+        echo -e "${RED}  → Re-run ./build-and-sign.sh — it should pass now.${NC}" >&2
+        echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}" >&2
+        exit 124
+    fi
+
+    return $rc
+}
 
 echo -e "${GREEN}Building ${DISPLAY_NAME}...${NC}"
 echo "Bundle ID: ${BUNDLE_ID}"
@@ -68,14 +137,12 @@ if [ ! -d "src-tauri/icons" ]; then
     echo -e "${GREEN}Icons generated!${NC}"
 fi
 
-# Step 0b: Kill any stale Vite/rolldown/esbuild workers that could hold a file
-# lock or block the build silently. SIGKILL (-9) because some rolldown workers
-# ignore SIGTERM. Covers: main vite node process, npm wrappers, rolldown's
-# worker pool, esbuild dep-optimizer subprocesses.
-pkill -9 -f "node.*vite" 2>/dev/null || true
-pkill -9 -f "npm run dev" 2>/dev/null || true
-pkill -9 -f "rolldown" 2>/dev/null || true
-pkill -9 -f "esbuild" 2>/dev/null || true
+# Step 0b: Sweep every stale Vite/rolldown/esbuild/tauri worker (and the dev
+# port) left by a prior build or dev session. Any one of them can hold a file
+# lock or the dep-optimizer cache and wedge this build silently. SIGKILL (-9)
+# because some rolldown workers ignore SIGTERM. Consolidated into kill_stale,
+# which the watchdog also calls when a step hangs.
+kill_stale
 sleep 1
 
 # Hard cache wipe. The build has hung repeatedly when Vite/rolldown trusts a
@@ -90,20 +157,23 @@ rm -rf \
     .rolldown \
     dist
 
-# Step 1: Build the web app. The hard cache wipe above already forces Vite
-# to re-optimize dependencies on next run (no cache to trust). Do NOT add
-# `--force` here — Vite v8's `vite build` rejects it (only `vite dev` and
+# Step 1: Build the web app, under the watchdog. The hard cache wipe above
+# already forces Vite to re-optimize dependencies (no cache to trust). Do NOT
+# add `--force` here — Vite v8's `vite build` rejects it (only `vite dev` and
 # `vite optimize` accept --force).
 #
-# `< /dev/null` is load-bearing: without it, npm/vite inherit the TTY and
-# any stdin prompt (npm update notice, deprecation warning, etc.) hangs the
-# build forever at 0% CPU. Do NOT remove this redirect.
+# run_step detaches stdin (kills the npm-prompt hang) AND enforces a 120s budget
+# (the real vite build finishes in well under a second), so this step can never
+# freeze silently again — whatever the cause, it dies loud and fast.
 echo -e "${YELLOW}Step 1: Building web app with Vite...${NC}"
-npm run build < /dev/null
+run_step 120 "Step 1 (Vite web build)" npm run build
 
-# Step 2: Build the macOS app with Tauri
+# Step 2: Build the macOS app with Tauri. Tauri re-runs `npm run build` as its
+# beforeBuildCommand, so the same Vite/npm hang can strike here too — it runs
+# under the watchdog as well. The 600s budget is generous enough for a cold
+# Rust compile while still catching a true hang.
 echo -e "${YELLOW}Step 2: Building macOS app with Tauri...${NC}"
-npm run tauri-build
+run_step 600 "Step 2 (Tauri macOS build)" npm run tauri-build
 
 # Step 3: Inject NSMicrophoneUsageDescription then sign with Developer ID
 echo -e "${YELLOW}Step 3: Injecting microphone permission description...${NC}"
