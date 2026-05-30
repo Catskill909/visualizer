@@ -591,6 +591,49 @@ const PALETTES = [
     { name: 'Plasma', wave: [1.00, 0.00, 0.80], glow: [0.20, 0.80, 1.00], accent: [1.00, 0.40, 0.00] },
 ];
 
+// ─── Color Studio (Phase 6 — milkdrop-tools-dev.md §10) ─────────────────────────
+// Foundation for richer colour tooling. `buildHarmonyPalette(rule, hue)` turns a
+// base hue + a colour-theory rule into a coherent { wave, glow, accent } that
+// _applyPalette() can consume directly (locks honoured). Future controls (rule
+// picker, HSL sliders, gradient ramp, mood presets) build on these primitives.
+const HARMONY_RULES = [
+    { id: 'mono',   name: 'Monochrome',      offsets: [0, 0, 0] },
+    { id: 'analog', name: 'Analogous',       offsets: [0, 30, -30] },
+    { id: 'comp',   name: 'Complementary',   offsets: [0, 0, 180] },
+    { id: 'split',  name: 'Split-complement', offsets: [0, 150, 210] },
+    { id: 'triad',  name: 'Triadic',         offsets: [0, 120, 240] },
+];
+
+/** HSL → RGB. h in degrees [0,360), s/l in [0,1]. Returns [r,g,b] in [0,1]. */
+function hslToRgb(h, s, l) {
+    h = ((h % 360) + 360) % 360 / 360;
+    const f = (n) => {
+        const k = (n + h * 12) % 12;
+        return l - s * Math.min(l, 1 - l) * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    };
+    return [f(0), f(8), f(4)];
+}
+
+/** Build a coherent { wave, glow, accent } from a base hue + harmony rule.
+ *  Vivid saturation, mid-high lightness; mono differentiates by lightness since
+ *  all three share a hue. Deterministic for a given (rule, hue). */
+function buildHarmonyPalette(rule, hue) {
+    if (rule === 'mono') {
+        return {
+            wave:   hslToRgb(hue, 0.85, 0.60),
+            glow:   hslToRgb(hue, 0.90, 0.42),
+            accent: hslToRgb(hue, 0.70, 0.75),
+        };
+    }
+    const r = HARMONY_RULES.find(x => x.id === rule) || HARMONY_RULES[1];
+    const [oW, oG, oA] = r.offsets;
+    return {
+        wave:   hslToRgb(hue + oW, 0.90, 0.58),
+        glow:   hslToRgb(hue + oG, 0.85, 0.50),
+        accent: hslToRgb(hue + oA, 0.95, 0.60),
+    };
+}
+
 // ─── Motion presets ──────────────────────────────────────────────────────────
 // One-click coherent motion configurations. Apply touches only motion-related
 // baseVals — colors / wave / palette / reactivity stay as the user has them.
@@ -674,6 +717,9 @@ const SHAPE_OPACITY_CURVE = 2.0;
 const SHAPE_SIDES_MIN = 3;
 const SHAPE_SIDES_MAX = 64;
 const SHAPE_SIDES_CURVE = 2.5;
+// A fresh shape preset defaults to this decay (short, clean trail) instead of the
+// global 0.98 (long trail) so new shapes read crisply. Trail slider range 0.85–0.999.
+const SHAPE_DEFAULT_DECAY = 0.90;
 // Mirrors butterchurn's shapeBaseValsDefaults; a fresh shape is enabled, magenta,
 // centred, hexagonal, no border, normal blend.
 function makeShapeDefaults() {
@@ -819,6 +865,7 @@ export class EditorInspector {
         this._buildPaletteChips();
         this._bindPaletteLocks();
         this._bindMyMixSave();
+        this._bindColorStudio();
         this._buildPaletteStrengthSliders();
         this._buildPaletteSliders();
         this._bindPaletteOpacity();
@@ -1083,6 +1130,22 @@ export class EditorInspector {
     }
 
     // ─── Palette chips ────────────────────────────────────────────────────────
+
+    /** Color Studio (Phase 6 v1). Bind the 🎲 Colors roll. Future colour controls
+     *  (rule picker, HSL, gradient, mood presets) wire up here too. Called once. */
+    _bindColorStudio() {
+        document.getElementById('btn-roll-colors')?.addEventListener('click', () => this._rollRandomPalette());
+    }
+
+    /** Roll a coherent random scheme: random base hue + random harmony rule →
+     *  buildHarmonyPalette → _applyPalette (which honours per-channel locks, so
+     *  "lock a colour you like, reroll the rest" works for free). */
+    _rollRandomPalette() {
+        const hue = Math.floor(Math.random() * 360);
+        const rule = HARMONY_RULES[Math.floor(Math.random() * HARMONY_RULES.length)].id;
+        const p = { name: 'Random', ...buildHarmonyPalette(rule, hue) };
+        this._applyPalette(p, 'random');
+    }
 
     _buildPaletteChips() {
         const grid = document.getElementById('palette-grid');
@@ -1720,22 +1783,51 @@ export class EditorInspector {
 
     // ─── Custom Shapes Composer (Phase 2 — milkdrop-tools-dev.md §8) ──────────────
 
+    // Trail slider ⇄ decay mapping. Position 0 → decay 0 (TRUE no trail, the
+    // buffer is fully cleared each frame); position 1 → decay 0.999 (max). The
+    // curve front-loads the "no/short trail" zone (decay 0–0.8 ≈ invisible) into
+    // the bottom and spreads the perceptible long-trail range (0.9–0.999) across
+    // the top, so the useful range isn't crammed into the last few %.
+    _trailDecayFromPos(pos) {
+        if (pos <= 0.0001) return 0;
+        return 0.999 * (1 - Math.pow(1 - pos, 5));
+    }
+    _trailPosFromDecay(decay) {
+        if (decay <= 0.0001) return 0;
+        return 1 - Math.pow(1 - Math.min(decay, 0.999) / 0.999, 1 / 5);
+    }
+    /** Reflect the current decay onto the curved Trail slider (label shows decay). */
+    _syncTrailSlider() {
+        const t = document.getElementById('sh-trail');
+        if (!t) return;
+        const decay = this.currentState.baseVals.decay;
+        const pos = this._trailPosFromDecay(decay);
+        t.value = pos;
+        t.style.setProperty('--pct', `${pos * 100}%`);
+        const valEl = document.getElementById('sh-trail-val');
+        if (valEl) valEl.textContent = decay.toFixed(3);
+    }
+
     _buildShapesSection() {
         document.getElementById('btn-add-shape')?.addEventListener('click', () => this._addShape());
         // Trail = the global feedback decay (same field as Palette → Trail), surfaced
         // here because it's the dominant control over how much a shape smears/echoes.
+        // Curved so the bottom is TRUE zero (no trail) and the top is long trails.
         const trailWrap = document.getElementById('shape-trail-slider');
         if (trailWrap && !trailWrap.dataset.built) {
             trailWrap.dataset.built = '1';
-            const t = makeSlider(trailWrap, { id: 'sh-trail', label: 'Trail', min: 0.85, max: 0.999, step: 0.001, value: this.currentState.baseVals.decay, decimals: 3 });
-            t.setAttribute('data-tooltip', 'Feedback trail length — how long shapes/echoes linger (same as Palette → Trail)');
+            const pos0 = this._trailPosFromDecay(this.currentState.baseVals.decay);
+            const t = makeSlider(trailWrap, { id: 'sh-trail', label: 'Trail', min: 0, max: 1, step: 0.005, value: pos0 });
+            t.setAttribute('data-tooltip', 'Feedback trail length — left = none (crisp), right = long trails');
             const valEl = document.getElementById('sh-trail-val');
+            if (valEl) valEl.textContent = this.currentState.baseVals.decay.toFixed(3);
             t.addEventListener('pointerdown', () => this._preSnap());
             t.addEventListener('input', () => {
-                const v = parseFloat(t.value);
-                if (valEl) valEl.textContent = v.toFixed(3);
-                t.style.setProperty('--pct', `${((v - 0.85) / (0.999 - 0.85)) * 100}%`);
-                this.currentState.baseVals.decay = v;
+                const pos = parseFloat(t.value);
+                const decay = this._trailDecayFromPos(pos);
+                this.currentState.baseVals.decay = decay;
+                if (valEl) valEl.textContent = decay.toFixed(3);
+                t.style.setProperty('--pct', `${pos * 100}%`);
                 this._applyToEngine(true);
             });
             t.addEventListener('pointerup', () => { this._postSnap(); this._clearTrail(); });
@@ -1746,13 +1838,21 @@ export class EditorInspector {
     _addShape() {
         const shapes = this.currentState.shapes || (this.currentState.shapes = []);
         if (shapes.length >= MAX_SHAPES) return;
+        const isFirst = shapes.length === 0;
         this._preSnap();
         shapes.push(makeShapeDefaults());
-        this._wakeFeedbackIfSolid();   // shapes draw into the feedback buffer
+        // Shapes render over Solid/Shift too (the composite in _buildCompShader), so
+        // we DON'T flip out of solid — keep whatever background the user has. On the
+        // first shape over a Solid/Shift base, default to a short, clean trail (the
+        // global 0.98 = long smear); feedback variations keep their own decay.
+        if (isFirst && this._solidColor) this.currentState.baseVals.decay = SHAPE_DEFAULT_DECAY;
         this._postSnap();
         this._renderShapeCards();
+        this._buildCompShader();   // include the shape→solid composite when in solid mode
         this._applyToEngine();
         this._clearTrail();
+        this._syncTrailSlider();
+        this._syncSlider('ps-decay', this.currentState.baseVals.decay, 0.85, 0.999, 3);
     }
 
     _removeShape(index) {
@@ -1762,6 +1862,7 @@ export class EditorInspector {
         shapes.splice(index, 1);
         this._postSnap();
         this._renderShapeCards();
+        this._buildCompShader();   // drop the shape→solid composite if no shapes remain
         this._applyToEngine();
         this._clearTrail();
     }
@@ -1875,7 +1976,6 @@ export class EditorInspector {
         srcSel.addEventListener('change', () => {
             this._preSnap();
             react.source = srcSel.value;
-            this._wakeFeedbackIfSolid();
             this._postSnap();
             this._applyToEngine(true);
         });
@@ -1887,7 +1987,6 @@ export class EditorInspector {
                 curveBtns.forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 react.curve = btn.dataset.curve;
-                this._wakeFeedbackIfSolid();
                 this._postSnap();
                 this._applyToEngine(true);
             });
@@ -1931,7 +2030,6 @@ export class EditorInspector {
             bv.x = clamp((cx - rect.left) / rect.width, 0, 1);
             bv.y = clamp((cy - rect.top) / rect.height, 0, 1);   // shape y is down-positive (engine: y*-2+1)
             drawPad();
-            this._wakeFeedbackIfSolid();
             this._applyToEngine(true);
         };
         const onUp = () => {
@@ -1962,7 +2060,6 @@ export class EditorInspector {
             bv.r = r; bv.g = g; bv.b = b;
             bv.r2 = r; bv.g2 = g; bv.b2 = b;   // keep edge matched to fill (mono-colour)
             fillSw.style.background = fillPick.value;
-            this._wakeFeedbackIfSolid();
             this._postSnap();
             this._applyToEngine(true);
             this._clearTrail();
@@ -1974,7 +2071,6 @@ export class EditorInspector {
             this._preSnap();
             bv.border_r = r; bv.border_g = g; bv.border_b = b;
             borderSw.style.background = borderPick.value;
-            this._wakeFeedbackIfSolid();
             this._postSnap();
             this._applyToEngine(true);
             this._clearTrail();
@@ -1987,7 +2083,6 @@ export class EditorInspector {
             this._preSnap();
             bv.border_a = borderToggle.checked ? 1.0 : 0;
             borderSwatchWrap?.classList.toggle('is-disabled', !borderToggle.checked);  // border colour only matters when on
-            this._wakeFeedbackIfSolid();
             this._postSnap();
             this._applyToEngine(true);
             this._clearTrail();
@@ -1996,7 +2091,6 @@ export class EditorInspector {
         addToggle.addEventListener('change', () => {
             this._preSnap();
             bv.additive = addToggle.checked ? 1 : 0;
-            this._wakeFeedbackIfSolid();
             this._postSnap();
             this._applyToEngine(true);
             this._clearTrail();
@@ -2010,7 +2104,7 @@ export class EditorInspector {
 
     _bindShapeSlider(input, bv, key, min, max, decimals = 2) {
         const valEl = document.getElementById(`${input.id}-val`);
-        input.addEventListener('pointerdown', () => { this._preSnap(); this._wakeFeedbackIfSolid(); });
+        input.addEventListener('pointerdown', () => this._preSnap());
         input.addEventListener('input', () => {
             const v = parseFloat(input.value);
             if (valEl) valEl.textContent = v.toFixed(decimals);
@@ -2025,7 +2119,7 @@ export class EditorInspector {
      *  The frame_eqs are regenerated from these in _buildRuntimePreset. */
     _bindShapeMotionSlider(input, motion, key, min, max) {
         const valEl = document.getElementById(`${input.id}-val`);
-        input.addEventListener('pointerdown', () => { this._preSnap(); this._wakeFeedbackIfSolid(); });
+        input.addEventListener('pointerdown', () => this._preSnap());
         input.addEventListener('input', () => {
             const v = parseFloat(input.value);
             if (valEl) valEl.textContent = v.toFixed(2);
@@ -2041,7 +2135,7 @@ export class EditorInspector {
      *  Wave-tab reactivity panel. */
     _bindShapeReactSlider(input, react, key, min, max) {
         const valEl = document.getElementById(`${input.id}-val`);
-        input.addEventListener('pointerdown', () => { this._preSnap(); this._wakeFeedbackIfSolid(); });
+        input.addEventListener('pointerdown', () => this._preSnap());
         input.addEventListener('input', () => {
             const v = parseFloat(input.value);
             if (valEl) valEl.textContent = v.toFixed(2);
@@ -2079,7 +2173,7 @@ export class EditorInspector {
     _bindShapeSides(input, bv) {
         const valEl = document.getElementById(`${input.id}-val`);
         if (valEl) valEl.textContent = String(Math.round(bv.sides));
-        input.addEventListener('pointerdown', () => { this._preSnap(); this._wakeFeedbackIfSolid(); });
+        input.addEventListener('pointerdown', () => this._preSnap());
         input.addEventListener('input', () => {
             const pos = parseFloat(input.value);
             const sides = Math.round(SHAPE_SIDES_MIN + (SHAPE_SIDES_MAX - SHAPE_SIDES_MIN) * Math.pow(pos, SHAPE_SIDES_CURVE));
@@ -2096,7 +2190,7 @@ export class EditorInspector {
     _bindShapeOpacity(input, bv) {
         const valEl = document.getElementById(`${input.id}-val`);
         if (valEl) valEl.textContent = clamp(bv.a, 0, 1).toFixed(2);   // show true alpha, not raw pos
-        input.addEventListener('pointerdown', () => { this._preSnap(); this._wakeFeedbackIfSolid(); });
+        input.addEventListener('pointerdown', () => this._preSnap());
         input.addEventListener('input', () => {
             const pos = parseFloat(input.value);
             const alpha = Math.pow(pos, SHAPE_OPACITY_CURVE);
@@ -7617,6 +7711,12 @@ export class EditorInspector {
             : `texture(sampler_main, uv_m).xyz * 2.0 * ${_po.toFixed(4)}`;
 
         let base;
+        // Are any custom shapes enabled? Solid/Shift mode paints a flat colour and
+        // ignores sampler_main (the feedback buffer where shapes draw) — so without
+        // this, shapes vanish behind a solid base. When shapes exist we composite
+        // them OVER the solid colour (keyed by the shape's own brightness).
+        const _hasShapes = (this.currentState.shapes || []).some(s => s && s.baseVals && s.baseVals.enabled !== 0);
+
         if (this._imagesOnly) {
             base = uvFold + '  vec3 col = vec3(0.0);\n' + (_bgT ? '  float col_a = 0.0;\n' : '');
         } else if (this._solidColor) {
@@ -7653,6 +7753,17 @@ export class EditorInspector {
                 `  vec3 _colB = vec3(${bR}, ${bG}, ${bB});\n` +
                 `  vec3 col = mix(_colA, _colB, _shiftT) * _breath * _pulse;\n` +
                 (_po < 1.0 ? `  col *= ${_po.toFixed(4)};\n` : '');
+            // Composite custom shapes over the solid/shift background. sampler_main
+            // holds the shapes (+ their feedback trail); key the over-composite on
+            // the shape's own brightness so the flat colour shows where there's no
+            // shape. No-op when the buffer is black (shapeless), so plain Solid/Shift
+            // presets are unchanged.
+            if (_hasShapes) {
+                base +=
+                    `  vec3 _shp = texture(sampler_main, uv_m).xyz * 2.0;\n` +
+                    `  float _shpCov = clamp(max(_shp.r, max(_shp.g, _shp.b)), 0.0, 1.0);\n` +
+                    `  col = mix(col, _shp, _shpCov);\n`;
+            }
         } else {
             base = uvFold + `  vec3 col = ${mainSample};\n`;
         }
@@ -8916,7 +9027,7 @@ export class EditorInspector {
         this._syncSlider('ps-glow-strength', bv.ob_a, 0, 1.0, 2);
         this._syncSlider('ps-accent-strength', bv.ib_a, 0, 1.0, 2);
         this._syncSlider('ps-decay', bv.decay, 0.85, 0.999, 3);
-        this._syncSlider('sh-trail', bv.decay, 0.85, 0.999, 3);   // shapes-section Trail mirrors the same decay
+        this._syncTrailSlider();   // shapes-section Trail mirrors the same decay (curved)
         this._syncSlider('ps-ob-size', bv.ob_size, 0, 0.1, 3);
         this._syncSlider('ps-ob-a', bv.ob_a, 0, 1.0, 2);
         this._syncSlider('ps-ib-size', bv.ib_size, 0, 0.1, 3);

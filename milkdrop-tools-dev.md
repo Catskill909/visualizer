@@ -25,15 +25,15 @@ Per-phase detail is in §3; the rationale for the ordering is in §4.
 | 0 | Brainstorm + direction survey | — | ✅ **DONE** (2026-05-30) | — |
 | 1 | **Generative Motion Engines** (frame_eqs-backed motion presets, 2 knobs each) | **Adds** a new "living motion" category beside the existing 6 static presets | ✅ **DONE** (2026-05-30) — reviewed & approved | Engine (Breathe/Sway/Spin + Speed/Depth) + auto-wake shipped. Follow-ups (4th engine, Remix-rolls-engine) deferred. |
 | 2 | **Custom Shapes Composer** (up to 4 shapes, placement-first cards) | **Adds** — shapes don't exist in the editor today | ✅ **DONE** (2026-05-30) — reviewed & approved ("works great") | Shipped. Post-review fix: opacity slider now uses a `pos²` curve (`SHAPE_OPACITY_CURVE`) so low-alpha gets the travel. |
-| 3 | **Shape Motion & Reactivity** (per-shape Spin / Pulse / Orbit) — *reframed from the abstract "Modulator / LFO bank", see §9.0* | **Adds** motion controls onto Phase 2's shape cards | 🔵 **CODE COMPLETE — builds; awaiting visual review** | Review: add a shape → Spin/Pulse/Orbit animate it live (auto-wakes); save/reload + player parity; tune coefficients |
+| 3 | **Shape Motion & Reactivity** (Motion: Spin/Orbit · Reactivity: Size/Opacity/Spin/Shake/Sides + Trail) — *reframed from the abstract "Modulator / LFO bank", see §9.0* | **Adds** motion + reactivity onto Phase 2's shape cards | ✅ **DONE** (2026-05-30) — reviewed & approved | Shipped + post-review fixes (§9.7) + Trail control & expanded reactivity (§9.8). |
 | 3b | ~~Modulator / LFO bank (raw q-var wiring)~~ | — | ⏸ **Deferred** — from-scratch presets have no q-var consumers (§9.0); revisit only with a source→destination matrix |
-| 4 | **Warp Shader Variants picker** (4–6 GLSL warps as chips) | **Adds** a Motion-tab picker | ⬜ Stretch goal | Real shader work — regression-test across all 1,144 presets |
+| 4 | **Warp Shader Variants picker** (4–6 GLSL warps as chips) | **Adds** a Motion-tab picker | ⏸ **DEFERRED to its own session + doc** | Touches the *shared* warp shader → can regress all 1,144 presets. Needs a dedicated `warp-variants-dev.md`: vendor/override strategy + cross-preset regression plan. Seed: milkdrop-dev.md "GLSL future work". |
 | 5 | **Expert eqn / shader drawer** (opt-in EEL/GLSL textareas) | **Adds** an opt-in expert mode | ⬜ Optional / post-import | Only if we decide a code escape hatch is on-brand |
-| 6 | **Color Studio** — palette generator + harmony tools (incl. random color generator) | **Adds** to the Palette tab beside the 12 quick palettes / My Mix | ⬜ Future (after Phases 1–5) | One-click harmony-aware "🎲 Colors" roll; see §3.G |
+| 6 | **Color Studio** — palette generator + harmony tools | **Adds** to the Palette tab beside the 12 quick palettes / My Mix | 🟢 **v1 SHIPPED — builds** (🎲 Colors random roll). Foundation for more (§10.5). | Re-test the roll; then build out: rule picker, HSL sliders, gradient ramp, mood presets. |
 
-**Current state in one line:** Phases 0–2 ✅ DONE. Phase 3 (Shape Motion & Reactivity) **code-complete
-and building** (§9.5) — per-shape Spin / Pulse / Orbit sliders generating each shape's `frame_eqs` via
-the shared `buildShapeMotionEqs` builder (editor + player parity). Awaiting visual review.
+**Current state in one line:** Phases 0–3 ✅ DONE. **Phase 6 (Color Studio) v1 SHIPPED** — 🎲 Colors
+harmony-aware random roll (§10.5), built as the FOUNDATION for a larger Color Studio build-out (rule
+picker, HSL, gradient, mood presets). Phase 4 (Warp Variants) deferred to its own session + doc.
 
 **Does this add or replace? → It ADDS.** The existing Palette / Motion sliders / basic Wave / Layers
 surface stays untouched. Every phase is a new surface layered on top. The *only* "replace" candidate
@@ -669,3 +669,121 @@ Per user request ("can trail be controlled? can we have more than Size?"):
   `sides` = round(base + signal·SidesReact·16), clamped 3–64. `react` gained `spinAmt/shakeAmt/sidesAmt`
   + perSrc keys (defaulted for old shapes). Shapes can't mirror every image-layer effect (no separate
   X/Y scale, hue pipeline) — these five are the meaningful shape targets. Builds clean; awaiting review.
+
+### 9.9 Trail default fix (2026-05-30)
+
+User: "trails stay forever / Trail slider is almost all the way up by default!!" ROOT: the global
+`decay` default is **0.98**, which on the Trail range (0.85–0.999) sits at **~87%** — a long trail —
+so every fresh shape smeared. (Decay *does* fade: pulling to 0.85 = no trails confirmed it; the bug
+was purely the default.) FIX: a fresh shape preset (the auto-wake transition in `_addShape`) now
+defaults `decay` to **`SHAPE_DEFAULT_DECAY = 0.90`** — a short, clean trail (~1/3 up the slider) — so
+new shapes read crisply and the user opts *into* longer trails by raising Trail. Only set on the wake
+transition, never stomping a trail the user already dialled. Both decay sliders re-synced.
+
+### 9.10 Shapes over Solid/Shift backgrounds (2026-05-30)
+
+User: shapes show over feedback variations (Drift/Pulse/…) but **vanish behind Solid/Shift**. ROOT:
+the same solid-mode trap — the solid comp paints a flat colour and never samples `sampler_main` (where
+shapes draw). FIX: when enabled shapes exist, the solid-mode comp now **composites the shape buffer
+over the solid/shift base**, keyed by the shape's own brightness:
+`col = mix(solidBase, texture(sampler_main, uv_m).xyz*2.0, shapeCoverage)`. So you can have **a shape
+on a flat Solid/Shift background** (incl. the beat-mix Shift). No-op when the buffer is black
+(shapeless) → plain Solid/Shift presets are byte-identical. `_buildCompShader` rebuilds on variation
+change (which is when this matters), so picking Shift with a shape present shows the shape over it.
+
+### 9.11 Shapes no longer auto-wake out of Solid (2026-05-30)
+
+Follow-on from §9.10: user found that **Add Shape made the background go dark gray** — because
+`_addShape`/shape edits called `_wakeFeedbackIfSolid()`, flipping OUT of Solid/Shift (→ empty feedback
+buffer = dark gray), discarding the background. Now that shapes render *over* solid (§9.10), that wake
+is obsolete and harmful. FIX: **removed `_wakeFeedbackIfSolid()` from ALL shape handlers** (add, sliders,
+react, XY pad, colour pickers, toggles) — shapes keep whatever background you have (Solid/Shift OR a
+feedback variation). `_addShape`/`_removeShape` now call `_buildCompShader()` so the shape→solid
+composite is added/removed as shapes come and go. First shape over a Solid/Shift base still defaults to
+a crisp trail (`SHAPE_DEFAULT_DECAY`, §9.9), gated on `this._solidColor` so feedback variations keep
+their decay. **Auto-wake stays for Motion/Wave only** (they genuinely need feedback mode to show).
+
+### 9.12 Trail reaches true zero (2026-05-30)
+
+User: "can we get Trail to zero? there's a trail no matter what." ROOT: the Trail slider min was decay
+**0.85**, which still leaves a few-frame residual (0.85ⁿ); true no-trail needs decay **0** (warp wipes
+the buffer each frame). FIX: the shapes-section Trail is now a **curved 0→1 slider** —
+`decay = pos===0 ? 0 : 0.999·(1−(1−pos)⁵)` (inverse `_trailPosFromDecay` for sync). Bottom = **decay 0
+= crisp, no trail**; the curve front-loads the invisible 0–0.8 decay zone into the low end and spreads
+the perceptible long-trail range (0.9–0.999) across the top. Helpers `_trailDecayFromPos` /
+`_trailPosFromDecay` + `_syncTrailSlider`; the fresh-shape default (`SHAPE_DEFAULT_DECAY 0.90`) sits at
+~37%. (Palette → Trail stays linear 0.85–0.999 — the wave/feedback control; the shapes Trail is the one
+that bottoms to zero.)
+---
+
+## 10. Phase 6 — Execution plan: Color Studio (audit complete, awaiting code approval)
+
+**Goal:** add real *color creation* to the Palette tab — a one-click **harmony-aware random palette
+generator** (the headline) plus the groundwork for harmony tools. Additive; the 12 quick palettes,
+color rows, locks, and My Mix all stay.
+
+### 10.1 Verified architecture (read-only audit, 2026-05-30)
+
+- **`_applyPalette(p, key)` does all the work** ([inspector.js:1124](src/editor/inspector.js#L1124)):
+  takes a `{ wave:[r,g,b], glow:[r,g,b], accent:[r,g,b] }` object, **respects the per-channel 🔒 locks**
+  (`_paletteLock.wave/glow/accent`), writes `wave_r/g/b` + `ob_r/g/b` + `ib_r/g/b` + `solidColorB`,
+  rebuilds the comp shader, syncs swatches/sliders, highlights the active chip. So the generator only
+  needs to **produce a `{wave, glow, accent}`** and call `_applyPalette(p, 'random')`.
+- **"Lock a hue → reroll the rest" is free** — `_applyPalette` already skips locked channels.
+- **No engine / eq / parity work** — colors are plain `baseVals`, saved + applied through the existing
+  path. Player parity is automatic. (Contrast Phase 1/3 which needed shared builders + visualizer.js.)
+- Existing helpers: `rgbToHex`, `hexToRgb`. **Need to add `hslToRgb`** for harmony math.
+
+### 10.2 Design
+
+- **Random color generator ("🎲 Colors")** — one click: pick a random base hue + a random harmony
+  rule → build a coherent `{wave, glow, accent}` → `_applyPalette`. Respects locks (lock what you like,
+  reroll the rest). Pure "roll the dice, get a beautiful scheme" — fits the discovery aesthetic.
+- **Harmony rules** (`buildHarmonyPalette(rule, hue)` → 3 hues, vivid S, mid-high L):
+  | Rule | Hues (wave / glow / accent) |
+  |---|---|
+  | Monochrome | h / h / h (vary lightness) |
+  | Analogous | h / h+30 / h−30 |
+  | Complementary | h / h / h+180 |
+  | Triadic | h / h+120 / h+240 |
+  | Split-complementary | h / h+150 / h+210 |
+- **v1 = one-click random** (rule chosen at random each roll). A **rule picker** (chips) is a clean
+  v1.1 follow-up if the user wants to steer the scheme. HSL sliders / gradient ramp / mood presets
+  remain future extras (§3.G).
+- **Where it lives:** Palette tab, beside "Quick Palettes" / "+ Save current mix" — color is the
+  Palette dimension. A "🎲 Colors" button next to the section header.
+
+### 10.3 Touch-points (2 files — no customPresets.js, no visualizer.js)
+
+| # | File | Change |
+|---|---|---|
+| 1 | [src/editor/inspector.js](src/editor/inspector.js) | `hslToRgb(h,s,l)` + `buildHarmonyPalette(rule, hue)` helpers; wire a "🎲 Colors" button → roll random hue+rule → `_applyPalette(p, 'random')`. |
+| 2 | [editor.html](editor.html) | "🎲 Colors" button by the Quick Palettes header (+ optional CSS). |
+
+### 10.4 Risk / done
+
+- **Risk: very low.** Reuses `_applyPalette` wholesale; no engine, eq, or parity changes; locks honored
+  for free.
+- **Done =** clicking 🎲 Colors produces a coherent, good-looking scheme every time; locked channels
+  are preserved; the scheme applies live + saves/reloads like any palette; old presets unaffected.
+
+### 10.5 v1 shipped — 🎲 Colors random roll (2026-05-30) · FOUNDATION
+
+Shipped the quick win; **explicitly a foundation** — Color Studio is a build-out, this is step 1.
+
+| File | What landed |
+|---|---|
+| [src/editor/inspector.js](src/editor/inspector.js) | `HARMONY_RULES` (mono/analogous/complementary/split/triadic) + `hslToRgb()` + `buildHarmonyPalette(rule, hue)` (reusable primitives); `_rollRandomPalette()` (random hue + rule → `_applyPalette`); `_bindColorStudio()` (called once in init). |
+| [editor.html](editor.html) | "🎲 Colors" button in a section-label-row beside Quick Palettes. |
+
+Reuses `_applyPalette` wholesale → honours per-channel 🔒 locks (lock + reroll), rebuilds the comp
+shader, syncs swatches, free player parity (colours are `baseVals`). No engine/eq/visualizer work.
+
+**Build-on roadmap (the "more thought" pass):**
+- **Harmony rule picker** — chips to choose the rule (mono/analogous/…) instead of pure-random; reuses
+  `buildHarmonyPalette` directly.
+- **Base-hue control** — a hue wheel/slider to drive the scheme from a chosen colour.
+- **HSL sliders** on the colour rows (today they're RGB swatches).
+- **Gradient ramp** — two-colour ramp mapped across wave→glow→accent.
+- **Mood presets** — warm / cool / neon / pastel S/L profiles applied to a rolled hue.
+- Possibly factor the colour helpers into their own module if this grows.
