@@ -492,6 +492,152 @@ export function buildMotionReactFrameEqs(mr) {
     ].join('\n');
 }
 
+// ---------------------------------------------------------------------------
+// Motion Engine — autonomous, time-driven generative motion (frame_eqs).
+// Unlike motionReact (audio-driven), these breathe on `a.time` alone, layering
+// a *living* baseline of motion on top of otherwise-static baseVals — the first
+// from-scratch control that reaches the frame_eqs engine layer. Additive +
+// clamped, so an engine composes with any base preset's own frame_eqs instead
+// of fighting them. Shared by editor (inspector._buildRuntimePreset) and player
+// (visualizer.refreshCustomPresets) — single source of truth, byte-identical in
+// every runtime. See milkdrop-tools-dev.md §7.
+// ---------------------------------------------------------------------------
+
+const _engZoom = (e) => `a.zoom=Math.max(0.30,Math.min(2.50,${e}));`;
+const _engRot  = (e) => `a.rot=Math.max(-2.00,Math.min(2.00,${e}));`;
+const _eng01   = (f, e) => `a.${f}=Math.max(0.00,Math.min(1.00,${e}));`;
+
+// Each engine: { id, name, desc, eqs(speed, depth) -> [lines] }. Two universal
+// knobs only — Speed (oscillation rate) + Depth (amount). 'none' has no eqs.
+export const MOTION_ENGINES = [
+    { id: 'none', name: 'None', desc: 'Static base' },
+    {
+        id: 'breathe', name: 'Breathe', desc: 'Pulsing zoom',
+        eqs: (sp, dp) => [
+            _engZoom(`a.zoom+Math.sin(a.time*${sp.toFixed(4)})*${(dp * 0.04).toFixed(4)}`),
+        ],
+    },
+    {
+        id: 'sway', name: 'Sway', desc: 'Drifting center',
+        eqs: (sp, dp) => [
+            _eng01('cx', `a.cx+Math.sin(a.time*${sp.toFixed(4)})*${(dp * 0.12).toFixed(4)}`),
+            _eng01('cy', `a.cy+Math.cos(a.time*${(sp * 0.8).toFixed(4)})*${(dp * 0.12).toFixed(4)}`),
+        ],
+    },
+    {
+        id: 'spin', name: 'Spin', desc: 'Rocking rotation',
+        eqs: (sp, dp) => [
+            _engRot(`a.rot+Math.sin(a.time*${sp.toFixed(4)})*${(dp * 0.15).toFixed(4)}`),
+        ],
+    },
+];
+
+/**
+ * Build the frame_eqs_str snippet for the active Motion Engine. Returns '' when
+ * id is 'none'/missing or depth is 0 — so blank presets stay byte-identical.
+ * @param {object} me - preset.motionEngine { id, speed, depth } (may be null)
+ */
+export function buildMotionEngineFrameEqs(me) {
+    const conf = me || {};
+    if (!conf.id || conf.id === 'none') return '';
+    const def = MOTION_ENGINES.find(e => e.id === conf.id);
+    if (!def || !def.eqs) return '';
+    const speed = Number(conf.speed ?? 1);
+    const depth = Number(conf.depth ?? 0.5);
+    if (!(depth > 0.00001)) return '';
+    return def.eqs(speed, depth).join('\n');
+}
+
+/**
+ * Build a custom shape's frame_eqs_str from its motion (time-driven) and react
+ * (audio-driven) params (Phase 3 — milkdrop-tools-dev.md §9). Base values are
+ * baked in as LITERALS (not `a.rad*…`) because a shape's eq context can persist
+ * frame-to-frame — reading the live field would compound into runaway. Each
+ * field has exactly one owner (no `a.field=` collisions): ang←Spin, x/y←Orbit,
+ * rad←Size-react, a←Opacity-react. Returns '' when nothing is active.
+ * Shared by editor (_buildRuntimePreset) and player (refreshCustomPresets).
+ * @param {object} baseVals - the shape's baseVals (x, y, rad, ang, a, …)
+ * @param {object} motion   - { spin, orbit } time-driven (may be null)
+ * @param {object} react    - { source, curve, sizeAmt, opacityAmt, perSrc } audio-driven (may be null)
+ */
+export function buildShapeMotionEqs(baseVals, motion, react) {
+    const m = motion || {};
+    const r = react || {};
+    const bv = baseVals || {};
+    const baseAng = Number(bv.ang ?? 0);
+    const baseRad = Number(bv.rad ?? 0.15);
+    const baseX = Number(bv.x ?? 0.5);
+    const baseY = Number(bv.y ?? 0.5);
+    const baseA = Number(bv.a ?? 1);
+    const baseSides = Number(bv.sides ?? 4);
+
+    const spin = Number(m.spin || 0);
+    const orbit = Number(m.orbit || 0);
+
+    const srcMap = { bass: 'a.bass', mid: 'a.mid', treb: 'a.treb', vol: 'a.vol', flux: 'a.q31' };
+    const globalSrc = srcMap[r.source] || 'a.bass';
+    const curve = r.curve || 'linear';
+    const perSrc = r.perSrc || {};
+    // Curved per-target signal: each react slider may override the global source.
+    const sig = (key) => {
+        const raw = srcMap[perSrc[key]] || globalSrc;
+        if (curve === 'squared') return `${raw}*${raw}`;
+        if (curve === 'cubed') return `${raw}*${raw}*${raw}`;
+        if (curve === 'threshold' || curve === 'gate') return `Math.max(0,Math.min(1,(${raw}-0.3)*8))`;
+        return raw;
+    };
+    const amt = (k) => Number(r[k] || 0);
+    const on = (v) => Math.abs(v) > 1e-5;
+    const sizeAmt = amt('sizeAmt'), opacityAmt = amt('opacityAmt');
+    const spinAmt = amt('spinAmt'), shakeAmt = amt('shakeAmt'), sidesAmt = amt('sidesAmt');
+
+    if (!(on(spin) || orbit > 1e-5 || on(sizeAmt) || on(opacityAmt) || on(spinAmt) || on(shakeAmt) || on(sidesAmt))) {
+        return '';
+    }
+
+    const lines = [];
+
+    // ── ANGLE: time-Spin (continuous) + beat-Spin (kick), merged into one assign ──
+    if (on(spin) || on(spinAmt)) {
+        let e = `${baseAng.toFixed(4)}`;
+        if (on(spin)) e += `+a.time*${spin.toFixed(4)}`;
+        if (on(spinAmt)) e += `+${sig('spinAmt')}*${spinAmt.toFixed(4)}*1.5`;
+        lines.push(`a.ang=${e};`);
+    }
+
+    // ── POSITION: time-Orbit (circle) + beat-Shake (jitter), merged ──
+    if (orbit > 1e-5 || on(shakeAmt)) {
+        let ex = `${baseX.toFixed(4)}`, ey = `${baseY.toFixed(4)}`;
+        if (orbit > 1e-5) {
+            const o = (orbit * 0.30).toFixed(4);
+            ex += `+Math.cos(a.time*1.30)*${o}`;
+            ey += `+Math.sin(a.time*1.30)*${o}`;
+        }
+        if (on(shakeAmt)) {
+            const s = sig('shakeAmt'), k = (shakeAmt * 0.12).toFixed(4);
+            ex += `+(Math.sin(a.time*37.0)+Math.sin(a.time*53.0))*0.5*${s}*${k}`;
+            ey += `+(Math.sin(a.time*41.0)+Math.sin(a.time*59.0))*0.5*${s}*${k}`;
+        }
+        lines.push(`a.x=Math.max(0.00,Math.min(1.00,${ex}));`);
+        lines.push(`a.y=Math.max(0.00,Math.min(1.00,${ey}));`);
+    }
+
+    // ── SIZE (rad): floored so a negative amount shrinks but never zeroes ──
+    if (on(sizeAmt)) {
+        lines.push(`a.rad=Math.max(0.001,Math.min(2.50,${baseRad.toFixed(4)}*Math.max(0.05,1.0+${sig('sizeAmt')}*${sizeAmt.toFixed(4)})));`);
+    }
+    // ── OPACITY (a + matched edge a2) ──
+    if (on(opacityAmt)) {
+        lines.push(`a.a=Math.max(0.00,Math.min(1.00,${baseA.toFixed(4)}*(1.0+${sig('opacityAmt')}*${opacityAmt.toFixed(4)})));`);
+        lines.push(`a.a2=a.a;`);
+    }
+    // ── SIDES morph (integer, clamped to the slider range) ──
+    if (on(sidesAmt)) {
+        lines.push(`a.sides=Math.max(3,Math.min(64,Math.round(${baseSides}+${sig('sidesAmt')}*${sidesAmt.toFixed(4)}*16.0)));`);
+    }
+    return lines.join('\n');
+}
+
 // Max number of image/video/text layers a preset can hold. Mirrors MAX_LAYERS
 // in the editor (inspector.js); both must stay equal so q-slots line up.
 export const MAX_ANIM_LAYERS = 5;

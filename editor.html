@@ -351,6 +351,13 @@
                     <div id="tab-motion" class="tab-panel" role="tabpanel" hidden>
                         <div class="tab-scroll">
                             <div class="section-label-row">
+                                <p class="section-label">Motion Engine</p>
+                            </div>
+                            <div class="motion-presets-grid" id="motion-engine-grid"
+                                role="group" aria-label="Motion engine"></div>
+                            <div id="motion-engine-knobs"></div>
+
+                            <div class="section-label-row" style="margin-top:16px">
                                 <p class="section-label">Motion Presets</p>
                                 <button id="btn-motion-reset" class="mini-btn" type="button"
                                     data-tooltip="Reset all motion sliders to defaults">↺ Reset</button>
@@ -438,7 +445,15 @@
                     <div id="tab-wave" class="tab-panel" role="tabpanel" hidden>
                         <div class="tab-scroll">
                             <div class="section-label-row">
-                                <p class="section-label">Shape</p>
+                                <p class="section-label">Custom Shapes</p>
+                                <button id="btn-add-shape" class="mini-btn" type="button"
+                                    data-tooltip="Add a shape (up to 4)">+ Add Shape</button>
+                            </div>
+                            <div id="shapes-list" class="shapes-list"></div>
+                            <div id="shape-trail-slider"></div>
+
+                            <div class="section-label-row" style="margin-top:16px">
+                                <p class="section-label">Wave Shape</p>
                                 <button id="btn-wave-reset" class="mini-btn" type="button"
                                     data-tooltip="Hide the wave (no shape drawn)">↺ Reset</button>
                             </div>

@@ -10,7 +10,7 @@ import butterchurnPresetsImport from 'butterchurn-presets';
 import butterchurnPresetsExtra from 'butterchurn-presets/lib/butterchurnPresetsExtra.min.js';
 import butterchurnPresetsExtra2 from 'butterchurn-presets/lib/butterchurnPresetsExtra2.min.js';
 import butterchurnPresetsMD1 from 'butterchurn-presets/lib/butterchurnPresetsMD1.min.js';
-import { loadAllCustomPresets, CUSTOM_PREFIX, registryKey, getImage, buildMotionReactFrameEqs, buildWaveReactFrameEqs, buildAnimFrameEqs } from './customPresets.js';
+import { loadAllCustomPresets, CUSTOM_PREFIX, registryKey, getImage, buildMotionReactFrameEqs, buildWaveReactFrameEqs, buildAnimFrameEqs, buildMotionEngineFrameEqs, buildShapeMotionEqs } from './customPresets.js';
 import { parseGIF, decompressFrames } from 'gifuct-js';
 // animation-dev.md — drive entrance/exit/idle in the player & timeline (not just
 // the editor). animation.js is the same GSAP driver the editor uses; gsap here is
@@ -584,8 +584,11 @@ export class VisualizerEngine {
         preset.frame_eqs_str = preset.frame_eqs || '';
         preset.pixel_eqs_str = preset.pixel_eqs || '';
       }
-      // Inject motionReact + waveReact equations so the player honours both
-      // Motion-tab and Wave-tab reactivity.
+      // Inject Motion Engine + motionReact + waveReact equations so the player
+      // honours the living-motion engine and both Motion/Wave reactivity. Engine
+      // first (living baseline), then audio reactivity on top — matches the
+      // editor's _buildRuntimePreset order so playback is byte-identical.
+      const meInjected = buildMotionEngineFrameEqs(preset.motionEngine);
       const mrInjected = buildMotionReactFrameEqs(preset.motionReact);
       const wrInjected = buildWaveReactFrameEqs(preset.waveReact);
       // animation-dev.md — inject the SAME q-register bridge the editor uses so
@@ -593,10 +596,21 @@ export class VisualizerEngine {
       // the editor. Neutral when no animation runs, so un-animated presets are
       // byte-identical to before.
       const animInjected = buildAnimFrameEqs();
-      const reactBlock = [mrInjected, wrInjected, animInjected].filter(Boolean).join('\n');
+      const reactBlock = [meInjected, mrInjected, wrInjected, animInjected].filter(Boolean).join('\n');
       if (reactBlock) {
         const base = preset.frame_eqs_str || '';
         preset.frame_eqs_str = base ? `${base}\n${reactBlock}` : reactBlock;
+      }
+      // Phase 3 — regenerate per-shape motion eqs (Spin/Pulse/Orbit) from each
+      // shape's stored motion params, mirroring the editor's _buildRuntimePreset
+      // so custom shapes animate identically in the player/timeline.
+      if (Array.isArray(preset.shapes)) {
+        for (const sh of preset.shapes) {
+          if (sh && sh.baseVals && (sh.motion || sh.react)) {
+            const eqs = buildShapeMotionEqs(sh.baseVals, sh.motion, sh.react);
+            if (eqs) sh.frame_eqs_str = eqs;
+          }
+        }
       }
       this.presets[key] = preset;
     }

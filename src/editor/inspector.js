@@ -13,7 +13,7 @@
  *  All three swatches can be freely overridden after applying a palette.
  */
 
-import { createCustomPreset, saveCustomPreset, getImage, storeImage, generateId, buildMotionReactFrameEqs, buildWaveReactFrameEqs, buildAnimFrameEqs } from '../customPresets.js';
+import { createCustomPreset, saveCustomPreset, getImage, storeImage, generateId, buildMotionReactFrameEqs, buildWaveReactFrameEqs, buildAnimFrameEqs, buildMotionEngineFrameEqs, buildShapeMotionEqs, MOTION_ENGINES } from '../customPresets.js';
 import {
     parseGifFile, processGifFrames, generateFrameStrip,
     shouldOptimize, getRecommendedSettings, formatBytes,
@@ -417,6 +417,11 @@ const BLANK = {
     bgTransparent: false,  // transparent canvas behind layers (Phase 1/2)
     sceneMirror: 'none',  // 'none' | 'h' | 'v' | 'both' | 'kaleido'
     sceneMirrorKaleidoSpeed: 0.00,
+    // Motion Engine — autonomous, time-driven generative motion (Phase 1,
+    // milkdrop-tools-dev.md §7). id 'none' = static; speed/depth are the two
+    // universal knobs every engine reads. Round-trips via the standard BLANK
+    // overlay (no save/load surgery).
+    motionEngine: { id: 'none', speed: 1.0, depth: 0.5 },
     motionReact: {
         source: 'bass',
         curve: 'linear',
@@ -655,6 +660,47 @@ const WAVE_MODES = [
     },
 ];
 
+// ─── Custom shapes (Phase 2 — milkdrop-tools-dev.md §8) ─────────────────────────
+// The engine renders up to 4 custom shapes (butterchurn inits range(4)). A static
+// shape is pure baseVals — no eqs needed. We expose a curated, no-code subset.
+const MAX_SHAPES = 4;
+// Opacity slider curve exponent: alpha = pos^N. >1 expands the low-alpha range
+// (where the 2× feedback amplification puts most of the visible change) across
+// more of the slider, so the bottom isn't twitchy and the top isn't wasted.
+const SHAPE_OPACITY_CURVE = 2.0;
+// Sides slider curve: sides = MIN + (MAX-MIN)*pos^N. The distinct polygons live
+// at low side counts (3–12); past ~20 it's all "circle". N>1 gives the low end
+// most of the slider so you can dial an exact triangle/pentagon/hexagon.
+const SHAPE_SIDES_MIN = 3;
+const SHAPE_SIDES_MAX = 64;
+const SHAPE_SIDES_CURVE = 2.5;
+// Mirrors butterchurn's shapeBaseValsDefaults; a fresh shape is enabled, magenta,
+// centred, hexagonal, no border, normal blend.
+function makeShapeDefaults() {
+    return {
+        baseVals: {
+            enabled: 1, sides: 6, additive: 0, thickoutline: 0, textured: 0, num_inst: 1,
+            tex_zoom: 1, tex_ang: 0, x: 0.5, y: 0.5, rad: 0.15, ang: 0,
+            // Shapes are a 2-colour radial gradient (centre r/g/b/a → edge r2/g2/b2/a2).
+            // We expose one Fill colour and keep the edge matched to it (mono-colour)
+            // so a shape is the colour you pick — no stray green from the stock edge
+            // default. (A real gradient control is a deferred follow-up.)
+            r: 1, g: 0.2, b: 0.6, a: 1, r2: 1, g2: 0.2, b2: 0.6, a2: 1,
+            border_r: 1, border_g: 1, border_b: 1, border_a: 0,
+        },
+        // Phase 3 — per-shape animation. motion = time-driven; react = audio-driven
+        // (full Source/Curve/per-slider menu like the Wave tab). 0 = static.
+        // frame_eqs_str is generated from these at runtime, never stored.
+        motion: { spin: 0, orbit: 0 },
+        react: {
+            source: 'bass', curve: 'linear',
+            sizeAmt: 0, opacityAmt: 0, spinAmt: 0, shakeAmt: 0, sidesAmt: 0,
+            perSrc: { sizeAmt: '', opacityAmt: '', spinAmt: '', shakeAmt: '', sidesAmt: '' },
+        },
+        init_eqs_str: '', frame_eqs_str: '',
+    };
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function deepClone(obj) { return JSON.parse(JSON.stringify(obj)); }
@@ -777,6 +823,7 @@ export class EditorInspector {
         this._buildPaletteSliders();
         this._bindPaletteOpacity();
         this._buildSolidFxPanel();
+        this._buildMotionEngineSection();
         this._buildMotionPresetsGrid();
         this._bindSurpriseButton();
         this._buildMotionSliders();
@@ -784,6 +831,7 @@ export class EditorInspector {
         this._buildWaveReactPanel();
         this._buildWaveModeGrid();
         this._buildWaveSliders();
+        this._buildShapesSection();
         this._buildFeelSliders();
         this._bindColorSwatches();
         this._bindToggles();
@@ -907,6 +955,39 @@ export class EditorInspector {
         document.querySelectorAll('.base-var-btn').forEach((el, idx) => {
             el.classList.toggle('active', idx === i);
         });
+    }
+
+    /**
+     * Auto-wake feedback mode. Solid/Shift variations paint a flat colour and
+     * never sample the warp feedback buffer, so Motion, Wave, and the Motion
+     * Engine render nothing. The moment the user reaches for any of those, flip
+     * the base into feedback mode so the effect is actually visible. Shift stays
+     * the default landing / asset-layering surface — it just "wakes up" on use.
+     *
+     * No-op when already in feedback mode. Seeds a visible wave if hidden (solid
+     * variations ship wave_a:0) so the feedback buffer has content to act on.
+     * Mirrors _applyVariation's instance-var pattern (_solidColor lives outside
+     * currentState; undo of the wake matches existing variation-change behaviour).
+     * Returns true if it actually woke. Caller owns pre/postSnap.
+     */
+    _wakeFeedbackIfSolid() {
+        if (!this._solidColor) return false;
+        this._solidColor = null;
+        // Feedback needs *some* content to act on. A shape IS content — so only
+        // seed a wave when there's no enabled shape AND the wave is hidden.
+        // Otherwise adding a shape would also switch on an unwanted oscilloscope.
+        const hasShape = (this.currentState.shapes || []).some(s => s && s.baseVals && s.baseVals.enabled !== 0);
+        if (!hasShape && this.currentState.baseVals.wave_a < 0.001) {
+            this.currentState.baseVals.wave_a = 0.8;
+        }
+        this._buildCompShader();
+        this._applyToEngine();
+        // UI: no longer a solid variation — drop the Solid-FX panel + relabel the
+        // swatch back to "Wave", and clear the active variation chip highlight.
+        this._updateSolidFxVisibility(null);
+        document.querySelectorAll('.base-var-btn').forEach(el => el.classList.remove('active'));
+        this._syncWaveControls?.();
+        return true;
     }
 
     /**
@@ -1350,6 +1431,77 @@ export class EditorInspector {
         });
     }
 
+    // ─── Motion Engine (living, time-driven motion) ─────────────────────────────
+
+    _buildMotionEngineSection() {
+        const grid = document.getElementById('motion-engine-grid');
+        if (grid) {
+            MOTION_ENGINES.forEach(eng => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'motion-preset-btn motion-engine-btn';
+                btn.dataset.engine = eng.id;
+                btn.innerHTML = `
+        <span class="motion-preset-name">${eng.name}</span>
+        <span class="motion-preset-desc">${eng.desc}</span>`;
+                btn.addEventListener('click', () => this._applyMotionEngine(eng.id));
+                grid.appendChild(btn);
+            });
+        }
+        // Two universal knobs — Speed (rate) + Depth (amount).
+        const knobWrap = document.getElementById('motion-engine-knobs');
+        if (knobWrap) {
+            const me = this.currentState.motionEngine;
+            const speedIn = makeSlider(knobWrap, { id: 'me-speed', label: 'Speed', min: 0.1, max: 4.0, step: 0.05, value: me.speed });
+            const depthIn = makeSlider(knobWrap, { id: 'me-depth', label: 'Depth', min: 0.0, max: 1.0, step: 0.01, value: me.depth });
+            this._bindEngineKnob(speedIn, 'speed');
+            this._bindEngineKnob(depthIn, 'depth');
+        }
+        this._syncMotionEngine();
+    }
+
+    _bindEngineKnob(input, key) {
+        const valEl = document.getElementById(`${input.id}-val`);
+        input.addEventListener('pointerdown', () => this._preSnap());
+        input.addEventListener('input', () => {
+            const v = parseFloat(input.value);
+            if (valEl) valEl.textContent = v.toFixed(2);
+            this.currentState.motionEngine[key] = v;
+            // A knob nudge while an engine is active should wake feedback so the
+            // change shows; nudging on 'none' just stores the value (no surprise).
+            if (this.currentState.motionEngine.id !== 'none') this._wakeFeedbackIfSolid();
+            this._applyToEngine();
+        });
+        input.addEventListener('pointerup', () => this._postSnap());
+    }
+
+    /** Select a Motion Engine (or 'none'). Auto-wakes feedback so the living
+     *  motion is visible even from the default Shift landing surface. */
+    _applyMotionEngine(id) {
+        this._preSnap();
+        this.currentState.motionEngine.id = id;
+        if (id !== 'none') this._wakeFeedbackIfSolid();
+        this._postSnap();
+        this._applyToEngine();
+        this._syncMotionEngine();
+    }
+
+    _syncMotionEngine() {
+        const me = this.currentState.motionEngine || (this.currentState.motionEngine = deepClone(BLANK.motionEngine));
+        document.querySelectorAll('.motion-engine-btn').forEach(el => {
+            el.classList.toggle('active', el.dataset.engine === me.id);
+        });
+        [['me-speed', 'speed', 0.1, 4.0], ['me-depth', 'depth', 0.0, 1.0]].forEach(([id, key, min, max]) => {
+            const input = document.getElementById(id);
+            if (!input) return;
+            const v = me[key];
+            input.value = v;
+            const valEl = document.getElementById(`${id}-val`);
+            if (valEl) valEl.textContent = Number(v).toFixed(2);
+            input.style.setProperty('--pct', `${((v - min) / (max - min)) * 100}%`);
+        });
+    }
+
     _buildMotionPresetsGrid() {
         const grid = document.getElementById('motion-presets-grid');
         if (!grid) return;
@@ -1380,6 +1532,7 @@ export class EditorInspector {
         if (!mp) return;
         this._preSnap();
         Object.assign(this.currentState.baseVals, mp.bv);
+        this._wakeFeedbackIfSolid();  // motion presets shape the feedback buffer — wake so they show
         this._postSnap();
         this._applyToEngine();
         this._syncMotionSliders();
@@ -1449,7 +1602,9 @@ export class EditorInspector {
             configs.forEach(cfg => {
                 const input = makeSlider(container, cfg);
                 const valEl = document.getElementById(`${cfg.id}-val`);
-                input.addEventListener('pointerdown', () => this._preSnap());
+                // Motion shapes the feedback buffer, which solid mode ignores —
+                // wake feedback the moment a motion slider is touched.
+                input.addEventListener('pointerdown', () => { this._preSnap(); this._wakeFeedbackIfSolid(); });
                 input.addEventListener('input', () => {
                     const v = parseFloat(input.value);
                     if (valEl) valEl.textContent = v.toFixed(2);
@@ -1463,6 +1618,7 @@ export class EditorInspector {
 
         document.getElementById('btn-randomize-motion')?.addEventListener('click', () => {
             this._preSnap();
+            this._wakeFeedbackIfSolid();
             const bv = this.currentState.baseVals;
             bv.zoom = 0.80 + Math.random() * 0.60;
             bv.rot = (Math.random() - 0.5) * 0.70;
@@ -1540,6 +1696,9 @@ export class EditorInspector {
                 // If wave was hidden via Reset, picking a shape should make it
                 // visible again — otherwise the click looks like a no-op.
                 if (bv.wave_a < 0.001) bv.wave_a = 0.8;
+                // The wave draws into the feedback buffer, which solid mode never
+                // samples — wake feedback so the shape is actually visible.
+                this._wakeFeedbackIfSolid();
                 this._postSnap();
                 this._applyToEngine();
                 this._syncWaveControls();
@@ -1559,6 +1718,396 @@ export class EditorInspector {
         this._syncWaveControls();
     }
 
+    // ─── Custom Shapes Composer (Phase 2 — milkdrop-tools-dev.md §8) ──────────────
+
+    _buildShapesSection() {
+        document.getElementById('btn-add-shape')?.addEventListener('click', () => this._addShape());
+        // Trail = the global feedback decay (same field as Palette → Trail), surfaced
+        // here because it's the dominant control over how much a shape smears/echoes.
+        const trailWrap = document.getElementById('shape-trail-slider');
+        if (trailWrap && !trailWrap.dataset.built) {
+            trailWrap.dataset.built = '1';
+            const t = makeSlider(trailWrap, { id: 'sh-trail', label: 'Trail', min: 0.85, max: 0.999, step: 0.001, value: this.currentState.baseVals.decay, decimals: 3 });
+            t.setAttribute('data-tooltip', 'Feedback trail length — how long shapes/echoes linger (same as Palette → Trail)');
+            const valEl = document.getElementById('sh-trail-val');
+            t.addEventListener('pointerdown', () => this._preSnap());
+            t.addEventListener('input', () => {
+                const v = parseFloat(t.value);
+                if (valEl) valEl.textContent = v.toFixed(3);
+                t.style.setProperty('--pct', `${((v - 0.85) / (0.999 - 0.85)) * 100}%`);
+                this.currentState.baseVals.decay = v;
+                this._applyToEngine(true);
+            });
+            t.addEventListener('pointerup', () => { this._postSnap(); this._clearTrail(); });
+        }
+        this._renderShapeCards();
+    }
+
+    _addShape() {
+        const shapes = this.currentState.shapes || (this.currentState.shapes = []);
+        if (shapes.length >= MAX_SHAPES) return;
+        this._preSnap();
+        shapes.push(makeShapeDefaults());
+        this._wakeFeedbackIfSolid();   // shapes draw into the feedback buffer
+        this._postSnap();
+        this._renderShapeCards();
+        this._applyToEngine();
+        this._clearTrail();
+    }
+
+    _removeShape(index) {
+        const shapes = this.currentState.shapes || [];
+        if (index < 0 || index >= shapes.length) return;
+        this._preSnap();
+        shapes.splice(index, 1);
+        this._postSnap();
+        this._renderShapeCards();
+        this._applyToEngine();
+        this._clearTrail();
+    }
+
+    /** Rebuild the whole card list from state.shapes. Cheap (≤4 cards) and keeps
+     *  indices/labels in sync after add/delete. */
+    _renderShapeCards() {
+        const list = document.getElementById('shapes-list');
+        if (!list) return;
+        list.innerHTML = '';
+        const shapes = this.currentState.shapes || [];
+        shapes.forEach((entry, i) => list.appendChild(this._buildShapeCard(entry, i)));
+        const addBtn = document.getElementById('btn-add-shape');
+        if (addBtn) addBtn.disabled = shapes.length >= MAX_SHAPES;
+    }
+
+    _buildShapeCard(entry, index) {
+        const bv = entry.baseVals;
+        const card = document.createElement('div');
+        card.className = 'shape-card';
+        const fillHex = rgbToHex(bv.r, bv.g, bv.b);
+        const borderHex = rgbToHex(bv.border_r, bv.border_g, bv.border_b);
+        card.innerHTML = `
+      <div class="shape-card-head">
+        <span class="shape-card-title">Shape ${index + 1}</span>
+        <button class="shape-remove" type="button" data-tooltip="Delete shape" aria-label="Delete shape">✕</button>
+      </div>
+      <div class="shape-card-body">
+        <div class="shape-xy-row">
+          <div class="xy-pad-wrap">
+            <canvas class="xy-pad shape-xy-pad" width="96" height="96" data-tooltip="Drag to place the shape"></canvas>
+          </div>
+          <div class="shape-sliders"></div>
+        </div>
+        <div class="shape-prop-row">
+          <span class="shape-prop-label">Fill</span>
+          <span class="shape-swatch-wrap" data-tooltip="Shape fill colour">
+            <span class="shape-color-swatch shape-fill-swatch" style="background:${fillHex}"></span>
+            <input type="color" class="shape-fill-picker" value="${fillHex}">
+          </span>
+        </div>
+        <div class="shape-prop-row">
+          <label class="shape-prop-label shape-check">
+            <input type="checkbox" class="shape-border-toggle" ${bv.border_a > 0 ? 'checked' : ''}> Border
+          </label>
+          <span class="shape-swatch-wrap shape-border-swatch-wrap${bv.border_a > 0 ? '' : ' is-disabled'}" data-tooltip="Border colour">
+            <span class="shape-color-swatch shape-border-swatch" style="background:${borderHex}"></span>
+            <input type="color" class="shape-border-picker" value="${borderHex}">
+          </span>
+        </div>
+        <div class="shape-prop-row">
+          <label class="shape-prop-label shape-check">
+            <input type="checkbox" class="shape-additive-toggle" ${bv.additive ? 'checked' : ''}> Glow
+          </label>
+        </div>
+        <p class="shape-motion-label">Motion</p>
+        <div class="shape-motion"></div>
+        <p class="shape-motion-label">Reactivity</p>
+        <div class="shape-react-head">
+          <select class="shape-react-source layer-react-source" data-tooltip="Audio band driving this shape's reactivity">
+            <option value="bass">Bass</option>
+            <option value="mid">Mid</option>
+            <option value="treb">Treble</option>
+            <option value="vol">Volume</option>
+            <option value="flux">Flux</option>
+          </select>
+          <div class="shape-react-curve layer-react-curve" role="group" aria-label="Shape reactivity curve">
+            <button class="lseg" data-curve="linear">Linear</button>
+            <button class="lseg" data-curve="squared">Squared</button>
+            <button class="lseg" data-curve="cubed">Cubed</button>
+            <button class="lseg" data-curve="threshold">Gate</button>
+          </div>
+        </div>
+        <div class="shape-react-sliders"></div>
+      </div>`;
+
+        // ── Sliders: Size / Sides / Angle / Opacity ──
+        const sl = card.querySelector('.shape-sliders');
+        const sizeIn = makeSlider(sl, { id: `sh${index}-rad`, label: 'Size', min: 0.02, max: 1.50, step: 0.01, value: bv.rad });
+        const sidesPos = Math.pow((clamp(bv.sides, SHAPE_SIDES_MIN, SHAPE_SIDES_MAX) - SHAPE_SIDES_MIN) / (SHAPE_SIDES_MAX - SHAPE_SIDES_MIN), 1 / SHAPE_SIDES_CURVE);
+        const sidesIn = makeSlider(sl, { id: `sh${index}-sides`, label: 'Sides', min: 0, max: 1, step: 0.001, value: sidesPos });
+        const angIn = makeSlider(sl, { id: `sh${index}-ang`, label: 'Angle', min: 0, max: 6.28, step: 0.02, value: bv.ang });
+        this._bindShapeSlider(sizeIn, bv, 'rad', 0.02, 1.50);
+        this._bindShapeSides(sidesIn, bv);
+        this._bindShapeSlider(angIn, bv, 'ang', 0, 6.28);
+        // Opacity: the shape draws into the feedback buffer which the comp shader
+        // amplifies 2×, so most of the visible change lives in low alpha. Map the
+        // slider through a power curve (pos^2) so the low end gets the travel.
+        const opaIn = makeSlider(sl, { id: `sh${index}-a`, label: 'Opacity', min: 0, max: 1.0, step: 0.01, value: Math.pow(clamp(bv.a, 0, 1), 1 / SHAPE_OPACITY_CURVE) });
+        this._bindShapeOpacity(opaIn, bv);
+
+        // ── Motion (time-driven): Spin / Orbit ──
+        const motion = entry.motion || (entry.motion = { spin: 0, orbit: 0 });
+        // Migrate old shapes: the former bass-only "Pulse" → Reactivity Size.
+        const react = entry.react || (entry.react = { source: 'bass', curve: 'linear', sizeAmt: 0, opacityAmt: 0, spinAmt: 0, shakeAmt: 0, sidesAmt: 0, perSrc: {} });
+        if (motion.pulse && !react.sizeAmt) { react.sizeAmt = motion.pulse; }
+        delete motion.pulse;
+        react.perSrc = react.perSrc || {};
+        for (const k of ['sizeAmt', 'opacityAmt', 'spinAmt', 'shakeAmt', 'sidesAmt']) {
+            if (!(k in react.perSrc)) react.perSrc[k] = '';
+        }
+        const ml = card.querySelector('.shape-motion');
+        const spinIn = makeSlider(ml, { id: `sh${index}-spin`, label: 'Spin', min: -2, max: 2, step: 0.05, value: motion.spin });
+        const orbitIn = makeSlider(ml, { id: `sh${index}-orbit`, label: 'Orbit', min: 0, max: 1, step: 0.01, value: motion.orbit });
+        this._bindShapeMotionSlider(spinIn, motion, 'spin', -2, 2);
+        this._bindShapeMotionSlider(orbitIn, motion, 'orbit', 0, 1);
+
+        // ── Reactivity (audio-driven): Source + Curve + Size/Opacity w/ per-slider pills ──
+        const srcSel = card.querySelector('.shape-react-source');
+        srcSel.value = react.source || 'bass';
+        srcSel.addEventListener('change', () => {
+            this._preSnap();
+            react.source = srcSel.value;
+            this._wakeFeedbackIfSolid();
+            this._postSnap();
+            this._applyToEngine(true);
+        });
+        const curveBtns = card.querySelectorAll('.shape-react-curve .lseg');
+        curveBtns.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.curve === (react.curve || 'linear'));
+            btn.addEventListener('click', () => {
+                this._preSnap();
+                curveBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                react.curve = btn.dataset.curve;
+                this._wakeFeedbackIfSolid();
+                this._postSnap();
+                this._applyToEngine(true);
+            });
+        });
+        const rl = card.querySelector('.shape-react-sliders');
+        [
+            { id: `sh${index}-rsize`, label: 'Size', min: -1.5, max: 1.5, key: 'sizeAmt' },
+            { id: `sh${index}-ropacity`, label: 'Opacity', min: -1.0, max: 1.0, key: 'opacityAmt' },
+            { id: `sh${index}-rspin`, label: 'Spin', min: -1.0, max: 1.0, key: 'spinAmt' },
+            { id: `sh${index}-rshake`, label: 'Shake', min: 0.0, max: 1.0, key: 'shakeAmt' },
+            { id: `sh${index}-rsides`, label: 'Sides', min: -1.0, max: 1.0, key: 'sidesAmt' },
+        ].forEach(cfg => {
+            const input = makeSlider(rl, { id: cfg.id, label: cfg.label, min: cfg.min, max: cfg.max, step: 0.01, value: react[cfg.key] || 0 });
+            this._bindShapeReactSlider(input, react, cfg.key, cfg.min, cfg.max);
+        });
+
+        // ── XY pad (reuses the image-layer pad pattern) ──
+        const pad = card.querySelector('.shape-xy-pad');
+        const ctx = pad.getContext('2d');
+        const PAD = 96;
+        const drawPad = () => {
+            ctx.clearRect(0, 0, PAD, PAD);
+            ctx.fillStyle = 'rgba(255,255,255,0.04)';
+            ctx.beginPath(); ctx.roundRect(0, 0, PAD, PAD, 4); ctx.fill();
+            ctx.strokeStyle = 'rgba(255,255,255,0.10)'; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(PAD / 2, 0); ctx.lineTo(PAD / 2, PAD); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, PAD / 2); ctx.lineTo(PAD, PAD / 2); ctx.stroke();
+            ctx.strokeRect(0.5, 0.5, PAD - 1, PAD - 1);
+            ctx.beginPath();
+            ctx.arc(bv.x * PAD, bv.y * PAD, 5, 0, Math.PI * 2);  // shape y is down-positive (y=0 top), like the pad
+            ctx.fillStyle = rgbToHex(bv.r, bv.g, bv.b); ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 1.5; ctx.stroke();
+        };
+        drawPad();
+        // Window listeners are added on mousedown and removed on mouseup so
+        // re-rendering cards (every load/undo) never leaks accumulating handlers.
+        const onMove = (e) => {
+            const rect = pad.getBoundingClientRect();
+            const cx = e.touches ? e.touches[0].clientX : e.clientX;
+            const cy = e.touches ? e.touches[0].clientY : e.clientY;
+            bv.x = clamp((cx - rect.left) / rect.width, 0, 1);
+            bv.y = clamp((cy - rect.top) / rect.height, 0, 1);   // shape y is down-positive (engine: y*-2+1)
+            drawPad();
+            this._wakeFeedbackIfSolid();
+            this._applyToEngine(true);
+        };
+        const onUp = () => {
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+            window.removeEventListener('touchmove', onMove);
+            window.removeEventListener('touchend', onUp);
+            this._postSnap();
+            this._clearTrail();
+        };
+        const onDown = (e) => {
+            this._preSnap();
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('mouseup', onUp);
+            window.addEventListener('touchmove', onMove, { passive: true });
+            window.addEventListener('touchend', onUp);
+            onMove(e);
+        };
+        pad.addEventListener('mousedown', onDown);
+        pad.addEventListener('touchstart', (e) => { onDown(e); e.preventDefault(); }, { passive: false });
+
+        // ── Colour pickers ──
+        const fillPick = card.querySelector('.shape-fill-picker');
+        const fillSw = card.querySelector('.shape-fill-swatch');
+        fillPick.addEventListener('input', () => {
+            const [r, g, b] = hexToRgb(fillPick.value);
+            this._preSnap();
+            bv.r = r; bv.g = g; bv.b = b;
+            bv.r2 = r; bv.g2 = g; bv.b2 = b;   // keep edge matched to fill (mono-colour)
+            fillSw.style.background = fillPick.value;
+            this._wakeFeedbackIfSolid();
+            this._postSnap();
+            this._applyToEngine(true);
+            this._clearTrail();
+        });
+        const borderPick = card.querySelector('.shape-border-picker');
+        const borderSw = card.querySelector('.shape-border-swatch');
+        borderPick.addEventListener('input', () => {
+            const [r, g, b] = hexToRgb(borderPick.value);
+            this._preSnap();
+            bv.border_r = r; bv.border_g = g; bv.border_b = b;
+            borderSw.style.background = borderPick.value;
+            this._wakeFeedbackIfSolid();
+            this._postSnap();
+            this._applyToEngine(true);
+            this._clearTrail();
+        });
+
+        // ── Toggles: Border on/off, Additive (Glow) ──
+        const borderToggle = card.querySelector('.shape-border-toggle');
+        const borderSwatchWrap = card.querySelector('.shape-border-swatch-wrap');
+        borderToggle.addEventListener('change', () => {
+            this._preSnap();
+            bv.border_a = borderToggle.checked ? 1.0 : 0;
+            borderSwatchWrap?.classList.toggle('is-disabled', !borderToggle.checked);  // border colour only matters when on
+            this._wakeFeedbackIfSolid();
+            this._postSnap();
+            this._applyToEngine(true);
+            this._clearTrail();
+        });
+        const addToggle = card.querySelector('.shape-additive-toggle');
+        addToggle.addEventListener('change', () => {
+            this._preSnap();
+            bv.additive = addToggle.checked ? 1 : 0;
+            this._wakeFeedbackIfSolid();
+            this._postSnap();
+            this._applyToEngine(true);
+            this._clearTrail();
+        });
+
+        // ── Delete ──
+        card.querySelector('.shape-remove').addEventListener('click', () => this._removeShape(index));
+
+        return card;
+    }
+
+    _bindShapeSlider(input, bv, key, min, max, decimals = 2) {
+        const valEl = document.getElementById(`${input.id}-val`);
+        input.addEventListener('pointerdown', () => { this._preSnap(); this._wakeFeedbackIfSolid(); });
+        input.addEventListener('input', () => {
+            const v = parseFloat(input.value);
+            if (valEl) valEl.textContent = v.toFixed(decimals);
+            input.style.setProperty('--pct', `${((v - min) / (max - min)) * 100}%`);
+            bv[key] = v;
+            this._applyToEngine(true);
+        });
+        input.addEventListener('pointerup', () => { this._postSnap(); this._clearTrail(); });
+    }
+
+    /** Per-shape motion slider (Spin / Orbit) → entry.motion[key].
+     *  The frame_eqs are regenerated from these in _buildRuntimePreset. */
+    _bindShapeMotionSlider(input, motion, key, min, max) {
+        const valEl = document.getElementById(`${input.id}-val`);
+        input.addEventListener('pointerdown', () => { this._preSnap(); this._wakeFeedbackIfSolid(); });
+        input.addEventListener('input', () => {
+            const v = parseFloat(input.value);
+            if (valEl) valEl.textContent = v.toFixed(2);
+            input.style.setProperty('--pct', `${((v - min) / (max - min)) * 100}%`);
+            motion[key] = v;
+            this._applyToEngine(true);
+        });
+        input.addEventListener('pointerup', () => { this._postSnap(); this._clearTrail(); });
+    }
+
+    /** Per-shape audio-reactivity slider (Size / Opacity) → react[key], with a
+     *  per-slider source pill (· = global, B/M/T/V/F override) mirroring the
+     *  Wave-tab reactivity panel. */
+    _bindShapeReactSlider(input, react, key, min, max) {
+        const valEl = document.getElementById(`${input.id}-val`);
+        input.addEventListener('pointerdown', () => { this._preSnap(); this._wakeFeedbackIfSolid(); });
+        input.addEventListener('input', () => {
+            const v = parseFloat(input.value);
+            if (valEl) valEl.textContent = v.toFixed(2);
+            input.style.setProperty('--pct', `${((v - min) / (max - min)) * 100}%`);
+            react[key] = v;
+            this._applyToEngine(true);
+        });
+        input.addEventListener('pointerup', () => { this._postSnap(); this._clearTrail(); });
+
+        const header = input.closest('.slider-row')?.querySelector('.slider-header');
+        if (header) {
+            const pill = document.createElement('button');
+            pill.type = 'button';
+            pill.className = 'react-src-pill';
+            pill.id = `${input.id}-src`;
+            pill.setAttribute('data-tooltip', 'Audio source for this slider — click to cycle (· = global, B = Bass, M = Mid, T = Treble, V = Volume, F = Flux)');
+            header.insertBefore(pill, valEl);
+            pill.addEventListener('click', () => {
+                this._preSnap();
+                react.perSrc = react.perSrc || {};
+                const cycle = ['', 'bass', 'mid', 'treb', 'vol', 'flux'];
+                const cur = react.perSrc[key] || '';
+                react.perSrc[key] = cycle[(cycle.indexOf(cur) + 1) % cycle.length];
+                this._postSnap();
+                this._renderReactSrcPill(pill, react.perSrc[key]);
+                this._applyToEngine(true);
+            });
+            this._renderReactSrcPill(pill, react.perSrc?.[key] || '');
+        }
+    }
+
+    /** Sides slider with a power curve: raw pos∈[0,1] → sides =
+     *  round(MIN+(MAX-MIN)·pos^N). Low side counts (where the distinct polygons
+     *  are) get most of the travel. The value label shows the integer count. */
+    _bindShapeSides(input, bv) {
+        const valEl = document.getElementById(`${input.id}-val`);
+        if (valEl) valEl.textContent = String(Math.round(bv.sides));
+        input.addEventListener('pointerdown', () => { this._preSnap(); this._wakeFeedbackIfSolid(); });
+        input.addEventListener('input', () => {
+            const pos = parseFloat(input.value);
+            const sides = Math.round(SHAPE_SIDES_MIN + (SHAPE_SIDES_MAX - SHAPE_SIDES_MIN) * Math.pow(pos, SHAPE_SIDES_CURVE));
+            bv.sides = sides;
+            if (valEl) valEl.textContent = String(sides);
+            input.style.setProperty('--pct', `${pos * 100}%`);
+            this._applyToEngine(true);
+        });
+        input.addEventListener('pointerup', () => { this._postSnap(); this._clearTrail(); });
+    }
+
+    /** Opacity slider with a power curve: the raw slider position is pos∈[0,1],
+     *  stored alpha = pos^SHAPE_OPACITY_CURVE. The value label shows real alpha. */
+    _bindShapeOpacity(input, bv) {
+        const valEl = document.getElementById(`${input.id}-val`);
+        if (valEl) valEl.textContent = clamp(bv.a, 0, 1).toFixed(2);   // show true alpha, not raw pos
+        input.addEventListener('pointerdown', () => { this._preSnap(); this._wakeFeedbackIfSolid(); });
+        input.addEventListener('input', () => {
+            const pos = parseFloat(input.value);
+            const alpha = Math.pow(pos, SHAPE_OPACITY_CURVE);
+            bv.a = alpha; bv.a2 = alpha;   // centre + edge fade together (mono-colour)
+            if (valEl) valEl.textContent = alpha.toFixed(2);
+            input.style.setProperty('--pct', `${pos * 100}%`);
+            this._applyToEngine(true);
+        });
+        input.addEventListener('pointerup', () => { this._postSnap(); this._clearTrail(); });
+    }
+
     // ─── Wave style sliders ────────────────────────────────────────────────────
 
     _buildWaveSliders() {
@@ -1576,7 +2125,9 @@ export class EditorInspector {
         configs.forEach(cfg => {
             const input = makeSlider(container, cfg);
             const valEl = document.getElementById(`${cfg.id}-val`);
-            input.addEventListener('pointerdown', () => this._preSnap());
+            // The wave renders into the feedback buffer that solid mode discards —
+            // wake feedback when a wave slider is touched so the change is visible.
+            input.addEventListener('pointerdown', () => { this._preSnap(); this._wakeFeedbackIfSolid(); });
             input.addEventListener('input', () => {
                 const v = parseFloat(input.value);
                 if (valEl) valEl.textContent = v.toFixed(2);
@@ -1589,6 +2140,7 @@ export class EditorInspector {
 
         document.getElementById('btn-randomize-wave')?.addEventListener('click', () => {
             this._preSnap();
+            this._wakeFeedbackIfSolid();
             const bv = this.currentState.baseVals;
             bv.wave_mode = Math.floor(Math.random() * 8);
             bv.wave_scale = 0.3 + Math.random() * 3.2;
@@ -6951,6 +7503,25 @@ export class EditorInspector {
 
     _buildRuntimePreset(state) {
         const runtime = deepClone(state);
+        // Phase 3 — generate each shape's frame_eqs from its motion params (Spin/
+        // Pulse/Orbit). Generated at runtime, never stored (saved frame_eqs_str
+        // stays ''). Player mirrors this in refreshCustomPresets for parity.
+        const shapes = (runtime.shapes || []).slice(0, MAX_SHAPES);
+        for (const sh of shapes) {
+            if (sh && sh.baseVals && (sh.motion || sh.react)) {
+                sh.frame_eqs_str = buildShapeMotionEqs(sh.baseVals, sh.motion, sh.react) || sh.frame_eqs_str || '';
+            }
+        }
+        // The engine iterates 4 shape renderers and indexes preset.shapes[i], so
+        // pad to 4 slots with disabled stubs (matches how bundled presets ship)
+        // to avoid drawCustomShape(undefined) on empty slots. Clone only — never
+        // mutates the saved state.shapes.
+        while (shapes.length < MAX_SHAPES) shapes.push({ baseVals: { enabled: 0 }, init_eqs_str: '', frame_eqs_str: '' });
+        runtime.shapes = shapes;
+        // Engine runs first (a living motion baseline), then motionReact/waveReact
+        // punch audio on top. All additive + clamped, so order only affects which
+        // clamp wins on extremes — engine-before-react reads cleanest.
+        const injectedEngine = buildMotionEngineFrameEqs(state.motionEngine);
         const injectedMotion = buildMotionReactFrameEqs(state.motionReact);
         const injectedWave = buildWaveReactFrameEqs(state.waveReact);
         const baseFrame = runtime.frame_eqs_str || '';
@@ -6960,7 +7531,7 @@ export class EditorInspector {
         // player/timeline (visualizer.refreshCustomPresets) inject byte-identical
         // lines — single source of truth, see customPresets.buildAnimFrameEqs().
         const animLines = buildAnimFrameEqs();
-        runtime.frame_eqs_str = [baseFrame, injectedMotion, injectedWave, fluxLine, animLines].filter(Boolean).join('\n').trim();
+        runtime.frame_eqs_str = [baseFrame, injectedEngine, injectedMotion, injectedWave, fluxLine, animLines].filter(Boolean).join('\n').trim();
         return runtime;
     }
 
@@ -6972,6 +7543,15 @@ export class EditorInspector {
             }
         }
         this.onchange?.();
+    }
+
+    /** Wipe the warp feedback buffer so a shape edit doesn't leave a stale ghost
+     *  (the decay trail of the shape's previous size/position). Called on shape
+     *  edit COMMITS (pointerup / add / delete), never per-frame — so it clears
+     *  remnants without flickering during a drag. Decay (Palette → Trail) is left
+     *  untouched, so a live animating shape still trails per the user's setting. */
+    _clearTrail() {
+        this.engine?.clearFeedbackBuffer?.();
     }
 
     /**
@@ -8314,6 +8894,8 @@ export class EditorInspector {
 
     _syncAllControls() {
         this._syncColorSwatches();
+        this._syncMotionEngine();
+        this._renderShapeCards();
         this._syncMotionSliders();
         this._syncMotionReact();
         this._syncWaveReact();
@@ -8334,6 +8916,7 @@ export class EditorInspector {
         this._syncSlider('ps-glow-strength', bv.ob_a, 0, 1.0, 2);
         this._syncSlider('ps-accent-strength', bv.ib_a, 0, 1.0, 2);
         this._syncSlider('ps-decay', bv.decay, 0.85, 0.999, 3);
+        this._syncSlider('sh-trail', bv.decay, 0.85, 0.999, 3);   // shapes-section Trail mirrors the same decay
         this._syncSlider('ps-ob-size', bv.ob_size, 0, 0.1, 3);
         this._syncSlider('ps-ob-a', bv.ob_a, 0, 1.0, 2);
         this._syncSlider('ps-ib-size', bv.ib_size, 0, 0.1, 3);

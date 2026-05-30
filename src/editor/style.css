@@ -735,6 +735,65 @@ html, body {
 .motion-preset-desc {
   font-size: 9.5px; color: var(--text-3); line-height: 1.2;
 }
+/* Motion Engine chips are selectable (unlike one-shot Motion Presets), so they
+   carry an active state — neutral white outline, matching base-var-btn. */
+.motion-engine-btn.active { border-color: #fff; background: rgba(255,255,255,0.06); }
+.motion-engine-btn.active .motion-preset-name { color: #fff; }
+
+/* ── Custom Shapes Composer (Phase 2) ───────────────────────────────────── */
+.shapes-list { display: flex; flex-direction: column; gap: 8px; }
+.shape-card {
+  background: var(--bg-3); border: 1px solid var(--border);
+  border-radius: var(--r-s); padding: 8px 9px;
+}
+.shape-card-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.shape-card-title {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.02em; color: var(--text-2);
+}
+.shape-remove {
+  background: transparent; border: none; color: var(--text-3);
+  cursor: pointer; font-size: 13px; line-height: 1; padding: 2px 4px;
+}
+.shape-remove:hover { color: var(--text); }
+.shape-xy-row { display: flex; gap: 10px; align-items: flex-start; }
+.shape-sliders { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+/* One property per row: a clear left-hand label, then its control. */
+.shape-prop-row {
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 8px; min-height: 20px;
+}
+.shape-prop-label {
+  font-size: 11px; color: var(--text-2); min-width: 52px;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.shape-check { cursor: pointer; }
+.shape-check input[type="checkbox"] { accent-color: #fff; cursor: pointer; margin: 0; }
+.shape-swatch-wrap {
+  position: relative; width: 20px; height: 20px;
+  display: inline-block; flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+.shape-swatch-wrap.is-disabled { opacity: 0.3; pointer-events: none; }
+.shape-color-swatch {
+  width: 20px; height: 20px; border-radius: 4px;
+  border: 1px solid var(--border-hi); display: block;
+}
+/* Native colour input sits invisibly over its swatch (same trick as layer swatches). */
+.shape-fill-picker, .shape-border-picker {
+  position: absolute; inset: 0; width: 20px; height: 20px;
+  opacity: 0; cursor: pointer; border: none; padding: 0;
+}
+.shape-motion-label {
+  font-size: 9px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--text-3); margin: 12px 0 6px;
+}
+.shape-motion { display: flex; flex-direction: column; gap: 6px; }
+.shape-react-head { display: flex; align-items: center; gap: 8px; margin: 4px 0 8px; flex-wrap: wrap; }
+.shape-react-head .shape-react-source { flex: 0 0 auto; }
+.shape-react-sliders { display: flex; flex-direction: column; gap: 6px; }
 
 /* ══════════════════════════════════════════════════════════════════════
    GHOST BUTTON  (randomize)
