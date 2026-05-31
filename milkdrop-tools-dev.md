@@ -27,13 +27,15 @@ Per-phase detail is in §3; the rationale for the ordering is in §4.
 | 2 | **Custom Shapes Composer** (up to 4 shapes, placement-first cards) | **Adds** — shapes don't exist in the editor today | ✅ **DONE** (2026-05-30) — reviewed & approved ("works great") | Shipped. Post-review fix: opacity slider now uses a `pos²` curve (`SHAPE_OPACITY_CURVE`) so low-alpha gets the travel. |
 | 3 | **Shape Motion & Reactivity** (Motion: Spin/Orbit · Reactivity: Size/Opacity/Spin/Shake/Sides + Trail) — *reframed from the abstract "Modulator / LFO bank", see §9.0* | **Adds** motion + reactivity onto Phase 2's shape cards | ✅ **DONE** (2026-05-30) — reviewed & approved | Shipped + post-review fixes (§9.7) + Trail control & expanded reactivity (§9.8). |
 | 3b | ~~Modulator / LFO bank (raw q-var wiring)~~ | — | ⏸ **Deferred** — from-scratch presets have no q-var consumers (§9.0); revisit only with a source→destination matrix |
-| 4 | **Warp Shader Variants picker** (4–6 GLSL warps as chips) | **Adds** a Motion-tab picker | ⏸ **DEFERRED to its own session + doc** | Touches the *shared* warp shader → can regress all 1,144 presets. Needs a dedicated `warp-variants-dev.md`: vendor/override strategy + cross-preset regression plan. Seed: milkdrop-dev.md "GLSL future work". |
-| 5 | **Expert eqn / shader drawer** (opt-in EEL/GLSL textareas) | **Adds** an opt-in expert mode | ⬜ Optional / post-import | Only if we decide a code escape hatch is on-brand |
-| 6 | **Color Studio** — palette generator + harmony tools | **Adds** to the Palette tab beside the 12 quick palettes / My Mix | 🟢 **v1 SHIPPED — builds** (🎲 Colors random roll). Foundation for more (§10.5). | Re-test the roll; then build out: rule picker, HSL sliders, gradient ramp, mood presets. |
+| 4 | ~~**Warp Shader Variants picker** (4–6 GLSL warps as chips)~~ | — | ❌ **REMOVED from plan** (2026-05-31) | **Can break the app.** Touches the *shared* warp submodule → regresses all 1,144 presets; genuine shader engineering, not a slider. See §11 for the full issue write-up. *(This is also the only dev that would author bundled presets' shader-driven colour — see §10.6.)* |
+| 5 | ~~**Expert eqn / shader drawer** (opt-in EEL/GLSL textareas)~~ | — | ❌ **REMOVED from plan** (2026-05-31) | **Off-brand / not recommended.** It's exactly the grid-of-knobs / code-box surface the project steers away from. See §11. Revisit only if `.milk` import ships and needs an edit home. |
+| 6 | **Color Studio** — palette generator + harmony tools | **Adds** to the Palette tab beside the 12 quick palettes / My Mix | 🟢 **Shipping in slices** — 🎲 Random + Color Roll + rule picker + Base Hue + tone/mood + **Glow/Accent bloom (border fix)** all SHIPPED (§10.5–10.10, builds). | Next: HSL sliders, gradient ramp (§10.6). |
 
 **Current state in one line:** Phases 0–3 ✅ DONE. **Phase 6 (Color Studio) v1 SHIPPED** — 🎲 Colors
-harmony-aware random roll (§10.5), built as the FOUNDATION for a larger Color Studio build-out (rule
-picker, HSL, gradient, mood presets). Phase 4 (Warp Variants) deferred to its own session + doc.
+harmony-aware random roll (§10.5) + **Color Roll** (§10.7) + **steerable generator: rule picker, Base
+Hue & tone/mood** (§10.8–10.9); next queued = HSL sliders, gradient ramp + the gradient-tint
+multi-colour fill (§10.6/10.7). **Phases 4 (Warp Variants) and 5 (Expert drawer) REMOVED from the plan**
+— Phase 4 can regress all 1,144 presets, Phase 5 is off-brand; full reasons in §11.
 
 **Does this add or replace? → It ADDS.** The existing Palette / Motion sliders / basic Wave / Layers
 surface stays untouched. Every phase is a new surface layered on top. The *only* "replace" candidate
@@ -53,8 +55,8 @@ introduces a *new* surface:
 | 1 — Generative Motion Engines | New "living motion" category **beside** today's 6 static Motion Presets. The static presets stay. *Optional* later: convert 1–2 of the existing 6 to frame_eq-backed versions — a per-preset call, never a bulk replace. |
 | 2 — Custom Shapes Composer | Brand-new surface. Shapes are not exposed in the editor today → pure add. |
 | 3 — Modulator / LFO bank | Brand-new surface → pure add. |
-| 4 — Warp Variants picker | New Motion-tab picker → pure add (the default warp remains the default). |
-| 5 — Expert drawer | New opt-in mode → pure add, hidden unless invoked. |
+| ~~4 — Warp Variants picker~~ | ❌ **REMOVED** — see §11 (regresses all 1,144 presets). |
+| ~~5 — Expert drawer~~ | ❌ **REMOVED** — see §11 (off-brand code surface). |
 | 6 — Color Studio | New generator button + harmony tools in the Palette tab → pure add; the 12 quick palettes, color rows, and My Mix all stay. |
 
 This matches the house preference for additive work over tearing out existing controls, and keeps
@@ -181,16 +183,15 @@ mirroring image layers: each card = XY pad + sides + size + color + border + tog
 - Aesthetic fit: **good** — reuses the existing image-layer card + XY-pad pattern.
 - Effort: medium. 25 fields/shape exist in the engine; composer exposes a curated subset.
 
-### C. Warp Shader Variants picker — highest visual ceiling, real GLSL (deferred Phase 9) → **Phase 4 (stretch)**
+### C. ~~Warp Shader Variants picker~~ — ❌ **REMOVED (2026-05-31), see §11**
 A dictionary of 4–6 hand-written warp GLSL strings (radial / stripes / spiral / tunnel /
 ripple-zoom) selectable as chips in the Motion tab.
 
-- This is **the** thing that defines named-MilkDrop looks — biggest expressive jump available.
-- Implementation sketch already in [milkdrop-dev.md](milkdrop-dev.md) §"GLSL future work" (Option B:
-  `WARP_VARIANTS` dict + `warpShader.updateShader()` per variant).
-- Aesthetic fit: **good** (chips, not code) once the shaders are written.
-- Risk: **high** — warp is a shared webpacked submodule; breaking it breaks every shipping preset.
-  Needs cross-preset regression testing. This is genuine shader engineering, not a slider.
+- This *was* the biggest expressive jump available — it's what defines named-MilkDrop looks (and the
+  shader-driven colour in 85% of the bundled library, §10.6).
+- **Removed because it can break the app:** warp is a shared webpacked submodule; breaking it breaks
+  every shipping preset. Genuine shader engineering with cross-preset regression risk, not a slider.
+  Full write-up in §11.
 
 ### D. Modulator / LFO bank for q-variables — most "DiscoCast-flavored" power tool → **Phase 3**
 MilkDrop's `q1`–`q32` are the glue between frame_eqs, per-pixel math, and shaders. Build a **visual**
@@ -206,13 +207,13 @@ drag, then let motion/warp read them — **no code**.
 The **4 custom waves** (separate from the basic wave) each carry spectrum / shape / smoothing / EEL.
 Multi-wave = layered oscilloscope art. Lower ceiling than A–C; a natural sibling to B.
 
-### F. Equation / shader editor — the escape hatch, *against* the aesthetic (Phases 10/11) → **Phase 5 (opt-in)**
-A hidden **"Advanced"** drawer with EEL / GLSL textareas, like butterchurn-electron. Unlocks
-literally everything, but it's exactly the grid-of-knobs / geek surface the project steers away
-from. **Frame as opt-in expert mode, never the default.** It's also the natural editing home for
+### F. ~~Equation / shader editor — the escape hatch~~ — ❌ **REMOVED (2026-05-31), see §11**
+A hidden **"Advanced"** drawer with EEL / GLSL textareas, like butterchurn-electron. Would unlock
+literally everything, but it's exactly the grid-of-knobs / geek surface the project deliberately
+steers away from — **off-brand, removed.** Its one redeeming use was as the editing home for
 *imported* `.milk` presets (whose motion lives in raw `frame_eqs_str`, per
-[milkdrop-import-dev.md](milkdrop-import-dev.md) §7.2) — so import + expert editor reinforce each
-other if both ship.
+[milkdrop-import-dev.md](milkdrop-import-dev.md) §7.2) — so revisit *only* if `.milk` import ships and
+needs an edit surface. Full write-up in §11.
 
 ### G. Color Studio — palette generator + harmony tools → **Phase 6** (after Phases 1–5)
 The Palette tab today gives fixed choices (12 quick palettes, RGB color rows, My Mix). Add real
@@ -236,19 +237,21 @@ The Palette tab today gives fixed choices (12 quick palettes, RGB color rows, My
 The order that maximizes "blank canvas feels rich" while respecting the no-code aesthetic:
 
 ```
-A  Generative Motion Engines     ← attacks the root cause (static baseVals); rides q-register pipe
-B  Custom Shapes Composer        ← off-center composition; reuses card/XY-pad pattern (Phase 13)
-D  Modulator / LFO bank          ← visual q-var wiring; pairs with A
+A  Generative Motion Engines     ← ✅ SHIPPED (Phase 1). Root-cause fix; rides q-register pipe
+B  Custom Shapes Composer        ← ✅ SHIPPED (Phase 2). Off-center composition; card/XY-pad reuse
+D  Shape Motion & Reactivity     ← ✅ SHIPPED (Phase 3). Replaced the abstract LFO bank (§9.0)
+G  Color Studio                  ← 🟢 v1 SHIPPED, build-out active (Phase 6 / §10.6)
 ─────────────────────────────────
-C  Warp Variants picker          ← high ceiling, high risk; stretch goal, real shader work
-F  Expert eqn/shader drawer      ← opt-in only; also the editing home for imported .milk
+C  Warp Variants picker          ← ❌ REMOVED — regresses all 1,144 presets (§11)
+F  Expert eqn/shader drawer      ← ❌ REMOVED — off-brand code surface (§11)
 ```
 
-**Why A first:** it's the only direction that fixes the *root* problem (frozen baseVals) rather than
-adding more surface, and the q-register plumbing already exists. B is the strongest composition
-unlock and reuses patterns we have. D is the differentiated power tool but should wait until A
-proves the injection path. C is the dream but carries regression risk across all 1,144 presets. F
-should exist only as an expert opt-in, made far more valuable if `.milk` import ships.
+**Why this order held:** A fixed the *root* problem (frozen baseVals) and the q-register plumbing
+already existed; B was the strongest composition unlock and reused patterns we had; D became the
+concrete "animate the shapes we just built" rather than an inert-from-scratch LFO bank (§9.0); G adds
+no-code colour creation with zero engine risk. **C and F are removed** — C carries cross-preset
+regression risk (it edits the shared warp submodule), F is the exact code-box aesthetic the project
+avoids. Both reasons are detailed in §11.
 
 ---
 
@@ -268,12 +271,12 @@ should exist only as an expert opt-in, made far more valuable if `.milk` import 
 
 ## 6. Open questions (for the user — no decisions yet)
 
-1. **Which direction first?** A (generative motion) is my recommendation as the root-cause fix.
+1. ~~**Which direction first?**~~ → RESOLVED: A→B→D→G shipped in that order.
 2. **Beta gating** — is any of this in-scope before the v1 beta, or strictly after Timeline + 3D?
-3. **Expert mode (F)** — do we want a code escape hatch at all, or is it firmly off-brand? (It
-   becomes much more valuable if `.milk` import ships, since imported presets need somewhere editable.)
-4. **Relationship to import** — should creation-tools work wait until `.milk` import lands, so the
-   two share the "edit a code-driven preset" surface? Or are they independent tracks?
+3. ~~**Expert mode (F)**~~ → RESOLVED (2026-05-31): firmly off-brand → **removed** (§11). Revisit only
+   if `.milk` import ships and needs an edit home.
+4. **Relationship to import** — if `.milk` import ever lands, it (not an expert drawer) becomes the
+   reason to reconsider a code-edit surface. Independent of the Color Studio build-out.
 
 ---
 
@@ -711,9 +714,61 @@ the buffer each frame). FIX: the shapes-section Trail is now a **curved 0→1 sl
 `decay = pos===0 ? 0 : 0.999·(1−(1−pos)⁵)` (inverse `_trailPosFromDecay` for sync). Bottom = **decay 0
 = crisp, no trail**; the curve front-loads the invisible 0–0.8 decay zone into the low end and spreads
 the perceptible long-trail range (0.9–0.999) across the top. Helpers `_trailDecayFromPos` /
-`_trailPosFromDecay` + `_syncTrailSlider`; the fresh-shape default (`SHAPE_DEFAULT_DECAY 0.90`) sits at
-~37%. (Palette → Trail stays linear 0.85–0.999 — the wave/feedback control; the shapes Trail is the one
+`_trailPosFromDecay` + `_syncTrailSlider`; the fresh-shape default (`SHAPE_DEFAULT_DECAY`) sits low.
+(Palette → Trail stays linear 0.85–0.999 — the wave/feedback control; the shapes Trail is the one
 that bottoms to zero.)
+
+### 9.13 🔴 Permanent gray trail on shape-add — the REAL root cause (2026-05-31)
+
+User (frustrated, recurring): *"I started from Shapes and it leaves a gray area in the canvas… nobody
+wants permanent trails!!!"* This had been "fixed" twice before (§9.9, §9.12) yet kept returning. The
+actual root cause, finally: the clean-trail reset in `_addShape` was **gated to solid mode** —
+`if (isFirst && this._solidColor)`. When the user added a shape **on a feedback variation** (warp
+visible, `_solidColor` null), the gate failed, so `decay` stayed at the variation's **0.96–0.99** → a
+long, permanent-looking gray smear. The earlier fixes only ever covered the solid-mode half, which is
+why it "kept coming up over and over."
+
+**FIX (decisive, all modes):**
+- `_addShape` now lowers decay on the first shape **in every mode**, gated on *value not mode*:
+  `if (isFirst && decay > SHAPE_DEFAULT_DECAY) decay = SHAPE_DEFAULT_DECAY`. So any preset whose trail
+  is longer than clean (the 0.98 blank default **and** every feedback variation) gets brought down to a
+  crisp trail; a short trail the user already dialled is never stomped. Raise it back anytime via Trail.
+- `SHAPE_DEFAULT_DECAY` lowered **0.90 → 0.85** (crisp; `0.85⁶⁰≈7e-5`, fades in <0.5 s — no permanent
+  ghost) while keeping a hair of smoothing. `_clearTrail()` on add still wipes the existing buffer once.
+
+**Not the bloom:** the §10.10 Glow/Accent bloom was *not* the cause here — the preset's Glow/Accent
+colours were `#000000`, so `col += blur · vec3(0) · strength` contributes nothing. The gray was purely
+the decay gate.
+
+`npm run build` passes. **Done =** adding a shape on *any* background (solid or a warp variation) yields
+a crisp shape with no permanent gray smear; Trail still raises it on demand.
+
+### 9.14 🔴 Permanent trails EVERYWHERE — global decay default fix + deep audit (2026-05-31)
+
+§9.13 fixed only the shape-add path; the user (rightly) pushed back: *"permanent trails are STILL there…
+deep deep audit, it's everywhere!!!"* — they were on the **Bloom variation**, no shape involved. Full
+audit of every feedback lever:
+
+- **`decay` was the one active culprit — and it shipped hot in every starting point.** BLANK = **0.98**;
+  the 9 variations = **0.96–0.99**. At 0.98 a frame is still ~30% visible after a second, and warp
+  regenerates content every frame, so the buffer never empties → a steady-state gray haze that reads as
+  "permanent." Present by default *everywhere*.
+- **`echo_zoom` ruled OUT:** the variations set `echo_zoom` 1.1–3.5 but `echo_alpha` is **0** in BLANK
+  and every variation → echo is inert. Not a factor. (The 3 *motion presets* DO set `echo_alpha`
+  0.1–0.35 — a separate echo-trail only hit by applying Vortex/Calm Drift/Earthquake; left as-is, their
+  intended tunnel look. Flagged for the user.)
+
+**FIX — lower `decay` across BLANK + all 9 variations into a clean band (0.88–0.92):** BLANK 0.98→**0.90**;
+Solid/Shift 0.98→0.90 (solid mode, cosmetic); Drift 0.985→0.92; Pulse 0.97→0.90; Storm 0.975→0.89;
+Ripple 0.99→0.92; Radiate 0.978→0.90; Scatter 0.96→**0.88**; Bloom 0.988→0.92. Warp still flows and reads
+as motion but clears in ~1s instead of piling into haze. The **Trail slider (→0.999) stays** for anyone
+who wants heavy smear — trail is now opt-IN, not the default. (Verified: no default `decay` > 0.92
+remains.) Also trimmed the over-long tooltips added during the Color Studio work (Harmony rule / Tone /
+Random colours / Trail length) per `[[feedback_slider_discovery_ux]]` — tooltips name the control, they
+don't narrate.
+
+**Standing rule captured:** the from-scratch + variation `decay` default must stay in the clean band;
+high decay (>~0.93) reads as broken/permanent to the user. See memory [[project_shape_trail_decay_gate]].
 ---
 
 ## 10. Phase 6 — Execution plan: Color Studio (audit complete, awaiting code approval)
@@ -780,10 +835,288 @@ Reuses `_applyPalette` wholesale → honours per-channel 🔒 locks (lock + rero
 shader, syncs swatches, free player parity (colours are `baseVals`). No engine/eq/visualizer work.
 
 **Build-on roadmap (the "more thought" pass):**
-- **Harmony rule picker** — chips to choose the rule (mono/analogous/…) instead of pure-random; reuses
-  `buildHarmonyPalette` directly.
-- **Base-hue control** — a hue wheel/slider to drive the scheme from a chosen colour.
+- ✅ **Harmony rule picker** — chips to choose the rule (mono/analogous/…) instead of pure-random; reuses
+  `buildHarmonyPalette` directly. **SHIPPED 2026-05-31 (§10.8).**
+- ✅ **Base-hue control** — a hue wheel/slider to drive the scheme from a chosen colour. **SHIPPED (§10.8).**
 - **HSL sliders** on the colour rows (today they're RGB swatches).
 - **Gradient ramp** — two-colour ramp mapped across wave→glow→accent.
-- **Mood presets** — warm / cool / neon / pastel S/L profiles applied to a rolled hue.
+- ✅ **Mood presets** — tone (Vivid / Neon / Pastel / Deep) S/L profiles applied to a rolled hue.
+  **SHIPPED 2026-05-31 (§10.9).** (Warm/cool temperature biases dropped — they'd fight the Base Hue
+  control; tone profiles compose cleanly instead.)
 - Possibly factor the colour helpers into their own module if this grows.
+
+### 10.6 Build-out — execution plan (active) + colour-coverage scope
+
+**What the Color Studio covers — and what "multiple colours in existing presets" means (audit 2026-05-31).**
+A 100-preset sample of the bundled library shows where their colour actually comes from:
+
+| Colour source | % of bundled presets | Authored by our Palette / Color Studio? |
+|---|---|---|
+| **Custom warp/comp GLSL shader** (per-pixel colour) | **85%** | ❌ No — that's shader code (was Phase 4, now removed §11) |
+| **Custom shapes** (own `r/g/b` → `r2/g2/b2` gradient) | 52% | ⚠️ Partial — we author *new* shape Fill (Phase 2), but can't repaint a bundled preset's shapes |
+| **Custom waves** (own colours) | 32% | ❌ Not exposed |
+| **Animated colour in `frame_eqs`** (cycles/pulses over time) | ~18% wave, 13% border | ❌ No no-code authoring |
+
+The Palette tab (and Color Studio) authors **three static baseVal channels** — Wave (`wave_r/g/b`),
+Glow (`ob_r/g/b`), Accent (`ib_r/g/b`) — plus `solidColorB` ([inspector.js:1187](src/editor/inspector.js#L1187)).
+A 4th baseVal colour, motion-vector `mv_r/g/b` ([inspector.js:404](src/editor/inspector.js#L404)), exists
+but is unexposed.
+
+**So, scoping the question honestly:**
+- **From-scratch presets — the Color Studio's actual job — the 3-channel model IS the whole colour
+  surface.** The build-out makes it *richer* (steerable, HSL, gradients, moods), not *broader*. This is
+  the correct, low-risk scope.
+- **Remixed bundled presets:** the palette repaints only the 3 baseVal channels; the dominant colour
+  (shader-computed in 85%, animated in ~18%) is untouched — the same "doesn't stick / gets stomped"
+  caveat already in the Remix taxonomy. **The only dev that would close that gap is the removed Phase 4
+  shader work** (§11) — which is precisely why "cover the bundled multi-colour" and "the dev that can
+  break the app" are the same thing.
+
+**Execution order (smallest → largest, each its own stop-and-evaluate):**
+
+| Step | What | Touch-points | Risk |
+|---|---|---|---|
+| **6.1** | **Harmony rule picker** — chips (Mono/Analogous/Complementary/Split/Triadic) so the roll is *steerable*, not blind. `_rollRandomPalette` reads the chosen rule (or "Surprise me" = random). | `inspector.js` (chip handler, store last rule) + `editor.html` (chip row) + `style.css` | very low |
+| **6.2** | **Base-hue control** — a hue slider/wheel to seed the scheme from a chosen colour; "Roll" then varies only S/L + harmony. | `inspector.js` + `editor.html` | low |
+| **6.3** | **Mood presets** — Warm / Cool / Neon / Pastel as S/L profiles over the rolled hue (small chip row). | `inspector.js` + `editor.html` | low |
+| **6.4** | **HSL sliders** on the colour rows (today RGB swatches) — needs `rgbToHsl` + row-UI change. | `inspector.js` + `editor.html` + `style.css` | medium (UI change) |
+| **6.5** | **Gradient ramp** — pick 2 colours, map across wave→glow→accent. | `inspector.js` + `editor.html` | low-medium |
+| **6.6** | *(optional)* **Living colour** — hue-cycle / beat-pulse the 3 channels over time. The colour analogue of Phase 1's Motion Engine; the *safe, no-code* answer to the ~18% "colour breathes" gap. Needs a shared builder in `customPresets.js` + `visualizer.js` parity (like Phase 1/3). | `customPresets.js` + `inspector.js` + `visualizer.js` + `editor.html` | medium (parity step) |
+
+Steps 6.1–6.5 are pure `_applyPalette` reuse → **no engine/eq/visualizer work, free player parity**
+(contrast 6.6, which injects time-driven colour and so needs the same dual-write parity as Phases 1/3).
+
+**First slice (proposed for code approval): 6.1 + 6.2 together** — the rule picker and base-hue share
+the `buildHarmonyPalette(rule, hue)` plumbing and together turn the blind roll into a real, steerable
+generator. Lowest risk, biggest single jump in usefulness. **Awaiting "go".**
+
+### 10.7 ✅ Shipped — "3 colours visible in feedback" fix + Color Roll (2026-05-31)
+
+User report: *"in Shift, multiple colours + random work great; but building milkdrop presets on the
+other tabs, only ONE colour gets applied."* Two safe, single-file (`inspector.js`) changes — **no
+`visualizer.js`, no `customPresets.js`, no shader-engine edits.** `npm run build` passes.
+
+**Root cause of the "one colour" bug (verified):** a palette sets **three** colours — Wave (`wave_r/g/b`),
+Glow (`ob_r/g/b` = *outer border* ring) and Accent (`ib_r/g/b` = *inner border* ring). But the two
+border rings default to **size 0 / alpha 0** ([inspector.js:402-403](src/editor/inspector.js#L402-L403))
+and `_applyPalette` deliberately painted *colour only*, never turning them on → in a feedback variation
+only the Wave colour rendered. (Shift looked fine because its comp paints Wave + `solidColorB` directly,
+both always visible — two colours by design.)
+
+**Feature 1 — all three palette colours render in feedback mode.** `_applyPalette` now seeds Glow +
+Accent **strength** when it's still off (Glow `ob_a=0.6`/`ob_size=0.03`, Accent `ib_a=0.45`/`ib_size≈0.0225`;
+the same alpha→size 0.05 coupling the Glow/Accent Strength sliders use). **Seed-when-off only** (never
+stomps a strength the user dialled), **skips locked channels**, and **skips solid/shift mode** (gated on
+`!this._solidColor`) so Shift stays exactly as the user likes it. Pure `baseVals` → free player parity.
+
+**Feature 2 — Color Roll (rolling colours).** New **Color Roll** slider in the Palette appearance
+sliders (`#ps-color-roll`, `studio_hue_roll` baseVal, range 0–1.5 rad/s, default 0 = off). When > 0 the
+hue-rotation angle in the Studio post-FX becomes `base + time * speed`, driven by the comp shader's
+existing `time` uniform — so the **whole frame's colours cycle continuously in BOTH solid/shift and
+feedback modes**, covering every colour (wave, borders, `solidColorB`, images' background). Implemented
+by extending the two existing post-FX GLSL builders (`buildStudioPostFxGlsl` on `ret`,
+`buildSatHueOnColGlsl` on `col` for the images path) to emit a time-driven Rodrigues rotation when
+`roll>0`; `roll` threaded through `injectStudioPostFx` + all comp-build call sites (`_rebuildPostFx`,
+main build [inspector.js:7794](src/editor/inspector.js#L7794), bundled-remix load [inspector.js:9238](src/editor/inspector.js#L9238)).
+
+**Why Feature 2 needs no parity work:** the roll is **baked into `state.comp`**, which saves via the
+`...currentState` spread and is consumed by the player/engine directly (same mechanism the existing
+Saturation / Hue Rotate controls already use) → free player + timeline parity, and `roll=0` is
+byte-identical to the old output. With images, the roll is applied inline to the background `col`
+*before* image layers composite, so photos don't hue-shift.
+
+| File | What landed |
+|---|---|
+| [src/editor/inspector.js](src/editor/inspector.js) | `BLANK.baseVals.studio_hue_roll=0`; time-driven roll in `buildStudioPostFxGlsl` + `buildSatHueOnColGlsl`; `roll` opt threaded through `injectStudioPostFx`, `_rebuildPostFx`, `_buildCompShader` (images + no-images), bundled-remix load; "Color Roll" slider in `_buildPaletteSliders` + sync in `_syncPaletteSliders`; Glow/Accent strength seed-when-off in `_applyPalette`. |
+
+**✅ Color Roll reviewed & approved 2026-05-31 ("works great")** — alongside the §10.5 🎲 Random roll
+("both work great"). Color Roll cycles the whole scheme over time in *both* Shift and feedback, saves/
+reloads, and plays identically in the player (baked into `state.comp`).
+
+**⚠️ Feature 1 (auto-seed borders) was a DEAD END — reverted 2026-05-31.** Glow/Accent *are* border
+rings, so seeding them on just drew outlines, not a multi-colour fill ("random colors just adds borders").
+Removed; `_applyPalette` paints colour only, as before. **Lesson:** a from-scratch *feedback* preset has
+structurally ONE fill colour (the Wave, smeared through the warp buffer) — there is no native second
+*fill* colour, only border rings. The real answers to simultaneous multi-colour are (a) **Color Roll**
+(temporal — shipped) and (b) a **colour tint baked into our from-scratch comp shader** — ✅ **SHIPPED as
+the Glow/Accent bloom (§10.10):** the Glow + Accent colours now bloom (blurred-feedback halo) into the
+image, so all three palette colours show at once. The safe, no-code slice of what the 85% shader-driven
+bundled presets do; edits only *our* comp, never the shared warp.
+
+### 10.8 ✅ Shipped — steerable generator: rule picker + Base Hue (2026-05-31)
+
+Turned the blind 🎲 roll into a real, steerable Color Studio. Two new controls under the 🎲 Colors
+button, both driving the **same `buildHarmonyPalette(rule, hue)` primitives** the roll already used —
+so zero new colour math, pure UI + wiring. Single feature area, `inspector.js` + `editor.html` +
+`style.css`. `npm run build` passes.
+
+- **Harmony rule picker** (`#cs-rule-chips`) — chips: **🎲 Surprise** (random rule each roll, default)
+  + Monochrome / Analogous / Complementary / Split-complement / Triadic. Picking a named rule **pins**
+  it (every roll + hue-drag uses it); Surprise restores random-per-roll. Clicking a chip applies a
+  scheme immediately for instant feedback.
+- **Base Hue slider** (`#cs-hue`, 0–360°) — drag to drive the whole scheme from a chosen hue, live;
+  the active rule decides how glow/accent derive from it. Under Surprise, hue-drag uses the last
+  concrete rule (`_csLastRule`, default Analogous) so dragging always shows a coherent scheme.
+- **🎲 Colors button** — now rolls a random hue + the *active* rule (random rule only under Surprise),
+  and syncs the hue slider + chip highlight to what it rolled.
+
+**Mechanics:** generator state (`_csRule` / `_csHue` / `_csLastRule`) is **transient tool state, not
+persisted** with the preset (it's a UI control, like a generator dial — the resulting colours save via
+`baseVals` as always). `_applyPalette(p, key, snap=true)` gained a `snap` flag so the live Base-Hue
+drag brackets the whole gesture in **one undo step** (pointerdown/up `_preSnap`/`_postSnap`) instead of
+snapping every frame. Still honours per-channel 🔒 locks (lock a colour, steer/reroll the rest) and has
+free player parity (colours are `baseVals`). New symbols: `_buildColorStudioControls`, `_pickColorRule`,
+`_syncColorStudioControls`; CSS `.cs-rule-chip(.active)` (neutral white-outline, no accent hues).
+
+| File | What landed |
+|---|---|
+| [src/editor/inspector.js](src/editor/inspector.js) | `_bindColorStudio` inits generator state + builds controls; `_buildColorStudioControls` (rule chips + Base Hue slider); `_pickColorRule`; `_rollRandomPalette` honours active rule; `_syncColorStudioControls`; `_applyPalette` gained `snap` flag. |
+| [editor.html](editor.html) | `.color-studio-controls` block (`#cs-rule-chips` + `#cs-hue-row`) under the 🎲 Colors button. |
+| [src/editor/style.css](src/editor/style.css) | `.cs-rule-chip` neutral chip + white-outline active state. |
+
+**⚠️ Interaction model reworked 2026-05-31 (§10.9.1) — the original "pin constrains the dice + Surprise
+chip" design confused the user** ("allows you to choose but not unchoose, and random doesn't affect
+these choices"). Superseded by the toggle-chips + fully-random-dice model below; the prose in this
+section describing the old behaviour is historical.
+
+### 10.9 ✅ Shipped — tone / mood presets (2026-05-31)
+
+Completed the generator's third axis: **hue (Base Hue) × harmony (rule) × tone (mood)**. A second chip
+row under the rule picker: **Vivid** (default, identity) / **Neon** / **Pastel** / **Deep**. Each is an
+S/L profile applied on top of the rolled hue+rule, so they compose with — never fight — the other two
+controls. Single feature area; `inspector.js` + `editor.html`; `npm run build` passes.
+
+- **Why tone, not warm/cool:** the §3.G note said "warm/cool/neon/pastel," but warm/cool are *hue*
+  biases that would fight the Base Hue control (set hue 200° + "warm" → contradiction). Tone profiles
+  (saturation/lightness only) leave hue/harmony untouched, so all three axes stack predictably.
+- **Mechanics:** `MOODS` catalog (`{id,name,sMul,lOff}`) + `_moodHsl(h,s,l,mood)` wraps `hslToRgb`,
+  scaling saturation (`sMul`) and shifting lightness (`lOff`), clamped. `buildHarmonyPalette(rule, hue,
+  mood)` threads it; `mood` undefined → Vivid (identity) → **byte-identical to the pre-mood output**, so
+  nothing else regressed. `_csMood` is transient tool state (not persisted; the resulting colours save
+  via `baseVals`). `_pickColorMood` re-applies current rule+hue with the new tone; the chip-builder was
+  generalised (`buildChips(wrapId, defs, dataKey, handler)`) and reused for both rows; `_syncColorStudio
+  Controls` now highlights the active rule **and** mood chip (scoped per container).
+
+| File | What landed |
+|---|---|
+| [src/editor/inspector.js](src/editor/inspector.js) | `MOODS` + `_moodHsl`; `buildHarmonyPalette` takes `mood`; `_csMood` state; `_pickColorMood`; `mood` threaded through roll / rule-pick / hue-drag; generalised `buildChips`; mood highlight in `_syncColorStudioControls`. |
+| [editor.html](editor.html) | `#cs-mood-chips` row in `.color-studio-controls` (reuses `.cs-rule-chip` styling). |
+
+**Done =** pick a tone → current scheme + every subsequent roll/hue-drag uses that S/L profile; Vivid =
+unchanged from before; composes with rule + Base Hue + locks.
+
+### 10.9.1 ✅ Interaction rework — toggle chips + fully-random dice (2026-05-31)
+
+User report on the §10.8/10.9 UI: *"the interface allows you to choose but not unchoose, and random
+doesn't affect these choices."* Root cause = a confused model I shipped: chips were **radio pins that
+constrained the dice** (always one selected, no way back to neutral), **🎲 respected the pins** (so a
+pinned rule never changed on roll → felt disconnected), and a separate **"🎲 Surprise" chip** duplicated
+the dice button (two dice). Per the house rule (don't patch a failed interaction — return to the
+requirement, rebuild clean), the model was replaced:
+
+- **Chips toggle.** Rule + tone chips are nullable selections; click to choose, **click the active one
+  again to clear** (`_csRule`/`_csMood` go `null` → no chip highlighted). Fixes "can't unchoose."
+- **🎲 Colors is fully random** — random hue **+ random rule + random tone** — and **reflects all three
+  in the chips/slider** (`_rollRandomPalette` sets `_csRule`/`_csMood`/`_csHue`, then
+  `_syncColorStudioControls` lights them up). Every roll visibly moves the selections. Fixes "random
+  doesn't affect these choices."
+- **"🎲 Surprise" chip removed** — the dice button *is* surprise (rule chips are now just the 5 harmony
+  rules). Fixes the two-dice redundancy.
+- **null fallbacks:** when a dimension is unselected, `_applyColorStudio` builds with Analogous / Vivid
+  so the scheme stays coherent; nothing is highlighted. New `_applyColorStudio(snap)` centralises
+  build+apply+sync (used by rule/mood toggles, Base-Hue drag, and the dice).
+- **Explore within a rule** = pick the rule chip + drag Base Hue; the 🔒 per-channel locks still cover
+  "keep this colour, reroll the rest." `_csLastRule` is gone (no longer needed).
+
+| File | What landed |
+|---|---|
+| [src/editor/inspector.js](src/editor/inspector.js) | `_csRule`/`_csMood` nullable + toggle in `_pickColorRule`/`_pickColorMood`; `_applyColorStudio(snap)` helper; `_rollRandomPalette` fully random + reflects; Surprise removed from rule chips; `_csLastRule` removed. |
+| [editor.html](editor.html) | Chip tooltips updated ("click again to clear"; dice rolls a random one). |
+
+**Done =** click a chip then click it again → it clears (no highlight); 🎲 Colors changes hue + rule +
+tone and the chips light up to match; no Surprise chip; rule+Base-Hue still explores a single rule;
+locks honoured. **Awaiting visual review.**
+
+### 10.10 ✅ Shipped — Glow/Accent Strength → real colored bloom (border fix) (2026-05-31)
+
+User report: *"Glow Strength and Accent Strength both only draw borders."* Correct — they drove `ob_a/
+ob_size` and `ib_a/ib_size`, the engine's **outer/inner border rings**, so by design they could only
+draw an edge rectangle, and the Glow/Accent *colours* only ever showed as rings. This is the same
+"borders are the wrong lever" root cause as the reverted §10.7 Feature 1 — fixed properly this time.
+
+**The fix (best + safest):** both Strength sliders now drive a **colored bloom** baked into our
+from-scratch comp shader:
+- **Glow Strength** → `col += texture(sampler_blur1, uv_m).rgb * glowColour * (strength·3)` — a tight,
+  bright halo around the waveform, tinted with the **Glow** colour (`ob_r/g/b`).
+- **Accent Strength** → same with `sampler_blur2` × the **Accent** colour (`ib_r/g/b`) — a wider, softer
+  halo.
+
+**Why this is safe & also fixes the original "only one colour" problem:**
+- The engine **auto-runs the blur passes** when the comp text references `sampler_blur1/2`
+  (`getHighestBlur` scans the shader, [butterchurn.js:2994](src/vendor/butterchurn.js#L2994)) — no engine
+  change. Bloom GLSL is **only emitted when a strength is > 0**, so `getHighestBlur` returns 0 and there's
+  **zero blur cost when off** + a byte-identical comp.
+- Edits **only our comp shader**, never the shared warp → can't regress the 1,144 bundled presets.
+- **Free player parity** — baked into `state.comp`, saved via `...currentState`, consumed by the player
+  directly (same mechanism as Saturation / Hue / Color Roll). No `visualizer.js` change.
+- The Glow + Accent **colours now bloom into the image**, so all three palette colours show at once —
+  this is the safe, no-code answer the deferred §10.7 *gradient-tint* idea was reaching for. **That open
+  item is now considered addressed by the bloom** (a halo-tint rather than a radius gradient).
+- The literal **Outer/Inner Border** rings stay on the Appearance Size/Alpha sliders for anyone who
+  actually wants borders; only the two *Strength* sliders were repointed.
+
+**Mechanics:** new `studio_glow` / `studio_accent` baseVals (save free; old presets default 0 = off →
+unchanged). Strength sliders rebuild the comp on input (like `paletteOpacity`); the early-out that
+returns `BLANK_COMP` for a plain feedback preset now also checks glow/accent are 0 (so bloom forces a
+real comp build). Border sliders' stale `mirror` to the strength sliders removed (they're decoupled now).
+
+| File | What landed |
+|---|---|
+| [src/editor/inspector.js](src/editor/inspector.js) | `studio_glow`/`studio_accent` baseVals; bloom GLSL in `_buildCompShader` (gated on >0, `!imagesOnly`); `_buildCompShader` early-out checks glow/accent; `_buildPaletteStrengthSliders` repointed border→bloom (rebuilds comp); border sliders' `mirror` removed; `_syncPaletteSliders` reads `studio_glow/accent`. |
+
+**Done =** raise Glow Strength on a feedback preset → a soft halo in the Glow colour blooms around the
+waveform (not an edge ring); Accent Strength adds a wider halo in the Accent colour; all three colours
+visible; 0 = no bloom + no blur cost; saves/reloads + plays in the player; bundled presets unaffected.
+**Awaiting visual review** — tune the ×3 bloom scale and blur1-vs-blur2 split after first look. Remaining
+build-out: HSL sliders, gradient ramp (§10.6).
+
+---
+
+## 11. Removed devs — why (2026-05-31)
+
+Per the house rule *"prefer deleting competing code over patching around it"* and *"don't over-build,"*
+two planned directions were cut from this plan. Recording the reasons so they aren't silently
+re-proposed later.
+
+### 11.1 Phase 4 — Warp Shader Variants picker — ❌ REMOVED: **can break the app**
+- **The break risk is structural.** The warp shader is a **shared webpacked submodule** that every one
+  of the 1,144 bundled presets runs through. A picker that swaps `warpShader.updateShader()` per variant
+  edits that shared path — a mistake there doesn't degrade gracefully, it **regresses the entire
+  shipping library** at once (the exact class of multi-file/shared-state change CLAUDE.md flags as
+  high-risk).
+- **It's genuine shader engineering, not a slider.** Writing 4–6 correct, performant GLSL warps +
+  cross-preset regression testing across the whole library is a project in itself — not the "pick a
+  vibe, turn two dials" surface the rest of this plan is.
+- **What we lose:** the single biggest *visual* ceiling jump, and the only path to authoring the
+  shader-driven colour that 85% of bundled presets rely on (§10.6). Accepted — the risk/effort isn't
+  worth it for a from-scratch creation tool.
+- **If ever revisited:** it must be its own session + its own `warp-variants-dev.md` with a
+  vendor/override strategy and a written cross-preset regression plan **first**. Not folded into this
+  plan. Seed material: milkdrop-dev.md §"GLSL future work" (Option B: `WARP_VARIANTS` dict).
+
+### 11.2 Phase 5 — Expert eqn / shader drawer — ❌ REMOVED: **off-brand, not recommended**
+- A drawer of raw EEL/GLSL textareas is **exactly the grid-of-knobs / code-box aesthetic the project
+  deliberately moves away from** (`[[feedback_slider_discovery_ux]]`). Every GitHub editor surveyed
+  (§2) already does code-only; our differentiation is the no-code discovery surface. Shipping a code
+  escape hatch undercuts that and invites the "wall of code and knobs" this doc opens by rejecting.
+- **It doesn't fix the root cause for the target user** — the from-scratch builder who doesn't write
+  EEL/GLSL gets nothing from a textarea.
+- **The one scenario that resurrects it:** if `.milk` import ever ships, imported presets carry raw
+  `frame_eqs_str` that needs *somewhere* editable — at that point an expert surface earns its place,
+  driven by import, not by this plan. Until then it stays cut.
+
+### 11.3 Phase 3b — Modulator / LFO bank — already deferred (not newly removed)
+Kept on the tracker as ⏸ deferred (not cut): it's **inert from scratch** — spare q-vars only matter if
+something reads them, and from a blank base nothing does (§9.0). Revisit only with a concrete
+source→destination matrix. Phase 3 delivered the *concrete* version of this idea (animate the shapes
+directly) instead.

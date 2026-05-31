@@ -328,35 +328,56 @@ async function resizeImageFile(file, maxDim) {
 
 // Generates inline GLSL to apply sat/hue to `col` (vec3 background) BEFORE image
 // layers are composited. Returns empty string at defaults → zero cost.
-function buildSatHueOnColGlsl(sat, hue) {
+// `roll` (rad/s) > 0 → the hue angle cycles over `time` (Color Roll); 0 = static
+// hue, byte-identical to before. Applied to `col` only so image layers don't roll.
+function buildSatHueOnColGlsl(sat, hue, roll) {
     const s = (typeof sat === 'number' && isFinite(sat)) ? sat : 1.0;
     const h = (typeof hue === 'number' && isFinite(hue)) ? hue : 0;
+    const sp = (typeof roll === 'number' && isFinite(roll)) ? roll : 0;
     const satLine = (Math.abs(s - 1.0) < 0.001) ? '' :
         `  float _bg_lum = dot(col, vec3(0.299, 0.587, 0.114));
   col = mix(vec3(_bg_lum), col, ${s.toFixed(4)});
 `;
-    const rad = h * Math.PI / 180;
-    const cosA = Math.cos(rad).toFixed(6);
-    const sinA = Math.sin(rad).toFixed(6);
-    const oneMinusCos = (1 - Math.cos(rad)).toFixed(6);
-    const hueLine = (Math.abs(h) < 0.01) ? '' :
-        `  { vec3 _bgk = vec3(0.57735);
+    let hueLine = '';
+    if (Math.abs(sp) > 1e-4) {
+        // Time-driven hue roll about the (1,1,1) luma axis (Rodrigues rotation).
+        const base = (h * Math.PI / 180).toFixed(6);
+        hueLine = `  { float _ba = ${base} + time * ${sp.toFixed(4)};
+  float _bc = cos(_ba), _bs = sin(_ba); vec3 _bgk = vec3(0.57735);
+  col = col * _bc + cross(_bgk, col) * _bs + _bgk * dot(_bgk, col) * (1.0 - _bc); }
+`;
+    } else if (Math.abs(h) >= 0.01) {
+        const rad = h * Math.PI / 180;
+        const cosA = Math.cos(rad).toFixed(6);
+        const sinA = Math.sin(rad).toFixed(6);
+        const oneMinusCos = (1 - Math.cos(rad)).toFixed(6);
+        hueLine = `  { vec3 _bgk = vec3(0.57735);
   col = col * ${cosA} + cross(_bgk, col) * ${sinA} + _bgk * dot(_bgk, col) * ${oneMinusCos}; }
 `;
+    }
     return satLine + hueLine;
 }
 
-function buildStudioPostFxGlsl(sat, hue) {
+// `roll` (rad/s) > 0 → hue angle cycles over the comp shader's `time` uniform
+// (Color Roll), so the whole frame's colours rotate continuously — works in both
+// solid/shift and feedback modes. 0 = static hue (byte-identical to before).
+function buildStudioPostFxGlsl(sat, hue, roll) {
     const s = (typeof sat === 'number' && isFinite(sat)) ? sat : 1.0;
     const h = (typeof hue === 'number' && isFinite(hue)) ? hue : 0;
-    const rad = h * Math.PI / 180;
-    const cosA = Math.cos(rad).toFixed(6);
-    const sinA = Math.sin(rad).toFixed(6);
-    const oneMinusCos = (1 - Math.cos(rad)).toFixed(6);
+    const sp = (typeof roll === 'number' && isFinite(roll)) ? roll : 0;
     const satLine = (Math.abs(s - 1.0) < 0.001) ? '' :
         `\n    float _lum = dot(ret.rgb, vec3(0.299, 0.587, 0.114));\n    ret.rgb = mix(vec3(_lum), ret.rgb, ${s.toFixed(4)});`;
-    const hueLine = (Math.abs(h) < 0.01) ? '' :
-        `\n    vec3 _k = vec3(0.57735);\n    ret.rgb = ret.rgb * ${cosA} + cross(_k, ret.rgb) * ${sinA} + _k * dot(_k, ret.rgb) * ${oneMinusCos};`;
+    let hueLine = '';
+    if (Math.abs(sp) > 1e-4) {
+        const base = (h * Math.PI / 180).toFixed(6);
+        hueLine = `\n    float _ra = ${base} + time * ${sp.toFixed(4)};\n    float _rc = cos(_ra), _rs = sin(_ra); vec3 _k = vec3(0.57735);\n    ret.rgb = ret.rgb * _rc + cross(_k, ret.rgb) * _rs + _k * dot(_k, ret.rgb) * (1.0 - _rc);`;
+    } else if (Math.abs(h) >= 0.01) {
+        const rad = h * Math.PI / 180;
+        const cosA = Math.cos(rad).toFixed(6);
+        const sinA = Math.sin(rad).toFixed(6);
+        const oneMinusCos = (1 - Math.cos(rad)).toFixed(6);
+        hueLine = `\n    vec3 _k = vec3(0.57735);\n    ret.rgb = ret.rgb * ${cosA} + cross(_k, ret.rgb) * ${sinA} + _k * dot(_k, ret.rgb) * ${oneMinusCos};`;
+    }
     return `    /* STUDIO_POST_FX */\n    if (brighten != 0) ret = sqrt(ret);\n    if (darken != 0) ret = ret * ret;\n    if (solarize != 0) ret = ret * (1.0 - ret) * 4.0;\n    if (invert != 0) ret = 1.0 - ret;${satLine}${hueLine}\n`;
 }
 
@@ -377,7 +398,8 @@ function injectStudioPostFx(compText, opts) {
     if (lastCurly === -1) return clean;
     const sat = (opts && opts.sat != null) ? opts.sat : 1.0;
     const hue = (opts && opts.hue != null) ? opts.hue : 0;
-    const glsl = buildStudioPostFxGlsl(sat, hue);
+    const roll = (opts && opts.roll != null) ? opts.roll : 0;
+    const glsl = buildStudioPostFxGlsl(sat, hue, roll);
     return `${clean.slice(0, lastCurly)}\n${glsl}${clean.slice(lastCurly)}`;
 }
 
@@ -389,7 +411,7 @@ const BLANK = {
     baseVals: {
         zoom: 1.0, rot: 0.0, warp: 0.0, warpanimspeed: 1.0, warpscale: 1.0,
         zoomexp: 1.0,
-        decay: 0.98, gammaadj: 2.0,
+        decay: 0.90, gammaadj: 2.0,   // clean default — warp flows but clears in ~1s (was 0.98 = permanent haze)
         echo_zoom: 1.0, echo_orient: 0, echo_alpha: 0,
         dx: 0, dy: 0,
         sx: 1.0, sy: 1.0,
@@ -404,7 +426,10 @@ const BLANK = {
         mv_x: 12, mv_y: 9, mv_l: 0.9, mv_r: 0.0, mv_g: 0.0, mv_b: 1.0, mv_a: 0.0,
         darken: 0, invert: 0, brighten: 0, solarize: 0, darken_center: 0,
         modwavealphabyvolume: 0,
-        studio_saturation: 1.0, studio_hue_rotate: 0,
+        studio_saturation: 1.0, studio_hue_rotate: 0, studio_hue_roll: 0,
+        // Glow / Accent bloom (a colored halo from the blurred feedback buffer,
+        // tinted by the Glow / Accent colour). 0 = off → comp is byte-identical.
+        studio_glow: 0, studio_accent: 0,
         b1ed: 0.5,
     },
     shapes: [], waves: [],
@@ -473,7 +498,7 @@ const BASE_VARIATIONS = [
         name: 'Solid', desc: 'One color', color: '#2a0050',
         solid: [0.16, 0.04, 0.44],
         bv: {
-            decay: 0.98, gammaadj: 2.0,
+            decay: 0.90, gammaadj: 2.0,
             wave_a: 0,  // no audio waveform overlay by default
         },
     },
@@ -487,7 +512,7 @@ const BASE_VARIATIONS = [
         solidBreath: 0.2,
         solidShift: 0.7,
         bv: {
-            decay: 0.98, gammaadj: 2.0,
+            decay: 0.90, gammaadj: 2.0,
             wave_a: 0,
         },
     },
@@ -495,7 +520,7 @@ const BASE_VARIATIONS = [
         name: 'Drift', desc: 'Slow & dreamy', color: '#5010c0',
         bv: {
             zoom: 0.97, rot: 0.12, warp: 1.5, warpanimspeed: 0.4,
-            decay: 0.985, gammaadj: 2.2,
+            decay: 0.92, gammaadj: 2.2,
             echo_zoom: 1.8,
             wave_mode: 3,
             wave_r: 0.7, wave_g: 0.2, wave_b: 1.0, wave_a: 0.75, wave_scale: 0.8,
@@ -505,7 +530,7 @@ const BASE_VARIATIONS = [
     {
         name: 'Pulse', desc: 'Neon heartbeat', color: '#0090ff',
         bv: {
-            zoom: 0.94, decay: 0.97, gammaadj: 2.8,
+            zoom: 0.94, decay: 0.90, gammaadj: 2.8,
             echo_zoom: 1.6,
             wave_mode: 3,
             wave_r: 0.0, wave_g: 0.85, wave_b: 1.0, wave_a: 0.95,
@@ -517,7 +542,7 @@ const BASE_VARIATIONS = [
         name: 'Storm', desc: 'Chaotic energy', color: '#cccccc',
         bv: {
             zoom: 1.02, warp: 3.5, warpanimspeed: 2.2,
-            decay: 0.975,
+            decay: 0.89,
             echo_zoom: 1.1,
             wave_mode: 1,
             wave_r: 1.0, wave_g: 1.0, wave_b: 1.0, wave_a: 0.85,
@@ -528,7 +553,7 @@ const BASE_VARIATIONS = [
         name: 'Ripple', desc: 'Liquid rings', color: '#1060c0',
         bv: {
             zoom: 0.98, warp: 0.5, warpanimspeed: 0.8,
-            decay: 0.99,
+            decay: 0.92,
             echo_zoom: 2.2,
             wave_mode: 7,
             wave_r: 0.1, wave_g: 0.65, wave_b: 1.0, wave_a: 0.9, wave_scale: 1.0,
@@ -539,7 +564,7 @@ const BASE_VARIATIONS = [
         name: 'Radiate', desc: 'Warm spin', color: '#c07000',
         bv: {
             zoom: 1.0, rot: 0.25, warp: 0.8,
-            decay: 0.978, gammaadj: 2.5,
+            decay: 0.90, gammaadj: 2.5,
             echo_zoom: 1.4,
             wave_mode: 6,
             wave_r: 1.0, wave_g: 0.75, wave_b: 0.0, wave_a: 0.9,
@@ -551,7 +576,7 @@ const BASE_VARIATIONS = [
         name: 'Scatter', desc: 'Acid dots', color: '#50b800',
         bv: {
             warp: 1.0, warpanimspeed: 1.5,
-            decay: 0.96, gammaadj: 3.0,
+            decay: 0.88, gammaadj: 3.0,
             wave_mode: 5,
             wave_r: 0.7, wave_g: 1.0, wave_b: 0.0, wave_a: 1.0,
             wave_scale: 2.0, wave_usedots: 1, additivewave: 1,
@@ -561,7 +586,7 @@ const BASE_VARIATIONS = [
         name: 'Bloom', desc: 'Soft center', color: '#cc2060',
         bv: {
             zoom: 0.99, warp: 0.3, warpanimspeed: 0.6,
-            decay: 0.988, gammaadj: 2.8,
+            decay: 0.92, gammaadj: 2.8,
             echo_zoom: 3.5,
             wave_mode: 0,
             wave_r: 1.0, wave_g: 0.25, wave_b: 0.55, wave_a: 0.9,
@@ -614,23 +639,42 @@ function hslToRgb(h, s, l) {
     return [f(0), f(8), f(4)];
 }
 
-/** Build a coherent { wave, glow, accent } from a base hue + harmony rule.
+// Tone presets — adjust saturation/lightness of a rolled scheme without touching
+// hue/harmony, so they compose with the rule picker + Base Hue (no hue conflict,
+// unlike warm/cool temperature biases which would fight the Base Hue control).
+const MOODS = [
+    { id: 'vivid',  name: 'Vivid',  sMul: 1.00, lOff:  0.00 },
+    { id: 'neon',   name: 'Neon',   sMul: 1.20, lOff:  0.06 },
+    { id: 'pastel', name: 'Pastel', sMul: 0.45, lOff:  0.22 },
+    { id: 'deep',   name: 'Deep',   sMul: 0.95, lOff: -0.18 },
+];
+
+/** HSL → RGB with a tone (mood) profile applied to S/L. Undefined mood = Vivid
+ *  (identity) → byte-identical to the pre-mood output. */
+function _moodHsl(h, s, l, mood) {
+    const m = MOODS.find(x => x.id === mood) || MOODS[0];
+    const S = Math.max(0, Math.min(1, s * m.sMul));
+    const L = Math.max(0.04, Math.min(0.96, l + m.lOff));
+    return hslToRgb(h, S, L);
+}
+
+/** Build a coherent { wave, glow, accent } from a base hue + harmony rule + tone.
  *  Vivid saturation, mid-high lightness; mono differentiates by lightness since
- *  all three share a hue. Deterministic for a given (rule, hue). */
-function buildHarmonyPalette(rule, hue) {
+ *  all three share a hue. Deterministic for a given (rule, hue, mood). */
+function buildHarmonyPalette(rule, hue, mood) {
     if (rule === 'mono') {
         return {
-            wave:   hslToRgb(hue, 0.85, 0.60),
-            glow:   hslToRgb(hue, 0.90, 0.42),
-            accent: hslToRgb(hue, 0.70, 0.75),
+            wave:   _moodHsl(hue, 0.85, 0.60, mood),
+            glow:   _moodHsl(hue, 0.90, 0.42, mood),
+            accent: _moodHsl(hue, 0.70, 0.75, mood),
         };
     }
     const r = HARMONY_RULES.find(x => x.id === rule) || HARMONY_RULES[1];
     const [oW, oG, oA] = r.offsets;
     return {
-        wave:   hslToRgb(hue + oW, 0.90, 0.58),
-        glow:   hslToRgb(hue + oG, 0.85, 0.50),
-        accent: hslToRgb(hue + oA, 0.95, 0.60),
+        wave:   _moodHsl(hue + oW, 0.90, 0.58, mood),
+        glow:   _moodHsl(hue + oG, 0.85, 0.50, mood),
+        accent: _moodHsl(hue + oA, 0.95, 0.60, mood),
     };
 }
 
@@ -717,9 +761,10 @@ const SHAPE_OPACITY_CURVE = 2.0;
 const SHAPE_SIDES_MIN = 3;
 const SHAPE_SIDES_MAX = 64;
 const SHAPE_SIDES_CURVE = 2.5;
-// A fresh shape preset defaults to this decay (short, clean trail) instead of the
-// global 0.98 (long trail) so new shapes read crisply. Trail slider range 0.85–0.999.
-const SHAPE_DEFAULT_DECAY = 0.90;
+// A fresh shape preset defaults to this decay (short, crisp trail) instead of the
+// global 0.98 (long, "permanent"-looking smear) so new shapes read clean. Applied in
+// all modes on the first shape (see _addShape). Trail slider bottoms out at true zero.
+const SHAPE_DEFAULT_DECAY = 0.85;
 // Mirrors butterchurn's shapeBaseValsDefaults; a fresh shape is enabled, magenta,
 // centred, hexagonal, no border, normal blend.
 function makeShapeDefaults() {
@@ -1134,17 +1179,90 @@ export class EditorInspector {
     /** Color Studio (Phase 6 v1). Bind the 🎲 Colors roll. Future colour controls
      *  (rule picker, HSL, gradient, mood presets) wire up here too. Called once. */
     _bindColorStudio() {
+        // Generator state (transient tool settings — not persisted with the preset).
+        // _csRule / _csMood are nullable: null = "not chosen" (no chip highlighted).
+        // A rule/mood chip is a toggle (click again to clear); 🎲 Colors picks a
+        // random rule + mood + hue and reflects them in the chips. When a dimension
+        // is null we build with a sensible default (rule→Analogous, mood→Vivid).
+        if (this._csHue == null) this._csHue = Math.floor(Math.random() * 360);
+        if (this._csRule === undefined) this._csRule = null;
+        if (this._csMood === undefined) this._csMood = null;
+        this._buildColorStudioControls();
         document.getElementById('btn-roll-colors')?.addEventListener('click', () => this._rollRandomPalette());
     }
 
-    /** Roll a coherent random scheme: random base hue + random harmony rule →
-     *  buildHarmonyPalette → _applyPalette (which honours per-channel locks, so
-     *  "lock a colour you like, reroll the rest" works for free). */
+    /** Build the harmony-rule chips, the tone/mood chips, and the Base Hue slider.
+     *  All drive the same buildHarmonyPalette primitives the 🎲 roll uses, so the
+     *  roll is steerable; chips toggle (click the active one to clear). */
+    _buildColorStudioControls() {
+        const buildChips = (wrapId, defs, dataKey, handler) => {
+            const wrap = document.getElementById(wrapId);
+            if (!wrap || wrap.children.length) return;
+            defs.forEach(d => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'cs-rule-chip';
+                b.dataset[dataKey] = d.id;
+                b.textContent = d.name;
+                b.addEventListener('click', () => handler(d.id));
+                wrap.appendChild(b);
+            });
+        };
+        buildChips('cs-rule-chips', HARMONY_RULES, 'rule', id => this._pickColorRule(id));
+        buildChips('cs-mood-chips', MOODS, 'mood', id => this._pickColorMood(id));
+        const hueWrap = document.getElementById('cs-hue-row');
+        if (hueWrap && !document.getElementById('cs-hue')) {
+            const input = makeSlider(hueWrap, { id: 'cs-hue', label: 'Base Hue', min: 0, max: 360, step: 1, value: this._csHue, decimals: 0 });
+            const valEl = document.getElementById('cs-hue-val');
+            input.addEventListener('pointerdown', () => this._preSnap());
+            input.addEventListener('input', () => {
+                const v = parseFloat(input.value);
+                if (valEl) valEl.textContent = v.toFixed(0);
+                input.style.setProperty('--pct', `${(v / 360) * 100}%`);
+                this._csHue = v;
+                this._applyColorStudio(false); // snap=false: one undo step per drag
+            });
+            input.addEventListener('pointerup', () => this._postSnap());
+        }
+        this._syncColorStudioControls();
+    }
+
+    /** Build + apply a scheme from the current generator state. null rule/mood fall
+     *  back to Analogous / Vivid so the scheme is always coherent. */
+    _applyColorStudio(snap = true) {
+        const rule = this._csRule || 'analog';
+        this._applyPalette({ name: 'Custom', ...buildHarmonyPalette(rule, this._csHue, this._csMood) }, 'random', snap);
+        this._syncColorStudioControls();
+    }
+
+    /** Toggle a harmony rule (click the active one to clear → back to no selection). */
+    _pickColorRule(rule) {
+        this._csRule = (this._csRule === rule) ? null : rule;
+        this._applyColorStudio();
+    }
+
+    /** Toggle a tone (Vivid / Neon / Pastel / Deep); clear by clicking the active one. */
+    _pickColorMood(mood) {
+        this._csMood = (this._csMood === mood) ? null : mood;
+        this._applyColorStudio();
+    }
+
+    /** 🎲 Colors — fully random: random hue + random rule + random tone, then
+     *  reflect all three in the chips/slider. Honours per-channel 🔒 locks. */
     _rollRandomPalette() {
-        const hue = Math.floor(Math.random() * 360);
-        const rule = HARMONY_RULES[Math.floor(Math.random() * HARMONY_RULES.length)].id;
-        const p = { name: 'Random', ...buildHarmonyPalette(rule, hue) };
-        this._applyPalette(p, 'random');
+        this._csHue = Math.floor(Math.random() * 360);
+        this._csRule = HARMONY_RULES[Math.floor(Math.random() * HARMONY_RULES.length)].id;
+        this._csMood = MOODS[Math.floor(Math.random() * MOODS.length)].id;
+        this._applyColorStudio();
+    }
+
+    /** Reflect generator state in the UI. null rule/mood → no chip highlighted. */
+    _syncColorStudioControls() {
+        document.querySelectorAll('#cs-rule-chips .cs-rule-chip').forEach(el =>
+            el.classList.toggle('active', el.dataset.rule === this._csRule));
+        document.querySelectorAll('#cs-mood-chips .cs-rule-chip').forEach(el =>
+            el.classList.toggle('active', el.dataset.mood === this._csMood));
+        this._syncSlider('cs-hue', this._csHue, 0, 360, 0);
     }
 
     _buildPaletteChips() {
@@ -1184,11 +1302,13 @@ export class EditorInspector {
      * the chip's identifier ('0'..'11' for builtins, 'mymix' for the saved
      * mix) used to highlight the active chip. Locked channels are skipped.
      */
-    _applyPalette(p, key) {
+    _applyPalette(p, key, snap = true) {
         // Clear the hover backup so the upcoming mouseleave doesn't restore
         // over the colors we're about to commit.
         this._palettePreviewBackup = null;
-        this._preSnap();
+        // snap=false lets a live drag (e.g. Base Hue) bracket the whole gesture in
+        // one undo step via its own pointerdown/up _preSnap/_postSnap.
+        if (snap) this._preSnap();
         const bv = this.currentState.baseVals;
         if (!this._paletteLock.wave) {
             [bv.wave_r, bv.wave_g, bv.wave_b] = p.wave;
@@ -1204,7 +1324,7 @@ export class EditorInspector {
         // NOTE: do not touch ob_a/ob_size/ib_a/ib_size here. Chip paints colors
         // only; border intensity is owned by the Glow/Accent Strength sliders
         // (Palette tab) and the matching Appearance sliders.
-        this._postSnap();
+        if (snap) this._postSnap();
         // Rebuild comp shader so solid-color base picks up the new wave_r/g/b
         this._buildCompShader();
         this._applyToEngine();
@@ -1298,37 +1418,37 @@ export class EditorInspector {
         });
     }
 
-    // ─── Palette strength sliders (Glow / Accent intensity) ─────────────────
-    // Live under the Quick Palettes grid. Mirror ob_a / ib_a so users dial in
-    // border intensity right where they pick colors, instead of jumping to the
-    // Appearance section. The matching Appearance sliders stay as the deeper
-    // controls (size + alpha) and are kept in sync.
+    // ─── Palette strength sliders (Glow / Accent bloom) ─────────────────────
+    // Live under the Quick Palettes grid. Drive a colored bloom (blurred feedback
+    // tinted by the Glow / Accent colour) baked into the comp shader — see
+    // _buildCompShader. Replaced the old border-ring mapping (ob_a/ib_a), which
+    // only ever drew an edge rectangle; the literal border rings are still on the
+    // Appearance Outer/Inner Border sliders for anyone who wants them.
 
     _buildPaletteStrengthSliders() {
         const container = document.getElementById('palette-strength-sliders');
         if (!container) return;
-        // Strength is a coupled "loudness" axis: drives BOTH alpha and size at
-        // once. Without this coupling, dragging Strength on a virgin preset
-        // (size = 0) would change alpha but render nothing. The Appearance tab
-        // still exposes separate size + alpha sliders for fine-tuning.
-        const SIZE_FROM_STRENGTH = 0.05;  // strength=1 → size=0.05 (visible glow)
+        // Glow / Accent Strength drive a colored BLOOM (a soft halo from the blurred
+        // feedback buffer, tinted by the Glow / Accent colour) baked into the comp
+        // shader — a real glow on the visualisation, NOT the old edge-border ring
+        // (which only ever drew a rectangle at the screen edge). The literal border
+        // rings are still available via the Appearance Outer/Inner Border sliders.
+        // studio_glow/studio_accent save via baseVals (free player parity); 0 = off.
         const configs = [
-            { id: 'ps-glow-strength',   label: 'Glow Strength',   alphaKey: 'ob_a', sizeKey: 'ob_size', alphaMirror: 'ps-ob-a', sizeMirror: 'ps-ob-size' },
-            { id: 'ps-accent-strength', label: 'Accent Strength', alphaKey: 'ib_a', sizeKey: 'ib_size', alphaMirror: 'ps-ib-a', sizeMirror: 'ps-ib-size' },
+            { id: 'ps-glow-strength',   label: 'Glow Strength',   key: 'studio_glow' },
+            { id: 'ps-accent-strength', label: 'Accent Strength', key: 'studio_accent' },
         ];
         configs.forEach(cfg => {
-            const input = makeSlider(container, { ...cfg, min: 0, max: 1.0, step: 0.01, value: BLANK.baseVals[cfg.alphaKey] });
+            const input = makeSlider(container, { ...cfg, min: 0, max: 1.0, step: 0.01, value: BLANK.baseVals[cfg.key] ?? 0 });
             const valEl = document.getElementById(`${cfg.id}-val`);
             input.addEventListener('pointerdown', () => this._preSnap());
             input.addEventListener('input', () => {
                 const v = parseFloat(input.value);
-                const sizeV = v * SIZE_FROM_STRENGTH;
                 if (valEl) valEl.textContent = v.toFixed(2);
                 input.style.setProperty('--pct', `${v * 100}%`);
-                this.currentState.baseVals[cfg.alphaKey] = v;
-                this.currentState.baseVals[cfg.sizeKey] = sizeV;
-                this._syncSlider(cfg.alphaMirror, v,     0, 1.0, 2);
-                this._syncSlider(cfg.sizeMirror,  sizeV, 0, 0.1, 3);
+                this.currentState.baseVals[cfg.key] = v;
+                // Bloom is baked into the comp shader → rebuild (like paletteOpacity).
+                this._buildCompShader();
                 this._applyToEngine(true);
             });
             input.addEventListener('pointerup', () => this._postSnap());
@@ -1342,12 +1462,13 @@ export class EditorInspector {
         const configs = [
             { id: 'ps-decay', label: 'Trail', min: 0.85, max: 0.999, step: 0.001, value: BLANK.baseVals.decay, decimals: 3, key: 'decay' },
             { id: 'ps-ob-size', label: 'Outer Border Size', min: 0, max: 0.1, step: 0.001, value: BLANK.baseVals.ob_size, decimals: 3, key: 'ob_size' },
-            { id: 'ps-ob-a', label: 'Outer Border Alpha', min: 0, max: 1.0, step: 0.01, value: BLANK.baseVals.ob_a, key: 'ob_a', mirror: 'ps-glow-strength' },
+            { id: 'ps-ob-a', label: 'Outer Border Alpha', min: 0, max: 1.0, step: 0.01, value: BLANK.baseVals.ob_a, key: 'ob_a' },
             { id: 'ps-ib-size', label: 'Inner Border Size', min: 0, max: 0.1, step: 0.001, value: BLANK.baseVals.ib_size, decimals: 3, key: 'ib_size' },
-            { id: 'ps-ib-a', label: 'Inner Border Alpha', min: 0, max: 1.0, step: 0.01, value: BLANK.baseVals.ib_a, key: 'ib_a', mirror: 'ps-accent-strength' },
+            { id: 'ps-ib-a', label: 'Inner Border Alpha', min: 0, max: 1.0, step: 0.01, value: BLANK.baseVals.ib_a, key: 'ib_a' },
             { id: 'ps-wavefade', label: 'Fade Wave in Silence', min: 0, max: 2.0, step: 0.01, value: BLANK.baseVals.modwavealphabyvolume, key: 'modwavealphabyvolume' },
             { id: 'ps-saturation', label: 'Saturation', min: 0, max: 2.0, step: 0.01, value: 1.0, key: 'studio_saturation', reInject: true },
             { id: 'ps-hue', label: 'Hue Rotate', min: 0, max: 360, step: 1, value: 0, key: 'studio_hue_rotate', reInject: true },
+            { id: 'ps-color-roll', label: 'Color Roll', min: 0, max: 1.5, step: 0.01, value: 0, key: 'studio_hue_roll', reInject: true },
         ];
         configs.forEach(cfg => {
             const input = makeSlider(container, cfg);
@@ -1397,7 +1518,7 @@ export class EditorInspector {
 
     _rebuildPostFx() {
         const bv = this.currentState.baseVals;
-        const opts = { sat: bv.studio_saturation ?? 1.0, hue: bv.studio_hue_rotate ?? 0 };
+        const opts = { sat: bv.studio_saturation ?? 1.0, hue: bv.studio_hue_rotate ?? 0, roll: bv.studio_hue_roll ?? 0 };
         // When images are present, sat/hue must be baked inline into `col` BEFORE
         // image layers blend in (_buildCompShader handles this). The end-block
         // strip+re-inject can't reach that position, so delegate to a full rebuild.
@@ -1818,7 +1939,7 @@ export class EditorInspector {
             trailWrap.dataset.built = '1';
             const pos0 = this._trailPosFromDecay(this.currentState.baseVals.decay);
             const t = makeSlider(trailWrap, { id: 'sh-trail', label: 'Trail', min: 0, max: 1, step: 0.005, value: pos0 });
-            t.setAttribute('data-tooltip', 'Feedback trail length — left = none (crisp), right = long trails');
+            t.setAttribute('data-tooltip', 'Trail length');
             const valEl = document.getElementById('sh-trail-val');
             if (valEl) valEl.textContent = this.currentState.baseVals.decay.toFixed(3);
             t.addEventListener('pointerdown', () => this._preSnap());
@@ -1843,9 +1964,15 @@ export class EditorInspector {
         shapes.push(makeShapeDefaults());
         // Shapes render over Solid/Shift too (the composite in _buildCompShader), so
         // we DON'T flip out of solid — keep whatever background the user has. On the
-        // first shape over a Solid/Shift base, default to a short, clean trail (the
-        // global 0.98 = long smear); feedback variations keep their own decay.
-        if (isFirst && this._solidColor) this.currentState.baseVals.decay = SHAPE_DEFAULT_DECAY;
+        // first shape, give it a short, clean trail so it doesn't drown in a permanent
+        // gray smear — IN EVERY MODE (the old `&& this._solidColor` gate skipped this
+        // for feedback variations, whose decay 0.96–0.99 left exactly the "permanent
+        // trail" the user kept hitting). Only lowered when the current trail is longer
+        // than clean, so a short trail the user already dialled is never stomped; raise
+        // it back any time via the Trail slider.
+        if (isFirst && this.currentState.baseVals.decay > SHAPE_DEFAULT_DECAY) {
+            this.currentState.baseVals.decay = SHAPE_DEFAULT_DECAY;
+        }
         this._postSnap();
         this._renderShapeCards();
         this._buildCompShader();   // include the shape→solid composite when in solid mode
@@ -7670,7 +7797,10 @@ export class EditorInspector {
         // (_imagesOnly). Gated this way so MilkDrop/solid modes are byte-identical
         // (avoids the May-2026 "turns off the layers too" regression).
         const _bgT = this._imagesOnly && !!this.currentState.bgTransparent;
-        if (visibleImages.length === 0 && !this._solidColor && sm === 'none' && _po >= 1.0 && !_bgT) {
+        const _glow = this.currentState.baseVals.studio_glow ?? 0;
+        const _accent = this.currentState.baseVals.studio_accent ?? 0;
+        if (visibleImages.length === 0 && !this._solidColor && sm === 'none' && _po >= 1.0 && !_bgT
+            && _glow === 0 && _accent === 0) {
             this.currentState.comp = BLANK_COMP;
             this._lastBuildMs = performance.now() - _t0;
             return;
@@ -7768,16 +7898,33 @@ export class EditorInspector {
             base = uvFold + `  vec3 col = ${mainSample};\n`;
         }
         const _bv = this.currentState.baseVals;
+        // Glow / Accent bloom — a colored halo from the BLURRED feedback buffer
+        // (engine auto-runs the blur passes because we reference sampler_blur1/2),
+        // tinted by the Glow (ob) / Accent (ib) colours. This is the real "glow"
+        // the border rings never were, and it makes all three palette colours show
+        // at once. Only emitted when on (so getHighestBlur=0 → no blur cost when
+        // off), and skipped in imagesOnly mode (empty feedback buffer = nothing to
+        // bloom). The ×3 scale gives the 0–1 slider a visible-but-not-blown range.
+        if ((_glow > 0 || _accent > 0) && !this._imagesOnly) {
+            const f = (n) => Number(n || 0).toFixed(4);
+            if (_glow > 0) {
+                base += `  col += texture(sampler_blur1, uv_m).rgb * vec3(${f(_bv.ob_r)}, ${f(_bv.ob_g)}, ${f(_bv.ob_b)}) * ${(_glow * 3).toFixed(4)};\n`;
+            }
+            if (_accent > 0) {
+                base += `  col += texture(sampler_blur2, uv_m).rgb * vec3(${f(_bv.ib_r)}, ${f(_bv.ib_g)}, ${f(_bv.ib_b)}) * ${(_accent * 3).toFixed(4)};\n`;
+            }
+        }
         const _sat = _bv.studio_saturation ?? 1.0;
         const _hue = _bv.studio_hue_rotate ?? 0;
+        const _roll = _bv.studio_hue_roll ?? 0;
         const _hasImages = visibleImages.length > 0;
 
         let body = base;
-        // When images are present, apply sat/hue to `col` HERE — after `col` is
+        // When images are present, apply sat/hue/roll to `col` HERE — after `col` is
         // initialised from the MilkDrop background but BEFORE any image layer is
-        // composited into it.  That way image pixels are never colour-shifted.
+        // composited into it.  That way image pixels are never colour-shifted/rolled.
         if (_hasImages) {
-            const _satHue = buildSatHueOnColGlsl(_sat, _hue);
+            const _satHue = buildSatHueOnColGlsl(_sat, _hue, _roll);
             if (_satHue) body += _satHue;
         }
         for (const img of visibleImages) {
@@ -7791,7 +7938,7 @@ export class EditorInspector {
         this._baseComp = _rawComp;
         // With images: end-block uses defaults (sat=1, hue=0) — sat/hue already applied above.
         // Without images: end-block carries the full sat/hue as before.
-        this.currentState.comp = injectStudioPostFx(_rawComp, _hasImages ? { sat: 1.0, hue: 0 } : { sat: _sat, hue: _hue });
+        this.currentState.comp = injectStudioPostFx(_rawComp, _hasImages ? { sat: 1.0, hue: 0, roll: 0 } : { sat: _sat, hue: _hue, roll: _roll });
         this._lastBuildMs = performance.now() - _t0;
     }
 
@@ -9024,8 +9171,8 @@ export class EditorInspector {
     _syncPaletteSliders() {
         this._syncSlider('ps-opacity', this.currentState.paletteOpacity ?? 1.0, 0, 1.0, 2);
         const bv = this.currentState.baseVals;
-        this._syncSlider('ps-glow-strength', bv.ob_a, 0, 1.0, 2);
-        this._syncSlider('ps-accent-strength', bv.ib_a, 0, 1.0, 2);
+        this._syncSlider('ps-glow-strength', bv.studio_glow ?? 0, 0, 1.0, 2);
+        this._syncSlider('ps-accent-strength', bv.studio_accent ?? 0, 0, 1.0, 2);
         this._syncSlider('ps-decay', bv.decay, 0.85, 0.999, 3);
         this._syncTrailSlider();   // shapes-section Trail mirrors the same decay (curved)
         this._syncSlider('ps-ob-size', bv.ob_size, 0, 0.1, 3);
@@ -9035,6 +9182,7 @@ export class EditorInspector {
         this._syncSlider('ps-wavefade', bv.modwavealphabyvolume, 0, 2.0, 2);
         this._syncSlider('ps-saturation', bv.studio_saturation ?? 1.0, 0, 2.0, 2);
         this._syncSlider('ps-hue', bv.studio_hue_rotate ?? 0, 0, 360, 0);
+        this._syncSlider('ps-color-roll', bv.studio_hue_roll ?? 0, 0, 1.5, 2);
     }
 
     _syncSolidFx() {
@@ -9212,7 +9360,7 @@ export class EditorInspector {
         const _bundledRaw = stripStudioPostFx(bundled.comp || BLANK_COMP_RAW);
         this._baseComp = _bundledRaw;
         const _bbv = this.currentState.baseVals;
-        this.currentState.comp = injectStudioPostFx(_bundledRaw, { sat: _bbv.studio_saturation ?? 1.0, hue: _bbv.studio_hue_rotate ?? 0 });
+        this.currentState.comp = injectStudioPostFx(_bundledRaw, { sat: _bbv.studio_saturation ?? 1.0, hue: _bbv.studio_hue_rotate ?? 0, roll: _bbv.studio_hue_roll ?? 0 });
 
         // Track remix origin so a save references the parent
         this.currentState.parentPresetName = name;

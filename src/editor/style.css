@@ -740,6 +740,19 @@ html, body {
 .motion-engine-btn.active { border-color: #fff; background: rgba(255,255,255,0.06); }
 .motion-engine-btn.active .motion-preset-name { color: #fff; }
 
+/* Color Studio — harmony rule picker + Base Hue. Neutral chips, white-outline
+   active state (matches Motion Engine / base-var conventions; no accent hues). */
+.color-studio-controls { margin: 6px 0 10px; }
+.cs-rule-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.cs-rule-chip {
+  font-size: 10px; padding: 3px 8px; border-radius: 10px; cursor: pointer;
+  background: var(--surface-2, rgba(255,255,255,0.04));
+  border: 1px solid var(--border, rgba(255,255,255,0.12));
+  color: var(--text-2, #bbb); white-space: nowrap;
+}
+.cs-rule-chip:hover { border-color: var(--border-hi); color: var(--text); }
+.cs-rule-chip.active { border-color: #fff; color: #fff; background: rgba(255,255,255,0.08); }
+
 /* ── Custom Shapes Composer (Phase 2) ───────────────────────────────────── */
 .shapes-list { display: flex; flex-direction: column; gap: 8px; }
 .shape-card {
