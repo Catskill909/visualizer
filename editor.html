@@ -256,7 +256,7 @@
                                     Shift.</p>
                                 <div class="layer-row-inline" style="gap:8px;margin-bottom:6px">
                                     <span class="layer-ctrl-label"
-                                        data-tooltip="Which frequency band drives Pulse and Shift — Bass = kicks, Mid = melody, Treble = hi-hats, Volume = overall mix">Source</span>
+                                        data-tooltip="Audio source">Source</span>
                                     <select id="solid-react-source" class="layer-react-source">
                                         <option value="bass">Bass</option>
                                         <option value="mid">Mid</option>
@@ -267,7 +267,7 @@
                                 </div>
                                 <div class="layer-row-inline" style="gap:8px;margin-bottom:8px">
                                     <span class="layer-ctrl-label"
-                                        data-tooltip="How the signal is shaped — Squared suppresses quiet hits, Cubed reserves reaction for loudest peaks, Gate flips binary on/off">Curve</span>
+                                        data-tooltip="Response curve">Curve</span>
                                     <div id="solid-react-curve" class="layer-react-curve" role="group"
                                         aria-label="Reactivity curve">
                                         <button class="lseg active" data-curve="linear">Linear</button>
@@ -303,7 +303,7 @@
                             </div>
                             <div class="palette-grid" id="palette-grid"></div>
                             <button class="ghost-btn ghost-btn--inline" id="btn-save-mymix" type="button"
-                                data-tooltip="Save current Wave / Glow / Accent colors as a personal chip">
+                                data-tooltip="Save current colours">
                                 + Save current mix
                             </button>
                             <div id="palette-strength-sliders"></div>
@@ -313,7 +313,7 @@
 
                                 <div class="color-row">
                                     <button class="color-lock-btn" id="lock-wave" type="button"
-                                        data-tooltip="Lock the Wave color so palette chips and Save can't overwrite it"
+                                        data-tooltip="Lock Wave colour"
                                         aria-pressed="false">🔓</button>
                                     <span class="color-row-label" id="wave-row-label">Wave</span>
                                     <div class="color-swatch-wrap">
@@ -327,7 +327,7 @@
 
                                 <div class="color-row">
                                     <button class="color-lock-btn" id="lock-glow" type="button"
-                                        data-tooltip="Lock the Glow color so palette chips can't overwrite it"
+                                        data-tooltip="Lock Glow colour"
                                         aria-pressed="false">🔓</button>
                                     <span class="color-row-label">Glow</span>
                                     <div class="color-swatch-wrap">
@@ -341,7 +341,7 @@
 
                                 <div class="color-row">
                                     <button class="color-lock-btn" id="lock-accent" type="button"
-                                        data-tooltip="Lock the Accent color so palette chips can't overwrite it"
+                                        data-tooltip="Lock Accent colour"
                                         aria-pressed="false">🔓</button>
                                     <span class="color-row-label">Accent</span>
                                     <div class="color-swatch-wrap">
@@ -446,7 +446,7 @@
                                 preset motion and do not modify Image layer reactivity.</p>
                             <div class="layer-row-inline" style="gap:8px;margin-bottom:6px">
                                 <span class="layer-ctrl-label"
-                                    data-tooltip="Which frequency band drives preset motion modulation">Source</span>
+                                    data-tooltip="Audio source">Source</span>
                                 <select id="motion-react-source" class="layer-react-source">
                                     <option value="bass">Bass</option>
                                     <option value="mid">Mid</option>
@@ -457,7 +457,7 @@
                             </div>
                             <div class="layer-row-inline" style="gap:8px;margin-bottom:8px">
                                 <span class="layer-ctrl-label"
-                                    data-tooltip="How the signal is shaped before driving motion modulation">Curve</span>
+                                    data-tooltip="Response curve">Curve</span>
                                 <div id="motion-react-curve" class="layer-react-curve" role="group"
                                     aria-label="Motion reactivity curve">
                                     <button class="lseg active" data-curve="linear">Linear</button>
@@ -471,7 +471,7 @@
                                 but apply to MilkDrop preset motion only.</p>
                             <div class="layer-row-inline" style="gap:8px;margin-top:8px;margin-bottom:8px">
                                 <span class="layer-ctrl-label"
-                                    data-tooltip="Reverses Pulse direction — audio pulls zoom inward instead of pushing outward">Shrink</span>
+                                    data-tooltip="Reverse Pulse direction">Shrink</span>
                                 <label class="toggle-switch toggle-switch--sm" style="margin-left:auto">
                                     <input type="checkbox" id="motion-react-shrink" />
                                     <span class="toggle-track"><span class="toggle-thumb"></span></span>
@@ -544,7 +544,7 @@
                             </div>
                             <div class="layer-row-inline" style="gap:8px;margin-bottom:8px">
                                 <span class="layer-ctrl-label"
-                                    data-tooltip="How the signal is shaped before driving wave modulation">Curve</span>
+                                    data-tooltip="Response curve">Curve</span>
                                 <div id="wave-react-curve" class="layer-react-curve" role="group"
                                     aria-label="Wave reactivity curve">
                                     <button class="lseg active" data-curve="linear">Linear</button>
@@ -587,7 +587,7 @@
                                 <button class="seg" data-smirror="kaleido">✦ Kaleido</button>
                             </div>
                             <div class="layer-slider-row" id="scene-kaleido-speed-row" style="display:none;margin-top:8px">
-                                <span class="layer-ctrl-label" data-tooltip="Speed at which the kaleidoscope pattern rotates. Zero = frozen.">Speed</span>
+                                <span class="layer-ctrl-label" data-tooltip="Kaleidoscope spin speed">Speed</span>
                                 <input type="range" id="scene-kaleido-speed-sl" class="slider slider--bipolar" min="-1" max="1" step="0.01" value="0" style="--pct-lo:50%;--pct-hi:50%">
                                 <span class="lsv" id="scene-kaleido-speed-val">0.00</span>
                             </div>
@@ -595,7 +595,7 @@
                             <div class="images-header" style="margin-top:16px">
                                 <p class="section-label" style="margin:0">Layers</p>
                                 <label class="images-only-row"
-                                    data-tooltip="Hide the MilkDrop visualizer and show only your layers (images/videos) over black">
+                                    data-tooltip="Show layers only">
                                     <span class="images-only-label">Show layers only</span>
                                     <label class="toggle-switch toggle-switch--sm">
                                         <input type="checkbox" id="toggle-images-only" />
@@ -603,7 +603,7 @@
                                     </label>
                                 </label>
                                 <label class="images-only-row"
-                                    data-tooltip="Make the canvas behind your layers transparent (layers-only presets) so lower timeline zones show through">
+                                    data-tooltip="Transparent canvas behind layers">
                                     <span class="images-only-label">Transparent background</span>
                                     <label class="toggle-switch toggle-switch--sm">
                                         <input type="checkbox" id="toggle-bg-transparent" />
@@ -615,7 +615,7 @@
                             <div class="layers-bar">
                                 <span class="layers-count" id="layers-count">Layers: 0 / 5</span>
                                 <label class="hd-upload-row"
-                                    data-tooltip="Next upload gets resized to 2048px (HD) instead of 1024px. Uses more VRAM.">
+                                    data-tooltip="Upload at 2048px (HD)">
                                     <span class="hd-upload-label">HD uploads</span>
                                     <label class="toggle-switch toggle-switch--sm">
                                         <input type="checkbox" id="toggle-hd-uploads" />

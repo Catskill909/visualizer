@@ -2278,7 +2278,7 @@ export class EditorInspector {
             pill.type = 'button';
             pill.className = 'react-src-pill';
             pill.id = `${input.id}-src`;
-            pill.setAttribute('data-tooltip', 'Audio source for this slider — click to cycle (· = global, B = Bass, M = Mid, T = Treble, V = Volume, F = Flux)');
+            pill.setAttribute('data-tooltip', 'Audio source (click to cycle)');
             header.insertBefore(pill, valEl);
             pill.addEventListener('click', () => {
                 this._preSnap();
@@ -2476,7 +2476,7 @@ export class EditorInspector {
                 pill.type = 'button';
                 pill.className = 'react-src-pill';
                 pill.id = `${cfg.id}-src`;
-                pill.setAttribute('data-tooltip', 'Audio source for this slider — click to cycle (· = global, B = Bass, M = Mid, T = Treble, V = Volume, F = Flux)');
+                pill.setAttribute('data-tooltip', 'Audio source (click to cycle)');
                 header.insertBefore(pill, valEl);
                 pill.addEventListener('click', () => {
                     this._preSnap();
