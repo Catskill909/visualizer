@@ -1920,19 +1920,12 @@ html, body {
    ══════════════════════════════════════════════════════════════════════ */
 
 .mini-player {
-  position: fixed;
-  bottom: 20px;
-  left: 20px;
-  z-index: 150;
-  width: 280px;
-  background: rgba(10,10,10,0.88);
-  border: 1px solid var(--border-hi);
-  border-radius: var(--r-l);
-  backdrop-filter: blur(16px);
-  padding: 10px 12px 10px;
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.03);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
   display: flex; flex-direction: column; gap: 8px;
   animation: mp-in 0.25s cubic-bezier(0.34,1.56,0.64,1);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
 }
 .mini-player[hidden] { display: none; }
 

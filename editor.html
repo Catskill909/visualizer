@@ -143,6 +143,38 @@
             <!-- Right panel -->
             <aside id="editor-panel" class="editor-panel" data-mode="edit" aria-label="Preset controls">
 
+                <!-- ════════════════════ MINI PLAYER ════════════════════ -->
+                <div id="mini-player" class="mini-player" hidden>
+                    <div class="mp-track">
+                        <span id="mp-filename" class="mp-filename">—</span>
+                        <span id="mp-time" class="mp-time">0:00 / 0:00</span>
+                    </div>
+                    <div class="mp-controls">
+                        <button id="mp-play" class="mp-btn" type="button" data-tooltip="Play / Pause">
+                            <svg id="mp-icon-play" viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
+                                <path d="M8 5v14l11-7z" />
+                            </svg>
+                            <svg id="mp-icon-pause" viewBox="0 0 24 24" fill="currentColor" width="14" height="14"
+                                style="display:none">
+                                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                            </svg>
+                        </button>
+                        <input id="mp-seek" class="mp-seek slider" type="range" min="0" max="1" step="0.001" value="0"
+                            style="--pct:0%">
+                        <input id="mp-vol" class="mp-vol slider" type="range" min="0" max="1" step="0.01" value="1"
+                            title="Volume" style="--pct:100%">
+                        <button id="mp-load" class="mp-btn" type="button" data-tooltip="Load audio file">
+                            <svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13">
+                                <path
+                                    d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z" />
+                            </svg>
+                        </button>
+                        <input id="mp-file-input" type="file"
+                            accept="audio/mpeg,audio/wav,audio/ogg,audio/flac,audio/aac,audio/mp4,audio/x-m4a,.mp3,.wav,.ogg,.flac,.aac,.m4a"
+                            hidden>
+                    </div>
+                </div>
+
                 <!-- Mode toggle: Edit | Library -->
                 <div class="mode-toggle" id="mode-toggle" role="group" aria-label="Panel mode">
                     <button class="mode-seg active" data-mode="edit">
@@ -1072,38 +1104,6 @@
             <div class="dev-hud-row"><span>VRAM</span><span><span id="hud-vram">0</span> MB</span></div>
             <div class="dev-hud-row"><span>Build</span><span><span id="hud-build">—</span> ms</span></div>
             <div class="dev-hud-hint">Press ` to hide</div>
-        </div>
-
-        <!-- ════════════════════ MINI PLAYER ════════════════════ -->
-        <div id="mini-player" class="mini-player" hidden>
-            <div class="mp-track">
-                <span id="mp-filename" class="mp-filename">—</span>
-                <span id="mp-time" class="mp-time">0:00 / 0:00</span>
-            </div>
-            <div class="mp-controls">
-                <button id="mp-play" class="mp-btn" type="button" data-tooltip="Play / Pause">
-                    <svg id="mp-icon-play" viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
-                        <path d="M8 5v14l11-7z" />
-                    </svg>
-                    <svg id="mp-icon-pause" viewBox="0 0 24 24" fill="currentColor" width="14" height="14"
-                        style="display:none">
-                        <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-                    </svg>
-                </button>
-                <input id="mp-seek" class="mp-seek slider" type="range" min="0" max="1" step="0.001" value="0"
-                    style="--pct:0%">
-                <input id="mp-vol" class="mp-vol slider" type="range" min="0" max="1" step="0.01" value="1"
-                    title="Volume" style="--pct:100%">
-                <button id="mp-load" class="mp-btn" type="button" data-tooltip="Load audio file">
-                    <svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13">
-                        <path
-                            d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z" />
-                    </svg>
-                </button>
-                <input id="mp-file-input" type="file"
-                    accept="audio/mpeg,audio/wav,audio/ogg,audio/flac,audio/aac,audio/mp4,audio/x-m4a,.mp3,.wav,.ogg,.flac,.aac,.m4a"
-                    hidden>
-            </div>
         </div>
 
         <script type="module" src="/src/editor/main.js"></script>
