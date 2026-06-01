@@ -13,7 +13,7 @@
  *  All three swatches can be freely overridden after applying a palette.
  */
 
-import { createCustomPreset, saveCustomPreset, getImage, storeImage, generateId, buildMotionReactFrameEqs, buildWaveReactFrameEqs, buildAnimFrameEqs, buildMotionEngineFrameEqs, buildShapeMotionEqs, MOTION_ENGINES } from '../customPresets.js';
+import { createCustomPreset, saveCustomPreset, getImage, storeImage, generateId, buildMotionReactFrameEqs, buildWaveReactFrameEqs, buildAnimFrameEqs, buildMotionEngineFrameEqs, buildShapeMotionEqs, MOTION_ENGINES, buildWarpShader, WARP_STYLES } from '../customPresets.js';
 import {
     parseGifFile, processGifFrames, generateFrameStrip,
     shouldOptimize, getRecommendedSettings, formatBytes,
@@ -447,6 +447,7 @@ const BLANK = {
     // universal knobs every engine reads. Round-trips via the standard BLANK
     // overlay (no save/load surgery).
     motionEngine: { id: 'none', speed: 1.0, depth: 0.5 },
+    flowStyle: { id: 'none', speed: 1.0, depth: 0.5, density: 0.5 },  // Phase 7 — per-preset warp field
     motionReact: {
         source: 'bass',
         curve: 'linear',
@@ -483,6 +484,17 @@ const BLANK = {
     solidColorB: [0, 0, 0],
     solidReactSource: 'bass',  // 'bass' | 'mid' | 'treb' | 'vol'
     solidReactCurve: 'linear', // 'linear' | 'squared' | 'cubed' | 'threshold'
+    // Phase 8 — Color Field. Spreads the Shift A→B blend across SPACE, not just
+    // time: 'flat' = the classic flat Shift (byte-identical, so old presets are
+    // unchanged); linear/radial/plasma make the background a moving multi-colour
+    // field that still pulses with the audio. scale = pattern frequency, speed =
+    // how fast it drifts. Lives outside baseVals; round-trips via ...currentState.
+    bgField: { style: 'flat', scale: 1.0, speed: 0.3 },
+    // Phase 8.2 — Background colour A, distinct from the foreground wave colour
+    // (wave_r/g/b). null = fall back to the wave colour (so old presets that never
+    // had this are byte-identical). Set by the palette/roll to a contrasting
+    // harmony colour so the background field ≠ the wave/shapes/flow on top of it.
+    bgColorA: null,
 };
 
 
@@ -765,6 +777,12 @@ const SHAPE_SIDES_CURVE = 2.5;
 // global 0.98 (long, "permanent"-looking smear) so new shapes read clean. Applied in
 // all modes on the first shape (see _addShape). Trail slider bottoms out at true zero.
 const SHAPE_DEFAULT_DECAY = 0.85;
+// Picking a Flow Style seeds a fuller feedback so the warp field actually FILLS the
+// screen (MilkDrop fills via high decay + the warp loop; our clean 0.88–0.92 default
+// left flows thin — milkdrop-tools-dev.md §3.10). Opt-in (you picked a flow), so it
+// never reintroduces the permanent-gray BLANK default; seed-when-clean only, Trail
+// still dials it back.
+const FLOW_FILL_DECAY = 0.96;
 // Mirrors butterchurn's shapeBaseValsDefaults; a fresh shape is enabled, magenta,
 // centred, hexagonal, no border, normal blend.
 function makeShapeDefaults() {
@@ -827,6 +845,22 @@ function loadPaletteLocks() {
 }
 function savePaletteLocks(locks) {
     try { localStorage.setItem(PALETTE_LOCKS_KEY, JSON.stringify(locks)); } catch { /* quota / SSR */ }
+}
+
+// Remix (🎲 full-stack roll) per-group locks — pin a group and Remix re-rolls only
+// the rest. Session preference (localStorage), not saved per-preset.
+const REMIX_LOCKS_KEY = 'dc.remix.locks';
+const REMIX_LOCK_GROUPS = ['colours', 'field', 'motion', 'flow', 'reactivity'];
+function loadRemixLocks() {
+    const blank = { colours: false, field: false, motion: false, flow: false, reactivity: false };
+    try {
+        const v = JSON.parse(localStorage.getItem(REMIX_LOCKS_KEY) || '{}');
+        REMIX_LOCK_GROUPS.forEach(k => { blank[k] = !!v[k]; });
+        return blank;
+    } catch { return blank; }
+}
+function saveRemixLocks(locks) {
+    try { localStorage.setItem(REMIX_LOCKS_KEY, JSON.stringify(locks)); } catch { /* quota / SSR */ }
 }
 
 function loadMyMix() {
@@ -901,6 +935,7 @@ export class EditorInspector {
         // gate palette-chip writes per channel; My Mix is a user-saved 13th
         // chip; hover backup powers transient preview without polluting undo.
         this._paletteLock = loadPaletteLocks();
+        this._remixLock = loadRemixLocks();
         this._myMix = loadMyMix();
         this._palettePreviewBackup = null;
 
@@ -915,9 +950,11 @@ export class EditorInspector {
         this._buildPaletteSliders();
         this._bindPaletteOpacity();
         this._buildSolidFxPanel();
+        this._buildFlowStyleSection();
         this._buildMotionEngineSection();
         this._buildMotionPresetsGrid();
         this._bindSurpriseButton();
+        this._bindRemixLocks();
         this._buildMotionSliders();
         this._buildMotionReactPanel();
         this._buildWaveReactPanel();
@@ -1050,36 +1087,27 @@ export class EditorInspector {
     }
 
     /**
-     * Auto-wake feedback mode. Solid/Shift variations paint a flat colour and
-     * never sample the warp feedback buffer, so Motion, Wave, and the Motion
-     * Engine render nothing. The moment the user reaches for any of those, flip
-     * the base into feedback mode so the effect is actually visible. Shift stays
-     * the default landing / asset-layering surface — it just "wakes up" on use.
+     * Ensure the feedback buffer has content to show. Solid/Shift variations paint
+     * a flat colour and ship wave_a:0, so a bare wave / motion / flow would be
+     * invisible — seed a wave when nothing is drawn so there's something to see.
      *
-     * No-op when already in feedback mode. Seeds a visible wave if hidden (solid
-     * variations ship wave_a:0) so the feedback buffer has content to act on.
-     * Mirrors _applyVariation's instance-var pattern (_solidColor lives outside
-     * currentState; undo of the wake matches existing variation-change behaviour).
-     * Returns true if it actually woke. Caller owns pre/postSnap.
+     * Does NOT clear the Solid colour: all content composites OVER the Palette
+     * colour (see _buildCompShader), so the background is never blacked out. This
+     * replaced the old _wakeFeedbackIfSolid, which cleared solid → black on every
+     * wave/shape/motion touch (the "everything goes black" bug). Caller owns
+     * pre/postSnap; rebuilds the comp + re-applies so the seeded wave shows.
      */
-    _wakeFeedbackIfSolid() {
-        if (!this._solidColor) return false;
-        this._solidColor = null;
-        // Feedback needs *some* content to act on. A shape IS content — so only
-        // seed a wave when there's no enabled shape AND the wave is hidden.
-        // Otherwise adding a shape would also switch on an unwanted oscilloscope.
+    _ensureFeedbackContent() {
+        // A shape IS content — so only seed a wave when there's no enabled shape
+        // AND the wave is hidden. Otherwise adding a shape would also switch on an
+        // unwanted oscilloscope.
         const hasShape = (this.currentState.shapes || []).some(s => s && s.baseVals && s.baseVals.enabled !== 0);
         if (!hasShape && this.currentState.baseVals.wave_a < 0.001) {
             this.currentState.baseVals.wave_a = 0.8;
+            this._syncWaveControls?.();
         }
         this._buildCompShader();
         this._applyToEngine();
-        // UI: no longer a solid variation — drop the Solid-FX panel + relabel the
-        // swatch back to "Wave", and clear the active variation chip highlight.
-        this._updateSolidFxVisibility(null);
-        document.querySelectorAll('.base-var-btn').forEach(el => el.classList.remove('active'));
-        this._syncWaveControls?.();
-        return true;
     }
 
     /**
@@ -1172,6 +1200,58 @@ export class EditorInspector {
                 needsSnap = true;
             });
         }
+
+        // ── Color Field (Phase 8): style picker + Scale / Motion sliders ──
+        const fieldBtns = document.querySelectorAll('#bgfield-style .lseg');
+        fieldBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                this._preSnap();
+                fieldBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                (this.currentState.bgField || (this.currentState.bgField = deepClone(BLANK.bgField))).style = btn.dataset.field;
+                this._postSnap();
+                this._buildCompShader();
+                this._applyToEngine();
+            });
+        });
+        const fieldSliders = document.getElementById('bgfield-sliders');
+        if (fieldSliders) {
+            [
+                { id: 'bgf-scale', label: 'Scale', min: 0.2, max: 3.0, step: 0.05, key: 'scale' },
+                { id: 'bgf-speed', label: 'Motion', min: 0.0, max: 2.0, step: 0.05, key: 'speed' },
+            ].forEach(cfg => {
+                const bgf = this.currentState.bgField || (this.currentState.bgField = deepClone(BLANK.bgField));
+                const input = makeSlider(fieldSliders, { ...cfg, value: bgf[cfg.key] });
+                const valEl = document.getElementById(`${cfg.id}-val`);
+                input.addEventListener('pointerdown', () => this._preSnap());
+                input.addEventListener('input', () => {
+                    const v = parseFloat(input.value);
+                    if (valEl) valEl.textContent = v.toFixed(2);
+                    input.style.setProperty('--pct', `${((v - cfg.min) / (cfg.max - cfg.min)) * 100}%`);
+                    (this.currentState.bgField || (this.currentState.bgField = deepClone(BLANK.bgField)))[cfg.key] = v;
+                    this._buildCompShader();
+                    this._applyToEngine();
+                });
+                input.addEventListener('pointerup', () => this._postSnap());
+            });
+        }
+    }
+
+    /** Reflect bgField state onto the Color Field controls (style button + sliders). */
+    _syncBgField() {
+        const bgf = this.currentState.bgField || (this.currentState.bgField = deepClone(BLANK.bgField));
+        document.querySelectorAll('#bgfield-style .lseg').forEach(b => {
+            b.classList.toggle('active', b.dataset.field === (bgf.style || 'flat'));
+        });
+        [['bgf-scale', 'scale', 0.2, 3.0], ['bgf-speed', 'speed', 0.0, 2.0]].forEach(([id, key, min, max]) => {
+            const input = document.getElementById(id);
+            if (!input) return;
+            const v = bgf[key];
+            input.value = v;
+            const valEl = document.getElementById(`${id}-val`);
+            if (valEl) valEl.textContent = Number(v).toFixed(2);
+            input.style.setProperty('--pct', `${((v - min) / (max - min)) * 100}%`);
+        });
     }
 
     // ─── Palette chips ────────────────────────────────────────────────────────
@@ -1320,6 +1400,9 @@ export class EditorInspector {
         }
         if (!this._paletteLock.accent) {
             [bv.ib_r, bv.ib_g, bv.ib_b] = p.accent;
+            // 8.2 — give the background field its own colour (the accent), so the
+            // field (bgColorA→Shift) differs from the foreground wave (= p.wave).
+            this.currentState.bgColorA = p.accent.slice();
         }
         // NOTE: do not touch ob_a/ob_size/ib_a/ib_size here. Chip paints colors
         // only; border intensity is owned by the Glow/Accent Strength sliders
@@ -1352,6 +1435,7 @@ export class EditorInspector {
                 glow: [bv.ob_r, bv.ob_g, bv.ob_b],
                 accent: [bv.ib_r, bv.ib_g, bv.ib_b],
                 solidColorB: (this.currentState.solidColorB || [0, 0, 0]).slice(),
+                bgColorA: this.currentState.bgColorA ? this.currentState.bgColorA.slice() : null,
             };
         }
         if (!this._paletteLock.wave) {
@@ -1363,6 +1447,7 @@ export class EditorInspector {
         }
         if (!this._paletteLock.accent) {
             [bv.ib_r, bv.ib_g, bv.ib_b] = p.accent;
+            this.currentState.bgColorA = p.accent.slice();
         }
         this._buildCompShader();
         this._applyToEngine(true);
@@ -1376,6 +1461,7 @@ export class EditorInspector {
         [bv.ob_r, bv.ob_g, bv.ob_b] = b.glow;
         [bv.ib_r, bv.ib_g, bv.ib_b] = b.accent;
         this.currentState.solidColorB = b.solidColorB.slice();
+        this.currentState.bgColorA = b.bgColorA;
         this._palettePreviewBackup = null;
         this._buildCompShader();
         this._applyToEngine(true);
@@ -1537,7 +1623,13 @@ export class EditorInspector {
     // ─── Color swatches ────────────────────────────────────────────────────────
 
     _bindColorSwatches() {
-        this._bindSwatch('wave', (hex) => { const [r, g, b] = hexToRgb(hex); this.currentState.baseVals.wave_r = r; this.currentState.baseVals.wave_g = g; this.currentState.baseVals.wave_b = b; });
+        this._bindSwatch('wave', (hex) => {
+            const [r, g, b] = hexToRgb(hex);
+            this.currentState.baseVals.wave_r = r; this.currentState.baseVals.wave_g = g; this.currentState.baseVals.wave_b = b;
+            // When the Background is on auto (bgColorA null), it shows the wave colour
+            // as its fallback — keep that swatch in sync as the wave changes.
+            if (!this.currentState.bgColorA) this._setSwatchHex('bg', hex);
+        });
         this._bindSwatch('glow', (hex) => {
             const [r, g, b] = hexToRgb(hex);
             this.currentState.baseVals.ob_r = r; this.currentState.baseVals.ob_g = g; this.currentState.baseVals.ob_b = b;
@@ -1546,6 +1638,8 @@ export class EditorInspector {
             const [r, g, b] = hexToRgb(hex);
             this.currentState.baseVals.ib_r = r; this.currentState.baseVals.ib_g = g; this.currentState.baseVals.ib_b = b;
         });
+        // 8.2 — background field colour A, independent of the foreground wave.
+        this._bindSwatch('bg', (hex) => { this.currentState.bgColorA = hexToRgb(hex); });
     }
 
     /** Wire up one colour swatch + its hidden native <input type=color>. */
@@ -1580,6 +1674,10 @@ export class EditorInspector {
         this._setSwatchHex('wave', rgbToHex(bv.wave_r, bv.wave_g, bv.wave_b));
         this._setSwatchHex('glow', rgbToHex(bv.ob_r, bv.ob_g, bv.ob_b));
         this._setSwatchHex('accent', rgbToHex(bv.ib_r, bv.ib_g, bv.ib_b));
+        // bg swatch shows the effective background colour (falls back to the wave
+        // colour when bgColorA is unset, matching the shader).
+        const bgA = this.currentState.bgColorA;
+        this._setSwatchHex('bg', bgA ? rgbToHex(bgA[0], bgA[1], bgA[2]) : rgbToHex(bv.wave_r, bv.wave_g, bv.wave_b));
     }
 
     _setSwatchHex(name, hex) {
@@ -1597,21 +1695,87 @@ export class EditorInspector {
 
     // ─── Motion sliders ────────────────────────────────────────────────────────
 
-    /** Wire the footer "Surprise" button. Rolls a coherent set of choices:
-     *  random variation → random palette → random motion preset → wave randomize.
-     *  Each step uses the existing apply path (which does its own snap), so the
-     *  user can step-undo the surprise back to their starting state. */
+    /** Wire the footer "Remix" 🎲 button — Phase 9: the full-stack roll. One press
+     *  rolls the WHOLE preset across all three creative axes — Colour (palette +
+     *  Colour Field + fg/bg split), Motion (living engine), and Flow (warp field) —
+     *  landing on the Shift colour engine so the field + beat-pulse are live. The
+     *  result is a complete, varied, colourful, moving preset every time (not a
+     *  thin line on a slab). Reuses the tested apply paths (multi-step undo). */
     _bindSurpriseButton() {
         const btn = document.getElementById('btn-surprise');
         if (!btn) return;
-        btn.addEventListener('click', () => {
-            const vi = Math.floor(Math.random() * BASE_VARIATIONS.length);
-            this._applyVariation(vi);
-            const pi = Math.floor(Math.random() * PALETTES.length);
-            this._applyPalette(PALETTES[pi], String(pi));
-            const mi = Math.floor(Math.random() * MOTION_PRESETS.length);
-            this._applyMotionPreset(mi);
-            document.getElementById('btn-randomize-wave')?.click();
+        btn.addEventListener('click', () => this._rollFullStack());
+    }
+
+    _rollFullStack() {
+        const L = this._remixLock || {};
+        const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+        const rnd = (lo, hi) => +(lo + Math.random() * (hi - lo)).toFixed(2);
+
+        // Ensure the Shift colour engine (solid mode) is on so the Colour Field +
+        // beat-pulse run. Only flips when currently in feedback mode, so repeated
+        // rolls don't reset a locked palette/field.
+        if (!this._solidColor) this._applyVariation(DEFAULT_VARIATION_INDEX);
+
+        // Each group rolls only when UNLOCKED — a locked group keeps its current
+        // values, so you can pin what you love and gamble the rest (Roll-and-lock).
+        // ── Colours: harmony rule + tone + hue → wave/glow/accent + contrasting bgColorA.
+        if (!L.colours) this._rollRandomPalette();
+        // ── Colour Field + Reactivity (separate locks) + a visible wave — one snapped step.
+        this._preSnap();
+        if (!L.field) {
+            this.currentState.bgField = { style: pick(['linear', 'radial', 'plasma', 'radial', 'plasma']), scale: rnd(0.5, 2.5), speed: rnd(0.15, 0.95) };
+        }
+        if (!L.reactivity) {
+            // The audio response itself is rollable — Shift pulse depth + which band
+            // drives it + the response curve. Audio reactivity is the differentiator.
+            this.currentState.solidShift = rnd(0.35, 0.85);
+            this.currentState.solidReactSource = pick(['bass', 'mid', 'treb', 'vol', 'flux']);
+            this.currentState.solidReactCurve = pick(['linear', 'squared', 'cubed', 'threshold']);
+        }
+        this.currentState.baseVals.wave_a = 0.8;
+        this._postSnap();
+        // ── Living Motion (engine).
+        if (!L.motion) {
+            this.currentState.motionEngine.speed = rnd(0.4, 2.2);
+            this.currentState.motionEngine.depth = rnd(0.3, 0.9);
+            this._applyMotionEngine(pick(MOTION_ENGINES).id);
+        }
+        // ── Flow (warp field) — ~35% none, else a random warp + knobs (seeds fill decay).
+        if (!L.flow) {
+            this.currentState.flowStyle.speed = rnd(0.4, 2.2);
+            this.currentState.flowStyle.depth = rnd(0.3, 0.9);
+            this.currentState.flowStyle.density = rnd(0.3, 0.8);
+            this._applyFlowStyle(Math.random() < 0.35 ? 'none' : pick(WARP_STYLES.filter(f => f.id !== 'none')).id);
+        }
+        // ── Content — a fresh wave shape every roll (the seed; not separately lockable).
+        document.getElementById('btn-randomize-wave')?.click();
+        // Bake the directly-set field/shift and re-sync every control.
+        this._buildCompShader();
+        this._applyToEngine();
+        this._syncAllControls();
+        const anyLocked = REMIX_LOCK_GROUPS.some(k => L[k]);
+        showToast?.(anyLocked ? '🎲 Remixed — locks kept' : '🎲 Remixed');
+    }
+
+    /** Wire the Remix lock chips (pin a group; Remix re-rolls only the rest).
+     *  Locks persist across sessions in localStorage, like the palette locks. */
+    _bindRemixLocks() {
+        const chips = document.querySelectorAll('#remix-locks .remix-lock');
+        chips.forEach(chip => {
+            const group = chip.dataset.lock;
+            const sync = () => {
+                const locked = !!this._remixLock[group];
+                chip.classList.toggle('locked', locked);
+                chip.setAttribute('aria-pressed', String(locked));
+                chip.title = locked ? `${group} locked — Remix keeps it` : `${group} — Remix re-rolls it`;
+            };
+            sync();
+            chip.addEventListener('click', () => {
+                this._remixLock[group] = !this._remixLock[group];
+                saveRemixLocks(this._remixLock);
+                sync();
+            });
         });
     }
 
@@ -1650,10 +1814,11 @@ export class EditorInspector {
         input.addEventListener('input', () => {
             const v = parseFloat(input.value);
             if (valEl) valEl.textContent = v.toFixed(2);
+            input.style.setProperty('--pct', `${((v - input.min) / (input.max - input.min)) * 100}%`);
             this.currentState.motionEngine[key] = v;
             // A knob nudge while an engine is active should wake feedback so the
             // change shows; nudging on 'none' just stores the value (no surprise).
-            if (this.currentState.motionEngine.id !== 'none') this._wakeFeedbackIfSolid();
+            if (this.currentState.motionEngine.id !== 'none') this._ensureFeedbackContent();
             this._applyToEngine();
         });
         input.addEventListener('pointerup', () => this._postSnap());
@@ -1664,7 +1829,7 @@ export class EditorInspector {
     _applyMotionEngine(id) {
         this._preSnap();
         this.currentState.motionEngine.id = id;
-        if (id !== 'none') this._wakeFeedbackIfSolid();
+        if (id !== 'none') this._ensureFeedbackContent();
         this._postSnap();
         this._applyToEngine();
         this._syncMotionEngine();
@@ -1679,6 +1844,102 @@ export class EditorInspector {
             const input = document.getElementById(id);
             if (!input) return;
             const v = me[key];
+            input.value = v;
+            const valEl = document.getElementById(`${id}-val`);
+            if (valEl) valEl.textContent = Number(v).toFixed(2);
+            input.style.setProperty('--pct', `${((v - min) / (max - min)) * 100}%`);
+        });
+    }
+
+    // ─── Flow Style (Phase 7 — per-preset warp field) ──────────────────────────
+    // Mirrors the Motion Engine: chips + Speed/Depth knobs. Picking a flow sets a
+    // per-preset warp shader (buildWarpShader → runtime.warp). Auto-wakes feedback
+    // since the warp field only shows in feedback mode (like the Motion Engine).
+    _buildFlowStyleSection() {
+        const grid = document.getElementById('flow-style-grid');
+        if (grid) {
+            WARP_STYLES.forEach(fs => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'motion-preset-btn motion-engine-btn';
+                btn.dataset.flow = fs.id;
+                btn.innerHTML = `
+        <span class="motion-preset-name">${fs.name}</span>
+        <span class="motion-preset-desc">${fs.desc}</span>`;
+                btn.addEventListener('click', () => this._applyFlowStyle(fs.id));
+                grid.appendChild(btn);
+            });
+        }
+        const knobWrap = document.getElementById('flow-style-knobs');
+        if (knobWrap) {
+            const fl = this.currentState.flowStyle;
+            const speedIn = makeSlider(knobWrap, { id: 'fl-speed', label: 'Speed', min: 0.1, max: 4.0, step: 0.05, value: fl.speed });
+            const depthIn = makeSlider(knobWrap, { id: 'fl-depth', label: 'Depth', min: 0.0, max: 1.0, step: 0.01, value: fl.depth });
+            const densIn = makeSlider(knobWrap, { id: 'fl-density', label: 'Density', min: 0.0, max: 1.0, step: 0.01, value: fl.density ?? 0.5 });
+            this._bindFlowKnob(speedIn, 'speed');
+            this._bindFlowKnob(depthIn, 'depth');
+            this._bindFlowKnob(densIn, 'density');
+        }
+        this._syncFlowStyle();
+    }
+
+    _bindFlowKnob(input, key) {
+        const valEl = document.getElementById(`${input.id}-val`);
+        input.addEventListener('pointerdown', () => this._preSnap());
+        input.addEventListener('input', () => {
+            const v = parseFloat(input.value);
+            if (valEl) valEl.textContent = v.toFixed(2);
+            input.style.setProperty('--pct', `${((v - input.min) / (input.max - input.min)) * 100}%`);
+            this.currentState.flowStyle[key] = v;
+            // Knob nudges only re-bake the warp — they must NOT clear solid mode
+            // (the flow plays over the Solid/Shift colour; see _applyFlowStyle).
+            this._applyToEngine();
+        });
+        input.addEventListener('pointerup', () => this._postSnap());
+    }
+
+    /** Select a Flow Style (or 'none'). Unlike the Motion Engine, a flow plays
+     *  OVER the Solid/Shift palette colour (not on black): we KEEP solid mode and
+     *  let _buildCompShader composite the warped feedback over the flat colour
+     *  (its `_flowActive` branch). Only seed a wave so the feedback buffer has
+     *  content for the warp to act on (solid variations ship wave_a:0). */
+    _applyFlowStyle(id) {
+        this._preSnap();
+        this.currentState.flowStyle.id = id;
+        if (id !== 'none') {
+            // Feedback needs *some* content to warp. A shape counts — only seed a
+            // wave when there's no enabled shape AND the wave is hidden.
+            const hasShape = (this.currentState.shapes || []).some(s => s && s.baseVals && s.baseVals.enabled !== 0);
+            if (!hasShape && this.currentState.baseVals.wave_a < 0.001) {
+                this.currentState.baseVals.wave_a = 0.8;
+            }
+            // Fill: a flow needs feedback persistence to build big shapes. Seed a
+            // fuller decay when the current trail is below the fill threshold —
+            // never stomp a higher one (§3.10).
+            if (this.currentState.baseVals.decay < FLOW_FILL_DECAY) {
+                this.currentState.baseVals.decay = FLOW_FILL_DECAY;
+            }
+        }
+        this._postSnap();
+        this._buildCompShader();   // bake/clear the flow→Solid composite (_flowActive branch)
+        this._applyToEngine();
+        this._syncFlowStyle();
+        // Trail lives on two tabs — keep both in sync after the decay seed.
+        this._syncTrailSlider();
+        this._syncSlider('ps-decay', this.currentState.baseVals.decay, 0.85, 0.999, 3);
+        this._syncWaveControls?.();  // wave_a may have changed
+    }
+
+    _syncFlowStyle() {
+        const fl = this.currentState.flowStyle || (this.currentState.flowStyle = deepClone(BLANK.flowStyle));
+        if (fl.density == null) fl.density = 0.5;  // backfill pre-Density presets
+        document.querySelectorAll('.motion-engine-btn[data-flow]').forEach(el => {
+            el.classList.toggle('active', el.dataset.flow === fl.id);
+        });
+        [['fl-speed', 'speed', 0.1, 4.0], ['fl-depth', 'depth', 0.0, 1.0], ['fl-density', 'density', 0.0, 1.0]].forEach(([id, key, min, max]) => {
+            const input = document.getElementById(id);
+            if (!input) return;
+            const v = fl[key];
             input.value = v;
             const valEl = document.getElementById(`${id}-val`);
             if (valEl) valEl.textContent = Number(v).toFixed(2);
@@ -1716,7 +1977,7 @@ export class EditorInspector {
         if (!mp) return;
         this._preSnap();
         Object.assign(this.currentState.baseVals, mp.bv);
-        this._wakeFeedbackIfSolid();  // motion presets shape the feedback buffer — wake so they show
+        this._ensureFeedbackContent();  // motion presets shape the feedback buffer — wake so they show
         this._postSnap();
         this._applyToEngine();
         this._syncMotionSliders();
@@ -1788,7 +2049,7 @@ export class EditorInspector {
                 const valEl = document.getElementById(`${cfg.id}-val`);
                 // Motion shapes the feedback buffer, which solid mode ignores —
                 // wake feedback the moment a motion slider is touched.
-                input.addEventListener('pointerdown', () => { this._preSnap(); this._wakeFeedbackIfSolid(); });
+                input.addEventListener('pointerdown', () => { this._preSnap(); this._ensureFeedbackContent(); });
                 input.addEventListener('input', () => {
                     const v = parseFloat(input.value);
                     if (valEl) valEl.textContent = v.toFixed(2);
@@ -1802,7 +2063,7 @@ export class EditorInspector {
 
         document.getElementById('btn-randomize-motion')?.addEventListener('click', () => {
             this._preSnap();
-            this._wakeFeedbackIfSolid();
+            this._ensureFeedbackContent();
             const bv = this.currentState.baseVals;
             bv.zoom = 0.80 + Math.random() * 0.60;
             bv.rot = (Math.random() - 0.5) * 0.70;
@@ -1882,7 +2143,7 @@ export class EditorInspector {
                 if (bv.wave_a < 0.001) bv.wave_a = 0.8;
                 // The wave draws into the feedback buffer, which solid mode never
                 // samples — wake feedback so the shape is actually visible.
-                this._wakeFeedbackIfSolid();
+                this._ensureFeedbackContent();
                 this._postSnap();
                 this._applyToEngine();
                 this._syncWaveControls();
@@ -1958,8 +2219,11 @@ export class EditorInspector {
 
     _addShape() {
         const shapes = this.currentState.shapes || (this.currentState.shapes = []);
-        if (shapes.length >= MAX_SHAPES) return;
-        const isFirst = shapes.length === 0;
+        // Count only editor shapes — bundled shapes from a remixed preset occupy the
+        // array but aren't "ours", so they must not block adding (or be counted).
+        const editorCount = shapes.filter(s => this._isEditorShape(s)).length;
+        if (editorCount >= MAX_SHAPES) return;
+        const isFirst = editorCount === 0;
         this._preSnap();
         shapes.push(makeShapeDefaults());
         // Shapes render over Solid/Shift too (the composite in _buildCompShader), so
@@ -1994,16 +2258,34 @@ export class EditorInspector {
         this._clearTrail();
     }
 
-    /** Rebuild the whole card list from state.shapes. Cheap (≤4 cards) and keeps
-     *  indices/labels in sync after add/delete. */
+    /** Is this shape one the EDITOR made (so its card actually controls something)?
+     *  Editor shapes always carry the editor's `motion` + `react` objects
+     *  (makeShapeDefaults adds them). Bundled MilkDrop shapes never do — they're raw
+     *  baseVals + equations. So `motion && react` is the reliable test, and it works
+     *  for old saved editor presets too (no marker/migration needed). */
+    _isEditorShape(entry) {
+        return !!(entry && entry.motion && entry.react);
+    }
+
+    /** Rebuild the card list from state.shapes. Loading a bundled MilkDrop preset must
+     *  NEVER add shape cards to our UI — its shapes are raw (equation/baseVals-driven),
+     *  the editor's sliders can't control them, and they'd render as dead "NaN" menus.
+     *  So ONLY editor-made shapes get a card; bundled shapes stay in state (preserved
+     *  for the visual + remix-save) but are never shown. Add/limit count editor shapes
+     *  only, so the section is purely about the shapes you created here. */
     _renderShapeCards() {
         const list = document.getElementById('shapes-list');
         if (!list) return;
         list.innerHTML = '';
         const shapes = this.currentState.shapes || [];
-        shapes.forEach((entry, i) => list.appendChild(this._buildShapeCard(entry, i)));
+        let editorCount = 0;
+        shapes.forEach((entry, i) => {
+            if (!this._isEditorShape(entry)) return;   // bundled raw shape — never a card
+            list.appendChild(this._buildShapeCard(entry, i));
+            editorCount++;
+        });
         const addBtn = document.getElementById('btn-add-shape');
-        if (addBtn) addBtn.disabled = shapes.length >= MAX_SHAPES;
+        if (addBtn) addBtn.disabled = editorCount >= MAX_SHAPES;
     }
 
     _buildShapeCard(entry, index) {
@@ -2348,7 +2630,7 @@ export class EditorInspector {
             const valEl = document.getElementById(`${cfg.id}-val`);
             // The wave renders into the feedback buffer that solid mode discards —
             // wake feedback when a wave slider is touched so the change is visible.
-            input.addEventListener('pointerdown', () => { this._preSnap(); this._wakeFeedbackIfSolid(); });
+            input.addEventListener('pointerdown', () => { this._preSnap(); this._ensureFeedbackContent(); });
             input.addEventListener('input', () => {
                 const v = parseFloat(input.value);
                 if (valEl) valEl.textContent = v.toFixed(2);
@@ -2361,7 +2643,7 @@ export class EditorInspector {
 
         document.getElementById('btn-randomize-wave')?.addEventListener('click', () => {
             this._preSnap();
-            this._wakeFeedbackIfSolid();
+            this._ensureFeedbackContent();
             const bv = this.currentState.baseVals;
             bv.wave_mode = Math.floor(Math.random() * 8);
             bv.wave_scale = 0.3 + Math.random() * 3.2;
@@ -7739,6 +8021,11 @@ export class EditorInspector {
         // mutates the saved state.shapes.
         while (shapes.length < MAX_SHAPES) shapes.push({ baseVals: { enabled: 0 }, init_eqs_str: '', frame_eqs_str: '' });
         runtime.shapes = shapes;
+        // Phase 7 — Flow Style: a per-preset warp shader (the motion field). '' when
+        // 'none' → keep the preset's own warp (default / bundled). Player mirrors this
+        // in refreshCustomPresets for parity.
+        const flowWarp = buildWarpShader(state.flowStyle);
+        if (flowWarp) runtime.warp = flowWarp;
         // Engine runs first (a living motion baseline), then motionReact/waveReact
         // punch audio on top. All additive + clamped, so order only affects which
         // clamp wins on extremes — engine-before-react reads cleanest.
@@ -7841,19 +8128,34 @@ export class EditorInspector {
             : `texture(sampler_main, uv_m).xyz * 2.0 * ${_po.toFixed(4)}`;
 
         let base;
-        // Are any custom shapes enabled? Solid/Shift mode paints a flat colour and
-        // ignores sampler_main (the feedback buffer where shapes draw) — so without
-        // this, shapes vanish behind a solid base. When shapes exist we composite
-        // them OVER the solid colour (keyed by the shape's own brightness).
+        // Solid/Shift mode paints a flat colour and ignores sampler_main (the
+        // feedback buffer where the wave, shapes, flow + motion all draw). We
+        // composite that buffer OVER the flat colour (keyed by its own brightness)
+        // so EVERYTHING plays over the Palette colour — the background is never
+        // blacked out (the old "wake feedback → clear solid → black" path is gone).
+        // No-op when the buffer is black, so a pure flat colour is unchanged.
         const _hasShapes = (this.currentState.shapes || []).some(s => s && s.baseVals && s.baseVals.enabled !== 0);
+        const _flowActive = !!(this.currentState.flowStyle && this.currentState.flowStyle.id && this.currentState.flowStyle.id !== 'none');
+        const _meActive = !!(this.currentState.motionEngine && this.currentState.motionEngine.id && this.currentState.motionEngine.id !== 'none');
+        const _waveVisible = (this.currentState.baseVals.wave_a ?? 0) > 0.001;
+        // Composite the feedback buffer whenever anything could be drawing into it.
+        const _hasFeedbackContent = _hasShapes || _flowActive || _meActive || _waveVisible;
 
         if (this._imagesOnly) {
             base = uvFold + '  vec3 col = vec3(0.0);\n' + (_bgT ? '  float col_a = 0.0;\n' : '');
         } else if (this._solidColor) {
             const bv = this.currentState.baseVals;
-            const aR = (bv.wave_r ?? this._solidColor[0]).toFixed(4);
-            const aG = (bv.wave_g ?? this._solidColor[1]).toFixed(4);
-            const aB = (bv.wave_b ?? this._solidColor[2]).toFixed(4);
+            // Background field Colour A — its own colour (8.2), independent of the
+            // foreground wave (wave_r/g/b). Used only when the background is actually
+            // dynamic (non-flat field or Shift on); in a plain flat Solid the "Color"
+            // swatch (wave) still drives the colour, so that mode is unchanged. null
+            // → wave fallback (old presets byte-identical).
+            const bgA = this.currentState.bgColorA;
+            const _bgDyn = !!((this.currentState.bgField && this.currentState.bgField.style && this.currentState.bgField.style !== 'flat') || Number(this.currentState.solidShift || 0) > 0);
+            const _useBg = bgA && _bgDyn;
+            const aR = (_useBg ? bgA[0] : (bv.wave_r ?? this._solidColor[0])).toFixed(4);
+            const aG = (_useBg ? bgA[1] : (bv.wave_g ?? this._solidColor[1])).toFixed(4);
+            const aB = (_useBg ? bgA[2] : (bv.wave_b ?? this._solidColor[2])).toFixed(4);
             const cb = this.currentState.solidColorB || [0, 0, 0];
             const bR = Number(cb[0]).toFixed(4);
             const bG = Number(cb[1]).toFixed(4);
@@ -7870,25 +8172,40 @@ export class EditorInspector {
                 case 'threshold': solidCurveExpr = 'step(0.3, _sr_raw)'; break;
                 default: solidCurveExpr = '_sr_raw';
             }
+            // Color Field — spreads the A→B blend across SPACE (Phase 8). 'flat'
+            // returns 0.0 → _shiftT reduces to the classic audio-only Shift (byte-
+            // identical). The others build a spatial 0..1 field from uv_m + time, so
+            // the background becomes a moving multi-colour gradient; the audio shift
+            // still rides on top (clamped sum) so the beat-pulse is preserved.
+            const bgf = this.currentState.bgField || { style: 'flat', scale: 1.0, speed: 0.3 };
+            const fsc = Number(bgf.scale ?? 1).toFixed(4);
+            const fsp = Number(bgf.speed ?? 0.3).toFixed(4);
+            let fieldExpr;
+            switch (bgf.style) {
+                case 'linear': fieldExpr = `0.5 + 0.5 * sin((uv_m.x + uv_m.y) * ${fsc} * 3.14159 + time * ${fsp})`; break;
+                case 'radial': fieldExpr = `0.5 + 0.5 * sin(length(uv_m - 0.5) * ${fsc} * 14.0 - time * ${fsp} * 2.0)`; break;
+                case 'plasma': fieldExpr = `0.5 + 0.5 * sin(uv_m.x * ${fsc} * 7.0 + time * ${fsp}) * cos(uv_m.y * ${fsc} * 7.0 - time * ${fsp} * 0.8)`; break;
+                default: fieldExpr = '0.0';  // flat — classic audio-only Shift
+            }
             // Breath: lerp between 1.0 (off) and a slow sine (0..1) by breath amount.
             // Pulse:  multiplies brightness by (1 + signal * pulse).
-            // Shift:  mixes A→B by shaped signal * shift, clamped 0..1.
+            // Shift:  mixes A→B by (spatial field + shaped signal * shift), clamped.
             base = uvFold +
                 `  float _sr_raw = ${reactSrc};\n` +
                 `  float _sr = ${solidCurveExpr};\n` +
                 `  float _breath = mix(1.0, 0.5 + 0.5 * sin(time * 0.6), ${breath});\n` +
                 `  float _pulse = 1.0 + _sr * ${pulse};\n` +
-                `  float _shiftT = clamp(_sr * ${shift}, 0.0, 1.0);\n` +
+                `  float _field = ${fieldExpr};\n` +
+                `  float _shiftT = clamp(_field + _sr * ${shift}, 0.0, 1.0);\n` +
                 `  vec3 _colA = vec3(${aR}, ${aG}, ${aB});\n` +
                 `  vec3 _colB = vec3(${bR}, ${bG}, ${bB});\n` +
                 `  vec3 col = mix(_colA, _colB, _shiftT) * _breath * _pulse;\n` +
                 (_po < 1.0 ? `  col *= ${_po.toFixed(4)};\n` : '');
-            // Composite custom shapes over the solid/shift background. sampler_main
-            // holds the shapes (+ their feedback trail); key the over-composite on
-            // the shape's own brightness so the flat colour shows where there's no
-            // shape. No-op when the buffer is black (shapeless), so plain Solid/Shift
-            // presets are unchanged.
-            if (_hasShapes) {
+            // Composite the feedback buffer (wave + shapes + warped flow + motion,
+            // with their trail) over the solid/shift background. Key the over-composite
+            // on its own brightness so the flat colour shows where there's no content.
+            // No-op when the buffer is black, so a pure flat colour is unchanged.
+            if (_hasFeedbackContent) {
                 base +=
                     `  vec3 _shp = texture(sampler_main, uv_m).xyz * 2.0;\n` +
                     `  float _shpCov = clamp(max(_shp.r, max(_shp.g, _shp.b)), 0.0, 1.0);\n` +
@@ -9152,6 +9469,7 @@ export class EditorInspector {
 
     _syncAllControls() {
         this._syncColorSwatches();
+        this._syncFlowStyle();
         this._syncMotionEngine();
         this._renderShapeCards();
         this._syncMotionSliders();
@@ -9162,6 +9480,7 @@ export class EditorInspector {
         this._syncPaletteSliders();
         this._syncFeelSliders();
         this._syncSolidFx();
+        this._syncBgField();
         this._syncToggle('toggle-invert', 'invert');
         this._syncToggle('toggle-darken', 'darken');
         this._syncToggle('toggle-brighten-fx', 'brighten');

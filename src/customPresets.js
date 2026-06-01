@@ -548,6 +548,111 @@ export function buildMotionEngineFrameEqs(me) {
     return def.eqs(speed, depth).join('\n');
 }
 
+// ─── Flow Style — per-preset warp shaders (milkdrop-tools-dev.md Phase 7) ───────
+// The warp shader is the per-pixel motion FIELD — the signature tunnel/spiral/
+// ripple look 85% of bundled presets get from a custom warp. We author it as the
+// preset's OWN `warp` string (isolated, recompiled per preset load), so it can't
+// touch any other preset — same proven pattern as our comp shader. The warp
+// shader_body gets: `uv` (already mesh-warped by zoom/rot/warp/cx/cy → flows
+// compose with the Motion sliders for free), `uv_orig`, `rad`, `ang`, `time`,
+// `bass/mid/treb`, `q1..q32`, `decay`, samplers. It writes `vec3 ret`. Each style
+// samples the previous frame at uv + a per-style displacement, faded by `decay`
+// (matches the engine's no-shader fallback so Trail still controls smear).
+export const WARP_STYLES = [
+    { id: 'none',    name: 'None',        desc: 'Default warp' },
+    { id: 'tunnel',  name: 'Tunnel',      desc: 'Rushing depth' },
+    { id: 'spiral',  name: 'Spiral',      desc: 'Twisting in' },
+    { id: 'ripple',  name: 'Ripple',      desc: 'Liquid rings' },
+    { id: 'swirl',   name: 'Swirl',       desc: 'Whirlpool' },
+    { id: 'plasma',  name: 'Plasma',      desc: 'Flowing noise' },
+    { id: 'liquid',  name: 'Liquid',      desc: 'Slow drift' },
+    { id: 'kaleido', name: 'Kaleido',     desc: 'Mirror fold' },
+];
+
+/**
+ * Build a per-preset warp shader for the active Flow Style. Returns '' when id is
+ * 'none'/missing → the preset keeps its own `warp` (from-scratch = engine default;
+ * bundled = its own) → byte-identical when unused. Knobs baked as literals.
+ * Shared by editor (_buildRuntimePreset) and player (refreshCustomPresets).
+ * @param {object} flow - preset.flowStyle { id, speed, depth } (may be null)
+ */
+export function buildWarpShader(flow) {
+    const f = flow || {};
+    if (!f.id || f.id === 'none') return '';
+    const sp = Number(f.speed ?? 1).toFixed(4);
+    const dp = Number(f.depth ?? 0.5).toFixed(4);
+    const dn = Number(f.density ?? 0.5).toFixed(4);
+    // All flows sample the previous frame at the mesh-warped `uv` plus a per-style
+    // displacement, faded by `decay` (so the Trail slider still controls smear).
+    // `_c`/`_r` = vector/distance from centre; `ang` is provided by the engine.
+    // Density bakes a gentle per-frame zoom-out-of-centre (_zuv): content magnifies
+    // outward and accumulates through the feedback loop → thin lines bloom into a
+    // full field (MilkDrop's real screen-fill mechanic). 0 = no zoom, 1 ≈ 3%/frame.
+    const head = '  vec2 _c = uv_orig - 0.5;\n  float _r = length(_c) + 1e-4;\n';
+    const zoom = `  float _z = ${dn} * 0.03;\n  vec2 _zuv = (uv - 0.5) * (1.0 - _z) + 0.5;\n`;
+    const wrap = (body) => `shader_body {\n${head}${body}\n${zoom}  ret = texture(sampler_main, _zuv + _flow).rgb * decay;\n}`;
+    switch (f.id) {
+        case 'tunnel':
+            // Radial push + a gentle perpendicular swirl, oscillating on time*speed
+            // → content rushes through a tunnel.
+            return wrap(
+                `  float _pull = ${dp} * 0.05 * (0.6 + 0.4 * sin(time * ${sp} * 0.7));\n` +
+                `  vec2 _flow = (_c / _r) * _pull + vec2(-_c.y, _c.x) * ${dp} * 0.03;`
+            );
+        case 'spiral':
+            // Rotation that grows with radius + slight inward pull → spirals inward.
+            return wrap(
+                `  float _t = time * ${sp} * 0.5;\n` +
+                `  vec2 _flow = vec2(-_c.y, _c.x) * ${dp} * 0.06 * (0.7 + 0.3 * sin(_t)) + (_c / _r) * ${dp} * 0.02;`
+            );
+        case 'ripple':
+            // Concentric waves: radial displacement modulated by sin(rad - time).
+            return wrap(
+                `  float _w = sin(_r * 22.0 - time * ${sp} * 2.0) * ${dp} * 0.02;\n` +
+                `  vec2 _flow = (_c / _r) * _w;`
+            );
+        case 'swirl':
+            // Whirlpool — rotation stronger near the centre (1/(_r+k)).
+            return wrap(
+                `  vec2 _flow = vec2(-_c.y, _c.x) * (${dp} * 0.05 / (_r + 0.18)) * (0.8 + 0.2 * sin(time * ${sp} * 0.4));`
+            );
+        case 'plasma':
+            // Higher-frequency sin/cos field → flowing plasma displacement.
+            return wrap(
+                `  vec2 _flow = vec2(\n` +
+                `    sin(uv_orig.y * 11.0 + time * ${sp} * 1.3),\n` +
+                `    cos(uv_orig.x * 11.0 + time * ${sp} * 1.1)\n` +
+                `  ) * ${dp} * 0.014;`
+            );
+        case 'liquid':
+            // Low-frequency domain-warped sin → slow, smooth liquid drift.
+            return wrap(
+                `  vec2 _flow = vec2(\n` +
+                `    sin((uv_orig.y + time * ${sp} * 0.10) * 5.0),\n` +
+                `    sin((uv_orig.x + time * ${sp} * 0.13) * 5.0)\n` +
+                `  ) * ${dp} * 0.022;`
+            );
+        case 'kaleido': {
+            // Mirror-fold kaleidoscope — the proven scene-mirror fold: recompute the
+            // angle/radius from centre, reflect into N sectors, reconstruct the sample
+            // UV with cos/sin·radius. Depth → sector count (2→12); Speed → slow spin.
+            // Samples the reconstructed coord directly (a kaleido is its own field).
+            return `shader_body {
+  vec2 _kp = uv_orig - 0.5;
+  float _kang = atan(_kp.y, _kp.x) + time * ${sp} * 0.15;
+  float _krad = length(_kp);
+  float _kseg = 6.2831853 / (2.0 + floor(${dp} * 10.0));
+  float _ka = mod(_kang, _kseg);
+  if (_ka > _kseg * 0.5) _ka = _kseg - _ka;
+  vec2 _kuv = vec2(cos(_ka), sin(_ka)) * _krad * (1.0 - ${dn} * 0.03) + 0.5;
+  ret = texture(sampler_main, _kuv).rgb * decay;
+}`;
+        }
+        default:
+            return '';
+    }
+}
+
 /**
  * Build a custom shape's frame_eqs_str from its motion (time-driven) and react
  * (audio-driven) params (Phase 3 — milkdrop-tools-dev.md §9). Base values are

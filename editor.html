@@ -287,6 +287,29 @@
                                     </div>
                                     <span class="color-row-hex" id="hex-shift">#1A33E6</span>
                                 </div>
+                                <!-- Color Field: spreads the Shift A→B blend across the screen
+                                     (a moving multi-colour background). Flat = the classic flat Shift. -->
+                                <p class="section-label" style="margin-top:12px">Color Field</p>
+                                <div class="color-row" id="bg-colora-row">
+                                    <span class="color-row-label">Background</span>
+                                    <div class="color-swatch-wrap">
+                                        <span class="color-swatch" id="swatch-bg"
+                                            aria-label="Background field color"></span>
+                                        <input type="color" id="color-bg" class="color-native" tabindex="-1" />
+                                    </div>
+                                    <span class="color-row-hex" id="hex-bg"></span>
+                                </div>
+                                <div class="layer-row-inline" style="gap:8px;margin-bottom:8px">
+                                    <span class="layer-ctrl-label" data-tooltip="Background field shape">Field</span>
+                                    <div id="bgfield-style" class="layer-react-curve" role="group"
+                                        aria-label="Background color field">
+                                        <button class="lseg active" data-field="flat">Flat</button>
+                                        <button class="lseg" data-field="linear">Linear</button>
+                                        <button class="lseg" data-field="radial">Radial</button>
+                                        <button class="lseg" data-field="plasma">Plasma</button>
+                                    </div>
+                                </div>
+                                <div id="bgfield-sliders"></div>
                             </div>
 
                             <div class="section-label-row">
@@ -393,22 +416,35 @@
                     <!-- ─── MOTION TAB ─── -->
                     <div id="tab-motion" class="tab-panel" role="tabpanel" hidden>
                         <div class="tab-scroll">
+                            <!-- ① THE LOOK — pick a living Motion and/or a Flow field; they stack -->
                             <div class="section-label-row">
-                                <p class="section-label">Motion Engine</p>
+                                <p class="section-label">Motion</p>
                             </div>
+                            <p class="section-note">Living motion + a warp Flow — pick either or both, they stack.</p>
                             <div class="motion-presets-grid" id="motion-engine-grid"
-                                role="group" aria-label="Motion engine"></div>
+                                role="group" aria-label="Motion"></div>
                             <div id="motion-engine-knobs"></div>
 
                             <div class="section-label-row" style="margin-top:16px">
-                                <p class="section-label">Motion Presets</p>
+                                <p class="section-label">Flow</p>
+                            </div>
+                            <div class="motion-presets-grid" id="flow-style-grid"
+                                role="group" aria-label="Flow field"></div>
+                            <div id="flow-style-knobs"></div>
+
+                            <div class="section-label-row" style="margin-top:16px">
+                                <p class="section-label">Quick Looks</p>
                                 <button id="btn-motion-reset" class="mini-btn" type="button"
                                     data-tooltip="Reset all motion sliders to defaults">↺ Reset</button>
                             </div>
+                            <p class="section-note">One-tap combos for the fine controls below.</p>
                             <div class="motion-presets-grid" id="motion-presets-grid"
-                                role="group" aria-label="Motion presets"></div>
+                                role="group" aria-label="Quick looks"></div>
 
-                            <p class="section-label" style="margin-top:16px">Movement</p>
+                            <!-- ② ADJUST — every fine control, tucked away so the looks stay clean -->
+                            <details class="motion-adjust" style="margin-top:16px">
+                                <summary class="section-label motion-adjust-summary">Adjust — fine controls</summary>
+                            <p class="section-label" style="margin-top:10px">Movement</p>
                             <div id="motion-sliders"></div>
 
                             <p class="section-label">Echo Direction</p>
@@ -481,6 +517,7 @@
                             <p class="section-note" style="margin-top:10px">Beat Sensitivity is preset-saved and
                                 applies to MilkDrop beat behavior.</p>
                             <div id="motion-feel-sliders"></div>
+                            </details>
                         </div>
                     </div>
 
@@ -643,6 +680,18 @@
                             <div class="image-layers" id="image-layers"></div>
                         </div>
                     </div>
+
+                    <!-- Remix locks: pin a group and the 🎲 Remix re-rolls only the rest. -->
+                    <details class="remix-locks" id="remix-locks">
+                        <summary class="remix-locks-summary">🎲 Remix locks — pin what to keep</summary>
+                        <div class="remix-locks-row" role="group" aria-label="Remix locks">
+                            <button class="remix-lock" data-lock="colours" type="button">Colours</button>
+                            <button class="remix-lock" data-lock="field" type="button">Field</button>
+                            <button class="remix-lock" data-lock="motion" type="button">Motion</button>
+                            <button class="remix-lock" data-lock="flow" type="button">Flow</button>
+                            <button class="remix-lock" data-lock="reactivity" type="button">Reactivity</button>
+                        </div>
+                    </details>
 
                     <!-- Footer: 5 big icon buttons — New / Random / Remix / Save / Reset.
                          Inline SVG (not a font) so they render under any CSP, including the

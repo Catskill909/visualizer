@@ -10,7 +10,7 @@ import butterchurnPresetsImport from 'butterchurn-presets';
 import butterchurnPresetsExtra from 'butterchurn-presets/lib/butterchurnPresetsExtra.min.js';
 import butterchurnPresetsExtra2 from 'butterchurn-presets/lib/butterchurnPresetsExtra2.min.js';
 import butterchurnPresetsMD1 from 'butterchurn-presets/lib/butterchurnPresetsMD1.min.js';
-import { loadAllCustomPresets, CUSTOM_PREFIX, registryKey, getImage, buildMotionReactFrameEqs, buildWaveReactFrameEqs, buildAnimFrameEqs, buildMotionEngineFrameEqs, buildShapeMotionEqs } from './customPresets.js';
+import { loadAllCustomPresets, CUSTOM_PREFIX, registryKey, getImage, buildMotionReactFrameEqs, buildWaveReactFrameEqs, buildAnimFrameEqs, buildMotionEngineFrameEqs, buildShapeMotionEqs, buildWarpShader } from './customPresets.js';
 import { parseGIF, decompressFrames } from 'gifuct-js';
 // animation-dev.md — drive entrance/exit/idle in the player & timeline (not just
 // the editor). animation.js is the same GSAP driver the editor uses; gsap here is
@@ -601,6 +601,11 @@ export class VisualizerEngine {
         const base = preset.frame_eqs_str || '';
         preset.frame_eqs_str = base ? `${base}\n${reactBlock}` : reactBlock;
       }
+      // Phase 7 — Flow Style: rebuild the per-preset warp shader from the stored
+      // flowStyle, mirroring the editor's _buildRuntimePreset so the motion field
+      // plays identically in the player/timeline. '' when none → keep own warp.
+      const flowWarp = buildWarpShader(preset.flowStyle);
+      if (flowWarp) preset.warp = flowWarp;
       // Phase 3 — regenerate per-shape motion eqs (Spin/Pulse/Orbit) from each
       // shape's stored motion params, mirroring the editor's _buildRuntimePreset
       // so custom shapes animate identically in the player/timeline.
