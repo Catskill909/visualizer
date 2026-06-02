@@ -363,19 +363,9 @@ html, body {
 }
 .section-label + .section-label { margin-top: -4px; }
 
-/* Collapsible "Adjust — fine controls" disclosure on the Motion tab. Keeps the
-   look pickers clean up top while every fine control stays one click away. */
+/* Movement / Echo / Drift / Reactivity block on the Motion tab — a divider rule
+   below the look pickers. Always visible (audio reactivity is a headline feature). */
 .motion-adjust { border-top: 1px solid var(--border, rgba(255,255,255,0.08)); padding-top: 10px; }
-.motion-adjust-summary {
-  cursor: pointer; list-style: none; user-select: none;
-  display: flex; align-items: center; gap: 6px; margin: 0;
-}
-.motion-adjust-summary::-webkit-details-marker { display: none; }
-.motion-adjust-summary::before {
-  content: "▸"; font-size: 9px; transition: transform 0.15s ease; color: var(--text-3);
-}
-.motion-adjust[open] > .motion-adjust-summary::before { transform: rotate(90deg); }
-.motion-adjust-summary:hover { color: var(--text-2, var(--text-3)); }
 
 /* Remix locks — pin a group so the 🎲 Remix re-rolls only the rest. Sits just
    above the footer; collapsed by default to keep the footer clean. */
@@ -1620,6 +1610,10 @@ html, body {
 }
 .lseg:hover { border-color: var(--border-hi); color: var(--text); }
 .lseg.active { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.4); color: #fff; }
+
+/* Color Field style picker — many chips; wrap into clean justified rows. */
+#bgfield-style { display: flex; flex-wrap: wrap; gap: 4px; }
+#bgfield-style .lseg { flex: 1 1 auto; min-width: 52px; padding: 4px 8px; }
 
 /* Compact direction/axis chip pairs for beat-reactive sliders (Tilt/Hop/Squash) */
 .layer-tilt-dir, .layer-hop-dir, .layer-squash-axis {

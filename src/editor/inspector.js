@@ -1885,7 +1885,7 @@ export class EditorInspector {
             // Mutate (don't replace) so bgField.react — rolled in the Reactivity block —
             // survives a Field-unlocked + Reactivity-locked roll.
             const _f = this.currentState.bgField || (this.currentState.bgField = deepClone(BLANK.bgField));
-            _f.style = pick(['linear', 'radial', 'conic', 'spiral', 'plasma', 'radial', 'conic']);
+            _f.style = pick(['linear', 'stripes', 'weave', 'radial', 'diamond', 'moire', 'conic', 'spiral', 'rays', 'vortex', 'mandala', 'plasma', 'clouds', 'marble', 'ripples', 'checker', 'hex']);
             _f.scale = rnd(0.5, 2.5);
             _f.speed = rnd(0.15, 0.95);
             _f.spin = Math.random() < 0.5 ? 0 : rnd(-0.6, 0.6);     // sometimes a slow spin
@@ -8462,6 +8462,30 @@ export class EditorInspector {
                     case 'plasma': fieldExpr = `0.5 + 0.5 * sin(_fuv.x * ${fsc} * 7.0 + time * ${fsp}) * cos(_fuv.y * ${fsc} * 7.0 - time * ${fsp} * 0.8)`; break;
                     case 'conic':  fieldExpr = `0.5 + 0.5 * sin(atan(_fuv.y - 0.5, _fuv.x - 0.5) * ${fsc} * 3.0 + time * ${fsp})`; break;
                     case 'spiral': fieldExpr = `0.5 + 0.5 * sin(atan(_fuv.y - 0.5, _fuv.x - 0.5) * 3.0 + length(_fuv - 0.5) * ${fsc} * 14.0 - time * ${fsp} * 1.5)`; break;
+                    // Phase 17 — Diamond: square-radial (Manhattan-distance) rings.
+                    case 'diamond': fieldExpr = `0.5 + 0.5 * sin((abs(_fuv.x - 0.5) + abs(_fuv.y - 0.5)) * ${fsc} * 14.0 - time * ${fsp} * 2.0)`; break;
+                    // Phase 17 — Checker: scrolling hard tiles (0/1 lattice).
+                    case 'checker': fieldExpr = `mod(floor(_fuv.x * ${fsc} * 8.0 + time * ${fsp} * 0.5) + floor(_fuv.y * ${fsc} * 8.0), 2.0)`; break;
+                    // Phase 17 — Clouds: domain-warped pseudo-organic plasma (billowing).
+                    case 'clouds': fieldExpr = `0.5 + 0.5 * sin(_fuv.x * ${fsc} * 4.0 + time * ${fsp} + 2.0 * sin(_fuv.y * ${fsc} * 3.0 - time * ${fsp} * 0.5)) * cos(_fuv.y * ${fsc} * 4.0 - time * ${fsp} * 0.6 + 1.5 * sin(_fuv.x * ${fsc} * 2.5))`; break;
+                    // Phase 19 — Stripes: straight axis-aligned bands (Linear is diagonal).
+                    case 'stripes': fieldExpr = `0.5 + 0.5 * sin(_fuv.x * ${fsc} * 10.0 + time * ${fsp})`; break;
+                    // Phase 19 — Weave: soft crosshatch (X + Y bands).
+                    case 'weave': fieldExpr = `0.5 + 0.25 * (sin(_fuv.x * ${fsc} * 10.0 + time * ${fsp}) + sin(_fuv.y * ${fsc} * 10.0 - time * ${fsp}))`; break;
+                    // Phase 19 — Vortex: perspective rings + swirl into centre (tunnel).
+                    case 'vortex': fieldExpr = `0.5 + 0.5 * sin(1.0 / (length(_fuv - 0.5) + 0.1) * ${fsc} * 2.0 + atan(_fuv.y - 0.5, _fuv.x - 0.5) * 3.0 - time * ${fsp} * 2.0)`; break;
+                    // Phase 19 — Rays: spokes from centre (Conic w/ a higher ray count).
+                    case 'rays': fieldExpr = `0.5 + 0.5 * sin(atan(_fuv.y - 0.5, _fuv.x - 0.5) * ${fsc} * 8.0 + time * ${fsp})`; break;
+                    // Phase 19 — Ripples: two circular sources summed → interference shimmer.
+                    case 'ripples': fieldExpr = `0.5 + 0.25 * (sin(length(_fuv - vec2(0.35, 0.4)) * ${fsc} * 24.0 - time * ${fsp} * 2.0) + sin(length(_fuv - vec2(0.65, 0.6)) * ${fsc} * 24.0 + time * ${fsp} * 2.0))`; break;
+                    // Phase 19 — Moiré: two close radial freqs multiplied → beat pattern.
+                    case 'moire': fieldExpr = `0.5 + 0.5 * sin(length(_fuv - 0.5) * ${fsc} * 14.0 - time * ${fsp}) * sin(length(_fuv - 0.5) * ${fsc} * 15.0 + time * ${fsp})`; break;
+                    // Phase 19 — Marble: domain-warped stripes (veined, cousin of Clouds).
+                    case 'marble': fieldExpr = `0.5 + 0.5 * sin(_fuv.x * ${fsc} * 6.0 + 3.0 * sin(_fuv.y * ${fsc} * 2.0 - time * ${fsp}) + time * ${fsp} * 0.3)`; break;
+                    // Phase 19 — Mandala: angular fold → kaleidoscopic symmetry.
+                    case 'mandala': fieldExpr = `0.5 + 0.5 * sin(abs(mod(atan(_fuv.y - 0.5, _fuv.x - 0.5) * 6.0, 6.28318) - 3.14159) * ${fsc} * 2.0 + length(_fuv - 0.5) * 8.0 - time * ${fsp})`; break;
+                    // Phase 19 — Hex: three 60°-offset plane waves → honeycomb lattice.
+                    case 'hex': fieldExpr = `0.5 + 0.166 * (sin(_fuv.x * ${fsc} * 16.0 + time * ${fsp}) + sin((_fuv.x * 0.5 + _fuv.y * 0.866) * ${fsc} * 16.0 - time * ${fsp} * 0.5) + sin((_fuv.x * 0.5 - _fuv.y * 0.866) * ${fsc} * 16.0 + time * ${fsp} * 0.5))`; break;
                     default: fieldExpr = '0.0';
                 }
                 fieldGlsl = coordDecl + reactDecl + `  float _field = ${fieldExpr};\n`;

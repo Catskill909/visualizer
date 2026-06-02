@@ -299,17 +299,27 @@
                                     </div>
                                     <span class="color-row-hex" id="hex-bg"></span>
                                 </div>
-                                <div class="layer-row-inline" style="gap:8px;margin-bottom:8px">
-                                    <span class="layer-ctrl-label" data-tooltip="Background field shape">Field</span>
-                                    <div id="bgfield-style" class="layer-react-curve" role="group"
-                                        aria-label="Background color field">
-                                        <button class="lseg active" data-field="flat">Flat</button>
-                                        <button class="lseg" data-field="linear">Linear</button>
-                                        <button class="lseg" data-field="radial">Radial</button>
-                                        <button class="lseg" data-field="conic">Conic</button>
-                                        <button class="lseg" data-field="spiral">Spiral</button>
-                                        <button class="lseg" data-field="plasma">Plasma</button>
-                                    </div>
+                                <p class="section-label" style="margin-top:10px" data-tooltip="Background field shape">Field</p>
+                                <div id="bgfield-style" class="layer-react-curve" role="group"
+                                    aria-label="Background color field" style="margin-bottom:8px">
+                                    <button class="lseg active" data-field="flat">Flat</button>
+                                    <button class="lseg" data-field="linear">Linear</button>
+                                    <button class="lseg" data-field="stripes">Stripes</button>
+                                    <button class="lseg" data-field="weave">Weave</button>
+                                    <button class="lseg" data-field="radial">Radial</button>
+                                    <button class="lseg" data-field="diamond">Diamond</button>
+                                    <button class="lseg" data-field="moire">Moiré</button>
+                                    <button class="lseg" data-field="conic">Conic</button>
+                                    <button class="lseg" data-field="spiral">Spiral</button>
+                                    <button class="lseg" data-field="rays">Rays</button>
+                                    <button class="lseg" data-field="vortex">Vortex</button>
+                                    <button class="lseg" data-field="mandala">Mandala</button>
+                                    <button class="lseg" data-field="plasma">Plasma</button>
+                                    <button class="lseg" data-field="clouds">Clouds</button>
+                                    <button class="lseg" data-field="marble">Marble</button>
+                                    <button class="lseg" data-field="ripples">Ripples</button>
+                                    <button class="lseg" data-field="checker">Checker</button>
+                                    <button class="lseg" data-field="hex">Hex</button>
                                 </div>
                                 <div id="bgfield-sliders"></div>
                                 <label class="shape-prop-label shape-check" style="margin-top:6px"
@@ -474,13 +484,13 @@
                                 <button id="btn-motion-reset" class="mini-btn" type="button"
                                     data-tooltip="Reset all motion sliders to defaults">↺ Reset</button>
                             </div>
-                            <p class="section-note">One-tap combos for the fine controls below.</p>
+                            <p class="section-note">One-tap combos for the controls below.</p>
                             <div class="motion-presets-grid" id="motion-presets-grid"
                                 role="group" aria-label="Quick looks"></div>
 
-                            <!-- ② ADJUST — every fine control, tucked away so the looks stay clean -->
-                            <details class="motion-adjust" style="margin-top:16px">
-                                <summary class="section-label motion-adjust-summary">Adjust — fine controls</summary>
+                            <!-- ② Movement, Echo, Drift, Warp Center, Randomize + Reactivity — always visible
+                                 (audio reactivity is a headline feature; never hide it behind a disclosure). -->
+                            <div class="motion-adjust" style="margin-top:16px">
                             <p class="section-label" style="margin-top:10px">Movement</p>
                             <div id="motion-sliders"></div>
 
@@ -554,7 +564,7 @@
                             <p class="section-note" style="margin-top:10px">Beat Sensitivity is preset-saved and
                                 applies to MilkDrop beat behavior.</p>
                             <div id="motion-feel-sliders"></div>
-                            </details>
+                            </div>
                         </div>
                     </div>
 

@@ -5,8 +5,9 @@ Last updated: 2026-06-02
 > **The mission:** raise the Preset Studio's *from-scratch* creation ceiling to rival the 1,144 bundled
 > presets — **without** a wall of code/knobs. *Simple to use, great for the creative user* is the hard
 > constraint. **Phases 1–16 shipped (creator tools beta-ready; the thin-line "string" look is solved and
-> waves can now fill into broad shapes).** NEXT = backlog (§2) — no committed phase. The headline
-> edge is **audio reactivity**
+> waves can now fill into broad shapes).** Colour Field now has **18 styles** (Phases 8/13/17/19); Phase 18
+> (Remix Energy dial) was built then reverted (user disliked the static slider). NEXT = backlog (§2). The
+> headline edge is **audio reactivity**
 > ([[project_audio_reactivity_differentiator]]).
 >
 > **Doc layout:** the **NEXT** plan is up front (§1–§2); **shipped** history is reference at the back
@@ -33,6 +34,9 @@ Last updated: 2026-06-02
 | 14 | **Scene FX rack** — Posterize / Vignette / Scan lines / Film grain (any preset) | ✅ shipped |
 | 15 | **Break the thin-line look** — 15.1 Soft/Broad flows · 15.2 Scene Bloom · 15.3 Remix rebalance + pure-reseed fix | ✅ **SHIPPED & approved** (user: "finally solved this"). ⚠️ wave at ~10% *temporarily* — Phase 16 restores it (§1/§2). |
 | 16 | **Richer (filled) waves** — `wave_fill` broadens the wave into a disc/wedge + Remix restores broad wave content | ✅ **SHIPPED** — 16.1 fill **approved** ("fill is great!!!"); 16.2 Remix-restore shipped (§1.5) |
+| 17 | **More Colour Field styles** — Diamond · Checker · Clouds | ✅ **SHIPPED & approved** ("love the new chips!!") |
+| 18 | ~~Remix strength dial~~ — built then **❌ REVERTED** (user: "doesn't add much + hate it static atop crucial controls") | ❌ removed 2026-06-02 |
+| 19 | **9 more Colour Field styles** (Stripes·Weave·Vortex·Rays·Ripples·Moiré·Marble·Mandala·Hex) + Field→header layout + Remix rolls all 17 | ✅ **SHIPPED & tested** (user: "great stuff!") |
 | — | ~~Templates~~ ❌ dropped · ~~Expert eqn/shader drawer~~ ❌ removed · ~~Modulator/LFO bank~~ ⏸ deferred | — |
 
 **Current state:** A from-scratch preset has all three MilkDrop layers — a living **colour-field background**,
@@ -88,7 +92,7 @@ as soft glow not threads: **Bloom** (outward spread), **Smoke** (turbulent low-f
 ([butterchurn.js:4356](src/vendor/butterchurn.js#L4356)) and `getHighestBlur(warpText)` auto-runs the blur
 pass. Data-only — chips auto-appear (data-driven from `WARP_STYLES`), Remix rolls them (its flow pick
 iterates `WARP_STYLES`), player parity + save free. `npm run build` passes. Coefficients (0.8 blur-mix,
-displacement amounts) are the live-tuning dials. **Awaiting review.**
+displacement amounts) are the live-tuning dials.
 
 ### 15.2 — Scene Bloom ✅ SHIPPED (code, 2026-06-02)  *(the "more control over MilkDrop presets" bridge)*
 A **Bloom** fader in the Scene FX rack (`studio_bloom`): `ret.rgb += amt * texture(sampler_blur1, uv).rgb`
@@ -96,7 +100,7 @@ in the `STUDIO_POST_FX` block → a soft glow on the final pixel that works on *
 the **1,144 bundled** (softens harsh thin presets + universal finish control). No-op at 0 (byte-identical);
 `gradeOpts`-fed; save/parity free. **Audit unknown RESOLVED:** `getHighestBlur(compText)` scans the comp
 (incl. our inject) → referencing `sampler_blur1` auto-runs the blur pass even on a bundled comp. `npm run
-build` passes. **Awaiting review.**
+build` passes.
 
 ### 15.3 — Remix rebalance + the pure-reseed bug ✅ SHIPPED (code, 2026-06-02)
 **Root cause found (why the *majority* of rolls were stringy, not the intended ~20%):**
@@ -108,17 +112,19 @@ build` passes. **Awaiting review.**
 2. **Sharp flows thread.** Remix picked uniformly from 10 flows (7 sharp). Sharp flow + high decay smears
    bright content into threads. **Fix:** the flow pick is now ~35% none / else **~65% soft (bloom/smoke/melt)
    / ~35% sharp**.
-3. **Wave dropped:** content roll is now **wave ~10% / shapes ~55% / pure ~35%** (was 20/55/25).
+3. **Wave dropped (temporarily):** content roll was cut to **wave ~10% / shapes ~55% / pure ~35%** to break
+   the string majority.
 
-Net: most rolls are broad/soft fields & blobs; thin strings are a rare accent.
+Net at the time: most rolls were broad/soft fields & blobs; thin strings a rare accent.
 
-> **⚠️ TEMPORARY / Phase 16 TODO (don't lose this):** the **~10% wave cap is a temporary anti-string
-> measure.** Thin "string" animations look great *some* of the time — they should be a deliberate accent,
-> not banned. **When Phase 16 ships filled waves, RESTORE wave content** (raise the probability; offer
-> *filled* = broad and *thin* = accent, and let Remix roll both). See §2.
+> **✅ RESOLVED by Phase 16.2 (the 10% cap was retired).** Once filled waves shipped (16.1), the content
+> roll was raised back to **wave ~30% / shapes ~45% / pure ~25%**, with a wave roll being ~75% **filled**
+> (broad disc/wedge) + ~25% **thin** (deliberate accent string). Thin strings are a valid look, just not the
+> majority — exactly as intended. See §1.5 (Phase 16.2). *(This block is kept for history; the live numbers
+> live in the code + §1.5.)*
 
-**Sequencing done:** 15.1 ✅ → 15.2 ✅ → 15.3 ✅. **Awaiting review of the rebalance** (does the dice now land
-mostly broad?).
+**Sequencing done:** 15.1 ✅ → 15.2 ✅ → 15.3 ✅. **APPROVED** — user confirmed the string fix ("great!! this
+finally solved the issue. i see was a bug of reinjecting"). The temporary wave cap was later retired by 16.2.
 
 ---
 
@@ -146,7 +152,7 @@ Read of `BasicWaveform` in `src/vendor/butterchurn.js` (class ~L5408, `drawBasic
   fork, and **player parity is free** (player and editor share this one engine — no second code path).
 
 ### Plan (sequenced)
-- **16.1 — Filled wave (headline). ✅ SHIPPED (code, 2026-06-02) — awaiting visual review.** Forked
+- **16.1 — Filled wave (headline). ✅ SHIPPED & APPROVED (2026-06-02, user "fill is great!!!").** Forked
   `BasicWaveform` with a `wave_fill` baseVal (0–1, doubles as fill opacity; 0 = byte-identical line path).
   When >0, `drawBasicWaveform` draws a **`TRIANGLE_FAN`** (apex = the y-flipped wave center stored in
   `generateWaveform`; rim = the smoothed curve) UNDER the existing crisp line → circular modes (0/1) =
@@ -177,13 +183,56 @@ Read of `BasicWaveform` in `src/vendor/butterchurn.js` (class ~L5408, `drawBasic
 
 ---
 
-## 2. Backlog
+## 2. ▶ NEXT — Phases 17–18 (planned 2026-06-02)
 
-**🔭 Colour Field — future ideas:** Rings/Bands · Clouds/Noise · Checker/Grid · Diamond (square-radial) ·
-Drift direction · Mirror/Symmetry (kaleido-fold the field) · Hue-cycle field.
+### Phase 17 — More Colour Field styles ✅ SHIPPED & approved (2026-06-02, "love the new chips!!")
+Shipped exactly as planned: **Diamond / Checker / Clouds** cases added to the `fieldExpr` switch
+(~L8464); 3 chips added to `#bgfield-style` (`editor.html` ~L311); added to the Remix style pick (~L1888).
+Generic chip handler + `_syncBgField` needed no change; all three auto-inherit Spin/Sharpness/3-colour/
+beat-react. `flat` unchanged → byte-identical. `npm run build` passes.
+Add three new `bgField` styles. **Audit:** each style is ONE GLSL expression (0..1 scalar over `_fuv`) in the
+`switch` at `_buildCompShader` (~L8459); it auto-inherits Spin/Sharpness/3-colour/beat-react. Chips are
+static `.lseg` buttons (`editor.html` ~L304, `#bgfield-style`); the click handler + `_syncBgField` are generic
+(`data-field`), so **no handler change** — just add chips + cases + the Remix style pick (~L1888). `flat`
+stays default/byte-identical; a bad expr only affects that one non-flat style (near-zero risk).
+- **Diamond** — Manhattan-distance rings: `sin((|x-.5|+|y-.5|)*scale*14 - time*spd*2)`. Square-radial.
+- **Checker** — scrolling hard tiles: `mod(floor(x*scale*8 + time*spd*.5)+floor(y*scale*8), 2.0)`. Geometric.
+- **Clouds** — domain-warped pseudo-organic plasma (no helper fn — see constraint). Billowing.
+- **⚠️ Constraint:** the field is an INLINE expression in the comp body → can't declare a global `noise()`
+  there. True-fbm Clouds would need a shader-prelude change (deferred); Phase 17 ships the domain-warped
+  one-liner version. **Skip Rings** (redundant with Radial + Sharpness). **Deferred:** Hue-cycle (changes the
+  A→B colour mapping, not just the scalar) · Drift direction + Mirror/Symmetry (field MODIFIERS, not styles).
 
-**Optional minors:** Remix "subtle↔wild" strength dial · feedback-mode Remix variety · a "Content"
-Remix-lock for shapes/wave.
+### Phase 18 — Remix "subtle ↔ wild" strength dial ❌ BUILT THEN REVERTED (2026-06-02)
+Shipped in code, then **removed at the user's request** same day: *"doesn't add much and I hate that it's
+static on top of the crucial controls."* Fully reverted — `_rollFullStack` is byte-for-byte back to its
+pre-18 literals; the slider markup (`#remix-strength`), CSS (`.remix-strength-row`), persistence
+(`loadRemixStrength`/`dc.remix.strength`), and `_bindRemixStrength` are all deleted; `npm run build` passes
+with zero leftover refs. **Lesson:** a master "energy" dial added complexity without enough payoff, and a
+permanently-visible control above the Remix locks was unwanted UI clutter. **If revisited:** make it a roll
+*output* people feel, not a static knob — e.g. fold intensity into existing controls, not a new always-on
+slider. Don't rebuild it as a top-level slider.
+
+### 🎨 Colour Field styles (user loves these — "more anytime!")
+Each is ONE `fieldExpr` (0..1 over `_fuv`+time) → free chip + auto Spin/Sharpness/3-colour/beat-react.
+A reliable, cheap, high-delight vein. **✅ SHIPPED (18 total, Phases 8/13/17/19):** Flat · Linear · Stripes ·
+Weave · Radial · Diamond · Moiré · Conic · Spiral · Rays · Vortex · Mandala · Plasma · Clouds · Marble ·
+Ripples · Checker · Hex. All 17 non-flat rolled by 🎲 Remix; "Field" is now a full-width **header** above the
+wrapped chip grid (`#bgfield-style` flex-wrap CSS) — the inline label was too cramped at this chip count.
+
+**Still inline-ready if we want even more (no helper):** stacked-frequency bands · spiral-arms count ·
+log-polar grid · diagonal weave · target/bullseye. **Needs a shader PRELUDE (deferred — can't declare a
+global `noise()`/loop in the inline field expr):**
+real-fbm **Clouds HD / Smoke / Fire** · **Voronoi/Worley cells** · **Caustics**. → if we want these, first add
+a one-time GLSL helper-prelude to the generated comp, then they're all cheap.
+
+### Field MODIFIERS (apply to ANY style, not new styles)
+**Drift direction** (scroll vector on `_fuv` + angle/speed dial) · **Mirror/Symmetry** (fold `_fuv` for kaleido) ·
+**Hue-cycle** (map `_field`→hue rotation instead of the A→B blend — changes colour mapping, mid effort).
+
+### Remaining backlog (uncommitted)
+**Remix minors:** feedback-mode variety · a "Content" Remix-lock (pin shapes/wave).
+**Beyond the creator:** finish Timeline + three.js 3D layers ([[project_v1_beta_scope]]).
 
 ---
 ---
