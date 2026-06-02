@@ -38,6 +38,10 @@ creator tools are **beta-ready**. Detailed shipped writeups for the recent work 
 | **9** | **Full-stack 🎲 Remix** — one button rolls the whole preset (colour field + 3 colours + motion + flow + wave) | ✅ **SHIPPED** — footer Remix → `_rollFullStack()`. **+ 9.1 Roll-and-lock ✅** — pin Colours/Field/Motion/Flow/**Reactivity**, Remix re-rolls only the rest. | — |
 | **10** | **Palette declutter + Grade rack** — drop canned variations; grow the controls that tune ANY loaded preset | ✅ **SHIPPED (code, §3.14)** — removed Drift/Pulse/Storm/Ripple/Radiate/Scatter/Bloom (kept Solid+Shift); added **Brightness / Contrast / Gamma / Temperature** grade faders that bolt onto any preset (incl. the 1,144 bundled) via the STUDIO_POST_FX inject. | Optional: Posterize / Vignette; ✗ Templates (dropped — redundant with Remix+Library+Random) |
 | **11** | **Remix content variety + shape/A-B fixes** — stop forcing a wave (string) on every roll; fix the shape bugs the variety work surfaced | ✅ **SHIPPED (code, §3.15–§3.16)** — Remix rolls a content TYPE: wave ~20% (subtle coloured accent) / **shapes ~55%** (audio-reactive blobs & polygons via `_addRemixShape`) / pure field+flow ~25%; BLANK base wave softened (white→soft blue 0.6). **A/B "A" re-baselined** to the Shift entry (was stale BLANK string). **`currentState.shapes` is now EDITOR-ONLY** — bundled preset shapes no longer pollute the array / starve the 4 render slots (the "Shape 6"/won't-render bug). | — |
+| **12** | **Audio-reactive Grade rack** — make the grade pulse to the beat over ANY loaded preset (the headline next; the audio-reactivity differentiator) | 📋 **PLANNED (deep plan §6)** | **NEXT** — build 12.1 GLSL → 12.2 UI → 12.3 wire/save |
+| **13** | **Colour Field v2** — Spin/Angle · 3rd colour stop (A→B→C) · Conic + Spiral styles · Sharpness/Bands · beat-reactive field | 📋 **PLANNED (deep plan §6)** | After 12 |
+| **14** | **Scene FX rack** — Posterize / Vignette / RGB-split / scene Mirror, via the grade block; each audio-reactive | 📋 PLANNED | After 13 |
+| **15** | **Push from-scratch further** — more Flow warp styles, a second wave | 📋 PLANNED | After 14 |
 
 **Current state in one line:** ✅ **DONE & beta-ready** — Phases 1–11 **shipped**: Motion Engine, Custom
 Shapes + Motion/Reactivity, Color Studio, **Flow Style** (7-warp library), **Colour Field** (+ fg/bg colour
@@ -50,13 +54,15 @@ bundled library. **Differentiator (user-confirmed, the headline edge):** lean HE
 Remix randomises the reactivity itself; "you can do this in other VJ software but it's a whole thing."
 See [[project_audio_reactivity_differentiator]].
 
-**What's next (regroup — recommended order):**
-1. **Audio-reactive Grade rack** *(the headline next)* — make Brightness/Contrast/Gamma/Temperature **pulse
-   to the beat** so loading any of the 1,144 bundled presets gives it live audio-reactive grading. Sits in
-   BOTH bridges (more control over MilkDrop presets **and** the audio-reactivity edge). Contained extension
-   of the STUDIO_POST_FX block (§3.14).
-2. **Scene FX** — Posterize / Vignette / RGB-split / scene Mirror, via the same grade block (tune any preset).
-3. **Push from-scratch closer to MilkDrop** — more Colour Field styles, more Flow styles, a second wave.
+**What's next (regroup — phased, deep plan §6):**
+1. **Phase 12 — Audio-reactive Grade rack** *(NEXT)* — make Brightness/Contrast/Gamma/Temperature **pulse to
+   the beat** so loading any of the 1,144 bundled presets gives it live audio-reactive grading. Sits in BOTH
+   bridges (more control over MilkDrop presets **and** the audio-reactivity edge). Contained extension of the
+   STUDIO_POST_FX block (§3.14).
+2. **Phase 13 — Colour Field v2** — Spin/Angle · 3rd colour stop (A→B→C) · Conic+Spiral styles · Sharpness/
+   Bands · beat-reactive field (built alongside 12). Backlog of further field ideas noted in §6.
+3. **Phase 14 — Scene FX** — Posterize / Vignette / RGB-split / scene Mirror, via the same grade block.
+4. **Phase 15 — Push from-scratch further** — more Flow styles, a second wave.
    *(Honest limit: motion sliders only partly reach bundled presets — their own eqs overwrite them; the
    grade/FX layer is the reliable bridge.)*
 Bigger v1 picture beyond the creator: finish Timeline + three.js 3D layers ([[project_v1_beta_scope]]).
@@ -563,6 +569,63 @@ reactivity = on point (the load-bearing strength — every field/motion must rem
 - **Starting templates** — a handful of field+motion+content combos so a blank canvas never opens as a bare
   line.
 - **→ v1 beta lock** — README/help/promo already current for the Colour Field; final pass at beta.
+
+---
+
+## 6. Phase 12+ — Audio-reactive Grade & beyond (deep plan, 2026-06-01)
+
+Two bridges to keep building: **(A) more of our controls reach a loaded MilkDrop preset** (lever = the
+`STUDIO_POST_FX` grade block, §3.14 — bolts onto any preset's final pixel) and **(B) push our from-scratch
+tools toward MilkDrop's range** (lever = our generated layers). *Honest limit: motion sliders only partly
+reach bundled presets — their own `frame_eqs` overwrite them each frame; the grade/FX layer is the reliable
+A-bridge.* User-confirmed north star: **lean HEAVY on audio reactivity** ([[project_audio_reactivity_differentiator]]).
+
+### Phase 12 — Audio-reactive Grade rack (NEXT)
+
+Make Brightness/Contrast/Gamma/Temperature **pulse to the beat** over ANY loaded preset. Sits in *both*
+bridges (more control over MilkDrop presets + the audio edge). **UI:** a collapsible **"Grade Reactivity"**
+sub-section in the **Palette tab, directly under the grade faders** — a **Source** dropdown + **Curve**
+segmented control + per-fader **pulse-amount** sliders (mirrors the Wave/Solid-FX reactivity idiom). **Tech:**
+extend `buildStudioPostFxGlsl` so a grade fader bakes a *live expression* (`base + signal·amount`) instead
+of a static literal, reading the audio uniforms the Shift pulse already uses (`bass/mid/treb/vol/q31`).
+- **12.1 — GLSL:** each grade op optionally `base + curve(source)·amount`; shared Source+Curve. No-op (amount
+  0) → byte-identical. Works on bundled + custom alike (same inject path).
+- **12.2 — UI:** Grade Reactivity sub-section (Source/Curve/amount sliders), data-driven like `_buildPaletteSliders`.
+- **12.3 — Wire/save:** new `baseVals` (`studio_*_react` amounts + `studio_grade_react_source/curve`); `gradeOpts`
+  extended; `_syncPaletteSliders`. Rides `baseVals` → save/load + player parity free (grade baked into comp).
+
+### Phase 13 — Colour Field v2 (deepen the background field)
+
+The Colour Field (§3.5 / §8.1–8.2) is the headline background layer; v2 widens its vocabulary. **Shortlist
+(approved 2026-06-01):**
+- **Spin / Angle** — rotate the field. Linear → gradient angle; Radial/Plasma/etc. → rotate the pattern.
+  A continuous spin or a set angle. (Bake a rotation of `uv_m` about centre before the field math.)
+- **Third colour stop (A→B→C)** — the field uses a *third* palette colour (the accent) as a mid/end stop,
+  so it's a real multi-colour gradient, not two-tone. The single biggest "richness" win. (Palette/🎲 already
+  produce 3 harmonious colours — wire the accent in as stop C.)
+- **Conic + Spiral styles** — two new field shapes: **Conic** = colour sweep around the centre angle (the
+  colour-wheel look, spins beautifully); **Spiral** = colour spirals out (angle + radius blend).
+- **Sharpness / Bands** — a knob from soft gradient → hard posterized steps (quantise the field value into N
+  bands). Free graphic/retro variety from the same field.
+- **Beat-reactive field** — field **scale / spin / blend pulses to the beat**. *Build this alongside Phase
+  12* (same audio-uniform-in-comp pattern) so the field breathes with the music.
+
+All ride `bgField` (saves/player-parity free, like §8.1) + the existing comp inject. Same "pick a style,
+turn dials" ethos.
+
+**🔭 Colour Field — future / backlog (brainstormed 2026-06-01, NOT in v2):** more styles — **Rings/Bands**
+(hard concentric/parallel), **Clouds/Noise** (turbulent fbm, lava-lamp), **Checker/Grid**, **Diamond**
+(square-radial); **Drift direction** (field flows a chosen way); **Mirror/Symmetry** (kaleido-fold the
+field); **Hue-cycle field** (the field cycles hue over space, tied to Color Roll). Pull from here when v2
+proves out.
+
+### Phase 14 — Scene FX rack
+Posterize / Vignette / RGB-split (chromatic) / scene Mirror-Kaleido — all in the same grade block, operating
+on the final pixel so they tune any preset. Each can reuse Phase 12's reactivity pattern (beat-pulsed FX).
+
+### Phase 15 — Push from-scratch further
+More **Flow** warp styles · a **second wave** / richer wave options. The B-bridge — widen the generated-layer
+vocabulary. (Colour Field expansion moved up to its own Phase 13.)
 
 ---
 

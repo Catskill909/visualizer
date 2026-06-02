@@ -528,7 +528,7 @@ html, body {
 
 .color-row-label {
   font-size: 12px; font-weight: 500; color: var(--text-2);
-  width: 42px; flex-shrink: 0;
+  width: 72px; flex-shrink: 0;   /* fits the longest label ("Background") on one line — was 42px, which let it overflow under the swatch */
 }
 
 /* Swatch wrapper — positions the native <input type=color> on top */
