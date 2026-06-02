@@ -306,10 +306,16 @@
                                         <button class="lseg active" data-field="flat">Flat</button>
                                         <button class="lseg" data-field="linear">Linear</button>
                                         <button class="lseg" data-field="radial">Radial</button>
+                                        <button class="lseg" data-field="conic">Conic</button>
+                                        <button class="lseg" data-field="spiral">Spiral</button>
                                         <button class="lseg" data-field="plasma">Plasma</button>
                                     </div>
                                 </div>
                                 <div id="bgfield-sliders"></div>
+                                <label class="shape-prop-label shape-check" style="margin-top:6px"
+                                    data-tooltip="Blend a third colour (the wave colour) into the field">
+                                    <input type="checkbox" id="bgfield-tri"> 3-color blend
+                                </label>
                             </div>
 
                             <div class="section-label-row">
@@ -407,6 +413,10 @@
                                 </div>
                             </div>
                             <div id="grade-react-sliders"></div>
+
+                            <!-- Scene FX (Phase 14): final-image treatments over ANY loaded preset. -->
+                            <p class="section-label" style="margin-top:14px">Scene FX</p>
+                            <div id="scene-fx-sliders"></div>
 
                             <div class="toggle-row">
                                 <label class="toggle-label" for="toggle-invert">Invert colors</label>

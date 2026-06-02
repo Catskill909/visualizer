@@ -414,7 +414,24 @@ function buildStudioPostFxGlsl(opts) {
         const oneMinusCos = (1 - Math.cos(rad)).toFixed(6);
         hueLine = `\n    vec3 _k = vec3(0.57735);\n    ret.rgb = ret.rgb * ${cosA} + cross(_k, ret.rgb) * ${sinA} + _k * dot(_k, ret.rgb) * ${oneMinusCos};`;
     }
-    return `    /* STUDIO_POST_FX */\n    if (brighten != 0) ret = sqrt(ret);\n    if (darken != 0) ret = ret * ret;\n    if (solarize != 0) ret = ret * (1.0 - ret) * 4.0;\n    if (invert != 0) ret = 1.0 - ret;${sigDecl}${brLine}${conLine}${gamLine}${tmpLine}${satLine}${hueLine}\n`;
+    // Phase 14 — Scene FX. Final-image treatments on `ret.rgb` (uv/time in scope),
+    // applied AFTER colour grading. Each a no-op string at 0 → byte-identical when off.
+    const post = num(o.posterize, 0), vig = num(o.vignette, 0), scan = num(o.scanlines, 0), grain = num(o.grain, 0);
+    // Posterize: amount→levels, punchy — even a small nudge bands (0.2→~6 levels … 1→2).
+    const postLine = (post < 0.001) ? '' :
+        (() => { const lv = Math.max(2, Math.round(8 - post * 6)); return `\n    ret.rgb = floor(ret.rgb * ${lv}.0 + 0.5) / ${lv}.0;`; })();
+    // Vignette: strong radial falloff that reaches WAY into the centre — darkening
+    // saturates by mid-frame so only a small central bubble stays bright (not a
+    // corner ring). smoothstep(0.05, 0.6) → ~43% dark at r=0.3, full by the edges.
+    const vigLine = (vig < 0.001) ? '' :
+        `\n    ret.rgb *= 1.0 - ${vig.toFixed(4)} * smoothstep(0.05, 0.6, length(uv - 0.5));`;
+    // Scan lines: soft CRT horizontal banding (fixed density).
+    const scanLine = (scan < 0.001) ? '' :
+        `\n    ret.rgb *= 1.0 - ${(scan * 0.4).toFixed(4)} * (0.5 + 0.5 * sin(uv.y * 700.0));`;
+    // Film grain: animated noise, ± up to ~0.25 at full.
+    const grainLine = (grain < 0.001) ? '' :
+        `\n    ret.rgb += ${(grain * 0.5).toFixed(4)} * (fract(sin(dot(uv * (time + 1.0), vec2(12.9898, 78.233))) * 43758.5453) - 0.5);`;
+    return `    /* STUDIO_POST_FX */\n    if (brighten != 0) ret = sqrt(ret);\n    if (darken != 0) ret = ret * ret;\n    if (solarize != 0) ret = ret * (1.0 - ret) * 4.0;\n    if (invert != 0) ret = 1.0 - ret;${sigDecl}${brLine}${conLine}${gamLine}${tmpLine}${satLine}${hueLine}${postLine}${vigLine}${scanLine}${grainLine}\n`;
 }
 
 // Build the full grade-opts object the STUDIO_POST_FX inject reads, from a baseVals.
@@ -432,6 +449,9 @@ function gradeOpts(state) {
         gammaReact: b.studio_gamma_react ?? 0, tempReact: b.studio_temp_react ?? 0,
         gradeReactSource: st.studio_grade_react_source ?? 'bass',
         gradeReactCurve: st.studio_grade_react_curve ?? 'linear',
+        // Phase 14 — Scene FX amounts (baseVals).
+        posterize: b.studio_posterize ?? 0, vignette: b.studio_vignette ?? 0,
+        scanlines: b.studio_scanlines ?? 0, grain: b.studio_grain ?? 0,
     };
 }
 
@@ -489,6 +509,8 @@ const BLANK = {
         // the beat when > 0). Shared Source/Curve live top-level (strings stay out of
         // baseVals, like solidReactSource). All default-off → byte-identical.
         studio_brightness_react: 0, studio_contrast_react: 0, studio_gamma_react: 0, studio_temp_react: 0,
+        // Phase 14 — Scene FX (final-image treatments; 0 = off → byte-identical).
+        studio_posterize: 0, studio_vignette: 0, studio_scanlines: 0, studio_grain: 0,
         // Glow / Accent bloom (a colored halo from the blurred feedback buffer,
         // tinted by the Glow / Accent colour). 0 = off → comp is byte-identical.
         studio_glow: 0, studio_accent: 0,
@@ -554,7 +576,7 @@ const BLANK = {
     // unchanged); linear/radial/plasma make the background a moving multi-colour
     // field that still pulses with the audio. scale = pattern frequency, speed =
     // how fast it drifts. Lives outside baseVals; round-trips via ...currentState.
-    bgField: { style: 'flat', scale: 1.0, speed: 0.3 },
+    bgField: { style: 'flat', scale: 1.0, speed: 0.3, spin: 0, sharp: 0, tri: false, react: 0 },  // Phase 13: spin (rotate over time), sharp (0=gradient,1=hard bands), tri (3-colour A→B→C), react (field breathes to the beat)
     // Phase 8.2 — Background colour A, distinct from the foreground wave colour
     // (wave_r/g/b). null = fall back to the wave colour (so old presets that never
     // had this are byte-identical). Set by the palette/roll to a contrasting
@@ -941,6 +963,7 @@ export class EditorInspector {
         this._buildPaletteStrengthSliders();
         this._buildPaletteSliders();
         this._buildGradeReactPanel();
+        this._buildSceneFxPanel();
         this._bindPaletteOpacity();
         this._buildSolidFxPanel();
         this._buildFlowStyleSection();
@@ -1217,6 +1240,9 @@ export class EditorInspector {
             [
                 { id: 'bgf-scale', label: 'Scale', min: 0.2, max: 3.0, step: 0.05, key: 'scale' },
                 { id: 'bgf-speed', label: 'Motion', min: 0.0, max: 2.0, step: 0.05, key: 'speed' },
+                { id: 'bgf-spin', label: 'Spin', min: -1.0, max: 1.0, step: 0.02, key: 'spin' },
+                { id: 'bgf-sharp', label: 'Sharpness', min: 0.0, max: 1.0, step: 0.02, key: 'sharp' },
+                { id: 'bgf-react', label: 'Beat', min: 0.0, max: 1.0, step: 0.02, key: 'react' },
             ].forEach(cfg => {
                 const bgf = this.currentState.bgField || (this.currentState.bgField = deepClone(BLANK.bgField));
                 const input = makeSlider(fieldSliders, { ...cfg, value: bgf[cfg.key] });
@@ -1233,15 +1259,30 @@ export class EditorInspector {
                 input.addEventListener('pointerup', () => this._postSnap());
             });
         }
+        const triToggle = document.getElementById('bgfield-tri');
+        if (triToggle) {
+            triToggle.addEventListener('change', () => {
+                this._preSnap();
+                (this.currentState.bgField || (this.currentState.bgField = deepClone(BLANK.bgField))).tri = triToggle.checked;
+                this._postSnap();
+                this._buildCompShader();
+                this._applyToEngine();
+            });
+        }
     }
 
     /** Reflect bgField state onto the Color Field controls (style button + sliders). */
     _syncBgField() {
         const bgf = this.currentState.bgField || (this.currentState.bgField = deepClone(BLANK.bgField));
+        if (bgf.spin == null) bgf.spin = 0;     // backfill pre-v2 presets
+        if (bgf.sharp == null) bgf.sharp = 0;
+        if (bgf.react == null) bgf.react = 0;
         document.querySelectorAll('#bgfield-style .lseg').forEach(b => {
             b.classList.toggle('active', b.dataset.field === (bgf.style || 'flat'));
         });
-        [['bgf-scale', 'scale', 0.2, 3.0], ['bgf-speed', 'speed', 0.0, 2.0]].forEach(([id, key, min, max]) => {
+        const triToggle = document.getElementById('bgfield-tri');
+        if (triToggle) triToggle.checked = !!bgf.tri;
+        [['bgf-scale', 'scale', 0.2, 3.0], ['bgf-speed', 'speed', 0.0, 2.0], ['bgf-spin', 'spin', -1.0, 1.0], ['bgf-sharp', 'sharp', 0.0, 1.0], ['bgf-react', 'react', 0.0, 1.0]].forEach(([id, key, min, max]) => {
             const input = document.getElementById(id);
             if (!input) return;
             const v = bgf[key];
@@ -1673,6 +1714,40 @@ export class EditorInspector {
         });
     }
 
+    /** Phase 14 — Scene FX sliders (Posterize / Vignette / Scan lines / Film grain).
+     *  Final-image treatments baked into the post-FX block; re-inject on change so they
+     *  tune any loaded preset. Ride baseVals → save/player-parity free. */
+    _buildSceneFxPanel() {
+        const container = document.getElementById('scene-fx-sliders');
+        if (!container) return;
+        [
+            { id: 'sfx-posterize', label: 'Posterize', min: 0, max: 1.0, step: 0.01, key: 'studio_posterize' },
+            { id: 'sfx-vignette', label: 'Vignette', min: 0, max: 1.0, step: 0.01, key: 'studio_vignette' },
+            { id: 'sfx-scanlines', label: 'Scan lines', min: 0, max: 1.0, step: 0.01, key: 'studio_scanlines' },
+            { id: 'sfx-grain', label: 'Film grain', min: 0, max: 1.0, step: 0.01, key: 'studio_grain' },
+        ].forEach(cfg => {
+            const input = makeSlider(container, { ...cfg, value: this.currentState.baseVals[cfg.key] ?? 0 });
+            const valEl = document.getElementById(`${cfg.id}-val`);
+            input.addEventListener('pointerdown', () => this._preSnap());
+            input.addEventListener('input', () => {
+                const v = parseFloat(input.value);
+                if (valEl) valEl.textContent = v.toFixed(2);
+                input.style.setProperty('--pct', `${((v - cfg.min) / (cfg.max - cfg.min)) * 100}%`);
+                this.currentState.baseVals[cfg.key] = v;
+                this._rebuildPostFx();   // scene FX bake into the comp post-FX block
+            });
+            input.addEventListener('pointerup', () => this._postSnap());
+        });
+    }
+
+    _syncSceneFx() {
+        const bv = this.currentState.baseVals;
+        this._syncSlider('sfx-posterize', bv.studio_posterize ?? 0, 0, 1.0, 2);
+        this._syncSlider('sfx-vignette', bv.studio_vignette ?? 0, 0, 1.0, 2);
+        this._syncSlider('sfx-scanlines', bv.studio_scanlines ?? 0, 0, 1.0, 2);
+        this._syncSlider('sfx-grain', bv.studio_grain ?? 0, 0, 1.0, 2);
+    }
+
     /** Reflect Grade Reactivity state onto its controls. */
     _syncGradeReact() {
         const srcSel = document.getElementById('grade-react-source');
@@ -1786,18 +1861,54 @@ export class EditorInspector {
         // Each group rolls only when UNLOCKED — a locked group keeps its current
         // values, so you can pin what you love and gamble the rest (Roll-and-lock).
         // ── Colours: harmony rule + tone + hue → wave/glow/accent + contrasting bgColorA.
-        if (!L.colours) this._rollRandomPalette();
+        if (!L.colours) {
+            this._rollRandomPalette();
+            // Scene FX (Phase 14) — a final-image finish; rides the Colours/look lock.
+            // Clear each roll, then rarely add ONE subtle FX (they read strong).
+            const _sfx = this.currentState.baseVals;
+            _sfx.studio_posterize = 0; _sfx.studio_vignette = 0; _sfx.studio_scanlines = 0; _sfx.studio_grain = 0;
+            if (Math.random() < 0.25) {
+                const fx = pick(['studio_posterize', 'studio_vignette', 'studio_scanlines', 'studio_grain']);
+                _sfx[fx] = (fx === 'studio_vignette' || fx === 'studio_posterize') ? rnd(0.2, 0.45) : rnd(0.15, 0.3);
+            }
+        }
         // ── Colour Field + Reactivity (separate locks) + a visible wave — one snapped step.
         this._preSnap();
         if (!L.field) {
-            this.currentState.bgField = { style: pick(['linear', 'radial', 'plasma', 'radial', 'plasma']), scale: rnd(0.5, 2.5), speed: rnd(0.15, 0.95) };
+            // Mutate (don't replace) so bgField.react — rolled in the Reactivity block —
+            // survives a Field-unlocked + Reactivity-locked roll.
+            const _f = this.currentState.bgField || (this.currentState.bgField = deepClone(BLANK.bgField));
+            _f.style = pick(['linear', 'radial', 'conic', 'spiral', 'plasma', 'radial', 'conic']);
+            _f.scale = rnd(0.5, 2.5);
+            _f.speed = rnd(0.15, 0.95);
+            _f.spin = Math.random() < 0.5 ? 0 : rnd(-0.6, 0.6);     // sometimes a slow spin
+            _f.sharp = Math.random() < 0.35 ? rnd(0.3, 0.9) : 0;    // sometimes hard bands
+            _f.tri = Math.random() < 0.5;                           // ~half 3-colour
         }
         if (!L.reactivity) {
-            // The audio response itself is rollable — Shift pulse depth + which band
-            // drives it + the response curve. Audio reactivity is the differentiator.
+            // The audio response itself is rollable — audio reactivity is the
+            // differentiator, so Remix exercises EVERY reactive axis we build.
+            // 1) Shift pulse — depth + which band drives it + the response curve.
             this.currentState.solidShift = rnd(0.35, 0.85);
             this.currentState.solidReactSource = pick(['bass', 'mid', 'treb', 'vol', 'flux']);
             this.currentState.solidReactCurve = pick(['linear', 'squared', 'cubed', 'threshold']);
+            // 2) Color Reactivity (Phase 12) — the colour adjustments pulse to the beat.
+            //    Reuse the SAME band/curve as the Shift pulse for one cohesive audio
+            //    identity. Pulse ONE main fader (brightness or contrast) + sometimes a
+            //    subtle temperature sway — tasteful, not strobing chaos.
+            this.currentState.studio_grade_react_source = this.currentState.solidReactSource;
+            this.currentState.studio_grade_react_curve = this.currentState.solidReactCurve;
+            const _gb = this.currentState.baseVals;
+            _gb.studio_brightness_react = 0; _gb.studio_contrast_react = 0;
+            _gb.studio_gamma_react = 0; _gb.studio_temp_react = 0;
+            if (Math.random() < 0.5) _gb.studio_brightness_react = rnd(0.25, 0.5);
+            else _gb.studio_contrast_react = rnd(0.25, 0.5);
+            if (Math.random() < 0.4) _gb.studio_temp_react = rnd(0.05, 0.12);
+            // 3) Beat-reactive Colour Field (Phase 13) — the field breathes/zooms on the
+            //    beat (reuses _sr, same band). Mutate bgField so it rides the Reactivity
+            //    lock independent of the Field lock's shape roll.
+            (this.currentState.bgField || (this.currentState.bgField = deepClone(BLANK.bgField))).react =
+                Math.random() < 0.6 ? rnd(0.3, 0.7) : 0;
         }
         // ── Content — roll a TYPE for variety so it's NOT a string every time:
         // wave (~20%, a thin oscilloscope accent) / shapes (~55%, audio-reactive
@@ -8297,12 +8408,40 @@ export class EditorInspector {
             const bgf = this.currentState.bgField || { style: 'flat', scale: 1.0, speed: 0.3 };
             const fsc = Number(bgf.scale ?? 1).toFixed(4);
             const fsp = Number(bgf.speed ?? 0.3).toFixed(4);
-            let fieldExpr;
-            switch (bgf.style) {
-                case 'linear': fieldExpr = `0.5 + 0.5 * sin((uv_m.x + uv_m.y) * ${fsc} * 3.14159 + time * ${fsp})`; break;
-                case 'radial': fieldExpr = `0.5 + 0.5 * sin(length(uv_m - 0.5) * ${fsc} * 14.0 - time * ${fsp} * 2.0)`; break;
-                case 'plasma': fieldExpr = `0.5 + 0.5 * sin(uv_m.x * ${fsc} * 7.0 + time * ${fsp}) * cos(uv_m.y * ${fsc} * 7.0 - time * ${fsp} * 0.8)`; break;
-                default: fieldExpr = '0.0';  // flat — classic audio-only Shift
+            const fspin = Number(bgf.spin ?? 0);
+            const fsharp = Number(bgf.sharp ?? 0);
+            const _isFlatField = !bgf.style || bgf.style === 'flat';
+            // Build the `_field` GLSL (a 0..1 spatial pattern). 'flat' → 0.0 (byte-
+            // identical Shift). Phase 13: Spin rotates the field coord over time;
+            // Conic/Spiral add angular styles; Sharpness quantises into hard bands.
+            let fieldGlsl;
+            if (_isFlatField) {
+                fieldGlsl = `  float _field = 0.0;\n`;
+            } else {
+                const coordDecl = (Math.abs(fspin) > 1e-4)
+                    ? `  vec2 _fc = uv_m - 0.5;\n  float _fa = time * ${fspin.toFixed(4)};\n  float _fco = cos(_fa), _fsi = sin(_fa);\n  vec2 _fuv = vec2(_fc.x * _fco - _fc.y * _fsi, _fc.x * _fsi + _fc.y * _fco) + 0.5;\n`
+                    : `  vec2 _fuv = uv_m;\n`;
+                // Beat-reactive field (13.3): on the beat the field zooms/breathes —
+                // scale _fuv toward centre by the audio signal (_sr, the same band as
+                // the Shift pulse → one cohesive audio identity). 0 = static.
+                const freact = Number(bgf.react ?? 0);
+                const reactDecl = (freact > 0.001)
+                    ? `  _fuv = (_fuv - 0.5) * (1.0 - _sr * ${freact.toFixed(4)} * 0.6) + 0.5;\n`
+                    : '';
+                let fieldExpr;
+                switch (bgf.style) {
+                    case 'linear': fieldExpr = `0.5 + 0.5 * sin((_fuv.x + _fuv.y) * ${fsc} * 3.14159 + time * ${fsp})`; break;
+                    case 'radial': fieldExpr = `0.5 + 0.5 * sin(length(_fuv - 0.5) * ${fsc} * 14.0 - time * ${fsp} * 2.0)`; break;
+                    case 'plasma': fieldExpr = `0.5 + 0.5 * sin(_fuv.x * ${fsc} * 7.0 + time * ${fsp}) * cos(_fuv.y * ${fsc} * 7.0 - time * ${fsp} * 0.8)`; break;
+                    case 'conic':  fieldExpr = `0.5 + 0.5 * sin(atan(_fuv.y - 0.5, _fuv.x - 0.5) * ${fsc} * 3.0 + time * ${fsp})`; break;
+                    case 'spiral': fieldExpr = `0.5 + 0.5 * sin(atan(_fuv.y - 0.5, _fuv.x - 0.5) * 3.0 + length(_fuv - 0.5) * ${fsc} * 14.0 - time * ${fsp} * 1.5)`; break;
+                    default: fieldExpr = '0.0';
+                }
+                fieldGlsl = coordDecl + reactDecl + `  float _field = ${fieldExpr};\n`;
+                if (fsharp > 0.001) {
+                    const bands = Math.max(2, Math.round(2 + fsharp * 6));  // 2..8 hard bands
+                    fieldGlsl += `  _field = floor(_field * ${bands}.0 + 0.5) / ${bands}.0;\n`;
+                }
             }
             // Breath: lerp between 1.0 (off) and a slow sine (0..1) by breath amount.
             // Pulse:  multiplies brightness by (1 + signal * pulse).
@@ -8312,11 +8451,16 @@ export class EditorInspector {
                 `  float _sr = ${solidCurveExpr};\n` +
                 `  float _breath = mix(1.0, 0.5 + 0.5 * sin(time * 0.6), ${breath});\n` +
                 `  float _pulse = 1.0 + _sr * ${pulse};\n` +
-                `  float _field = ${fieldExpr};\n` +
+                fieldGlsl +
                 `  float _shiftT = clamp(_field + _sr * ${shift}, 0.0, 1.0);\n` +
                 `  vec3 _colA = vec3(${aR}, ${aG}, ${aB});\n` +
                 `  vec3 _colB = vec3(${bR}, ${bG}, ${bB});\n` +
-                `  vec3 col = mix(_colA, _colB, _shiftT) * _breath * _pulse;\n` +
+                // 3-colour stop (13.2): blend A→B→C across the field, where C = the
+                // palette's WAVE colour (the 3rd harmony colour), so the background is
+                // a richer multi-colour gradient, not two-tone. Off = classic A→B.
+                (bgf.tri
+                    ? `  vec3 _colC = vec3(${(bv.wave_r ?? 1).toFixed(4)}, ${(bv.wave_g ?? 1).toFixed(4)}, ${(bv.wave_b ?? 1).toFixed(4)});\n  vec3 col = (_shiftT < 0.5 ? mix(_colA, _colB, _shiftT * 2.0) : mix(_colB, _colC, (_shiftT - 0.5) * 2.0)) * _breath * _pulse;\n`
+                    : `  vec3 col = mix(_colA, _colB, _shiftT) * _breath * _pulse;\n`) +
                 (_po < 1.0 ? `  col *= ${_po.toFixed(4)};\n` : '');
             // Composite the feedback buffer (wave + shapes + warped flow + motion,
             // with their trail) over the solid/shift background. Key the over-composite
@@ -9602,6 +9746,7 @@ export class EditorInspector {
         this._syncSolidFx();
         this._syncBgField();
         this._syncGradeReact();
+        this._syncSceneFx();
         this._syncToggle('toggle-invert', 'invert');
         this._syncToggle('toggle-darken', 'darken');
         this._syncToggle('toggle-brighten-fx', 'brighten');
