@@ -567,6 +567,11 @@ export const WARP_STYLES = [
     { id: 'plasma',  name: 'Plasma',      desc: 'Flowing noise' },
     { id: 'liquid',  name: 'Liquid',      desc: 'Slow drift' },
     { id: 'kaleido', name: 'Kaleido',     desc: 'Mirror fold' },
+    // Phase 15 — Soft/Broad flows: sample the BLURRED feedback so high-decay fill
+    // reads as soft glow, not thin threads (breaks the "string" look).
+    { id: 'bloom',   name: 'Bloom',       desc: 'Soft glow' },
+    { id: 'smoke',   name: 'Smoke',       desc: 'Broad drift' },
+    { id: 'melt',    name: 'Melt',        desc: 'Slow melt' },
 ];
 
 /**
@@ -591,6 +596,11 @@ export function buildWarpShader(flow) {
     const head = '  vec2 _c = uv_orig - 0.5;\n  float _r = length(_c) + 1e-4;\n';
     const zoom = `  float _z = ${dn} * 0.03;\n  vec2 _zuv = (uv - 0.5) * (1.0 - _z) + 0.5;\n`;
     const wrap = (body) => `shader_body {\n${head}${body}\n${zoom}  ret = texture(sampler_main, _zuv + _flow).rgb * decay;\n}`;
+    // Soft flows (Phase 15): sample mostly the BLURRED feedback (sampler_blur1) so the
+    // high-decay fill accumulates as soft broad glow instead of sharp threads. Mixing
+    // in a little sharp keeps some structure. Referencing sampler_blur1 makes the
+    // engine auto-run the blur pass (getHighestBlur scans the warp text).
+    const wrapSoft = (body) => `shader_body {\n${head}${body}\n${zoom}  ret = mix(texture(sampler_main, _zuv + _flow), texture(sampler_blur1, _zuv + _flow), 0.8).rgb * decay;\n}`;
     switch (f.id) {
         case 'tunnel':
             // Radial push + a gentle perpendicular swirl, oscillating on time*speed
@@ -631,6 +641,22 @@ export function buildWarpShader(flow) {
                 `    sin((uv_orig.y + time * ${sp} * 0.10) * 5.0),\n` +
                 `    sin((uv_orig.x + time * ${sp} * 0.13) * 5.0)\n` +
                 `  ) * ${dp} * 0.022;`
+            );
+        case 'bloom':
+            // Gentle outward push, blur-sampled → soft blooming glow that fills.
+            return wrapSoft(`  vec2 _flow = (_c / _r) * ${dp} * 0.02;`);
+        case 'smoke':
+            // Turbulent low-frequency domain warp, blur-sampled → broad drifting smoke.
+            return wrapSoft(
+                `  vec2 _flow = vec2(\n` +
+                `    sin(uv_orig.y * 3.5 + time * ${sp} * 0.4) + 0.5 * sin(uv_orig.x * 6.0 - time * ${sp} * 0.3),\n` +
+                `    cos(uv_orig.x * 3.5 + time * ${sp} * 0.35) + 0.5 * cos(uv_orig.y * 6.0 + time * ${sp} * 0.25)\n` +
+                `  ) * ${dp} * 0.016;`
+            );
+        case 'melt':
+            // Slow downward drift + horizontal wobble, blur-sampled → melting flow.
+            return wrapSoft(
+                `  vec2 _flow = vec2(sin(uv_orig.x * 4.0 + time * ${sp} * 0.2) * ${dp} * 0.01, ${dp} * 0.018);`
             );
         case 'kaleido': {
             // Mirror-fold kaleidoscope — the proven scene-mirror fold: recompute the

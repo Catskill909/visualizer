@@ -3042,6 +3042,7 @@ function () {
       mixedFrame.wave_dots = mix < snapPoint ? mdVSFramePrev.wave_dots : mdVSFrame.wave_dots;
       mixedFrame.wave_thick = mix < snapPoint ? mdVSFramePrev.wave_thick : mdVSFrame.wave_thick;
       mixedFrame.wave_thickness = mix < snapPoint ? mdVSFramePrev.wave_thickness : mdVSFrame.wave_thickness;
+      mixedFrame.wave_fill = mix < snapPoint ? mdVSFramePrev.wave_fill : mdVSFrame.wave_fill;
       mixedFrame.wave_rot = mix * mdVSFrame.wave_rot + mix2 * mdVSFramePrev.wave_rot;
       mixedFrame.additivewave = mix < snapPoint ? mdVSFramePrev.additivewave : mdVSFrame.additivewave;
       mixedFrame.wave_brighten = mix < snapPoint ? mdVSFramePrev.wave_brighten : mdVSFrame.wave_brighten;
@@ -5421,6 +5422,10 @@ function () {
     this.oldPositions2 = new Float32Array(numAudioSamples * 3);
     this.smoothedPositions = new Float32Array((numAudioSamples * 2 - 1) * 3);
     this.smoothedPositions2 = new Float32Array((numAudioSamples * 2 - 1) * 3);
+    // DiscoCast fork (Phase 16): filled-wave fan buffer = smoothed rim + center apex.
+    this.fillPositions = new Float32Array(numAudioSamples * 2 * 3);
+    this.waveCenterX = 0;
+    this.waveCenterY = 0;
     this.color = [0, 0, 0, 1];
     this.texsizeX = opts.texsizeX;
     this.texsizeY = opts.texsizeY;
@@ -5918,6 +5923,11 @@ function () {
           }
         }
 
+        // DiscoCast fork (Phase 16): store the (y-flipped) wave center as the
+        // fan apex for filled-wave rendering in drawBasicWaveform.
+        this.waveCenterX = wavePosX;
+        this.waveCenterY = -wavePosY;
+
         this.smoothedNumVert = this.numVert * 2 - 1;
         _waveUtils__WEBPACK_IMPORTED_MODULE_1__["default"].smoothWave(this.positions, this.smoothedPositions, this.numVert);
 
@@ -5977,6 +5987,28 @@ function () {
         }
 
         var drawMode = mdVSFrame.wave_dots !== 0 ? this.gl.POINTS : this.gl.LINE_STRIP; // TODO: use drawArraysInstanced
+
+        // DiscoCast fork (Phase 16): filled wave. Draw a TRIANGLE_FAN (center apex
+        // + smoothed rim) UNDER the line so the wave reads as a broad shape, not a
+        // thread. wave_fill (0–1) doubles as fill opacity. No-op at 0 → byte-identical.
+        var fill = mdVSFrame.wave_fill || 0;
+        if (fill > 0) {
+          this.fillPositions[0] = this.waveCenterX;
+          this.fillPositions[1] = this.waveCenterY;
+          this.fillPositions[2] = 0;
+          this.fillPositions.set(this.smoothedPositions.subarray(0, this.smoothedNumVert * 3), 3);
+          this.gl.bufferData(this.gl.ARRAY_BUFFER, this.fillPositions, this.gl.STATIC_DRAW);
+          this.gl.vertexAttribPointer(this.aPosLoc, 3, this.gl.FLOAT, false, 0, 0);
+          this.gl.enableVertexAttribArray(this.aPosLoc);
+          this.gl.uniform2fv(this.thickOffsetLoc, [0, 0]);
+          this.gl.uniform4fv(this.colorLoc, [this.color[0], this.color[1], this.color[2], this.color[3] * fill]);
+          this.gl.drawArrays(this.gl.TRIANGLE_FAN, 0, this.smoothedNumVert + 1);
+          // Restore the line buffer + full color for the crisp edge passes below.
+          this.gl.bufferData(this.gl.ARRAY_BUFFER, this.smoothedPositions, this.gl.STATIC_DRAW);
+          this.gl.vertexAttribPointer(this.aPosLoc, 3, this.gl.FLOAT, false, 0, 0);
+          this.gl.enableVertexAttribArray(this.aPosLoc);
+          this.gl.uniform4fv(this.colorLoc, this.color);
+        }
 
         for (var i = 0; i < instances; i++) {
           var offset = thickPass ? thickness : 2;

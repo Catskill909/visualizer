@@ -416,7 +416,12 @@ function buildStudioPostFxGlsl(opts) {
     }
     // Phase 14 — Scene FX. Final-image treatments on `ret.rgb` (uv/time in scope),
     // applied AFTER colour grading. Each a no-op string at 0 → byte-identical when off.
-    const post = num(o.posterize, 0), vig = num(o.vignette, 0), scan = num(o.scanlines, 0), grain = num(o.grain, 0);
+    const post = num(o.posterize, 0), vig = num(o.vignette, 0), scan = num(o.scanlines, 0), grain = num(o.grain, 0), bloom = num(o.bloom, 0);
+    // Scene Bloom (Phase 15.2): add the BLURRED feedback as a soft glow over the final
+    // pixel — softens/fills ANY preset incl. the 1,144 bundled (referencing sampler_blur1
+    // auto-runs the blur pass). Applied first so the rest of the FX treat the bloomed image.
+    const bloomLine = (bloom < 0.001) ? '' :
+        `\n    ret.rgb += ${(bloom * 1.5).toFixed(4)} * texture(sampler_blur1, uv).rgb;`;
     // Posterize: amount→levels, punchy — even a small nudge bands (0.2→~6 levels … 1→2).
     const postLine = (post < 0.001) ? '' :
         (() => { const lv = Math.max(2, Math.round(8 - post * 6)); return `\n    ret.rgb = floor(ret.rgb * ${lv}.0 + 0.5) / ${lv}.0;`; })();
@@ -431,7 +436,7 @@ function buildStudioPostFxGlsl(opts) {
     // Film grain: animated noise, ± up to ~0.25 at full.
     const grainLine = (grain < 0.001) ? '' :
         `\n    ret.rgb += ${(grain * 0.5).toFixed(4)} * (fract(sin(dot(uv * (time + 1.0), vec2(12.9898, 78.233))) * 43758.5453) - 0.5);`;
-    return `    /* STUDIO_POST_FX */\n    if (brighten != 0) ret = sqrt(ret);\n    if (darken != 0) ret = ret * ret;\n    if (solarize != 0) ret = ret * (1.0 - ret) * 4.0;\n    if (invert != 0) ret = 1.0 - ret;${sigDecl}${brLine}${conLine}${gamLine}${tmpLine}${satLine}${hueLine}${postLine}${vigLine}${scanLine}${grainLine}\n`;
+    return `    /* STUDIO_POST_FX */\n    if (brighten != 0) ret = sqrt(ret);\n    if (darken != 0) ret = ret * ret;\n    if (solarize != 0) ret = ret * (1.0 - ret) * 4.0;\n    if (invert != 0) ret = 1.0 - ret;${sigDecl}${brLine}${conLine}${gamLine}${tmpLine}${satLine}${hueLine}${bloomLine}${postLine}${vigLine}${scanLine}${grainLine}\n`;
 }
 
 // Build the full grade-opts object the STUDIO_POST_FX inject reads, from a baseVals.
@@ -451,7 +456,7 @@ function gradeOpts(state) {
         gradeReactCurve: st.studio_grade_react_curve ?? 'linear',
         // Phase 14 — Scene FX amounts (baseVals).
         posterize: b.studio_posterize ?? 0, vignette: b.studio_vignette ?? 0,
-        scanlines: b.studio_scanlines ?? 0, grain: b.studio_grain ?? 0,
+        scanlines: b.studio_scanlines ?? 0, grain: b.studio_grain ?? 0, bloom: b.studio_bloom ?? 0,
     };
 }
 
@@ -493,7 +498,7 @@ const BLANK = {
         wave_r: 0.4, wave_g: 0.7, wave_b: 1.0, wave_a: 0.6,
         wave_scale: 1.0, wave_mystery: 0.0,
         wave_smoothing: 0.75, wave_x: 0.5, wave_y: 0.5,
-        wave_thick: 0, wave_thickness: 0, wave_rot: 0, additivewave: 0, wave_usedots: 0, wave_brighten: 0,
+        wave_thick: 0, wave_thickness: 0, wave_fill: 0, wave_rot: 0, additivewave: 0, wave_usedots: 0, wave_brighten: 0,
         ob_size: 0.0, ob_r: 0.0, ob_g: 0.0, ob_b: 0.0, ob_a: 0.0,
         ib_size: 0.0, ib_r: 0.0, ib_g: 0.0, ib_b: 0.0, ib_a: 0.0,
         mv_x: 12, mv_y: 9, mv_l: 0.9, mv_r: 0.0, mv_g: 0.0, mv_b: 1.0, mv_a: 0.0,
@@ -510,7 +515,7 @@ const BLANK = {
         // baseVals, like solidReactSource). All default-off → byte-identical.
         studio_brightness_react: 0, studio_contrast_react: 0, studio_gamma_react: 0, studio_temp_react: 0,
         // Phase 14 — Scene FX (final-image treatments; 0 = off → byte-identical).
-        studio_posterize: 0, studio_vignette: 0, studio_scanlines: 0, studio_grain: 0,
+        studio_posterize: 0, studio_vignette: 0, studio_scanlines: 0, studio_grain: 0, studio_bloom: 0,
         // Glow / Accent bloom (a colored halo from the blurred feedback buffer,
         // tinted by the Glow / Accent colour). 0 = off → comp is byte-identical.
         studio_glow: 0, studio_accent: 0,
@@ -1721,6 +1726,7 @@ export class EditorInspector {
         const container = document.getElementById('scene-fx-sliders');
         if (!container) return;
         [
+            { id: 'sfx-bloom', label: 'Bloom', min: 0, max: 1.0, step: 0.01, key: 'studio_bloom' },
             { id: 'sfx-posterize', label: 'Posterize', min: 0, max: 1.0, step: 0.01, key: 'studio_posterize' },
             { id: 'sfx-vignette', label: 'Vignette', min: 0, max: 1.0, step: 0.01, key: 'studio_vignette' },
             { id: 'sfx-scanlines', label: 'Scan lines', min: 0, max: 1.0, step: 0.01, key: 'studio_scanlines' },
@@ -1742,6 +1748,7 @@ export class EditorInspector {
 
     _syncSceneFx() {
         const bv = this.currentState.baseVals;
+        this._syncSlider('sfx-bloom', bv.studio_bloom ?? 0, 0, 1.0, 2);
         this._syncSlider('sfx-posterize', bv.studio_posterize ?? 0, 0, 1.0, 2);
         this._syncSlider('sfx-vignette', bv.studio_vignette ?? 0, 0, 1.0, 2);
         this._syncSlider('sfx-scanlines', bv.studio_scanlines ?? 0, 0, 1.0, 2);
@@ -1910,26 +1917,6 @@ export class EditorInspector {
             (this.currentState.bgField || (this.currentState.bgField = deepClone(BLANK.bgField))).react =
                 Math.random() < 0.6 ? rnd(0.3, 0.7) : 0;
         }
-        // ── Content — roll a TYPE for variety so it's NOT a string every time:
-        // wave (~20%, a thin oscilloscope accent) / shapes (~55%, audio-reactive
-        // blobs & polygons) / pure (~25%, no thin content — the colour field + flow
-        // carry it). Clear the last roll's content first so types don't stack.
-        this.currentState.shapes = [];   // full reroll — clear all prior content (shapes are editor-only)
-        this.currentState.baseVals.wave_a = 0;
-        const _content = Math.random();
-        if (_content < 0.20) {
-            // Wave — a subtle, COLOURED accent (palette colour), not a dominant white string.
-            const _wb = this.currentState.baseVals;
-            _wb.wave_mode = Math.floor(Math.random() * 8);
-            _wb.wave_scale = rnd(0.5, 2.5);
-            _wb.wave_thickness = Math.random() < 0.5 ? rnd(1, 3) : 0;
-            _wb.wave_a = rnd(0.3, 0.6);
-        } else if (_content < 0.75) {
-            // Shapes — 1–3 audio-reactive blobs / polygons (the "shapes & blobs" look).
-            const _n = 1 + Math.floor(Math.random() * 3);
-            for (let _i = 0; _i < _n; _i++) this._addRemixShape();
-        }
-        // else (~25%): pure field + flow — no thin content; the filled colour field carries it.
         this._postSnap();
         // ── Living Motion (engine).
         if (!L.motion) {
@@ -1937,13 +1924,50 @@ export class EditorInspector {
             this.currentState.motionEngine.depth = rnd(0.3, 0.9);
             this._applyMotionEngine(pick(MOTION_ENGINES).id);
         }
-        // ── Flow (warp field) — ~35% none, else a random warp + knobs (seeds fill decay).
+        // ── Flow (warp field) — ~35% none; else weighted ~65% toward the SOFT flows
+        //    (bloom/smoke/melt) over the sharp ones, because sharp flow + high decay
+        //    smears bright content into thin "string" threads (Phase 15.3 anti-string).
         if (!L.flow) {
             this.currentState.flowStyle.speed = rnd(0.4, 2.2);
             this.currentState.flowStyle.depth = rnd(0.3, 0.9);
             this.currentState.flowStyle.density = rnd(0.3, 0.8);
-            this._applyFlowStyle(Math.random() < 0.35 ? 'none' : pick(WARP_STYLES.filter(f => f.id !== 'none')).id);
+            const _flowId = Math.random() < 0.35 ? 'none'
+                : (Math.random() < 0.65 ? pick(['bloom', 'smoke', 'melt'])
+                    : pick(['tunnel', 'spiral', 'ripple', 'swirl', 'plasma', 'liquid', 'kaleido']));
+            this._applyFlowStyle(_flowId);
         }
+        // ── Content — rolled LAST (authoritative): the Motion/Flow applies above call
+        //    _ensureFeedbackContent, which would otherwise re-seed a thin wave onto a
+        //    "pure" roll. Type: wave ~30% / shapes ~45% (audio-reactive blobs) /
+        //    pure ~25% (field+flow carry it). Phase 16.2 RESTORED wave content now that
+        //    waves can fill: within a wave roll, ~75% FILLED (broad disc/wedge via
+        //    wave_fill) + ~25% thin (a deliberate accent string). A filled wave + the
+        //    flow rolled above = broad blooming motion, not a thread.
+        this._preSnap();
+        this.currentState.shapes = [];
+        this.currentState.baseVals.wave_a = 0;
+        this.currentState.baseVals.wave_fill = 0;
+        const _content = Math.random();
+        if (_content < 0.30) {
+            const _wb = this.currentState.baseVals;
+            _wb.wave_mode = Math.floor(Math.random() * 8);
+            _wb.wave_scale = rnd(0.5, 2.5);
+            _wb.wave_a = rnd(0.4, 0.7);
+            if (Math.random() < 0.75) {
+                // FILLED — the broad default look: a solid disc/wedge, not a string.
+                _wb.wave_fill = rnd(0.45, 1.0);
+                _wb.wave_thickness = Math.random() < 0.5 ? rnd(1, 4) : 0;
+            } else {
+                // THIN — a deliberate, occasional accent string.
+                _wb.wave_fill = 0;
+                _wb.wave_thickness = Math.random() < 0.5 ? rnd(1, 3) : 0;
+            }
+        } else if (_content < 0.75) {
+            const _n = 1 + Math.floor(Math.random() * 3);
+            for (let _i = 0; _i < _n; _i++) this._addRemixShape();
+        }
+        // else (~35%): pure field + flow — no thin content.
+        this._postSnap();
         // Bake the directly-set field/shift/content and re-sync every control.
         this._buildCompShader();
         this._applyToEngine();
@@ -2845,6 +2869,7 @@ export class EditorInspector {
             { id: 'ws-scale', label: 'Size', min: 0.10, max: 4.0, step: 0.05, value: BLANK.baseVals.wave_scale, key: 'wave_scale' },
             { id: 'ws-opacity', label: 'Opacity', min: 0, max: 1.0, step: 0.01, value: BLANK.baseVals.wave_a, key: 'wave_a' },
             { id: 'ws-thickness', label: 'Thickness', min: 0, max: 8.0, step: 0.5, value: BLANK.baseVals.wave_thickness, key: 'wave_thickness' },
+            { id: 'ws-fill', label: 'Fill', min: 0, max: 1.0, step: 0.05, value: BLANK.baseVals.wave_fill, key: 'wave_fill' },
             { id: 'ws-smoothing', label: 'Smoothing', min: 0, max: 1.0, step: 0.01, value: BLANK.baseVals.wave_smoothing, key: 'wave_smoothing' },
             { id: 'ws-mystery', label: 'Mystery', min: -1.0, max: 1.0, step: 0.01, value: BLANK.baseVals.wave_mystery, key: 'wave_mystery' },
             { id: 'ws-pos-x', label: 'Position X', min: 0, max: 1.0, step: 0.01, value: BLANK.baseVals.wave_x, key: 'wave_x' },
@@ -2876,6 +2901,7 @@ export class EditorInspector {
             bv.wave_a = 0.4 + Math.random() * 0.6;
             bv.wave_thickness = Math.random() > 0.5 ? 0.5 + Math.random() * 4.5 : 0;
             bv.wave_thick = 0;
+            bv.wave_fill = Math.random() > 0.5 ? 0.4 + Math.random() * 0.6 : 0;
             bv.wave_usedots = Math.random() > 0.80 ? 1 : 0;
             bv.additivewave = Math.random() > 0.65 ? 1 : 0;
             bv.wave_mystery = (Math.random() * 2) - 1;
@@ -2904,6 +2930,7 @@ export class EditorInspector {
             ['ws-scale', 'wave_scale', 0.1, 4.0],
             ['ws-opacity', 'wave_a', 0, 1.0],
             ['ws-thickness', 'wave_thickness', 0, 8.0],
+            ['ws-fill', 'wave_fill', 0, 1.0],
             ['ws-smoothing', 'wave_smoothing', 0, 1.0],
             ['ws-mystery', 'wave_mystery', -1.0, 1.0],
             ['ws-pos-x', 'wave_x', 0, 1.0],
