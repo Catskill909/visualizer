@@ -1,6 +1,6 @@
 # MilkDrop Creation Tools — Dev Plan
 
-Last updated: 2026-05-31
+Last updated: 2026-06-01
 
 > The problem: **the Preset Studio's from-scratch creation surface is limited.** A blank canvas can
 > vary palette / motion sliders / one wave / shapes / layers — but the 1,144 bundled presets get their
@@ -20,7 +20,8 @@ Last updated: 2026-05-31
 ## 🚦 Phase tracker — PICK UP HERE
 
 **Single source of truth for where we are. Update on every change.** Shipped-phase execution detail
-lives in the **archive**; this doc holds the live plan (currently Phase 7 — Flow Style, §3).
+lives in the **archive**; this doc holds the live plan. Phases 1–11 are **shipped** — the from-scratch
+creator tools are **beta-ready**. Detailed shipped writeups for the recent work are §3.8–§3.16.
 
 | Phase | What | State | Next action |
 |---|---|---|---|
@@ -34,20 +35,32 @@ lives in the **archive**; this doc holds the live plan (currently Phase 7 — Fl
 | 6 | **Color Studio** (🎲 random + rule/Base-Hue/tone generator + Color Roll + Glow/Accent bloom) | ✅ **SHIPPED & approved** — archive §10 | Optional: HSL sliders, gradient ramp |
 | **7** | **Flow Style** — per-preset warp-shader library (the motion *field*) | 🟢 **7.1✅ · library (7 flows) · FILL+Kaleido (§3.10) · Density (§3.11) · ROOT FIX: palette-colour bg everywhere SHIPPED+confirmed; rich fresh-start tried & reverted (§3.12) · bundled-remix dead shape-cards fixed (§3.13).** | Then 7.4 polish (Remix-rolls-a-flow, 4K perf); update README/help/promo once settled |
 | **8** | **The Colour Field** — the missing layer 1: a *generated* background colour field (extends Shift) so presets aren't a thin line on a flat slab | ✅ **8.1 Colour Field · 8.2 fg/bg split · 8.3 Motion tab reorg — all SHIPPED · docs banked.** | — |
-| **9** | **Full-stack 🎲 Remix** — one button rolls the whole preset (colour field + 3 colours + motion + flow + wave) | ✅ **SHIPPED** — footer Remix → `_rollFullStack()`. **+ 9.1 Roll-and-lock ✅** — pin Colours/Field/Motion/Flow/**Reactivity**, Remix re-rolls only the rest. | Optional: feedback-mode variety; starting templates; then v1 beta lock (README/help/promo pass) |
+| **9** | **Full-stack 🎲 Remix** — one button rolls the whole preset (colour field + 3 colours + motion + flow + wave) | ✅ **SHIPPED** — footer Remix → `_rollFullStack()`. **+ 9.1 Roll-and-lock ✅** — pin Colours/Field/Motion/Flow/**Reactivity**, Remix re-rolls only the rest. | — |
+| **10** | **Palette declutter + Grade rack** — drop canned variations; grow the controls that tune ANY loaded preset | ✅ **SHIPPED (code, §3.14)** — removed Drift/Pulse/Storm/Ripple/Radiate/Scatter/Bloom (kept Solid+Shift); added **Brightness / Contrast / Gamma / Temperature** grade faders that bolt onto any preset (incl. the 1,144 bundled) via the STUDIO_POST_FX inject. | Optional: Posterize / Vignette; ✗ Templates (dropped — redundant with Remix+Library+Random) |
+| **11** | **Remix content variety + shape/A-B fixes** — stop forcing a wave (string) on every roll; fix the shape bugs the variety work surfaced | ✅ **SHIPPED (code, §3.15–§3.16)** — Remix rolls a content TYPE: wave ~20% (subtle coloured accent) / **shapes ~55%** (audio-reactive blobs & polygons via `_addRemixShape`) / pure field+flow ~25%; BLANK base wave softened (white→soft blue 0.6). **A/B "A" re-baselined** to the Shift entry (was stale BLANK string). **`currentState.shapes` is now EDITOR-ONLY** — bundled preset shapes no longer pollute the array / starve the 4 render slots (the "Shape 6"/won't-render bug). | — |
 
-**Current state in one line:** ✅ **DONE & on track** — Phases 1–3 + Color Studio + **Phase 7 (Flow Style)**
-+ **Phase 8 (Colour Field · fg/bg colour split · Motion-tab reorg)** + **Phase 9 (full-stack 🎲 Remix)** all
-**shipped**. The "thin spinning line / one colour / no variety" problem is fully resolved: a from-scratch
-preset now has all three layers (a living colour-field background, a motion/flow field, foreground content),
-each its own colour, all audio-reactive — and one Remix press rolls a complete varied preset. The
-from-scratch creator tools are **beta-ready**. **Differentiator (user-confirmed):** lean HEAVY on audio
-reactivity — Remix even randomises the reactivity itself; this is what sets the app apart. See
-[[project_audio_reactivity_differentiator]].
+**Current state in one line:** ✅ **DONE & beta-ready** — Phases 1–11 **shipped**: Motion Engine, Custom
+Shapes + Motion/Reactivity, Color Studio, **Flow Style** (7-warp library), **Colour Field** (+ fg/bg colour
+split + Motion-tab reorg), **full-stack 🎲 Remix** (+ Roll-and-lock), **Grade rack** (Brightness/Contrast/
+Gamma/Temperature tuning *any* preset incl. the 1,144 bundled), and **Remix content variety** (wave/shapes/
+pure). The "thin spinning line / one colour / no variety" problem is fully resolved: a from-scratch preset
+has all three layers (living colour-field background · motion/flow field · foreground content), each its own
+colour, all audio-reactive — one Remix rolls a complete, varied preset, and any control can re-mood the
+bundled library. **Differentiator (user-confirmed, the headline edge):** lean HEAVY on audio reactivity —
+Remix randomises the reactivity itself; "you can do this in other VJ software but it's a whole thing."
+See [[project_audio_reactivity_differentiator]].
 
-**What's next (optional, pick when ready):** 🔒 Roll-and-lock ✅ DONE · Remix "subtle ↔ wild" strength dial
-· hand-tuned starting templates · feedback-mode Remix variety · final README/help/promo pass at v1 beta
-lock. Bigger v1 picture beyond the creator: finish Timeline + three.js 3D layers ([[project_v1_beta_scope]]).
+**What's next (regroup — recommended order):**
+1. **Audio-reactive Grade rack** *(the headline next)* — make Brightness/Contrast/Gamma/Temperature **pulse
+   to the beat** so loading any of the 1,144 bundled presets gives it live audio-reactive grading. Sits in
+   BOTH bridges (more control over MilkDrop presets **and** the audio-reactivity edge). Contained extension
+   of the STUDIO_POST_FX block (§3.14).
+2. **Scene FX** — Posterize / Vignette / RGB-split / scene Mirror, via the same grade block (tune any preset).
+3. **Push from-scratch closer to MilkDrop** — more Colour Field styles, more Flow styles, a second wave.
+   *(Honest limit: motion sliders only partly reach bundled presets — their own eqs overwrite them; the
+   grade/FX layer is the reliable bridge.)*
+Bigger v1 picture beyond the creator: finish Timeline + three.js 3D layers ([[project_v1_beta_scope]]).
+Optional minor: Remix "subtle↔wild" dial · feedback-mode Remix variety · a "Content" Remix-lock for shapes.
 
 ---
 
@@ -396,6 +409,80 @@ MilkDrop shapes never do. Works for old saved editor presets too (no marker/migr
 **stay in `currentState.shapes`** (preserved for the visual + remix-save) but are never shown. `_renderShapeCards`
 + `_addShape` now count **editor** shapes only (the `+ Add Shape` limit/first-shape logic ignores bundled
 shapes occupying the array). From-scratch + saved editor presets unchanged.
+
+### 3.14 ✅ SHIPPED (code, 2026-06-01) — Palette declutter + Grade rack (tune ANY preset)
+
+Two mandates from a reassessment of "do templates help?" — answer: no (Remix + Library + Random already
+cover starting points; a Templates feature/tab was **dropped as redundant**). The real creative lever is
+**tuning loaded presets harder** — so:
+
+**Mandate 1 — declutter "Start from".** Removed the 7 canned motion/wave variations (Drift/Pulse/Storm/
+Ripple/Radiate/Scatter/Bloom) from `BASE_VARIATIONS` — they didn't aid creativity and overlapped the 1,144
+library + Remix. **Kept Solid + Shift** (they're background colour *modes* — the engine behind the Colour
+Field — not presets). `DEFAULT_VARIATION_INDEX (1=Shift)` and all 6 references unchanged → no breakage.
+
+**Mandate 2 — grow the Grade rack.** The mechanism that lets Palette tune a *bundled* preset is
+`injectStudioPostFx` — it appends a `/* STUDIO_POST_FX */` block onto **any** preset's comp (the preset
+keeps its own shader; we bolt a grade on the end). Added four continuous faders into
+`buildStudioPostFxGlsl`, operating on the final `ret.rgb`: **Brightness** (×), **Contrast** (pivot 0.5),
+**Gamma** (pow), **Temperature** (R/B shift). Each emits an **empty string at its default → existing
+presets byte-identical**. New `gradeOpts(bv)` is the single source of truth for the inject opts, used at all
+three call sites (`_rebuildPostFx`, `_buildCompShader`, `loadBundledPreset`). Sliders are data-driven
+(`reInject:true` in `_buildPaletteSliders`) so **no HTML change**; synced in `_syncPaletteSliders`. Ride
+`baseVals` → save/load + player parity free (grade baked into saved comp, like sat/hue). With image layers,
+sat/hue stay col-stage (don't shift layers) while the four grade faders apply whole-frame.
+
+**Result:** load any of the 1,144 bundled presets → Brightness/Contrast/Gamma/Temperature (+ Saturation/Hue/
+Roll/Invert/Solarize/Brighten/Darken) now grade it live — "load a preset and *make it yours*." `npm run
+build` passes.
+
+---
+
+### 3.15 ✅ SHIPPED (code, 2026-06-01) — Remix content variety (not a string every time)
+
+User caught the root via A/B: pressing **A** always showed a white oscilloscope "string" — because A loads
+`originalState` = the **BLANK** base, which shipped `wave_mode 3, wave_r/g/b 1,1,1, wave_a 0.8` (a stark
+white wave). And **Remix forced `wave_a = 0.8` + a random wave on every roll** → every preset was
+string-dominated, no variety. The Colour Field/flow gave a rich *background*, but the *content* on top was
+always the same oscilloscope.
+
+**Fix — Remix rolls a content TYPE** (`_rollFullStack`): **wave ~20%** (a subtle, *coloured* accent —
+random mode/scale, `wave_a 0.3–0.6`, not a dominant white string) / **shapes ~55%** (1–3 audio-reactive
+blobs & polygons via new `_addRemixShape` — random sides 3→64, size, position, palette WAVE colour to
+contrast the field, spin/orbit, + beat-reactive size/opacity) / **pure ~25%** (no thin content — the filled
+colour field + flow carry it). Each roll clears the previous content first (drops editor shapes, `wave_a=0`)
+so types don't stack. Result: mostly **blobs & flowing colour**, strings only ~1 in 5 — real variety.
+Supporting: **BLANK base wave softened** (white→soft blue, `wave_a 0.8→0.6`). Shapes ride the existing
+Phase 2/3 system → free player parity + editable cards after a roll. `npm run build` passes.
+
+**The actual root of "A always shows a string" (2nd audit, 2026-06-01).** Softening BLANK was a band-aid —
+the real bug: A/B "A" loads `originalState`, which the constructor set to **BLANK** (carries a wave) and
+which was **only re-set on preset LOAD** (`loadBundledPreset`/`loadPresetData`/`saveCurrent`) — **never
+after init/Reset/New applied the Shift landing**. So on a fresh canvas you *saw* Shift (wave_a:0, no string)
+but A still held BLANK → pressing A showed a stray wave. **Fix:** re-baseline `this.originalState =
+deepClone(this.currentState)` at the end of **init** and at the end of **Reset** (New routes through Reset →
+covered for free; Load already did it). Now A == the actual entry (clean Shift, no string). Requires an
+editor reload to take (originalState is captured at init).
+
+---
+
+### 3.16 ✅ SHIPPED (code, 2026-06-01) — editor shapes are independent of preset shapes (the real Remix-shape bug)
+
+User found the true root of "shapes don't render after Remix": a bundled preset's own shapes were kept in
+`currentState.shapes` (§3.13 "for the visual") but their cards were *hidden*. So they silently occupied the
+array — adding a shape read **"Shape 6"**, and worse: the engine renders only **4** shape slots and
+`_buildRuntimePreset` does `slice(0, MAX_SHAPES)` — so the (hidden) bundled shapes **ate all 4 slots** and
+the editor shape you added got **sliced off and never drawn** (card + controls present, nothing on canvas).
+Remix's content clear used `filter(!_isEditorShape)`, which *kept* the bundled shapes, so they persisted
+across every roll.
+
+**Fix — `currentState.shapes` is now EDITOR-ONLY (user mandate: "make our shapes have nothing to do with
+presets").** `loadBundledPreset` no longer copies `bundled.shapes` into the array (`shapes = []`); Remix
+clears all shapes (`shapes = []`, a full content reroll). So editor shapes never compete with preset shapes
+for slots, the count is correct, and added shapes always render. **Trade-off:** a loaded bundled preset no
+longer renders its *own* custom shapes (it keeps its warp/comp/waves — the bulk of its look). If preserving
+bundled custom shapes matters later, the clean path is a separate `_bundledShapes` field merged
+editor-first in `_buildRuntimePreset` — deferred. `npm run build` passes.
 
 ---
 

@@ -361,10 +361,20 @@ function buildSatHueOnColGlsl(sat, hue, roll) {
 // `roll` (rad/s) > 0 → hue angle cycles over the comp shader's `time` uniform
 // (Color Roll), so the whole frame's colours rotate continuously — works in both
 // solid/shift and feedback modes. 0 = static hue (byte-identical to before).
-function buildStudioPostFxGlsl(sat, hue, roll) {
-    const s = (typeof sat === 'number' && isFinite(sat)) ? sat : 1.0;
-    const h = (typeof hue === 'number' && isFinite(hue)) ? hue : 0;
-    const sp = (typeof roll === 'number' && isFinite(roll)) ? roll : 0;
+function buildStudioPostFxGlsl(opts) {
+    const o = opts || {};
+    const num = (x, d) => (typeof x === 'number' && isFinite(x)) ? x : d;
+    const s = num(o.sat, 1.0);
+    const h = num(o.hue, 0);
+    const sp = num(o.roll, 0);
+    // Grade rack — continuous faders, each a no-op string at its default so existing
+    // presets stay byte-identical. Operate on the final `ret.rgb` so they tune ANY
+    // preset (bundled or custom). Order: brightness → contrast → gamma → temperature.
+    const br = num(o.brightness, 1.0), con = num(o.contrast, 1.0), gam = num(o.gamma, 1.0), tmp = num(o.temp, 0);
+    const brLine = (Math.abs(br - 1.0) < 0.001) ? '' : `\n    ret.rgb *= ${br.toFixed(4)};`;
+    const conLine = (Math.abs(con - 1.0) < 0.001) ? '' : `\n    ret.rgb = (ret.rgb - 0.5) * ${con.toFixed(4)} + 0.5;`;
+    const gamLine = (Math.abs(gam - 1.0) < 0.001) ? '' : `\n    ret.rgb = pow(max(ret.rgb, vec3(0.0)), vec3(${(1.0 / gam).toFixed(4)}));`;
+    const tmpLine = (Math.abs(tmp) < 0.001) ? '' : `\n    ret.rgb += vec3(${tmp.toFixed(4)}, 0.0, ${(-tmp).toFixed(4)});`;
     const satLine = (Math.abs(s - 1.0) < 0.001) ? '' :
         `\n    float _lum = dot(ret.rgb, vec3(0.299, 0.587, 0.114));\n    ret.rgb = mix(vec3(_lum), ret.rgb, ${s.toFixed(4)});`;
     let hueLine = '';
@@ -378,7 +388,19 @@ function buildStudioPostFxGlsl(sat, hue, roll) {
         const oneMinusCos = (1 - Math.cos(rad)).toFixed(6);
         hueLine = `\n    vec3 _k = vec3(0.57735);\n    ret.rgb = ret.rgb * ${cosA} + cross(_k, ret.rgb) * ${sinA} + _k * dot(_k, ret.rgb) * ${oneMinusCos};`;
     }
-    return `    /* STUDIO_POST_FX */\n    if (brighten != 0) ret = sqrt(ret);\n    if (darken != 0) ret = ret * ret;\n    if (solarize != 0) ret = ret * (1.0 - ret) * 4.0;\n    if (invert != 0) ret = 1.0 - ret;${satLine}${hueLine}\n`;
+    return `    /* STUDIO_POST_FX */\n    if (brighten != 0) ret = sqrt(ret);\n    if (darken != 0) ret = ret * ret;\n    if (solarize != 0) ret = ret * (1.0 - ret) * 4.0;\n    if (invert != 0) ret = 1.0 - ret;${brLine}${conLine}${gamLine}${tmpLine}${satLine}${hueLine}\n`;
+}
+
+// Build the full grade-opts object the STUDIO_POST_FX inject reads, from a baseVals.
+// One source of truth for every injectStudioPostFx call site (sat/hue/roll already
+// existed; the four grade faders are the 2026-06-01 addition).
+function gradeOpts(bv) {
+    const b = bv || {};
+    return {
+        sat: b.studio_saturation ?? 1.0, hue: b.studio_hue_rotate ?? 0, roll: b.studio_hue_roll ?? 0,
+        contrast: b.studio_contrast ?? 1.0, brightness: b.studio_brightness ?? 1.0,
+        gamma: b.studio_gamma ?? 1.0, temp: b.studio_temp ?? 0,
+    };
 }
 
 function stripStudioPostFx(compText) {
@@ -396,10 +418,7 @@ function injectStudioPostFx(compText, opts) {
     const clean = stripStudioPostFx(compText);
     const lastCurly = clean.lastIndexOf('}');
     if (lastCurly === -1) return clean;
-    const sat = (opts && opts.sat != null) ? opts.sat : 1.0;
-    const hue = (opts && opts.hue != null) ? opts.hue : 0;
-    const roll = (opts && opts.roll != null) ? opts.roll : 0;
-    const glsl = buildStudioPostFxGlsl(sat, hue, roll);
+    const glsl = buildStudioPostFxGlsl(opts || {});
     return `${clean.slice(0, lastCurly)}\n${glsl}${clean.slice(lastCurly)}`;
 }
 
@@ -417,7 +436,9 @@ const BLANK = {
         sx: 1.0, sy: 1.0,
         cx: 0.5, cy: 0.5,
         wave_mode: 3,
-        wave_r: 1.0, wave_g: 1.0, wave_b: 1.0, wave_a: 0.8,
+        // Soft coloured accent, not a stark white string. (The A/B "A" baseline is
+        // this BLANK; palette/Shift overwrite the colour in normal use.)
+        wave_r: 0.4, wave_g: 0.7, wave_b: 1.0, wave_a: 0.6,
         wave_scale: 1.0, wave_mystery: 0.0,
         wave_smoothing: 0.75, wave_x: 0.5, wave_y: 0.5,
         wave_thick: 0, wave_thickness: 0, wave_rot: 0, additivewave: 0, wave_usedots: 0, wave_brighten: 0,
@@ -427,6 +448,11 @@ const BLANK = {
         darken: 0, invert: 0, brighten: 0, solarize: 0, darken_center: 0,
         modwavealphabyvolume: 0,
         studio_saturation: 1.0, studio_hue_rotate: 0, studio_hue_roll: 0,
+        // Grade rack — bolts onto ANY preset's final colour (bundled or custom) via
+        // the STUDIO_POST_FX inject. Defaults are identity (no-op) → existing presets
+        // byte-identical. Tunes the 1,144 bundled presets too (they keep their own
+        // shader; the grade block is appended). See buildStudioPostFxGlsl.
+        studio_contrast: 1.0, studio_brightness: 1.0, studio_gamma: 1.0, studio_temp: 0,
         // Glow / Accent bloom (a colored halo from the blurred feedback buffer,
         // tinted by the Glow / Accent colour). 0 = off → comp is byte-identical.
         studio_glow: 0, studio_accent: 0,
@@ -528,84 +554,11 @@ const BASE_VARIATIONS = [
             wave_a: 0,
         },
     },
-    {
-        name: 'Drift', desc: 'Slow & dreamy', color: '#5010c0',
-        bv: {
-            zoom: 0.97, rot: 0.12, warp: 1.5, warpanimspeed: 0.4,
-            decay: 0.92, gammaadj: 2.2,
-            echo_zoom: 1.8,
-            wave_mode: 3,
-            wave_r: 0.7, wave_g: 0.2, wave_b: 1.0, wave_a: 0.75, wave_scale: 0.8,
-            ob_size: 0.015, ob_r: 0.4, ob_g: 0.0, ob_b: 0.9, ob_a: 0.6,
-        },
-    },
-    {
-        name: 'Pulse', desc: 'Neon heartbeat', color: '#0090ff',
-        bv: {
-            zoom: 0.94, decay: 0.90, gammaadj: 2.8,
-            echo_zoom: 1.6,
-            wave_mode: 3,
-            wave_r: 0.0, wave_g: 0.85, wave_b: 1.0, wave_a: 0.95,
-            wave_scale: 1.4, wave_thickness: 2, additivewave: 1,
-            ob_size: 0.02, ob_r: 0.0, ob_g: 0.25, ob_b: 0.9, ob_a: 0.7,
-        },
-    },
-    {
-        name: 'Storm', desc: 'Chaotic energy', color: '#cccccc',
-        bv: {
-            zoom: 1.02, warp: 3.5, warpanimspeed: 2.2,
-            decay: 0.89,
-            echo_zoom: 1.1,
-            wave_mode: 1,
-            wave_r: 1.0, wave_g: 1.0, wave_b: 1.0, wave_a: 0.85,
-            wave_scale: 1.8, wave_thickness: 2, additivewave: 1,
-        },
-    },
-    {
-        name: 'Ripple', desc: 'Liquid rings', color: '#1060c0',
-        bv: {
-            zoom: 0.98, warp: 0.5, warpanimspeed: 0.8,
-            decay: 0.92,
-            echo_zoom: 2.2,
-            wave_mode: 7,
-            wave_r: 0.1, wave_g: 0.65, wave_b: 1.0, wave_a: 0.9, wave_scale: 1.0,
-            ob_size: 0.012, ob_r: 0.0, ob_g: 0.2, ob_b: 0.8, ob_a: 0.5,
-        },
-    },
-    {
-        name: 'Radiate', desc: 'Warm spin', color: '#c07000',
-        bv: {
-            zoom: 1.0, rot: 0.25, warp: 0.8,
-            decay: 0.90, gammaadj: 2.5,
-            echo_zoom: 1.4,
-            wave_mode: 6,
-            wave_r: 1.0, wave_g: 0.75, wave_b: 0.0, wave_a: 0.9,
-            wave_scale: 1.2, additivewave: 1,
-            ob_size: 0.018, ob_r: 1.0, ob_g: 0.35, ob_b: 0.05, ob_a: 0.65,
-        },
-    },
-    {
-        name: 'Scatter', desc: 'Acid dots', color: '#50b800',
-        bv: {
-            warp: 1.0, warpanimspeed: 1.5,
-            decay: 0.88, gammaadj: 3.0,
-            wave_mode: 5,
-            wave_r: 0.7, wave_g: 1.0, wave_b: 0.0, wave_a: 1.0,
-            wave_scale: 2.0, wave_usedots: 1, additivewave: 1,
-        },
-    },
-    {
-        name: 'Bloom', desc: 'Soft center', color: '#cc2060',
-        bv: {
-            zoom: 0.99, warp: 0.3, warpanimspeed: 0.6,
-            decay: 0.92, gammaadj: 2.8,
-            echo_zoom: 3.5,
-            wave_mode: 0,
-            wave_r: 1.0, wave_g: 0.25, wave_b: 0.55, wave_a: 0.9,
-            wave_scale: 0.9, wave_thickness: 2,
-            ob_size: 0.025, ob_r: 0.9, ob_g: 0.05, ob_b: 0.35, ob_a: 0.75,
-        },
-    },
+    // NOTE: the motion/wave "variations" (Drift/Pulse/Storm/Ripple/Radiate/Scatter/
+    // Bloom) were removed 2026-06-01 — canned looks that didn't aid creativity and
+    // overlapped the 1,144 bundled library + 🎲 Remix. Solid + Shift stay because
+    // they're background colour MODES (the engine behind the Colour Field), not
+    // presets. DEFAULT_VARIATION_INDEX (1 = Shift) is unchanged.
 ];
 
 const DEFAULT_VARIATION_INDEX = 1; // Shift
@@ -1001,6 +954,11 @@ export class EditorInspector {
         this._applyToEngine();
         this._syncAllControls();
         this._updateSolidFxVisibility(v0);
+        // A/B "A" = the entry baseline. Init applied the Shift landing to currentState
+        // but originalState was still BLANK (which carries a wave) — so pressing A
+        // showed a stray wave string instead of the clean Shift entry. Re-baseline it
+        // to the actual landing so A == what you started on.
+        this.originalState = deepClone(this.currentState);
 
         // Butterchurn may be mid-blend from the engine's initial randomPreset() call.
         // Hammer the preset for several frames to guarantee we win the blend race.
@@ -1555,6 +1513,11 @@ export class EditorInspector {
             { id: 'ps-saturation', label: 'Saturation', min: 0, max: 2.0, step: 0.01, value: 1.0, key: 'studio_saturation', reInject: true },
             { id: 'ps-hue', label: 'Hue Rotate', min: 0, max: 360, step: 1, value: 0, key: 'studio_hue_rotate', reInject: true },
             { id: 'ps-color-roll', label: 'Color Roll', min: 0, max: 1.5, step: 0.01, value: 0, key: 'studio_hue_roll', reInject: true },
+            // Grade rack — tunes ANY loaded preset (bundled or custom). Defaults = identity.
+            { id: 'ps-brightness', label: 'Brightness', min: 0.5, max: 2.0, step: 0.01, value: 1.0, key: 'studio_brightness', reInject: true },
+            { id: 'ps-contrast', label: 'Contrast', min: 0.5, max: 2.0, step: 0.01, value: 1.0, key: 'studio_contrast', reInject: true },
+            { id: 'ps-gamma', label: 'Gamma', min: 0.4, max: 2.5, step: 0.01, value: 1.0, key: 'studio_gamma', reInject: true },
+            { id: 'ps-temp', label: 'Temperature', min: -0.3, max: 0.3, step: 0.01, value: 0, key: 'studio_temp', reInject: true },
         ];
         configs.forEach(cfg => {
             const input = makeSlider(container, cfg);
@@ -1604,7 +1567,7 @@ export class EditorInspector {
 
     _rebuildPostFx() {
         const bv = this.currentState.baseVals;
-        const opts = { sat: bv.studio_saturation ?? 1.0, hue: bv.studio_hue_rotate ?? 0, roll: bv.studio_hue_roll ?? 0 };
+        const opts = gradeOpts(bv);
         // When images are present, sat/hue must be baked inline into `col` BEFORE
         // image layers blend in (_buildCompShader handles this). The end-block
         // strip+re-inject can't reach that position, so delegate to a full rebuild.
@@ -1733,7 +1696,26 @@ export class EditorInspector {
             this.currentState.solidReactSource = pick(['bass', 'mid', 'treb', 'vol', 'flux']);
             this.currentState.solidReactCurve = pick(['linear', 'squared', 'cubed', 'threshold']);
         }
-        this.currentState.baseVals.wave_a = 0.8;
+        // ── Content — roll a TYPE for variety so it's NOT a string every time:
+        // wave (~20%, a thin oscilloscope accent) / shapes (~55%, audio-reactive
+        // blobs & polygons) / pure (~25%, no thin content — the colour field + flow
+        // carry it). Clear the last roll's content first so types don't stack.
+        this.currentState.shapes = [];   // full reroll — clear all prior content (shapes are editor-only)
+        this.currentState.baseVals.wave_a = 0;
+        const _content = Math.random();
+        if (_content < 0.20) {
+            // Wave — a subtle, COLOURED accent (palette colour), not a dominant white string.
+            const _wb = this.currentState.baseVals;
+            _wb.wave_mode = Math.floor(Math.random() * 8);
+            _wb.wave_scale = rnd(0.5, 2.5);
+            _wb.wave_thickness = Math.random() < 0.5 ? rnd(1, 3) : 0;
+            _wb.wave_a = rnd(0.3, 0.6);
+        } else if (_content < 0.75) {
+            // Shapes — 1–3 audio-reactive blobs / polygons (the "shapes & blobs" look).
+            const _n = 1 + Math.floor(Math.random() * 3);
+            for (let _i = 0; _i < _n; _i++) this._addRemixShape();
+        }
+        // else (~25%): pure field + flow — no thin content; the filled colour field carries it.
         this._postSnap();
         // ── Living Motion (engine).
         if (!L.motion) {
@@ -1748,14 +1730,44 @@ export class EditorInspector {
             this.currentState.flowStyle.density = rnd(0.3, 0.8);
             this._applyFlowStyle(Math.random() < 0.35 ? 'none' : pick(WARP_STYLES.filter(f => f.id !== 'none')).id);
         }
-        // ── Content — a fresh wave shape every roll (the seed; not separately lockable).
-        document.getElementById('btn-randomize-wave')?.click();
-        // Bake the directly-set field/shift and re-sync every control.
+        // Bake the directly-set field/shift/content and re-sync every control.
         this._buildCompShader();
         this._applyToEngine();
         this._syncAllControls();
         const anyLocked = REMIX_LOCK_GROUPS.some(k => L[k]);
         showToast?.(anyLocked ? '🎲 Remixed — locks kept' : '🎲 Remixed');
+    }
+
+    /** Add one randomised, audio-reactive editor shape for a Remix roll — a blob or
+     *  polygon that pulses to the beat. Coloured from the palette's WAVE colour so it
+     *  contrasts the background field (which blends accent→Shift-colour). This is the
+     *  "shapes & blobs" content type that gives Remix variety beyond the wave. */
+    _addRemixShape() {
+        const shapes = this.currentState.shapes || (this.currentState.shapes = []);
+        if (shapes.filter(s => this._isEditorShape(s)).length >= MAX_SHAPES) return;
+        const rnd = (lo, hi) => lo + Math.random() * (hi - lo);
+        const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+        const sh = makeShapeDefaults();
+        const b = sh.baseVals;
+        b.sides = pick([3, 4, 5, 6, 8, 16, 32, 64]);   // triangle → blob/circle
+        b.rad = rnd(0.15, 0.55);
+        b.x = rnd(0.32, 0.68); b.y = rnd(0.32, 0.68);
+        b.ang = rnd(0, 6.2832);
+        b.a = rnd(0.45, 0.9);
+        b.additive = Math.random() < 0.5 ? 1 : 0;       // glow blend
+        // Foreground colour = the palette's WAVE colour → contrasts the background field.
+        const cb = this.currentState.baseVals;
+        b.r = cb.wave_r; b.g = cb.wave_g; b.b = cb.wave_b;
+        b.r2 = b.r; b.g2 = b.g; b.b2 = b.b;
+        // Motion — gentle spin / optional orbit.
+        sh.motion.spin = rnd(-1, 1);
+        sh.motion.orbit = Math.random() < 0.5 ? rnd(0.1, 0.5) : 0;
+        // Audio reactivity — the differentiator: pulse size (+ sometimes opacity) to the beat.
+        sh.react.source = pick(['bass', 'mid', 'treb']);
+        sh.react.curve = pick(['linear', 'squared']);
+        sh.react.sizeAmt = rnd(0.25, 0.8);
+        if (Math.random() < 0.5) sh.react.opacityAmt = rnd(0.2, 0.6);
+        shapes.push(sh);
     }
 
     /** Wire the Remix lock chips (pin a group; Remix re-rolls only the rest).
@@ -3210,6 +3222,8 @@ export class EditorInspector {
             this._syncAllControls();
             this._updateLayersBar();
             this._updateSolidFxVisibility(v0);
+            // Re-baseline A/B "A" to the reset (Shift) state, so A isn't a stale wave.
+            this.originalState = deepClone(this.currentState);
             // Re-highlight the default variation (Shift)
             document.querySelectorAll('.base-var-btn').forEach((el, idx) => {
                 el.classList.toggle('active', idx === DEFAULT_VARIATION_INDEX);
@@ -8253,9 +8267,12 @@ export class EditorInspector {
         if (_bgT) body += '  ret_a = col_a;\n';
         const _rawComp = `${uniforms}\n shader_body {\n${body} }`;
         this._baseComp = _rawComp;
-        // With images: end-block uses defaults (sat=1, hue=0) — sat/hue already applied above.
-        // Without images: end-block carries the full sat/hue as before.
-        this.currentState.comp = injectStudioPostFx(_rawComp, _hasImages ? { sat: 1.0, hue: 0, roll: 0 } : { sat: _sat, hue: _hue, roll: _roll });
+        // With images: end-block forces sat/hue/roll to defaults (already applied to
+        // `col` above so layers aren't colour-shifted), but the four grade faders
+        // (brightness/contrast/gamma/temp) still apply whole-frame. Without images:
+        // the end-block carries the full grade as before.
+        const _grade = gradeOpts(_bv);
+        this.currentState.comp = injectStudioPostFx(_rawComp, _hasImages ? { ..._grade, sat: 1.0, hue: 0, roll: 0 } : _grade);
         this._lastBuildMs = performance.now() - _t0;
     }
 
@@ -9502,6 +9519,10 @@ export class EditorInspector {
         this._syncSlider('ps-saturation', bv.studio_saturation ?? 1.0, 0, 2.0, 2);
         this._syncSlider('ps-hue', bv.studio_hue_rotate ?? 0, 0, 360, 0);
         this._syncSlider('ps-color-roll', bv.studio_hue_roll ?? 0, 0, 1.5, 2);
+        this._syncSlider('ps-brightness', bv.studio_brightness ?? 1.0, 0.5, 2.0, 2);
+        this._syncSlider('ps-contrast', bv.studio_contrast ?? 1.0, 0.5, 2.0, 2);
+        this._syncSlider('ps-gamma', bv.studio_gamma ?? 1.0, 0.4, 2.5, 2);
+        this._syncSlider('ps-temp', bv.studio_temp ?? 0, -0.3, 0.3, 2);
     }
 
     _syncSolidFx() {
@@ -9664,7 +9685,13 @@ export class EditorInspector {
         if (bundled.baseVals) {
             this.currentState.baseVals = { ...deepClone(BLANK.baseVals), ...bundled.baseVals };
         }
-        this.currentState.shapes = deepClone(bundled.shapes || []);
+        // Editor shapes are independent of a preset's own shapes. A bundled preset's
+        // custom shapes are raw (uneditable here) AND the engine renders only 4 shape
+        // slots — so keeping them here let them occupy all 4 slots and starve the
+        // shapes YOU add (they got sliced off in _buildRuntimePreset and never drew,
+        // while the count read "Shape 6"). Drop them: `shapes` is now editor-only.
+        // (The bundled preset still keeps its warp/comp/waves — the bulk of its look.)
+        this.currentState.shapes = [];
         this.currentState.waves = deepClone(bundled.waves || []);
         this.currentState.warp = bundled.warp || '';
 
@@ -9679,7 +9706,7 @@ export class EditorInspector {
         const _bundledRaw = stripStudioPostFx(bundled.comp || BLANK_COMP_RAW);
         this._baseComp = _bundledRaw;
         const _bbv = this.currentState.baseVals;
-        this.currentState.comp = injectStudioPostFx(_bundledRaw, { sat: _bbv.studio_saturation ?? 1.0, hue: _bbv.studio_hue_rotate ?? 0, roll: _bbv.studio_hue_roll ?? 0 });
+        this.currentState.comp = injectStudioPostFx(_bundledRaw, gradeOpts(_bbv));
 
         // Track remix origin so a save references the parent
         this.currentState.parentPresetName = name;
