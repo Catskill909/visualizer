@@ -955,6 +955,7 @@ export class EditorInspector {
         // chip; hover backup powers transient preview without polluting undo.
         this._paletteLock = loadPaletteLocks();
         this._remixLock = loadRemixLocks();
+        this._rolling = false;   // batch flag: true only during _rollFullStack (defers engine reloads)
         this._myMix = loadMyMix();
         this._palettePreviewBackup = null;
 
@@ -1102,9 +1103,11 @@ export class EditorInspector {
         if (bgToggle) bgToggle.checked = false;
         this.engine?.canvas?.classList.remove('bg-transparent-checker');
         this._postSnap();
-        this._buildCompShader();
-        this._applyToEngine();
-        this._syncAllControls();
+        if (!this._rolling) {            // batched by _rollFullStack → one reload at the end
+            this._buildCompShader();
+            this._applyToEngine();
+            this._syncAllControls();
+        }
         this._clearPaletteActive();
         this._updateSolidFxVisibility(v);
         document.querySelectorAll('.base-var-btn').forEach((el, idx) => {
@@ -1452,9 +1455,12 @@ export class EditorInspector {
         // only; border intensity is owned by the Glow/Accent Strength sliders
         // (Palette tab) and the matching Appearance sliders.
         if (snap) this._postSnap();
-        // Rebuild comp shader so solid-color base picks up the new wave_r/g/b
-        this._buildCompShader();
-        this._applyToEngine();
+        // Rebuild comp shader so solid-color base picks up the new wave_r/g/b.
+        // Skipped during a Remix roll — _rollFullStack does one reload at the end.
+        if (!this._rolling) {
+            this._buildCompShader();
+            this._applyToEngine();
+        }
         this._syncColorSwatches();
         this._syncPaletteSliders();
         this._syncSolidFx(); // Update shift color swatch
@@ -1860,6 +1866,14 @@ export class EditorInspector {
         const pick = arr => arr[Math.floor(Math.random() * arr.length)];
         const rnd = (lo, hi) => +(lo + Math.random() * (hi - lo)).toFixed(2);
 
+        // Perf: a Remix touches ~5 axes, each of which would normally rebuild the
+        // comp shader + reload the engine (5 GLSL compiles per click = main-thread
+        // jank). Batch them: the sub-apply methods (_applyPalette/_applyVariation/
+        // _applyMotionEngine/_applyFlowStyle) skip their reload tail while _rolling,
+        // and we do ONE rebuild+apply+sync at the end. Cleared right before that
+        // single reload, so it's exception-safe (only the final apply can throw).
+        this._rolling = true;
+
         // Ensure the Shift colour engine (solid mode) is on so the Colour Field +
         // beat-pulse run. Only flips when currently in feedback mode, so repeated
         // rolls don't reset a locked palette/field.
@@ -1968,7 +1982,8 @@ export class EditorInspector {
         }
         // else (~35%): pure field + flow — no thin content.
         this._postSnap();
-        // Bake the directly-set field/shift/content and re-sync every control.
+        // End the batch and do the ONE real rebuild+apply+sync for the whole roll.
+        this._rolling = false;
         this._buildCompShader();
         this._applyToEngine();
         this._syncAllControls();
@@ -2081,8 +2096,10 @@ export class EditorInspector {
         this.currentState.motionEngine.id = id;
         if (id !== 'none') this._ensureFeedbackContent();
         this._postSnap();
-        this._applyToEngine();
-        this._syncMotionEngine();
+        if (!this._rolling) {            // batched by _rollFullStack → one reload at the end
+            this._applyToEngine();
+            this._syncMotionEngine();
+        }
     }
 
     _syncMotionEngine() {
@@ -2171,13 +2188,15 @@ export class EditorInspector {
             }
         }
         this._postSnap();
-        this._buildCompShader();   // bake/clear the flow→Solid composite (_flowActive branch)
-        this._applyToEngine();
-        this._syncFlowStyle();
-        // Trail lives on two tabs — keep both in sync after the decay seed.
-        this._syncTrailSlider();
-        this._syncSlider('ps-decay', this.currentState.baseVals.decay, 0.85, 0.999, 3);
-        this._syncWaveControls?.();  // wave_a may have changed
+        if (!this._rolling) {            // batched by _rollFullStack → one reload at the end
+            this._buildCompShader();   // bake/clear the flow→Solid composite (_flowActive branch)
+            this._applyToEngine();
+            this._syncFlowStyle();
+            // Trail lives on two tabs — keep both in sync after the decay seed.
+            this._syncTrailSlider();
+            this._syncSlider('ps-decay', this.currentState.baseVals.decay, 0.85, 0.999, 3);
+            this._syncWaveControls?.();  // wave_a may have changed
+        }
     }
 
     _syncFlowStyle() {

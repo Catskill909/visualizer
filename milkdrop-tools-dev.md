@@ -277,7 +277,13 @@ there's content (`_hasFeedbackContent`).
 
 **9 — Full-stack 🎲 Remix + Roll-and-lock.** `_rollFullStack` lands on Shift then rolls colours + field +
 Shift pulse + Motion + Flow + content. Roll-and-lock: "🎲 Remix locks" strip (Colours/Field/Motion/Flow/
-Reactivity), persists in localStorage.
+Reactivity), persists in localStorage. **Perf (2026-06-02):** a click used to fire **5 engine reloads**
+(palette/variation/motion/flow/final), each a shader recompile → 150–363ms main-thread Violations. Fixed with
+a `this._rolling` **batch flag**: while set, `_applyPalette`/`_applyVariation`/`_applyMotionEngine`/
+`_applyFlowStyle` skip their `_buildCompShader`+`_applyToEngine`+`_sync*` tail; the roll does **one**
+rebuild+apply+sync at the end (flag cleared right before it → exception-safe). **Standing rule:** any NEW axis
+added to `_rollFullStack` that calls a sub-apply method must respect `_rolling` (skip the reload), or the jank
+returns. Flag defaults false → standalone UI use of those methods is unchanged.
 
 **10 — Palette declutter + Color adjustments.** Removed 7 canned variations (kept Solid + Shift). Brightness/
 Contrast/Gamma/Temperature baked into `STUDIO_POST_FX` via `injectStudioPostFx`/`gradeOpts` — tune any
