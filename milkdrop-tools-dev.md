@@ -38,7 +38,7 @@ creator tools are **beta-ready**. Detailed shipped writeups for the recent work 
 | **9** | **Full-stack 🎲 Remix** — one button rolls the whole preset (colour field + 3 colours + motion + flow + wave) | ✅ **SHIPPED** — footer Remix → `_rollFullStack()`. **+ 9.1 Roll-and-lock ✅** — pin Colours/Field/Motion/Flow/**Reactivity**, Remix re-rolls only the rest. | — |
 | **10** | **Palette declutter + Grade rack** — drop canned variations; grow the controls that tune ANY loaded preset | ✅ **SHIPPED (code, §3.14)** — removed Drift/Pulse/Storm/Ripple/Radiate/Scatter/Bloom (kept Solid+Shift); added **Brightness / Contrast / Gamma / Temperature** grade faders that bolt onto any preset (incl. the 1,144 bundled) via the STUDIO_POST_FX inject. | Optional: Posterize / Vignette; ✗ Templates (dropped — redundant with Remix+Library+Random) |
 | **11** | **Remix content variety + shape/A-B fixes** — stop forcing a wave (string) on every roll; fix the shape bugs the variety work surfaced | ✅ **SHIPPED (code, §3.15–§3.16)** — Remix rolls a content TYPE: wave ~20% (subtle coloured accent) / **shapes ~55%** (audio-reactive blobs & polygons via `_addRemixShape`) / pure field+flow ~25%; BLANK base wave softened (white→soft blue 0.6). **A/B "A" re-baselined** to the Shift entry (was stale BLANK string). **`currentState.shapes` is now EDITOR-ONLY** — bundled preset shapes no longer pollute the array / starve the 4 render slots (the "Shape 6"/won't-render bug). | — |
-| **12** | **Audio-reactive Grade rack** — make the grade pulse to the beat over ANY loaded preset (the headline next; the audio-reactivity differentiator) | 📋 **PLANNED (deep plan §6)** | **NEXT** — build 12.1 GLSL → 12.2 UI → 12.3 wire/save |
+| **12** | **Audio-reactive Grade rack** — make the grade pulse to the beat over ANY loaded preset (the audio-reactivity differentiator) | ✅ **SHIPPED (code, §6)** — "Grade Reactivity" panel in Palette: shared Source/Curve + per-fader pulse amounts (Brightness/Contrast/Gamma/Temperature). Bakes a live `base + curve(source)·amount` into the grade block; 0 = byte-identical. Verified GLSL. **Awaiting visual review.** | — |
 | **13** | **Colour Field v2** — Spin/Angle · 3rd colour stop (A→B→C) · Conic + Spiral styles · Sharpness/Bands · beat-reactive field | 📋 **PLANNED (deep plan §6)** | After 12 |
 | **14** | **Scene FX rack** — Posterize / Vignette / RGB-split / scene Mirror, via the grade block; each audio-reactive | 📋 PLANNED | After 13 |
 | **15** | **Push from-scratch further** — more Flow warp styles, a second wave | 📋 PLANNED | After 14 |
@@ -580,7 +580,23 @@ tools toward MilkDrop's range** (lever = our generated layers). *Honest limit: m
 reach bundled presets — their own `frame_eqs` overwrite them each frame; the grade/FX layer is the reliable
 A-bridge.* User-confirmed north star: **lean HEAVY on audio reactivity** ([[project_audio_reactivity_differentiator]]).
 
-### Phase 12 — Audio-reactive Grade rack (NEXT)
+### Phase 12 — Audio-reactive Grade rack ✅ SHIPPED (code, 2026-06-01)
+
+Make Brightness/Contrast/Gamma/Temperature **pulse to the beat** over ANY loaded preset.
+
+**What landed:** new `baseVals` `studio_{brightness,contrast,gamma,temp}_react` (per-fader pulse amounts) +
+top-level `studio_grade_react_source`/`_curve` (shared, strings kept out of baseVals like `solidReactSource`).
+`buildStudioPostFxGlsl` now bakes a live signal (`float _gr = <bass|mid|treb|vol|q31>; _gs = curve(_gr)`)
+and each reactive fader emits `base + _gs·amount` instead of a static literal — **only when its amount > 0**,
+so the non-reactive path is byte-identical (verified: defaults emit just the toggle checks). `gradeOpts(state)`
+now reads amounts from `baseVals` + source/curve from top-level, used at all 3 inject sites. UI: collapsible
+**"Grade Reactivity"** panel in the Palette tab (Source dropdown + Curve seg + 4 pulse-amount sliders),
+`_buildGradeReactPanel` + `_syncGradeReact`, reusing the `.motion-adjust` disclosure. Save/load + player
+parity free (baked into the saved comp; the player's comp has the `bass`/`q31` uniforms). **Awaiting review.**
+
+---
+
+### Phase 12 — (original plan)
 
 Make Brightness/Contrast/Gamma/Temperature **pulse to the beat** over ANY loaded preset. Sits in *both*
 bridges (more control over MilkDrop presets + the audio edge). **UI:** a collapsible **"Grade Reactivity"**

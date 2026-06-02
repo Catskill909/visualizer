@@ -371,10 +371,36 @@ function buildStudioPostFxGlsl(opts) {
     // presets stay byte-identical. Operate on the final `ret.rgb` so they tune ANY
     // preset (bundled or custom). Order: brightness → contrast → gamma → temperature.
     const br = num(o.brightness, 1.0), con = num(o.contrast, 1.0), gam = num(o.gamma, 1.0), tmp = num(o.temp, 0);
-    const brLine = (Math.abs(br - 1.0) < 0.001) ? '' : `\n    ret.rgb *= ${br.toFixed(4)};`;
-    const conLine = (Math.abs(con - 1.0) < 0.001) ? '' : `\n    ret.rgb = (ret.rgb - 0.5) * ${con.toFixed(4)} + 0.5;`;
-    const gamLine = (Math.abs(gam - 1.0) < 0.001) ? '' : `\n    ret.rgb = pow(max(ret.rgb, vec3(0.0)), vec3(${(1.0 / gam).toFixed(4)}));`;
-    const tmpLine = (Math.abs(tmp) < 0.001) ? '' : `\n    ret.rgb += vec3(${tmp.toFixed(4)}, 0.0, ${(-tmp).toFixed(4)});`;
+    // Phase 12 — audio-reactive grade. Each fader can pulse to the beat: when its
+    // react amount > 0 it bakes a LIVE expression (`base + signal·amount`) instead of
+    // a static literal, where `signal = curve(source)` reads the same audio uniforms
+    // the Shift pulse uses. Zero amount → the original static line (byte-identical).
+    const brR = num(o.brightnessReact, 0), conR = num(o.contrastReact, 0), gamR = num(o.gammaReact, 0), tmpR = num(o.tempReact, 0);
+    const anyReact = !!(brR || conR || gamR || tmpR);
+    let sigDecl = '';
+    if (anyReact) {
+        const src = { bass: 'bass', mid: 'mid', treb: 'treb', vol: 'vol', flux: 'q31' }[o.gradeReactSource] || 'bass';
+        let cexpr;
+        switch (o.gradeReactCurve) {
+            case 'squared': cexpr = '_gr * _gr'; break;
+            case 'cubed': cexpr = '_gr * _gr * _gr'; break;
+            case 'threshold': cexpr = 'step(0.3, _gr)'; break;
+            default: cexpr = '_gr';
+        }
+        sigDecl = `\n    float _gr = ${src};\n    float _gs = ${cexpr};`;
+    }
+    // Per-fader expression: live `(base + _gs·amount)` when reactive, else the literal.
+    const brExpr = brR ? `(${br.toFixed(4)} + _gs * ${brR.toFixed(4)})` : br.toFixed(4);
+    const conExpr = conR ? `(${con.toFixed(4)} + _gs * ${conR.toFixed(4)})` : con.toFixed(4);
+    const tmpExpr = tmpR ? `(${tmp.toFixed(4)} + _gs * ${tmpR.toFixed(4)})` : tmp.toFixed(4);
+    const brLine = (Math.abs(br - 1.0) < 0.001 && !brR) ? '' : `\n    ret.rgb *= ${brExpr};`;
+    const conLine = (Math.abs(con - 1.0) < 0.001 && !conR) ? '' : `\n    ret.rgb = (ret.rgb - 0.5) * ${conExpr} + 0.5;`;
+    // Gamma: non-reactive keeps the precomputed `1/gam` literal (byte-identical);
+    // reactive divides at runtime, clamped > 0.01 so it never blows up.
+    const gamLine = (Math.abs(gam - 1.0) < 0.001 && !gamR) ? '' :
+        (gamR ? `\n    ret.rgb = pow(max(ret.rgb, vec3(0.0)), vec3(1.0 / max(${gam.toFixed(4)} + _gs * ${gamR.toFixed(4)}, 0.01)));`
+              : `\n    ret.rgb = pow(max(ret.rgb, vec3(0.0)), vec3(${(1.0 / gam).toFixed(4)}));`);
+    const tmpLine = (Math.abs(tmp) < 0.001 && !tmpR) ? '' : `\n    ret.rgb += vec3(${tmpExpr}, 0.0, -(${tmpExpr}));`;
     const satLine = (Math.abs(s - 1.0) < 0.001) ? '' :
         `\n    float _lum = dot(ret.rgb, vec3(0.299, 0.587, 0.114));\n    ret.rgb = mix(vec3(_lum), ret.rgb, ${s.toFixed(4)});`;
     let hueLine = '';
@@ -388,18 +414,24 @@ function buildStudioPostFxGlsl(opts) {
         const oneMinusCos = (1 - Math.cos(rad)).toFixed(6);
         hueLine = `\n    vec3 _k = vec3(0.57735);\n    ret.rgb = ret.rgb * ${cosA} + cross(_k, ret.rgb) * ${sinA} + _k * dot(_k, ret.rgb) * ${oneMinusCos};`;
     }
-    return `    /* STUDIO_POST_FX */\n    if (brighten != 0) ret = sqrt(ret);\n    if (darken != 0) ret = ret * ret;\n    if (solarize != 0) ret = ret * (1.0 - ret) * 4.0;\n    if (invert != 0) ret = 1.0 - ret;${brLine}${conLine}${gamLine}${tmpLine}${satLine}${hueLine}\n`;
+    return `    /* STUDIO_POST_FX */\n    if (brighten != 0) ret = sqrt(ret);\n    if (darken != 0) ret = ret * ret;\n    if (solarize != 0) ret = ret * (1.0 - ret) * 4.0;\n    if (invert != 0) ret = 1.0 - ret;${sigDecl}${brLine}${conLine}${gamLine}${tmpLine}${satLine}${hueLine}\n`;
 }
 
 // Build the full grade-opts object the STUDIO_POST_FX inject reads, from a baseVals.
 // One source of truth for every injectStudioPostFx call site (sat/hue/roll already
 // existed; the four grade faders are the 2026-06-01 addition).
-function gradeOpts(bv) {
-    const b = bv || {};
+function gradeOpts(state) {
+    const st = state || {};
+    const b = st.baseVals || {};
     return {
         sat: b.studio_saturation ?? 1.0, hue: b.studio_hue_rotate ?? 0, roll: b.studio_hue_roll ?? 0,
         contrast: b.studio_contrast ?? 1.0, brightness: b.studio_brightness ?? 1.0,
         gamma: b.studio_gamma ?? 1.0, temp: b.studio_temp ?? 0,
+        // Phase 12 — per-fader audio-reactive amounts (baseVals) + shared source/curve (top-level).
+        brightnessReact: b.studio_brightness_react ?? 0, contrastReact: b.studio_contrast_react ?? 0,
+        gammaReact: b.studio_gamma_react ?? 0, tempReact: b.studio_temp_react ?? 0,
+        gradeReactSource: st.studio_grade_react_source ?? 'bass',
+        gradeReactCurve: st.studio_grade_react_curve ?? 'linear',
     };
 }
 
@@ -453,6 +485,10 @@ const BLANK = {
         // byte-identical. Tunes the 1,144 bundled presets too (they keep their own
         // shader; the grade block is appended). See buildStudioPostFxGlsl.
         studio_contrast: 1.0, studio_brightness: 1.0, studio_gamma: 1.0, studio_temp: 0,
+        // Phase 12 — per-fader audio-reactive amounts (0 = static; the grade pulses to
+        // the beat when > 0). Shared Source/Curve live top-level (strings stay out of
+        // baseVals, like solidReactSource). All default-off → byte-identical.
+        studio_brightness_react: 0, studio_contrast_react: 0, studio_gamma_react: 0, studio_temp_react: 0,
         // Glow / Accent bloom (a colored halo from the blurred feedback buffer,
         // tinted by the Glow / Accent colour). 0 = off → comp is byte-identical.
         studio_glow: 0, studio_accent: 0,
@@ -510,6 +546,9 @@ const BLANK = {
     solidColorB: [0, 0, 0],
     solidReactSource: 'bass',  // 'bass' | 'mid' | 'treb' | 'vol'
     solidReactCurve: 'linear', // 'linear' | 'squared' | 'cubed' | 'threshold'
+    // Phase 12 — shared Source/Curve for the audio-reactive Grade rack (the per-fader
+    // amounts live in baseVals). Top-level strings, mirroring solidReactSource/Curve.
+    studio_grade_react_source: 'bass', studio_grade_react_curve: 'linear',
     // Phase 8 — Color Field. Spreads the Shift A→B blend across SPACE, not just
     // time: 'flat' = the classic flat Shift (byte-identical, so old presets are
     // unchanged); linear/radial/plasma make the background a moving multi-colour
@@ -901,6 +940,7 @@ export class EditorInspector {
         this._bindColorStudio();
         this._buildPaletteStrengthSliders();
         this._buildPaletteSliders();
+        this._buildGradeReactPanel();
         this._bindPaletteOpacity();
         this._buildSolidFxPanel();
         this._buildFlowStyleSection();
@@ -1567,7 +1607,7 @@ export class EditorInspector {
 
     _rebuildPostFx() {
         const bv = this.currentState.baseVals;
-        const opts = gradeOpts(bv);
+        const opts = gradeOpts(this.currentState);
         // When images are present, sat/hue must be baked inline into `col` BEFORE
         // image layers blend in (_buildCompShader handles this). The end-block
         // strip+re-inject can't reach that position, so delegate to a full rebuild.
@@ -1581,6 +1621,69 @@ export class EditorInspector {
         // through a separate path that doesn't update _baseComp.
         this.currentState.comp = injectStudioPostFx(this.currentState.comp, opts);
         this._applyToEngine(true);
+    }
+
+    // ─── Grade Reactivity (Phase 12 — beat-pulse the grade over any preset) ──────
+
+    /** Shared Source + Curve + four per-fader pulse-amount sliders. Each control
+     *  re-injects the post-FX (the reactive grade bakes into the comp), so it tunes
+     *  any loaded preset live — the audio-reactivity differentiator on the 1,144. */
+    _buildGradeReactPanel() {
+        const srcSel = document.getElementById('grade-react-source');
+        if (srcSel) {
+            srcSel.value = this.currentState.studio_grade_react_source || 'bass';
+            srcSel.addEventListener('change', () => {
+                this._preSnap();
+                this.currentState.studio_grade_react_source = srcSel.value;
+                this._postSnap();
+                this._rebuildPostFx();
+            });
+        }
+        const curveBtns = document.querySelectorAll('#grade-react-curve .lseg');
+        curveBtns.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.curve === (this.currentState.studio_grade_react_curve || 'linear'));
+            btn.addEventListener('click', () => {
+                this._preSnap();
+                curveBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.currentState.studio_grade_react_curve = btn.dataset.curve;
+                this._postSnap();
+                this._rebuildPostFx();
+            });
+        });
+        const container = document.getElementById('grade-react-sliders');
+        if (!container) return;
+        [
+            { id: 'gr-brightness', label: 'Brightness pulse', min: 0, max: 1.0, step: 0.01, key: 'studio_brightness_react' },
+            { id: 'gr-contrast', label: 'Contrast pulse', min: 0, max: 1.0, step: 0.01, key: 'studio_contrast_react' },
+            { id: 'gr-gamma', label: 'Gamma pulse', min: 0, max: 1.0, step: 0.01, key: 'studio_gamma_react' },
+            { id: 'gr-temp', label: 'Temperature pulse', min: 0, max: 0.3, step: 0.01, key: 'studio_temp_react' },
+        ].forEach(cfg => {
+            const input = makeSlider(container, { ...cfg, value: this.currentState.baseVals[cfg.key] ?? 0 });
+            const valEl = document.getElementById(`${cfg.id}-val`);
+            input.addEventListener('pointerdown', () => this._preSnap());
+            input.addEventListener('input', () => {
+                const v = parseFloat(input.value);
+                if (valEl) valEl.textContent = v.toFixed(2);
+                input.style.setProperty('--pct', `${((v - cfg.min) / (cfg.max - cfg.min)) * 100}%`);
+                this.currentState.baseVals[cfg.key] = v;
+                this._rebuildPostFx();   // reactive grade is baked into the comp
+            });
+            input.addEventListener('pointerup', () => this._postSnap());
+        });
+    }
+
+    /** Reflect Grade Reactivity state onto its controls. */
+    _syncGradeReact() {
+        const srcSel = document.getElementById('grade-react-source');
+        if (srcSel) srcSel.value = this.currentState.studio_grade_react_source || 'bass';
+        document.querySelectorAll('#grade-react-curve .lseg').forEach(b =>
+            b.classList.toggle('active', b.dataset.curve === (this.currentState.studio_grade_react_curve || 'linear')));
+        const bv = this.currentState.baseVals;
+        this._syncSlider('gr-brightness', bv.studio_brightness_react ?? 0, 0, 1.0, 2);
+        this._syncSlider('gr-contrast', bv.studio_contrast_react ?? 0, 0, 1.0, 2);
+        this._syncSlider('gr-gamma', bv.studio_gamma_react ?? 0, 0, 1.0, 2);
+        this._syncSlider('gr-temp', bv.studio_temp_react ?? 0, 0, 0.3, 2);
     }
 
     // ─── Color swatches ────────────────────────────────────────────────────────
@@ -8271,7 +8374,7 @@ export class EditorInspector {
         // `col` above so layers aren't colour-shifted), but the four grade faders
         // (brightness/contrast/gamma/temp) still apply whole-frame. Without images:
         // the end-block carries the full grade as before.
-        const _grade = gradeOpts(_bv);
+        const _grade = gradeOpts(this.currentState);
         this.currentState.comp = injectStudioPostFx(_rawComp, _hasImages ? { ..._grade, sat: 1.0, hue: 0, roll: 0 } : _grade);
         this._lastBuildMs = performance.now() - _t0;
     }
@@ -9498,6 +9601,7 @@ export class EditorInspector {
         this._syncFeelSliders();
         this._syncSolidFx();
         this._syncBgField();
+        this._syncGradeReact();
         this._syncToggle('toggle-invert', 'invert');
         this._syncToggle('toggle-darken', 'darken');
         this._syncToggle('toggle-brighten-fx', 'brighten');
@@ -9705,8 +9809,7 @@ export class EditorInspector {
         // be replaced when the user adds image layers or picks a new variation.
         const _bundledRaw = stripStudioPostFx(bundled.comp || BLANK_COMP_RAW);
         this._baseComp = _bundledRaw;
-        const _bbv = this.currentState.baseVals;
-        this.currentState.comp = injectStudioPostFx(_bundledRaw, gradeOpts(_bbv));
+        this.currentState.comp = injectStudioPostFx(_bundledRaw, gradeOpts(this.currentState));
 
         // Track remix origin so a save references the parent
         this.currentState.parentPresetName = name;

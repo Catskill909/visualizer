@@ -381,6 +381,33 @@
                             <p class="section-label">Appearance</p>
                             <div id="palette-sliders"></div>
 
+                            <!-- Color Reactivity (Phase 12): make the colour adjustments
+                                 (Brightness/Contrast/Gamma/Temperature) pulse to the beat over ANY
+                                 loaded preset. Always visible — audio reactivity is the headline. -->
+                            <p class="section-label" style="margin-top:14px">Color Reactivity</p>
+                            <p class="section-note">Make the colour pulse to the beat — works on any loaded preset.</p>
+                            <div class="layer-row-inline" style="gap:8px;margin-bottom:6px">
+                                <span class="layer-ctrl-label" data-tooltip="Audio source">Source</span>
+                                <select id="grade-react-source" class="layer-react-source">
+                                    <option value="bass">Bass</option>
+                                    <option value="mid">Mid</option>
+                                    <option value="treb">Treble</option>
+                                    <option value="vol">Volume</option>
+                                    <option value="flux">Flux</option>
+                                </select>
+                            </div>
+                            <div class="layer-row-inline" style="gap:8px;margin-bottom:8px">
+                                <span class="layer-ctrl-label" data-tooltip="Response curve">Curve</span>
+                                <div id="grade-react-curve" class="layer-react-curve" role="group"
+                                    aria-label="Color reactivity curve">
+                                    <button class="lseg active" data-curve="linear">Linear</button>
+                                    <button class="lseg" data-curve="squared">Squared</button>
+                                    <button class="lseg" data-curve="cubed">Cubed</button>
+                                    <button class="lseg" data-curve="threshold">Gate</button>
+                                </div>
+                            </div>
+                            <div id="grade-react-sliders"></div>
+
                             <div class="toggle-row">
                                 <label class="toggle-label" for="toggle-invert">Invert colors</label>
                                 <label class="toggle-switch">
