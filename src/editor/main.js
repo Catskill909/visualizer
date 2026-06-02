@@ -8,7 +8,7 @@ import '../assets/fonts/fonts.css';
 import { VisualizerEngine } from '../visualizer.js';
 import { EditorInspector, showToast } from './inspector.js';
 import { PresetLibrary } from './presetLibrary.js';
-import { getCustomPreset, loadAllCustomPresets, CUSTOM_PREFIX } from '../customPresets.js';
+import { getCustomPreset, loadAllCustomPresets, hydratePresets, CUSTOM_PREFIX } from '../customPresets.js';
 import { initAuthGate } from '../auth-gate.js';
 import { pickAndConnect } from '../devicePicker.js';
 import { showAudioLoadingModal, hideAudioLoadingModal } from '../fileUtils.js';
@@ -433,6 +433,10 @@ document.getElementById('remix-picker-search')?.addEventListener('input', e => {
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
 async function boot(connectAudioFn) {
+    // Phase 0: hydrate the preset cache from IndexedDB before the inspector mounts or
+    // the Library reads loadAllCustomPresets() (see milkdrop-pack-import.dev §0).
+    await hydratePresets();
+
     engine = new VisualizerEngine();
     engine.init(canvasEl);
     sizeCanvas();

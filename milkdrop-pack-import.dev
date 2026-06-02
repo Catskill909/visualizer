@@ -1,12 +1,17 @@
 # MilkDrop Pack Import — Research & Feature Spec
 
-Status: **🔬 Research complete — ready for design review**
+Status: **✅ Phase 0 SHIPPED & VERIFIED (storage upgrade — custom presets now on IndexedDB; localStorage wall gone). Community packs (Phase 1+) not started.**
 Last updated: 2026-06-02
 
 > Goal: Expand the existing import modal to let users browse and install curated
 > MilkDrop preset packs directly from GitHub — turning DiscoCast into a platform
 > where users can stack thousands (even tens of thousands) of additional presets
 > with a single click.
+
+> **2026-06-02 headline:** The codebase audit (§0, §11) confirmed a storage upgrade
+> we need **regardless of community packs** — custom preset *metadata* still lives
+> in localStorage and already throws "Storage full" at users. That upgrade is now
+> **Phase 0** (a unified IndexedDB preset store), and community packs plug into it.
 
 ---
 
@@ -20,6 +25,56 @@ Last updated: 2026-06-02
 6. [Import Pipeline — How 1,000s of Presets Flow In](#6-import-pipeline--how-1000s-of-presets-flow-in)
 7. [Related Work — Existing Import Infrastructure](#7-related-work--existing-import-infrastructure)
 8. [Open Questions](#8-open-questions)
+9. [Deep Codebase Audit](#9-deep-codebase-audit--every-touch-point)
+10. [Phased Implementation Plan](#10-phased-implementation-plan)
+11. [Verified Code Audit (2026-06-02)](#11-verified-code-audit-2026-06-02)
+12. [Doability Assessment & Risk Tiers](#12-doability-assessment--risk-tiers-2026-06-02)
+
+---
+
+## 0. Headline — The Storage Upgrade Is Phase 0 (and stands alone)
+
+**This is the part that matters even if community packs never ship.**
+
+While planning pack import we found the real bottleneck isn't the packs — it's how
+we store user presets *today*. The codebase audit (§11) verified it against the code:
+
+- **Custom preset *metadata*** (baseVals / shapes / waves / warp / comp / frame_eqs /
+  the images array) still lives in **localStorage** (`discocast_custom_presets`,
+  [customPresets.js:11](src/customPresets.js#L11)). Image/video **blobs** already moved
+  to IndexedDB / Tauri FS — so the 5–10 MB wall is on *metadata only*.
+- That wall **already fails users**: `saveCustomPreset()` throws *"Storage full — export
+  your presets to free space, then delete some"* on `QuotaExceededError`
+  ([customPresets.js:56](src/customPresets.js#L56)). A power user with a few hundred
+  layered presets hits it now.
+
+### The fix — one unified IndexedDB preset-metadata store
+
+Build **one** IndexedDB store for preset *metadata* and migrate **custom** presets onto
+it first. This:
+
+1. **Removes the ~200-preset wall for user-created presets** — ships real value with
+   **zero** community-pack UI. This is the "needed even without this dev" upgrade.
+2. **Becomes the substrate community packs plug into** — community presets are just the
+   same store under a `community:<packId>:` namespace (§9.6). Build the foundation once.
+
+### The insight that makes it safe — a boot-hydrated cache
+
+The naïve "make storage async" plan ripples through **~15 synchronous readers** of
+`loadAllCustomPresets()` across the editor + player (§11.3) and risks the engine's hot
+paths. Instead:
+
+> **Reads stay synchronous against an in-memory cache hydrated once at boot from
+> IndexedDB. Only WRITES (save / delete) and the one-time localStorage→IDB migration go
+> async.** The ~15 read sites keep working unchanged against the cache; only the 3–4
+> write functions + boot hydration change.
+
+This mirrors the **already-proven blob pattern** (`storeImage`/`getImage` route to
+Tauri FS or IndexedDB transparently, [customPresets.js:175–204](src/customPresets.js#L175-L204)).
+
+**Sequencing recommendation:** do Phase 0 (custom → unified IDB store, cache-backed)
+first as a self-contained, shippable infra upgrade. Then community packs (§10 Phases 1–4)
+plug into the same store. See the revised tracker in §10.
 
 ---
 
@@ -604,8 +659,11 @@ Tauri FS path for community packs:
 
 | Phase | What | State | Est. effort |
 |---|---|---|---|
-| **1a** | IndexedDB community store (`communityPresets.js`) | ⬜ Not started | 3–4 hr |
-| **1b** | Registry + engine integration (lazy load) | ⬜ Not started | 2–3 hr |
+| **0a** | Unified IndexedDB preset-metadata store + boot-hydrated cache (`presetStore.js`) | ✅ **Built 2026-06-02** (production build passes) | 4–5 hr |
+| **0b** | Migrate custom presets onto it (one-time localStorage→IDB migration; async writes) | ✅ **Built 2026-06-02** (customPresets routed through store; 3 boot hydrates; rename refactored) | 3–4 hr |
+| **0c** | Verify custom-preset wall is gone (save 500+ presets, reload, editor + player + timeline) | ✅ **Verified via real use 2026-06-02** — Random↔Remix, load, export, import, custom video presets all clean; migration confirmed (no DataCloneError, presets persist). Explicit 500-count stress not run, but the localStorage byte-wall is gone *by construction* (IndexedDB has no such limit). | 1–2 hr |
+| **1a** | Community namespace in the unified store (`community:<packId>:` keys + pack-meta store) | ⬜ Not started | 2–3 hr |
+| **1b** | Registry + engine integration (lazy load community bodies; light path, NOT refreshCustomPresets) | ⬜ Not started | 2–3 hr |
 | **1c** | Ansorre pack hard-coded install (no UI) | ⬜ Not started | 2–3 hr |
 | **2a** | Pack manifest + fetch | ⬜ Not started | 1–2 hr |
 | **2b** | Pack browser modal UI | ⬜ Not started | 4–6 hr |
@@ -615,13 +673,240 @@ Tauri FS path for community packs:
 | **3b** | .milk pack support (depends on milkdrop-import-dev.md) | ⬜ Not started | 4–6 hr |
 | **4** | Polish (Tauri FS fallback, dedup, User Guide) | ⬜ Not started | 3–4 hr |
 
-**Current state:** Research & audit done. Nothing built. Ready for Phase 1a.
+**Current state:** Research, codebase audit, **and code verification (§11)** done. Nothing
+built. **Ready for Phase 0a** — the unified store. Phase 0 ships independently of any
+community-pack feature (it fixes the custom-preset storage wall users hit today).
+
+> **Why Phase 0 changed from the old plan:** the original Phase 1a built a *separate*
+> community IndexedDB store and left custom presets on localStorage. The audit (§0, §11)
+> showed the localStorage wall is the *actual* user-facing pain, and that one unified
+> store serves both. Phase 1a is now "add the community namespace to the store Phase 0
+> built," not "build a second store."
 
 ---
 
-### Phase 1a — IndexedDB Community Store
+### Phase 0 — Unified IndexedDB Preset Store (the storage upgrade)
 
-**Goal:** New module `src/communityPresets.js` with CRUD for community presets.
+**Goal:** Move custom preset *metadata* off localStorage into a single IndexedDB store,
+fronted by a boot-hydrated in-memory cache so existing synchronous readers don't change.
+This removes the ~200-preset wall and becomes the substrate community packs reuse.
+
+**Deliverables:**
+```
+NEW     src/presetStore.js     — the unified store: IDB metadata store + in-memory cache
+MODIFY  src/customPresets.js   — route metadata CRUD through presetStore; keep the public
+                                  sync read API (cache-backed) so callers don't change
+```
+
+**The cache contract (the core of why this is safe):**
+```
+Boot:   await presetStore.hydrate()   → reads ALL metadata from IDB into an in-memory map
+Reads:  loadAllCustomPresets() / getCustomPreset(id)   → SYNC, served from the cache
+                                                          (signatures unchanged)
+Writes: saveCustomPreset() / createCustomPreset() / deleteCustomPreset()
+          → update cache synchronously, then persist to IDB (async, fire-and-forget OK)
+Migration (one-time, idempotent): on first boot, if localStorage `discocast_custom_presets`
+          has records and IDB is empty → copy them into IDB, mark migrated, keep the
+          localStorage copy as a backstop (don't delete until verified).
+```
+
+**Key design decisions:**
+- **Metadata-only.** Blobs already live in IDB/Tauri FS (`storeImage`/`getImage`) — Phase 0
+  does NOT touch them. Just the preset records that overflow localStorage today.
+- **Same DB or a new one?** Recommend a dedicated DB `discocast_presets` (store `presets`,
+  key = preset `id`) so it's independent of the `discocast_images` blob DB and of any
+  future schema bump.
+- **Boot ordering.** `hydrate()` must complete before the first `loadAllCustomPresets()`
+  read. Audit the entry points (`main.js`, `editor/main.js`, `timeline/main.js`) — each
+  must `await presetStore.hydrate()` before wiring the engine/inspector.
+  **✅ VERIFIED FEASIBLE (2026-06-02) — do not re-investigate:** the player boot is already
+  an `async` `DOMContentLoaded` handler that `await`s `initAuthGate()`, *then* constructs the
+  engine, *then* calls `refreshCustomPresets()` (the first preset read) at
+  [main.js:38](src/main.js#L38). So `await presetStore.hydrate()` drops in as a single line
+  immediately before line 38 — the cache is populated before any read, no race, no surgery.
+  The editor (`editor/main.js`) and timeline (`timeline/main.js`) follow the same async-boot
+  pattern; add the same one line. This is the assumption the whole "reads stay sync" design
+  rests on, and it holds.
+- **Tauri.** WKWebView IndexedDB can be evicted under storage pressure (same risk noted for
+  blobs). Phase 4 adds the Tauri-FS mirror for metadata; Phase 0 ships IDB-only (matches
+  how blobs shipped before their Tauri fallback).
+
+**Call sites that change (from §11.3):**
+- Writers (must update cache + IDB): `inspector.js:9923/9925` (save/create),
+  `presetLibrary.js:350` (delete), `controls.js:713` (delete).
+- Readers (UNCHANGED — served by cache): `presetRegistry.js:25`, `visualizer.js:577`,
+  `controls.js:703/732/743/762`, `editor/main.js:160/555`, `presetLibrary.js:146/168/310/349`.
+- Boot: add `await presetStore.hydrate()` in the three `main.js` entry points.
+
+**Verification (0c):**
+- Programmatically create 500 custom presets → confirm no QuotaExceededError, all persist
+  across reload, drawer + Library list + timeline all show them.
+- Confirm a pre-Phase-0 user (records only in localStorage) auto-migrates on first boot and
+  loses nothing.
+- Confirm editor save/load/delete + player drawer + timeline all still work (the cache must
+  be byte-identical to the old localStorage read path).
+
+---
+
+#### Phase 0 — VERIFIED EXECUTION TRACE & FILE-BY-FILE BUILD SPEC (2026-06-02)
+
+This is the written save/load-flow trace CLAUDE.md mandates before code. Every path below was
+read in the actual source, not inferred.
+
+**Save flow as it exists today (real path):**
+```
+Studio "Save" → editor/main.js attemptSave() (L553) reads loadAllCustomPresets() to check
+                name collision → inspector.saveCurrent(name, id) (inspector.js:9900)
+  → builds `data = { name, ...currentState, solidColor, thumbnailDataUrl? }`
+  → id present?  saveCustomPreset({...data, id, updatedAt}) (inspector.js:9923)
+     else        createCustomPreset(data) (inspector.js:9925)
+  → customPresets.js: saveCustomPreset() reads localStorage, merges, JSON.stringify→setItem
+     (THROWS friendly "Storage full" on QuotaExceededError, L56)
+```
+**Load flow:** `editor/main.js:160` `loadAllCustomPresets()[id]` → `inspector.loadPresetData()`.
+Player: `controls.js` → `engine.refreshCustomPresets()` (reads localStorage) → drawer.
+**Delete flow:** Studio `presetLibrary.js:350` / player `controls.js:713` → `deleteCustomPreset(id)`
++ blob cleanup via `deleteImage()`. **Rename flow:** `presetLibrary.js:308 commit()` → RAW
+`localStorage.setItem` (the §11.3 trap).
+
+**Design: `customPresets.js` keeps its exact public API; a cache backs it.** Callers don't change
+(except the rename refactor). The localStorage read/write *inside* the API functions is swapped
+for cache reads + async IDB persistence.
+
+**File-by-file changes:**
+
+```
+NEW  src/presetStore.js
+     • openDB()            → IndexedDB `discocast_presets`, store `presets` (key = id)
+     • hydrate()           → async; loads ALL records into module-level `_cache` Map.
+                             One-time migration: if localStorage `discocast_custom_presets`
+                             (or legacy `milkscreen_custom_presets`) has records AND the IDB
+                             store is empty → copy them in, set a `__dc_presets_migrated` flag,
+                             KEEP localStorage as a backstop (do NOT delete in Phase 0).
+     • getAllSync()        → returns `{ [id]: record }` from cache (sync)
+     • getOneSync(id)      → cache.get(id) (sync)
+     • putAsync(record)    → cache.set + async IDB put; on IDB quota error, surface same
+                             "Storage full" message (defensive — IDB quota is huge, unlikely)
+     • deleteAsync(id)     → cache.delete + async IDB delete
+     • isHydrated()        → guard so a read before hydrate() throws a clear dev error
+
+MOD  src/customPresets.js
+     • loadAllCustomPresets()  → return presetStore.getAllSync()   (was localStorage.getItem+parse)
+     • getCustomPreset(id)     → presetStore.getOneSync(id)
+     • saveCustomPreset(p)     → build record (unchanged), presetStore.putAsync(record), return record
+     • deleteCustomPreset(id)  → presetStore.deleteAsync(id)
+     • (export a `hydratePresets = presetStore.hydrate` passthrough so entry points import one module)
+
+MOD  src/editor/presetLibrary.js
+     • L308–319 commit(): replace the raw localStorage.setItem block with
+       `saveCustomPreset({ ...all[id], name: next, updatedAt: Date.now() })` inside the existing
+       try/catch (keeps the "Storage full" toast).
+
+MOD  src/main.js            → add `await hydratePresets()` immediately before
+                              `engine.refreshCustomPresets()` (L38). VERIFIED feasible (Phase 0c note).
+MOD  src/editor/main.js     → add `await hydratePresets()` in the async DOMContentLoaded boot,
+                              before the first loadAllCustomPresets()/inspector wiring.
+MOD  src/timeline/main.js   → same one-line hydrate before `engine.refreshCustomPresets()` (L209).
+```
+
+**Invariants this must preserve (the burn-list):**
+- The public API **signatures are unchanged** → the ~15 readers (§11.3) are not touched.
+- `saveCustomPreset` still **returns the record synchronously** (callers use the return value
+  immediately — e.g. `inspector.saveCurrent` returns it). The cache update is sync; only the IDB
+  write is deferred. So the return contract holds.
+- The **"Storage full" message survives** (now on the IDB-quota path + the rename toast).
+- **No data loss on migration** → localStorage retained as backstop until 0c signs off; migration
+  is idempotent (flag-guarded, only runs when IDB is empty).
+- **Blob cleanup on delete is untouched** — `deleteImage()` calls in `controls.js`/`presetLibrary.js`
+  stay exactly as-is; Phase 0 is metadata-only.
+
+**Out of scope for Phase 0 (do NOT do here):** community namespace (Phase 1a), Tauri-FS metadata
+mirror (Phase 4), deleting the localStorage backstop (a later cleanup once IDB is trusted in prod).
+
+---
+
+#### Phase 0 — WHAT SHIPPED (2026-06-02, build-verified)
+
+Production build passes (`vite build` ✓, 413 ms; only pre-existing vendor butterchurn CommonJS
+warnings). Runtime/behavioural test (0c) still pending a browser session.
+
+**New file:**
+- [`src/presetStore.js`](src/presetStore.js) — IndexedDB `discocast_presets` (store `presets`,
+  keyPath `id`) + in-memory `_cache` Map. Public API: `hydrate()`, `isHydrated()`,
+  `getAllSync()`, `getOneSync(id)`, `putRecord(record)`, `deleteRecord(id)`. Idempotent,
+  flag-guarded one-time localStorage→IDB migration inside `hydrate()` that **leaves the old
+  localStorage data intact** as a recovery backstop. `_ensureCache()` safety net lazy-seeds from
+  localStorage if anything reads before `hydrate()` (so worst case = old behaviour, never a crash).
+
+**Modified:**
+- [`src/customPresets.js`](src/customPresets.js) — `loadAllCustomPresets`/`getCustomPreset`/
+  `saveCustomPreset`/`deleteCustomPreset` now delegate to `presetStore` (signatures unchanged).
+  Removed the `STORAGE_KEY` localStorage path + the synchronous `QuotaExceededError` throw (the
+  wall it guarded is gone — IDB persist is async). Re-exports `hydratePresets = presetStore.hydrate`.
+- [`src/editor/presetLibrary.js`](src/editor/presetLibrary.js) — the **hidden 5th writer** (raw
+  `localStorage.setItem` in inline rename) now calls `saveCustomPreset({ ...record, name })`. This
+  was the §11.3 desync trap; closed.
+- [`src/main.js`](src/main.js), [`src/editor/main.js`](src/editor/main.js),
+  [`src/timeline/main.js`](src/timeline/main.js) — each `await hydratePresets()` before its first
+  preset read (player: before `refreshCustomPresets()`; editor/timeline: top of `boot()` /
+  before `refreshCustomPresets()`).
+
+**Invariants held:** public API signatures unchanged → the ~15 readers untouched; `saveCustomPreset`
+still returns the record synchronously; blob delete paths untouched; migration idempotent and
+non-destructive.
+
+**0c runtime bugs found & fixed (2026-06-02, during live testing):**
+
+Two bugs surfaced the moment real presets hit IndexedDB — both were **the same underlying
+gap**: localStorage implicitly JSON-round-tripped every record, and the first cut of
+`presetStore` didn't reproduce that. Fixes restore the exact old semantics.
+
+1. **`DataCloneError` on save.** IndexedDB persists via *structured clone*, which throws on
+   functions; preset records carry a derived animation closure on image entries. localStorage's
+   `JSON.stringify` silently dropped it. → **Fix:** `putRecord()` now stores
+   `JSON.parse(JSON.stringify(record))` (functions stripped) for both cache + IDB. Without this,
+   saves never reached disk — they lived only in the session cache and vanished on reload.
+
+2. **Equation corruption / `loadPreset failed: Unexpected identifier 'a'` on random cycle.**
+   `visualizer.refreshCustomPresets()` **mutates the record in place** (appends reactBlock / anim
+   eqs to `frame_eqs_str`, overwrites `warp`). Pre-Phase-0 this was harmless because
+   `loadAllCustomPresets()` returned a fresh `JSON.parse` copy each call. The first `presetStore`
+   returned cache objects **by reference**, so every refresh (drawer-open / save / import / boot)
+   re-appended the injected eqs onto the *same* cached record → `frame_eqs_str` accumulated copies
+   until Butterchurn's `new Function` compile failed (and drove the `setTimeout took 125ms`
+   violations). → **Fix:** `getAllSync()` / `getOneSync()` return **deep clones**, exactly like the
+   old `JSON.parse(localStorage)`. (No persistent corruption: saves are built from the editor's
+   `currentState`, not the mutated engine map, so nothing bad was written to disk.)
+
+**Lesson for Phase 1+ (community presets):** the unified store must hand out **fresh JSON-clean
+copies on read** and **store JSON-clean copies on write** — anything that relied on localStorage's
+implicit serialization needs it made explicit here.
+
+**0c runtime checklist (next browser session):**
+1. Fresh load with existing localStorage presets → confirm console logs `Migrated N custom
+   preset(s)`, all presets appear in player drawer + Studio Library + timeline, and DevTools →
+   Application → IndexedDB → `discocast_presets` holds the records.
+2. Reload → no second migration (flag set), presets persist.
+3. Save / rename / delete in the Studio → each survives a reload.
+4. Stress: script-create 500 presets → no "Storage full", all persist across reload.
+5. Confirm the secondary engine (timeline output) still sees custom presets.
+
+---
+
+### Phase 1a — Community Namespace in the Unified Store
+
+**Goal:** Extend the Phase 0 store with a `community:<packId>:` namespace + a `packs`
+meta-store. (Revised from the old plan's *separate* `communityPresets.js` — community
+presets are just rows in the unified store under a distinct key prefix.)
+
+> **Cache boundary (do not break the Phase 0 contract):** the boot-hydrated in-memory
+> cache holds **custom** preset bodies (small count) AND **community preset NAMES/keys**
+> — but **never community preset BODIES** (15k × ~10 KB = ~150 MB). Community bodies stay
+> on disk in IDB and are lazy-loaded per-key in `loadPreset()` (§9.1 path B). So:
+> `hydrate()` loads custom-bodies + all-keys; `getCommunityPreset(key)` is an async IDB
+> read at playback time, not a cache hit.
+
+**Original separate-store API surface (kept for reference — now methods on the unified store):**
 
 **Deliverables:**
 ```
@@ -1016,6 +1301,142 @@ document.getElementById('btn-import')?.addEventListener('click', () => {
   `installedAt` to show "Update available" badge.
 - **Drawer UI:** Add a "Community" tab or a section divider in the drawer so
   users can filter/search community presets separately.
+
+---
+
+## 11. Verified Code Audit (2026-06-02)
+
+Every claim below was checked against the actual source — not inferred from the earlier
+research. This is the ground truth the phase plan is built on.
+
+### 11.1 Storage reality (confirmed, and sharper than §5 stated)
+
+| Data | Where it actually lives | Evidence |
+|---|---|---|
+| Custom preset **metadata** (baseVals, shapes, waves, warp, comp, frame_eqs, **images array**) | **localStorage** `discocast_custom_presets` | [customPresets.js:11](src/customPresets.js#L11), `saveCustomPreset` L49–62 |
+| Image/video **blobs** | **IndexedDB** `discocast_images` **or Tauri FS** (auto-routed) | [customPresets.js:175–204](src/customPresets.js#L175-L204) |
+| The quota wall **already fires** | `QuotaExceededError` → user-facing *"Storage full…"* throw | [customPresets.js:56](src/customPresets.js#L56) |
+
+→ The localStorage wall is **metadata-only** and **already hits users**. This is the
+Phase 0 justification.
+
+### 11.2 `refreshCustomPresets()` is synchronous + runs a heavy per-preset loop
+
+- It is **sync** today ([visualizer.js:571](src/visualizer.js#L571)) and rebuilds frame_eqs /
+  warp shaders / anim eqs / shape eqs for **every** custom preset
+  ([visualizer.js:577–627](src/visualizer.js#L577-L627)).
+- **7 call sites**, none `await` it: `controls.js:719,780,1018`, `main.js:38`,
+  `timeline/main.js:209`, `timelineEditor.js:3479`, `presetLibrary.js:409`.
+- **Implication:** community presets (raw Butterchurn JSON, none of those fields) must **not**
+  go through this loop — running it 15k× would be brutal and pointless. They take the light
+  lazy-load path in `loadPreset()` instead. This is *why* the tiers are separate, beyond just
+  storage size.
+
+### 11.3 Synchronous consumers of the custom-preset API (the Phase 0 ripple)
+
+Readers (kept sync via the Phase 0 cache — **unchanged**):
+`presetRegistry.js:25`, `visualizer.js:577`, `controls.js:703,732,743,762`,
+`editor/main.js:160,555`, `presetLibrary.js:146,168,310,349`.
+
+Writers — **5 sites, not 4** (the deeper trace on 2026-06-02 caught a hidden one):
+1. `inspector.js:9923` — `saveCustomPreset()` (update existing)
+2. `inspector.js:9925` — `createCustomPreset()` (new preset)
+3. `presetLibrary.js:350` — `deleteCustomPreset()` (Studio Library card delete)
+4. `controls.js:713` — `deleteCustomPreset()` (player drawer delete)
+5. **`presetLibrary.js:315` — RAW `localStorage.setItem('discocast_custom_presets', …)`**
+   inside the inline-rename `commit()`. **This bypasses the public API entirely.** ⚠️ If Phase 0
+   only re-routes the four API functions, rename would still write straight to localStorage and
+   **desync the cache + IDB**. The fix: refactor rename to call `saveCustomPreset(all[id])` (it
+   already builds the mutated record — one-line change). This was the exact "save/load flow"
+   trap CLAUDE.md warns about; caught by tracing, not assuming.
+
+**Grep-verified:** the only raw read/write of the `discocast_custom_presets` key outside
+`customPresets.js` is that one rename site. The legacy `milkscreen_custom_presets` migration read
+lives at [customPresets.js:34](src/customPresets.js#L34) and must be preserved (folded into `hydrate()`).
+
+→ The cache strategy (§0) turns a ~15-site async migration into a **5-write-site** change + boot
+hydration. Readers stay byte-identical.
+
+### 11.4 Engine integration points (confirmed feasible)
+
+- `loadPreset(name)` is **already `async`** ([visualizer.js:329](src/visualizer.js#L329)) and
+  does a sync `this.presets[name]` lookup at L330 — so adding
+  `if (!preset && name.startsWith('community:')) preset = await getCommunityPreset(name);`
+  is clean.
+- `displayName()` ([visualizer.js:459](src/visualizer.js#L459)) handles `custom:` today; add a
+  `community:` branch (slice after the 2nd colon — same logic as
+  [presetRegistry.js:69–76](src/presetRegistry.js#L69-L76)).
+- **Two engines share state by reference** ([visualizer.js:224–225](src/visualizer.js#L224-L225):
+  `this.presets = primaryEngine.presets`). Whatever populates `presetNames`/`presets` for
+  community must account for the secondary engine seeing the same objects.
+- `_cyclePool()` ([visualizer.js:788](src/visualizer.js#L788)) filters `this.presetNames`, so
+  community presets auto-participate in cycling once their names are in the list — no change
+  needed (matches §9.1).
+
+### 11.5 Import-button wiring (confirmed line refs for Phase 2d)
+
+- Player: `btn-import-presets` → `import-file-input` → `importCustomPresetsFromFile(file)`
+  ([controls.js:297–300](src/controls.js#L297-L300), handler at L775).
+- Studio: `#btn-import` → `#import-file-input` → `_importFrom(file)`
+  ([presetLibrary.js:132–138](src/editor/presetLibrary.js#L132-L138), handler at L404).
+- The DOM input id is `import-file-input` in both pages (the doc's `els.importFileInput` is
+  just the JS variable name).
+
+### 11.6 What did NOT change from the research
+
+The pack landscape (§2), jsDelivr delivery (§3), manifest approach (§3), import pipeline
+shapes (§6), and the `community:<packId>:<name>` namespace (§9.6) all stand as written. The
+only structural change is **storage**: one unified store (Phase 0) instead of a separate
+community-only store, with custom presets migrated onto it first.
+
+---
+
+## 12. Doability Assessment & Risk Tiers (2026-06-02)
+
+**Verdict: yes, doable.** The plan has no speculative or blocked-on-an-unknown steps. Each
+phase is independently shippable, and the single genuinely hard piece (.milk conversion at
+scale) is correctly isolated at the very end. Risk climbs gradually; the foundation is the
+safest part.
+
+The one load-bearing assumption — *can the cache be hydrated before the first preset read?* —
+was **verified against the boot code**, not assumed (see Phase 0c and §11.4). It holds. That
+was the thing that could have turned Phase 0 from "easy" into "messy"; it didn't.
+
+### Risk tiers
+
+| Phase | Doable? | Effort | Risk | Why |
+|---|---|---|---|---|
+| **0 — Storage upgrade** | ✅ Yes | ~1 day | **Low** | IndexedDB + in-memory cache is textbook. Migration is idempotent (localStorage kept as backstop until verified). Ripple is small *because* of the cache: ~4 write sites change, readers untouched, one boot line per entry point. Only care item is boot ordering — and that's **already verified feasible**. |
+| **1 — Community namespace + Ansorre 15k (no UI)** | ✅ Yes | ~1 day | Low–Med | `loadPreset()` is already async → lazy community resolution is clean. The "watch this" items are known quantities, not research: a ~180 MB download, JSZip unzip, ~15k batched IDB writes (~1–2 min). That's a progress bar, not a hard problem. |
+| **2 — Manifest + browse modal + install flow** | ✅ Yes | ~2–3 days | Low–Med | Straight UI work over a static manifest + jsDelivr (CORS-clean, no rate limits). Reuses the existing import-button wiring (§11.5). Download-with-progress via `fetch` + `ReadableStream` reader (§ Phase 2c) is standard. |
+| **3 — .milk pack support (Cream of the Crop)** | ✅ Yes, but **the hard one** | ~3–5 days | **Med–High** | ~10k `.milk` files × ~10–100 ms each = minutes of CPU → **needs a Web Worker** to avoid freezing the UI. Depends on `milkdrop-import-dev.md` shipping the converter first. Some presets will fail conversion (`.milk2` double-presets, exotic shaders) — needs per-file try/catch + a failure summary. This is the only part with real engineering risk, and it's correctly parked behind everything else. |
+| **4 — Polish (Tauri FS mirror, dedup, User Guide)** | ✅ Yes | ~1 day | Low | Tauri-FS metadata mirror reuses the proven `_storeImageTauri`/`_getImageTauri` pattern. Dedup + docs are mechanical. |
+
+### What makes the foundation safe (recap)
+
+1. **Boot is already async + sequential** → `await presetStore.hydrate()` is a one-line drop
+   with no race ([main.js:38](src/main.js#L38), verified).
+2. **The cache contract** → reads stay synchronous, only ~4 writes + migration go async, so
+   the ~15 existing readers (§11.3) don't change.
+3. **Migration is reversible** → localStorage copy is retained as a backstop until Phase 0c
+   verifies the IDB path, so a bad migration can't lose a user's presets.
+4. **Community presets bypass the heavy loop** → they never touch
+   `refreshCustomPresets()`'s per-preset frame_eqs/warp build (§11.2); the engine resolves
+   them lazily, so 15k presets cost ~0 at boot.
+
+### The honest caveats (not blockers, but eyes-open)
+
+- **Tauri / WKWebView storage eviction.** IndexedDB can be wiped under storage pressure in
+  the macOS app. Phase 0 ships IDB-only (matching how blobs shipped before *their* Tauri
+  fallback); the Tauri-FS mirror lands in Phase 4. A mega-pack on the desktop app without the
+  mirror could theoretically be evicted — acceptable for the foundation, must-fix before
+  promoting mega-packs as a headline desktop feature.
+- **.milk conversion fidelity & failure rate.** Browser-side conversion is lower-fidelity
+  than the native mojoshader path (which is *why* the pre-converted Ansorre JSON pack is the
+  Phase 1 quick win). Expect a non-trivial failure count on raw `.milk` mega-packs — the UI
+  must surface "N converted, M failed" honestly rather than imply a clean import.
+- **Disk footprint expectations.** A user installing the Ansorre pack commits ~150–180 MB to
+  IDB. The install modal should state the size up front (the manifest carries `sizeEstimateMB`).
 
 ---
 

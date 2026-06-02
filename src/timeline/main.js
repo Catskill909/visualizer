@@ -7,6 +7,7 @@ import { VisualizerEngine } from '../visualizer.js';
 import { TimelineEditor }   from './timelineEditor.js';
 import { initAuthGate }     from '../auth-gate.js';
 import { pickAndConnect } from '../devicePicker.js';
+import { hydratePresets } from '../customPresets.js';
 
 initAuthGate();
 
@@ -204,6 +205,10 @@ async function boot(connectAudioFn) {
     startEl.style.pointerEvents = 'none';
     setTimeout(() => { startEl.hidden = true; }, 260);
     shellEl.hidden = false;
+
+    // Phase 0: hydrate the preset cache from IndexedDB before the first read
+    // (see milkdrop-pack-import.dev §0). refreshCustomPresets() reads synchronously.
+    await hydratePresets();
 
     // Load custom presets (not included in engine.init())
     engine.refreshCustomPresets();

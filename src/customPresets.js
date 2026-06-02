@@ -1,14 +1,23 @@
 /**
  * customPresets.js — Custom Preset Storage
  *
- * localStorage: discocast_custom_presets  { [id]: presetMeta }
- * IndexedDB:    discocast_images          blob per imageId
+ * Metadata:  IndexedDB `discocast_presets` via presetStore.js (boot-hydrated cache).
+ *            Migrated off localStorage `discocast_custom_presets` in Phase 0 — see
+ *            milkdrop-pack-import.dev §0. The public CRUD API below is UNCHANGED in
+ *            signature; it now reads/writes the cache instead of localStorage, so the
+ *            ~5–10 MB preset wall is gone.
+ * Blobs:     IndexedDB `discocast_images` (or Tauri FS) — image/video blob per imageId.
  *
  * Registry key format: `custom:<id>:<name>`
  * Drawer shows just `name`; engine uses the full key.
  */
 
-const STORAGE_KEY = 'discocast_custom_presets';
+import * as presetStore from './presetStore.js';
+
+// Re-export so each page's boot can `import { hydratePresets } from './customPresets.js'`
+// (or '../customPresets.js') and await it before the first preset read.
+export const hydratePresets = presetStore.hydrate;
+
 const DB_NAME = 'discocast_images';
 const DB_VERSION = 1;
 export const SCHEMA_VERSION = 1;
@@ -27,44 +36,27 @@ export function generateId() {
 // ---------------------------------------------------------------------------
 
 export function loadAllCustomPresets() {
-    try {
-        let stored = localStorage.getItem(STORAGE_KEY);
-        if (!stored) {
-            // Migration from old MilkScreen keys
-            stored = localStorage.getItem('milkscreen_custom_presets');
-            if (stored) {
-                localStorage.setItem(STORAGE_KEY, stored);
-            }
-        }
-        return JSON.parse(stored || '{}');
-    } catch {
-        return {};
-    }
+    // Reads the boot-hydrated cache (presetStore). Sync — signature unchanged.
+    // The legacy localStorage→IndexedDB migration now lives in presetStore.hydrate().
+    return presetStore.getAllSync();
 }
 
 export function getCustomPreset(id) {
-    return loadAllCustomPresets()[id] || null;
+    return presetStore.getOneSync(id);
 }
 
 export function saveCustomPreset(preset) {
-    const all = loadAllCustomPresets();
     const record = { ...preset, updatedAt: Date.now() };
-    all[preset.id] = record;
-    try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
-    } catch (e) {
-        if (e.name === 'QuotaExceededError') {
-            throw new Error('Storage full — export your presets to free space, then delete some.');
-        }
-        throw e;
-    }
+    // Cache update is synchronous, so the returned record is immediately authoritative
+    // for callers (e.g. inspector.saveCurrent). IndexedDB persist is async inside
+    // presetStore. IDB quota is effectively unlimited, so the old localStorage
+    // QuotaExceededError wall no longer applies (that was the whole point of Phase 0).
+    presetStore.putRecord(record);
     return record;
 }
 
 export function deleteCustomPreset(id) {
-    const all = loadAllCustomPresets();
-    delete all[id];
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+    presetStore.deleteRecord(id);
 }
 
 /**

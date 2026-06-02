@@ -5,6 +5,7 @@
 import { VisualizerEngine } from './visualizer.js';
 import { ControlPanel } from './controls.js';
 import { initAuthGate } from './auth-gate.js';
+import { hydratePresets } from './customPresets.js';
 
 // Wait for DOM
 document.addEventListener('DOMContentLoaded', async () => {
@@ -30,6 +31,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Initialize the control panel (binds all UI events)
     const controls = new ControlPanel(engine);
+
+    // Phase 0: hydrate the preset cache from IndexedDB BEFORE the first read.
+    // refreshCustomPresets() below reads loadAllCustomPresets() synchronously, so the
+    // cache must be populated first (see milkdrop-pack-import.dev §0 / Phase 0c).
+    await hydratePresets();
 
     // Load custom presets into engine.presets immediately so favorites cycling
     // works from startup without requiring the drawer to be opened first.

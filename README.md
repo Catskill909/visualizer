@@ -101,7 +101,8 @@ discocast-visualizer/
     ├── controls.js         # ControlPanel class — UI bindings, keyboard, auto-hide
     ├── style.css           # Main app design system — dark theme, glassmorphism
     ├── auth-gate.js        # Password gate overlay — soft auth via VITE_APP_PASSWORD env var
-    ├── customPresets.js    # Custom preset CRUD — localStorage + IndexedDB image storage
+    ├── customPresets.js    # Custom preset CRUD — metadata via presetStore (IndexedDB), blobs in IndexedDB/Tauri FS
+    ├── presetStore.js      # Unified IndexedDB preset-metadata store + boot-hydrated cache (escapes the localStorage wall)
     ├── fileUtils.js        # downloadFile helper — browser <a download> or Tauri native Save As
     ├── importResultModal.js # Import result modal — shows per-preset success/failure after import
     ├── presetRegistry.js   # Merge layer — bundled + custom presets under one API

@@ -6,6 +6,7 @@
 import { downloadFile } from '../fileUtils.js';
 import {
     loadAllCustomPresets,
+    saveCustomPreset,
     deleteCustomPreset,
     deleteImage,
     exportPreset,
@@ -307,12 +308,13 @@ export class PresetLibrary {
 
         const commit = () => {
             const next = input.value.trim() || prev;
-            const all  = loadAllCustomPresets();
-            if (all[id]) {
-                all[id].name      = next;
-                all[id].updatedAt = Date.now();
+            // Phase 0: route through saveCustomPreset (presetStore) instead of a raw
+            // localStorage write — a raw write here would desync the cache + IndexedDB.
+            // See milkdrop-pack-import.dev §11.3 (the "hidden 5th writer").
+            const record = loadAllCustomPresets()[id];
+            if (record) {
                 try {
-                    localStorage.setItem('discocast_custom_presets', JSON.stringify(all));
+                    saveCustomPreset({ ...record, name: next });
                 } catch (e) {
                     showToast('Storage full — export your presets to free space.', true);
                     return;
