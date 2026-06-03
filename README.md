@@ -7,6 +7,8 @@ A modern browser-based MilkDrop music visualizer powered by [Butterchurn](https:
 ### Visualizer & Presets
 
 - **1,144 bundled MilkDrop presets** — official Butterchurn packs (Base, Extra, Extra2, MD1) + the community-curated Baron pack, all statically bundled (no network calls)
+- **Community Packs** *(desktop app)* — browse and one-click **install extra preset packs** from the **Import** button (in the player and Preset Studio). Ships with **Extras Vol. 1–3** (750 additional full-fidelity, shader-intact MilkDrop presets from the MIT [butterchurn-presets](https://github.com/jberg/butterchurn-presets) collection). Installed presets are tagged by pack (e.g. `[Extras 1] …`) so you find them by typing the pack name in any preset search box; install/uninstall with live progress. Packs are bundled in the desktop app, not the web build
+- **Unlimited custom presets** — custom-preset storage moved off localStorage (which capped you at ~200) onto **IndexedDB** via a boot-hydrated cache, so the "Storage full" wall is gone; the desktop app also mirrors preset metadata to the native filesystem so it survives cache clears. See [`milkdrop-pack-import.md`](milkdrop-pack-import.md)
 - **Preset browser** — searchable drawer over the full library with favorites/tabs, heart + hide icons per row, and instant left-anchored tooltips
 - **Favorites-only cycling** — restrict auto-cycle to your hearted presets for curated sets
 - **Hide unwanted presets** — eye-slash icon or `X` shortcut removes a preset from the All tab, random, and auto-cycle; the hidden list persists in localStorage and survives reloads. A *Show hidden* toggle exposes them for unhiding (individually or via a modal-confirmed "Unhide all"). Hide beats favorite in cycle — a hidden preset never auto-plays, but the Favorites tab still shows it so nothing is lost
@@ -102,7 +104,9 @@ discocast-visualizer/
     ├── style.css           # Main app design system — dark theme, glassmorphism
     ├── auth-gate.js        # Password gate overlay — soft auth via VITE_APP_PASSWORD env var
     ├── customPresets.js    # Custom preset CRUD — metadata via presetStore (IndexedDB), blobs in IndexedDB/Tauri FS
-    ├── presetStore.js      # Unified IndexedDB preset-metadata store + boot-hydrated cache (escapes the localStorage wall)
+    ├── presetStore.js      # Unified IndexedDB preset-metadata store + boot-hydrated cache (escapes the localStorage wall) + community-pack store
+    ├── packBrowser.js      # Import / "Browse Packs" modal (From File + Community Packs tabs), shared across player/editor
+    ├── packInstaller.js    # Community pack install/uninstall pipeline (fetch ZIP → unzip → store → register)
     ├── fileUtils.js        # downloadFile helper — browser <a download> or Tauri native Save As
     ├── importResultModal.js # Import result modal — shows per-preset success/failure after import
     ├── presetRegistry.js   # Merge layer — bundled + custom presets under one API
@@ -416,6 +420,7 @@ After changing `nginx.conf`, redeploy and check the browser Console for CSP viol
 | `@ffmpeg/ffmpeg` | ^0.12.10 | Video transcoding — auto-downscale 1080p/4K to 720p on upload (lazy-loaded ~25MB) |
 | `@ffmpeg/util` | ^0.12.1 | FFmpeg helper utilities for file I/O |
 | `gifuct-js` | ^2.1.2 | GIF frame parsing for animated GIF layers |
+| `jszip` | ^3.10.1 | Unzip community-pack archives on install (lazy-loaded — only when installing a pack) |
 | `vite` | ^8.0.4 | Dev server and build tool |
 
 > **Notes**:
@@ -530,6 +535,8 @@ These are the entry points. Each one references its focused subdocs in `docs/`.
 | [`milkdrop-tools-dev.md`](milkdrop-tools-dev.md) | ✅ Phases 1–13 shipped — Motion Engine · Custom Shapes · Color Studio · Flow Style · Colour Field (+v2: spin/conic/spiral/3-colour/beat-reactive) · full-stack 🎲 Remix + Roll-and-lock · audio-reactive Color adjustments · Scene FX (Posterize/Vignette/Scan lines/Film grain). From-scratch creator tools **beta-ready**. Next: Phase 15 more Flow styles + a 2nd wave | **MilkDrop from-scratch creation tools (live plan).** Raises the blank-canvas ceiling without a code/knob wall. **Lean planning + handoff doc** — shipped execution detail in [`milkdrop-tools-archive.md`](milkdrop-tools-archive.md). Shipped: **Motion Engine** · **Custom Shapes** + Motion/Reactivity · **Color Studio** (🎲 + rule/tone/Base-Hue + Color Roll + bloom) · **Flow Style** (7-warp library + Density) · **Colour Field** (spatial Shift blend + fg/bg colour split + Motion-tab reorg) · **full-stack 🎲 Remix** + **Roll-and-lock** (rolls colour field + colours + motion + flow + content-type, pin what you love) · **Color adjustments + Color Reactivity** (Brightness/Contrast/Gamma/Temperature that tune *any* preset incl. the 1,144 bundled, and pulse to the beat, via the STUDIO_POST_FX inject). The "thin string / monochrome / no variety" problem is fully resolved. **Differentiator: lean HEAVY on audio reactivity.** Phase tracker + §3.8–§3.16 detail at top. |
 | [`milkdrop-tools-archive.md`](milkdrop-tools-archive.md) | 📦 Archive | Shipped execution detail (Phases 1–3 + Color Studio: audit → design → what landed → post-review fixes) + the original brainstorm/direction survey, split out of `milkdrop-tools-dev.md` to keep the live plan lean. Section numbers §2–§11 preserved. |
 | [`milkdrop-import-dev.md`](milkdrop-import-dev.md) | 📋 Research complete (awaiting sign-off) | `.milk` file import — client-side EEL→JS + HLSL→GLSL via the MIT `milkdrop-preset-converter`; a converted `.milk` becomes an ordinary custom preset. Feasibility verified; phased plan in doc. |
+| [`image-texture-dev.md`](image-texture-dev.md) | 💡 Brainstorm / scoping | **Image-as-texture** — feed a user image/video into the preset's feedback loop so the preset *processes* it (melts/tunnels/kaleidoscopes, audio-reactive) rather than overlaying it. Future headline creator feature; pure WebGL (cross-platform); gated on a feedback-buffer spike. |
+| [`milkdrop-pack-import.md`](milkdrop-pack-import.md) | ✅ Phases 0–3 shipped + polished | **Community Packs + the IndexedDB storage upgrade.** Custom presets → IndexedDB (no more ~200 wall) + Tauri-FS mirror; browse/install/uninstall community packs (Extras Vol. 1–3 = 750 shader presets, MIT, desktop-bundled); pack zips gitignored (not on web). §16 explains the "shader gap" (why we avoid raw `.milk`) + the future **image-as-preset-texture** idea. |
 | [`docs/user-guide-redesign.md`](docs/user-guide-redesign.md) | 📋 Planning | In-app user guide redesign — searchable help centre, contextual `?` deep links. |
 
 ### Handoff Docs ([`docs/`](docs/))

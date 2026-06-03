@@ -2099,8 +2099,8 @@ on-brand differentiator.
 - **Engine:** pure WebGL2 → fully cross-platform (web/macOS/Windows), no native code, no CSP issues.
   Effort is engine wiring + UX, not platform.
 
-➡️ **Not built. When ready, this earns its own dev doc + plan** (a headline creator feature, not a
-pack-import task).
+➡️ **Not built. Scoped in its own doc → [`image-texture-dev.md`](image-texture-dev.md)** (a headline
+creator feature, not a pack-import task). Starts with a spike: can we seed Butterchurn's feedback buffer?
 
 ---
 
