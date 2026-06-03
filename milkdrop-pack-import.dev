@@ -1,6 +1,6 @@
 # MilkDrop Pack Import — Research & Feature Spec
 
-Status: **✅ Phase 0 SHIPPED & VERIFIED (custom presets on IndexedDB; localStorage wall gone) + Phase 4 Tauri-FS metadata mirror BUILT into a notarized macOS DMG (desktop platform parity; in-app runtime test pending). Community packs (Phase 1–3) not started.**
+Status: **✅ Phase 0 SHIPPED & VERIFIED + Phase 4 Tauri-FS mirror BUILT (desktop parity). Pack strategy steered to small/curated, AVOID mega (§2.5). 📋 Phase 1 engine AUDITED + DEEP-PLANNED, ready to build next session (§13). No engine code written yet.**
 Last updated: 2026-06-02
 
 > Goal: Expand the existing import modal to let users browse and install curated
@@ -29,6 +29,7 @@ Last updated: 2026-06-02
 10. [Phased Implementation Plan](#10-phased-implementation-plan)
 11. [Verified Code Audit (2026-06-02)](#11-verified-code-audit-2026-06-02)
 12. [Doability Assessment & Risk Tiers](#12-doability-assessment--risk-tiers-2026-06-02)
+13. [Phase 1 Engine — Pick-Up-Ready Execution Plan](#13-phase-1-engine--pick-up-ready-execution-plan-post-phase-0-2026-06-02) ⭐ **start here next session**
 
 ---
 
@@ -97,7 +98,7 @@ plug into the same store. See the revised tracker in §10.
 - Entry point: Import button in **controls.js** (main player drawer) and
   **presetLibrary.js** (Preset Studio Library panel)
 - Handler: `importFromFile()` in `customPresets.js` — parses JSON, dedupes names,
-  stores images in IndexedDB, saves metadata in localStorage
+  stores images in IndexedDB, saves metadata via `presetStore` (IndexedDB; was localStorage pre-Phase-0)
 - Result display: `importResultModal.js` — shared success/failure modal
 - Stores as **custom presets** — `custom:<id>:<name>` keys in the registry
 
@@ -125,7 +126,7 @@ consumes. No conversion needed.
 |---|---|---|---|---|---|
 | **Official Butterchurn** | [jberg/butterchurn-presets](https://github.com/jberg/butterchurn-presets) | ~1,100+ | JS bundles (JSON presets) | MIT | Already bundled in our app (Base/Extra/Extra2/MD1). Files live in `presets/` dir as individual JSON. |
 | **Baron Community Pack** | `butterchurn-presets-baron` (npm) | ~762 | Individual JSON files | MIT | Already bundled via `import.meta.glob`. JSON files at `dist/presets/*.json`. |
-| **⭐ Ansorre Mega Collection** | [ansorre/tens-of-thousands-milkdrop-presets-for-butterchurn](https://github.com/ansorre/tens-of-thousands-milkdrop-presets-for-butterchurn) | **15,056** | ZIP containing JSON | Public | **This is the goldmine.** Pre-converted using the native mojoshader path (higher fidelity than browser converter). Single ZIP: `milkdrop-presets-for-butterchurn.zip`. Growing collection. |
+| Ansorre Mega Collection | [ansorre/tens-of-thousands-milkdrop-presets-for-butterchurn](https://github.com/ansorre/tens-of-thousands-milkdrop-presets-for-butterchurn) | **15,056** | single ZIP of JSON | ⚠️ **NO license stated** | Pre-converted JSON (drop-in). BUT: **mega, a single unsorted ZIP (no categories/best-of), and no license** — verified 2026-06-02. Re-evaluated DOWN (see §2.5): too big + unsorted + unclear redistribution rights. Useful only as a *slice* to smoke-test the import engine, not as a shipped product. |
 
 ### Tier 2: Raw .milk Files (Require Conversion)
 
@@ -151,8 +152,42 @@ pipeline (milkdrop-import-dev.md Phase 1–3).
 | + WACUP MegaPack | **+100,000** | ✅ .milk → JSON |
 | **Maximum potential** | **125,000+** | Mixed |
 
-**Key insight:** The Ansorre pack alone gives us 15,056 pre-converted, drop-in
-presets with zero conversion cost. That's the low-hanging fruit.
+---
+
+## 2.5 Pack Strategy — small & curated, AVOID mega (user steer, 2026-06-02)
+
+**Direction (locked):** stay away from the mega collections (Ansorre 15k, Cream 9.8k as a
+whole, WACUP 100k, Archive 52k). Ship **small/medium, curated, drop-in packs that behave exactly
+like our currently-bundled packs** (Butterchurn JSON, appear as normal presets, no conversion at
+play time).
+
+**The honest landscape after web verification (2026-06-02):** there is **no ready-made small +
+curated + JSON + cleanly-licensed pack** out there. The two axes trade off:
+
+| Tier | Examples | Drop-in JSON? | Curated/small? | Licensed? | Verdict |
+|---|---|---|---|---|---|
+| Official Butterchurn JSON | Base/Extra/Extra2/MD1 + Baron | ✅ | — | ✅ MIT | **Already 100% bundled** — nothing left to add here |
+| Pre-converted mega JSON | Ansorre 15k | ✅ | ❌ mega, unsorted | ⚠️ none | Avoid as product; OK as an engine smoke-test slice |
+| **Curated `.milk`** | **Cream of the Crop** (11 themed categories, 5/5-rated, projectM default), Original MilkDrop ~400 | ❌ needs converter | ✅ **yes — per-category is small** | ✅ community/widely redistributed (verify) | **The real prize** — but needs the Phase 3 converter |
+
+**Conclusion / recommended path:** the "best of" the user wants already exists — it's **Cream of
+the Crop**, whose **11 category folders ARE the curated themed lists** (Dancer, Drawing, Fractal,
+Geometric, Hypnotic, Particles, Reaction, Sparkle, Supernova, Waveform, Transition). The move is to
+build the **.milk converter (Phase 3)** and convert **one category at a time** into clean,
+small/medium **themed JSON packs we host** (e.g. "Geometric", "Waveform", "Sparkle" — a few hundred
+each) — which then install and play *exactly* like the bundled packs. That delivers small + curated
++ drop-in (after a one-time, build-side conversion we do, not the user).
+
+**Two-step plan that matches the steer:**
+1. **Engine first (Phase 1):** build the community install pipeline; smoke-test it with a *small
+   slice* of Ansorre JSON (e.g. 200–500 files) purely to prove drop-in install works. Throwaway.
+2. **Curated product (Phase 3 + curation):** convert selected Cream-of-the-Crop categories → host
+   as themed JSON packs in our manifest. These are the packs we actually ship to users.
+
+> There is no good shortcut around the converter for *curated* content: essentially every
+> hand-curated/best-of pack on the net is `.milk`. The only pre-converted JSON at scale is the
+> unsorted, unlicensed Ansorre dump. So "small + curated + drop-in" = "we convert a Cream category
+> ourselves, once."
 
 ---
 
@@ -487,28 +522,27 @@ For large packs, a progress modal is essential:
    stored in the Tauri FS (app data dir) instead of IndexedDB? This would
    survive cache clears and be more reliable for long-term storage.
 
-### Priority recommendation
+### Priority recommendation — REVISED 2026-06-02 (small/curated, avoid mega — see §2.5)
 
-**Phase 1: Ansorre JSON pack (the quick win)**
-- Pre-converted, drop-in compatible
-- 15k presets, no conversion needed
-- Single ZIP download → unzip → IndexedDB
-- Could ship within 2–3 days of dev
+> The original "Phase 1 = ship Ansorre 15k" plan is **superseded.** Ansorre is mega, unsorted,
+> and unlicensed; we are NOT shipping it. New direction below.
+
+**Phase 1: the engine (validate with a throwaway slice)**
+- Build the community install pipeline (IndexedDB `community:` namespace + install flow).
+- Smoke-test with a *small slice* of Ansorre JSON (200–500 files) — purely to prove drop-in
+  install works. Not a shipped pack.
 
 **Phase 2: Manifest + Browse UI**
-- Pack browser modal with cards
-- Install/remove functionality
-- Progress bar for large downloads
+- Pack browser modal with cards, install/remove, progress bar.
 
-**Phase 3: .milk pack support (Cream of the Crop)**
-- Depends on milkdrop-import-dev.md Phase 1 (converter integration)
-- Web Worker for batch conversion
-- Longer install times (minutes vs seconds)
+**Phase 3: .milk converter + curated themed packs (the actual product)**
+- Build/integrate the `.milk` converter (milkdrop-import-dev.md).
+- Convert selected **Cream-of-the-Crop categories** (Geometric / Waveform / Sparkle / Hypnotic …)
+  — a few hundred each — into clean themed JSON packs we host. These install & play exactly like
+  the bundled packs. This is what users actually get.
 
-**Phase 4: Self-hosted packs + user submissions**
-- Let users submit packs to a registry
-- Moderation / curation workflow
-- Rating/review system
+**Phase 4: Self-hosted packs + (maybe) user submissions**
+- Our hosted themed packs first; community submission/curation later if desired.
 
 ---
 
@@ -677,7 +711,9 @@ Tauri FS path for community packs:
 
 **Current state:** **Phase 0 SHIPPED & verified** (custom presets on IndexedDB, web + macOS).
 **Phase 4 metadata mirror BUILT** into a notarized macOS DMG (desktop FS-authoritative; in-app
-runtime test pending). Community packs (Phase 1–3) not started. Phase 0 ships independently of any
+runtime test pending). **Phase 1 engine now AUDITED + DEEP-PLANNED in §13 (pick-up-ready) — the
+rows below (1a/1b) are refined there: community presets behave like BUNDLED, IndexedDB-only, skip
+refreshCustomPresets.** Build is next session. Phase 0 ships independently of any
 community-pack feature (it fixes the custom-preset storage wall users hit today).
 
 > **Why Phase 0 changed from the old plan:** the original Phase 1a built a *separate*
@@ -1394,8 +1430,10 @@ relaunch. Also confirm a pre-existing desktop user's presets migrate IDB→FS on
 next launch sees a non-empty FS and won't re-migrate the missing ones — but IDB + localStorage are
 retained as backstops, so nothing is lost; a future reconcile pass can close this.
 
-**Not committed yet** — to deploy the new DMG to the promo page, `git add promo/ && commit && push`
-(Coolify auto-deploys). See README "Releasing a Build".
+**Committed + pushed to `main` 2026-06-02** (`353735e` source + `da26f05` DMG; Phase 0 itself was
+`cbdc54a`). Web/promo auto-deploy via Coolify. **Windows build triggered** via GitHub Actions
+("Build Windows Installer", run 26856188495) so a fresh `.exe` with the new Rust commands is ready
+for shadow.tech testing.
 
 ##### Cross-platform matrix — which storage path each target uses
 
@@ -1586,6 +1624,109 @@ was the thing that could have turned Phase 0 from "easy" into "messy"; it didn't
   must surface "N converted, M failed" honestly rather than imply a clean import.
 - **Disk footprint expectations.** A user installing the Ansorre pack commits ~150–180 MB to
   IDB. The install modal should state the size up front (the manifest carries `sizeEstimateMB`).
+
+---
+
+## 13. Phase 1 Engine — PICK-UP-READY EXECUTION PLAN (post-Phase-0, 2026-06-02)
+
+> Audit + deep plan done **now**; the build is **next session**. This section is
+> self-contained and re-grounded against the *current* code (after Phase 0 shipped). The
+> original §9.1 "lazy-load community bodies" design was written for the 15k mega pack; with
+> the small/curated steer (§2.5) the simpler "behave like bundled" design below supersedes it.
+
+### 13.1 The key architectural decision (verified against code)
+
+**Community presets register like BUNDLED presets, NOT like custom presets.** Verified why:
+- The bundled loader is just `Object.assign(this.presets, presets)` + rebuild `presetNames`
+  ([visualizer.js:150–182](src/visualizer.js#L150-L182)).
+- `loadPreset(name)` is a plain `this.presets[name]` lookup
+  ([visualizer.js:330](src/visualizer.js#L330)); the custom-only work (image binding L352–354,
+  animations L361–366) **gates on `CUSTOM_PREFIX`**, so it won't fire for community keys.
+- Therefore community presets **skip `refreshCustomPresets()` and its heavy per-preset eq-build
+  loop entirely** (the §11.2 requirement) — they're raw Butterchurn JSON, registered directly,
+  exactly like Base/Extra/Baron. This is also literally "works the same way our currently
+  installed packs work" (the user's ask).
+
+Keys: `community:<packId>:<name>` — distinct from bundled (collision-safe) and from `custom:`.
+`displayName()` strips the prefix for the drawer; a key-prefix scan groups a pack for uninstall.
+
+### 13.2 Storage decision — community is IndexedDB-only (no Tauri-FS mirror)
+
+Custom presets needed the Tauri-FS mirror because they're **irreplaceable user data**. Community
+packs are **re-downloadable from the manifest**, so eviction just means "reinstall" — not data
+loss. So Phase 1 stores community presets in **IndexedDB on all platforms** (a new object store),
+and **skips** the native-FS mirror. Simpler, and correct for replaceable content.
+
+> Scale note: with the small-pack steer, eager-loading all community bodies into `this.presets`
+> at boot is fine (a few hundred–few thousand small JSON ≈ tens of MB). Document a soft cap
+> (~a few thousand total); only revisit the §9.1 lazy design if we ever allow large packs.
+
+### 13.3 Exact touch points (to build next session)
+
+```
+MOD  src/presetStore.js
+     • Add a second object store `community` to the discocast_presets DB (bump DB_VERSION → 2;
+       create store in onupgradeneeded). Key = full `community:<packId>:<name>`.
+     • New API: storeCommunityBatch(entries[]) (one tx), getAllCommunitySync()/async load,
+       deletePackPresets(packId), listInstalledPacks()/recordPack(meta)/removePack(packId).
+       (Pack meta can live in a small `community_packs` store or a localStorage index.)
+     • NOTE: community presets are NOT in the custom cache and NOT cloned-on-read like custom
+       (they're never mutated by refreshCustomPresets). Keep them separate from getAllSync().
+
+MOD  src/visualizer.js
+     • New async loadCommunityPresets(): read all community records → Object.assign into
+       this.presets under their community:* keys → rebuild this.presetNames (mirror L150–182).
+       Idempotent; also call after an install/uninstall. Mind the 2-engine share (L224–225).
+     • displayName() (L459): add a `community:` branch (slice after the 2nd ':', same as custom).
+     • loadPreset()/_cyclePool()/random/next: NO change — they operate on this.presets/presetNames.
+
+MOD  src/main.js, src/editor/main.js, src/timeline/main.js
+     • After `await hydratePresets()`, also `await engine.loadCommunityPresets()` (one line each).
+
+NEW  src/packInstaller.js
+     • installPack(manifestEntry, onProgress): fetch ZIP (jsDelivr/our host) → JSZip → iterate
+       *.json → validate shape (baseVals|shapes|waves) → storeCommunityBatch → recordPack →
+       engine.loadCommunityPresets(). try/catch per file; return {installed, failed}.
+     • uninstallPack(packId): deletePackPresets + removePack + loadCommunityPresets refresh.
+
+ADD  dependency: jszip (lazy `import('jszip')`, never in main bundle).
+```
+
+### 13.4 Phase 1 smoke test (throwaway, proves the engine)
+
+A hardcoded `installAnsorreSlice(n=300)` callable from the console: fetch the Ansorre ZIP, take
+the first ~300 `.json`, run them through `installPack`. Confirm they appear in the drawer, play,
+survive reload, and uninstall cleanly. **Not shipped** — just proves the pipeline before we wire UI
+(Phase 2) or convert real Cream packs (Phase 3).
+
+### 13.5 Deferred to later phases (NOT Phase 1)
+
+- **Phase 2:** manifest schema + fetch + the Browse modal UI + wiring to the import buttons.
+- **Phase 3:** the `.milk` converter + converting curated Cream-of-the-Crop categories into the
+  themed JSON packs we actually ship (§2.5).
+- **Hosting decision (Phase 2):** our own host vs a `discocast/preset-registry` GitHub repo via
+  jsDelivr. Defer until we have a real converted pack to host.
+
+### 13.6 Open decisions to settle at the start of next session
+
+1. **Dedup vs bundled names** — skip a community preset whose name matches a bundled one, or always
+   keep (the `community:` prefix already prevents key collision; only *display* could duplicate)?
+2. **Drawer grouping** — a "Community" section/filter, or interleave with bundled? (No accent
+   colours per [[feedback_no_accent_color_timeline_ui]] if it touches timeline UI.)
+3. **Pack-meta storage** — small IDB `community_packs` store vs a localStorage index (tiny, fine).
+4. **Eager vs lazy** — confirm eager-load is acceptable given the small-pack cap (recommended yes).
+
+### 13.7 ✅ PICK UP HERE (ordered build steps, next session)
+
+1. `presetStore.js`: add the `community` object store + CRUD (13.3). Unit-test in console.
+2. `visualizer.js`: add `loadCommunityPresets()` + `displayName()` community branch.
+3. Wire `await engine.loadCommunityPresets()` into the 3 boot entry points.
+4. `packInstaller.js` + add `jszip`; implement `installPack`/`uninstallPack`.
+5. `installAnsorreSlice(300)` smoke test (13.4) → verify drawer/play/reload/uninstall.
+6. Stop. UI (Phase 2) and the real Cream packs (Phase 3) are separate sessions.
+
+**Prereq check before coding:** confirm `jszip` install is acceptable; re-read §13.1–13.2 so the
+"community = bundled-like, IndexedDB-only, skips refreshCustomPresets" model is fresh.
 
 ---
 
