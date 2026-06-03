@@ -1,6 +1,6 @@
 # MilkDrop Pack Import — Research & Feature Spec
 
-Status: **✅ Phase 0 SHIPPED & VERIFIED (storage upgrade — custom presets now on IndexedDB; localStorage wall gone). Community packs (Phase 1+) not started.**
+Status: **✅ Phase 0 SHIPPED & VERIFIED (custom presets on IndexedDB; localStorage wall gone) + Phase 4 Tauri-FS metadata mirror BUILT into a notarized macOS DMG (desktop platform parity; in-app runtime test pending). Community packs (Phase 1–3) not started.**
 Last updated: 2026-06-02
 
 > Goal: Expand the existing import modal to let users browse and install curated
@@ -644,7 +644,7 @@ In the macOS Tauri app:
 
 Tauri FS path for community packs:
 ```
-~/Library/Application Support/com.discocast.app/community/<packId>/
+~/Library/Application Support/app.discocast.visualizer/community/<packId>/
   manifest.json        — pack metadata
   presets/              — individual JSON files
 ```
@@ -661,7 +661,8 @@ Tauri FS path for community packs:
 |---|---|---|---|
 | **0a** | Unified IndexedDB preset-metadata store + boot-hydrated cache (`presetStore.js`) | ✅ **Built 2026-06-02** (production build passes) | 4–5 hr |
 | **0b** | Migrate custom presets onto it (one-time localStorage→IDB migration; async writes) | ✅ **Built 2026-06-02** (customPresets routed through store; 3 boot hydrates; rename refactored) | 3–4 hr |
-| **0c** | Verify custom-preset wall is gone (save 500+ presets, reload, editor + player + timeline) | ✅ **Verified via real use 2026-06-02** — Random↔Remix, load, export, import, custom video presets all clean; migration confirmed (no DataCloneError, presets persist). Explicit 500-count stress not run, but the localStorage byte-wall is gone *by construction* (IndexedDB has no such limit). | 1–2 hr |
+| **0c** | Verify custom-preset wall is gone (save 500+ presets, reload, editor + player + timeline) | ✅ **VERIFIED 2026-06-02** — real use (Random↔Remix/load/export/import/video presets all clean) **+ automated 500-preset stress test (8/8 pass): 14.8 MB persisted to IndexedDB and survived a reload with no QuotaExceededError**, function fields stripped, deep-clone reads confirmed mutation-safe. | 1–2 hr |
+| **0d** | Retire the localStorage backstop (delete the inert pre-migration snapshot) | ⏳ **Tracked, intentionally deferred** — keep ~2–3 clean sessions as cheap insurance, then `removeItem`. See note below. | 15 min |
 | **1a** | Community namespace in the unified store (`community:<packId>:` keys + pack-meta store) | ⬜ Not started | 2–3 hr |
 | **1b** | Registry + engine integration (lazy load community bodies; light path, NOT refreshCustomPresets) | ⬜ Not started | 2–3 hr |
 | **1c** | Ansorre pack hard-coded install (no UI) | ⬜ Not started | 2–3 hr |
@@ -671,10 +672,12 @@ Tauri FS path for community packs:
 | **2d** | Wire modal to existing import buttons | ⬜ Not started | 1–2 hr |
 | **3a** | Uninstall flow | ⬜ Not started | 1–2 hr |
 | **3b** | .milk pack support (depends on milkdrop-import-dev.md) | ⬜ Not started | 4–6 hr |
-| **4** | Polish (Tauri FS fallback, dedup, User Guide) | ⬜ Not started | 3–4 hr |
+| **4 (metadata mirror)** | Tauri-FS metadata mirror — desktop platform parity | ✅ **BUILT & in a notarized DMG 2026-06-02** (`cargo check` ✓, JS build ✓, full `./build-and-sign.sh` → Accepted). 🔬 In-app runtime test pending (install DMG → confirm presets persist to `~/Library/Application Support/app.discocast.visualizer/presets/*.json`). | 2 hr |
+| **4 (rest)** | Polish (community-pack FS, dedup, User Guide) | ⬜ Not started | 2–3 hr |
 
-**Current state:** Research, codebase audit, **and code verification (§11)** done. Nothing
-built. **Ready for Phase 0a** — the unified store. Phase 0 ships independently of any
+**Current state:** **Phase 0 SHIPPED & verified** (custom presets on IndexedDB, web + macOS).
+**Phase 4 metadata mirror BUILT** into a notarized macOS DMG (desktop FS-authoritative; in-app
+runtime test pending). Community packs (Phase 1–3) not started. Phase 0 ships independently of any
 community-pack feature (it fixes the custom-preset storage wall users hit today).
 
 > **Why Phase 0 changed from the old plan:** the original Phase 1a built a *separate*
@@ -890,6 +893,36 @@ implicit serialization needs it made explicit here.
 3. Save / rename / delete in the Studio → each survives a reload.
 4. Stress: script-create 500 presets → no "Storage full", all persist across reload.
 5. Confirm the secondary engine (timeline output) still sees custom presets.
+
+---
+
+#### Phase 0d — Retiring the localStorage backstop (tracked, NOT yet done)
+
+So this doesn't get buried, here's the full reasoning + the exact trigger to do it.
+
+**What the backstop actually is now:** after migration, all preset writes go to **IndexedDB only**.
+The old `discocast_custom_presets` localStorage blob is a **frozen, inert pre-migration snapshot**
+— it is no longer updated. It only protects presets that existed *at migration time*, and only
+against an IndexedDB wipe.
+
+**The honest nuance (the reason this isn't urgent OR critical):** any preset the user creates
+*after* migration is **already IndexedDB-only — it has no backstop at all.** So we're already
+trusting IDB for everything new. The snapshot is partial insurance for old presets against an
+eviction we have not observed.
+
+**Recommendation: keep it ~2–3 clean sessions, then delete.** It costs only a few MB and is cheap
+day-one insurance while IDB proves itself across real sessions. Deleting user data the same day we
+shipped the migration is the one premature move here.
+
+**When to do it (trigger):** after the user has reloaded across a few sessions with no preset loss,
+OR once the Phase 4 Tauri-FS metadata mirror lands (which makes the desktop app eviction-proof and
+fully supersedes the snapshot).
+
+**How (15 min):** in `presetStore.hydrate()`, *after* a successful IDB read that returns the
+migrated records, `localStorage.removeItem('discocast_custom_presets')` +
+`localStorage.removeItem('milkscreen_custom_presets')`. Gate it behind the `MIGRATED_FLAG` so it
+only fires once IDB is confirmed populated. **Never** delete the snapshot in the same path that
+*failed* to read IDB.
 
 ---
 
@@ -1290,8 +1323,103 @@ document.getElementById('btn-import')?.addEventListener('click', () => {
 
 ### Phase 4 — Polish
 
-- **Tauri FS fallback:** Store community preset JSONs in
-  `~/Library/Application Support/com.discocast.app/community/` alongside
+#### Phase 4 — Tauri-FS metadata mirror (CONCRETE SPEC, 2026-06-02)
+
+**What it is:** make preset *metadata* survive on the desktop app even if WKWebView evicts
+IndexedDB under disk pressure, by persisting records to the native filesystem (app data dir) —
+the same way blobs already do. **Web/Windows-web are untouched** (no `window.__TAURI__`).
+
+**Why the pattern is low-risk:** the Rust + JS plumbing already exists for blobs and is proven.
+`store_blob`/`get_blob`/`delete_blob` ([src-tauri/src/main.rs:164–210](src-tauri/src/main.rs#L164-L210))
+write base64 files under `app_data_dir()/images/`; `customPresets.js` routes to them when
+`window.__TAURI__` is present. The metadata mirror is the same shape, one directory over.
+
+**Rust (src-tauri/src/main.rs) — ~3 commands, ~40 lines, modelled on store_blob:**
+```
+store_preset(app, id, json)   → write app_data_dir/presets/<id>.json   (json is plain text, not base64)
+get_all_presets(app)          → read app_data_dir/presets/*.json → Vec<String>  (hydrate source on desktop)
+delete_preset(app, id)        → remove app_data_dir/presets/<id>.json
+```
+…then add the three names to `tauri::generate_handler![ … ]` (main.rs:374).
+
+**JS (src/presetStore.js) — add a `window.__TAURI__` branch:**
+- `hydrate()`: on Tauri, the **filesystem is authoritative** (IDB can be evicted) — read
+  `get_all_presets` into the cache. One-time migrate IDB→FS the first run (write each record).
+- `putRecord()` / `deleteRecord()`: on Tauri, also `invoke('store_preset' / 'delete_preset')`.
+- Keep the in-memory cache exactly as today, so the sync read API is unchanged on every platform.
+
+**Open design decision (the only real thinking):** on desktop, FS-authoritative vs FS-as-backup.
+Recommendation: **FS-authoritative on Tauri** (that's the whole point — eviction-proof). The IDB
+copy becomes a redundant cache. Mirror, don't dual-source-of-truth.
+
+**Verification cost — this is why it's NOT a dev-server task:** `window.__TAURI__` only exists in
+the packaged/`tauri dev` app, so it **cannot be tested in `npm run dev`**. Proving it needs a Tauri
+build — and per README, the real build is **`./build-and-sign.sh`** (Vite + Tauri compile + sign +
+Apple notarize + DMG), a ~10–15 min, network/Apple-dependent process that streams live and must not
+be backgrounded. That is a different, heavier workflow than the JS-only iteration Phase 0 used.
+
+**Recommendation on timing (2026-06-02):** **defer.** Phase 0 on IndexedDB already works in the
+desktop app today; eviction is an unobserved risk, not a current failure. The localStorage backstop
+(Phase 0d, kept) covers pre-migration presets in the meantime. Do this mirror as its own focused
+session — ideally bundled with the *next* macOS build you ship anyway, or the moment eviction is
+ever actually observed. Don't stack a Rust change + a notarized build on top of still-uncommitted
+Phase 0 JS.
+
+**Community-pack note (the original Phase 4 bullet):** the same mechanism stores community preset
+JSONs under `app_data_dir/community/<packId>/` — but that only matters once Phase 1+ ships, and a
+15k-pack on the FS is a separate scale question. Custom-preset metadata is the first/only thing that
+needs this today.
+
+##### ✅ WHAT SHIPPED (2026-06-02 — metadata mirror built into a notarized DMG)
+
+- **Rust** ([src-tauri/src/main.rs](src-tauri/src/main.rs)): added `store_preset(id, json)` /
+  `get_all_presets()` / `delete_preset(id)` (modelled on `store_blob`), writing
+  `app_data_dir/presets/<id>.json` as plain UTF-8; registered all three in `generate_handler!`.
+  `cargo check` ✓.
+- **JS** ([src/presetStore.js](src/presetStore.js)): `_isTauri()` branch. On desktop the **FS is
+  authoritative** — `hydrate()` reads `get_all_presets`; first run with an empty FS migrates from
+  the best source (IndexedDB from Phase 0, else the localStorage snapshot) and writes each to disk
+  (IDB + localStorage left intact as backstops). `putRecord`/`deleteRecord` invoke
+  `store_preset`/`delete_preset`. Web/Windows-web unchanged (no `window.__TAURI__`) → IndexedDB path.
+- **Build:** full `./build-and-sign.sh` → app + DMG both **notarized: Accepted**, stapled,
+  `source=Notarized Developer ID`. Output: `promo/DiscoCast Visualizer-1.0.20260602.2005.dmg`
+  (+ canonical `promo/DiscoCast-Visualizer.dmg`). Real bundle id = **`app.discocast.visualizer`**.
+
+**🔬 In-app runtime test still pending (the one thing the build can't prove):** install the DMG,
+save/rename/delete a preset, then confirm files appear/update/disappear in
+`~/Library/Application Support/app.discocast.visualizer/presets/`, and that they survive an app
+relaunch. Also confirm a pre-existing desktop user's presets migrate IDB→FS on first launch.
+
+**Known edge (logged, not blocking):** if the first-run IDB→FS migration write fails partway, the
+next launch sees a non-empty FS and won't re-migrate the missing ones — but IDB + localStorage are
+retained as backstops, so nothing is lost; a future reconcile pass can close this.
+
+**Not committed yet** — to deploy the new DMG to the promo page, `git add promo/ && commit && push`
+(Coolify auto-deploys). See README "Releasing a Build".
+
+##### Cross-platform matrix — which storage path each target uses
+
+| Target | `window.__TAURI__`? | Storage path | Needs a fresh build for today's mirror? |
+|---|---|---|---|
+| Web (browser / Coolify) | no | IndexedDB (Phase 0) | No — JS-only; ships on next web deploy |
+| Dev server (`localhost:5173`) | no | IndexedDB | No (but it therefore does NOT exercise the FS mirror) |
+| **macOS app** (Tauri/WKWebView) | yes | **native FS** (`store_preset`) | ✅ Done — in the 2026-06-02 notarized DMG |
+| **Windows app** (Tauri/WebView2) | **yes** | **native FS** (`store_preset`) | ⚠️ **YES — must rebuild via GitHub Actions** |
+
+**Windows gotcha (important):** the Windows desktop app is *also* Tauri, so `presetStore.js` takes
+the `_isTauri()` FS branch there too — it will call `store_preset`/`get_all_presets`/`delete_preset`.
+The **existing/old Windows `.exe` does not contain those Rust commands** (built before today), so a
+fresh **GitHub Actions Windows build** (which compiles the new Rust + JS together) is required before
+Windows persistence works. The FS path itself is cross-platform — `app_data_dir()` resolves to
+`%APPDATA%\app.discocast.visualizer\presets\` on Windows automatically. Test target = shadow.tech.
+
+**Order of operations for Windows test:** commit + push → trigger "Build Windows Installer" Action →
+install that `.exe` on shadow.tech → verify save/relaunch persistence + the `presets\` folder.
+
+#### Other Phase 4 polish
+
+- **Tauri FS fallback (community packs):** Store community preset JSONs in
+  `~/Library/Application Support/app.discocast.visualizer/community/` alongside
   IndexedDB. Mirror the `_storeImageTauri` / `_getImageTauri` pattern from
   `customPresets.js`.
 - **Deduplication:** Skip community presets whose names match bundled ones (by
@@ -1382,7 +1510,28 @@ hydration. Readers stay byte-identical.
 - The DOM input id is `import-file-input` in both pages (the doc's `els.importFileInput` is
   just the JS variable name).
 
-### 11.6 What did NOT change from the research
+### 11.6 Metadata vs. blobs — what Phase 0 moved (and what it didn't)
+
+A natural question: *don't HD video presets store way more than the stress test's 30 KB/record?*
+No — because a video's bytes are **not** in the metadata store. Verified split:
+
+| What | Where | Size | Touched by Phase 0? |
+|---|---|---|---|
+| Preset **metadata** — settings, eqs, layer params, image/video layers as **ID references** (`{ videoId: "…", …settings }`), + one **320×180 JPEG thumbnail** (~8–20 KB) | `presetStore` → IndexedDB `discocast_presets` | **single-digit to low-tens of KB per record, regardless of video resolution** | ✅ Yes (moved off localStorage) |
+| The actual **HD image/video bytes** | IndexedDB `discocast_images` (or Tauri FS) via `storeImage(id, blob)` ([customPresets.js:175](src/customPresets.js#L175)) | up to hundreds of MB per blob | ❌ No — predates Phase 0, no practical limit |
+
+Evidence: layers are saved as references ([inspector.js:5071–5082](src/editor/inspector.js#L5071-L5082),
+blobs persisted separately via `storeImage`); the thumbnail is a 320×180 JPEG @ 0.7 quality
+([visualizer.js:750–751](src/visualizer.js#L750-L751)). A 200 MB HD video preset = a ~15 KB metadata
+record **+** a 200 MB blob in the separate store.
+
+**So:** the stress test's 30 KB/record was *larger* than a typical real metadata record (which is
+dominated by the ~15 KB thumbnail) — a conservative model, not an understatement. Phase 0 fixed the
+**metadata wall** (the ~200-preset localStorage cap). The **blob** ceiling (browser IndexedDB quota /
+WKWebView eviction) is pre-existing and is addressed separately by `storage-audit-dev.md` (Tauri FS for
+blobs) + the planned Phase 4 Tauri-FS metadata mirror.
+
+### 11.8 What did NOT change from the research
 
 The pack landscape (§2), jsDelivr delivery (§3), manifest approach (§3), import pipeline
 shapes (§6), and the `community:<packId>:<name>` namespace (§9.6) all stand as written. The

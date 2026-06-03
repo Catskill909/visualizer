@@ -209,6 +209,55 @@ async fn delete_blob(app: tauri::AppHandle, image_id: String) -> Result<(), Stri
     Ok(())
 }
 
+// ── Preset METADATA storage (Phase 4 — Tauri-FS mirror) ──────────────────────
+// Eviction-proof native storage for custom-preset metadata records, mirroring the
+// blob commands above (one directory over: app_data_dir/presets/<id>.json). On the
+// desktop app the filesystem is authoritative for metadata because WKWebView/WebView2
+// can evict IndexedDB under storage pressure. JSON is plain UTF-8 text (not base64).
+// See milkdrop-pack-import.dev Phase 4.
+#[tauri::command]
+async fn store_preset(app: tauri::AppHandle, id: String, json: String) -> Result<(), String> {
+    let data_dir = app.path_resolver().app_data_dir()
+        .ok_or_else(|| "Could not resolve app data dir".to_string())?;
+    let presets_dir = data_dir.join("presets");
+    std::fs::create_dir_all(&presets_dir).map_err(|e| e.to_string())?;
+    std::fs::write(presets_dir.join(format!("{}.json", &id)), json.as_bytes()).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_all_presets(app: tauri::AppHandle) -> Result<Vec<String>, String> {
+    let data_dir = app.path_resolver().app_data_dir()
+        .ok_or_else(|| "Could not resolve app data dir".to_string())?;
+    let presets_dir = data_dir.join("presets");
+    if !presets_dir.exists() {
+        return Ok(Vec::new());
+    }
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(&presets_dir).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) == Some("json") {
+            if let Ok(text) = std::fs::read_to_string(&path) {
+                out.push(text);
+            }
+        }
+    }
+    Ok(out)
+}
+
+#[tauri::command]
+async fn delete_preset(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    let data_dir = app.path_resolver().app_data_dir()
+        .ok_or_else(|| "Could not resolve app data dir".to_string())?;
+    let presets_dir = data_dir.join("presets");
+    let preset_path = presets_dir.join(format!("{}.json", &id));
+    if preset_path.exists() {
+        std::fs::remove_file(&preset_path).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 #[tauri::command]
 async fn save_file(filename: String, content: String) -> Result<Option<String>, String> {
     let (tx, mut rx) = channel::<Option<std::path::PathBuf>>(1);
@@ -371,7 +420,7 @@ fn main() {
     tauri::Builder::default()
         .manage(CaffeinateState(Mutex::new(None)))
         .manage(NdiState(Mutex::new(None)))
-        .invoke_handler(tauri::generate_handler![caffeinate_start, caffeinate_stop, toggle_fullscreen, get_fullscreen, list_monitors, fullscreen_on_monitor, pick_audio_file, pick_image_file, save_file, store_blob, get_blob, delete_blob, convert_to_stacked_alpha, convert_to_stacked_alpha_b64, ndi_start, ndi_send_frame, ndi_stop])
+        .invoke_handler(tauri::generate_handler![caffeinate_start, caffeinate_stop, toggle_fullscreen, get_fullscreen, list_monitors, fullscreen_on_monitor, pick_audio_file, pick_image_file, save_file, store_blob, get_blob, delete_blob, store_preset, get_all_presets, delete_preset, convert_to_stacked_alpha, convert_to_stacked_alpha_b64, ndi_start, ndi_send_frame, ndi_stop])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -129,15 +129,41 @@ function _ensureCache() {
 }
 
 // ---------------------------------------------------------------------------
+// Tauri native filesystem (desktop app — eviction-proof metadata; Phase 4)
+// ---------------------------------------------------------------------------
+// On the macOS/Windows desktop apps, WKWebView/WebView2 can evict IndexedDB under
+// storage pressure, so the FILESYSTEM is authoritative for metadata there. Mirrors
+// the proven blob pattern in customPresets.js. Web/Windows-web have no window.__TAURI__
+// and take the IndexedDB path above, unchanged.
+
+const _isTauri = () => typeof window !== 'undefined' && !!window.__TAURI__;
+
+function _tauriStorePreset(record) {
+    return window.__TAURI__.invoke('store_preset', { id: record.id, json: JSON.stringify(record) });
+}
+function _tauriGetAll() {
+    return window.__TAURI__.invoke('get_all_presets'); // → string[] of JSON
+}
+function _tauriDelete(id) {
+    return window.__TAURI__.invoke('delete_preset', { id });
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
 /**
- * Load all preset records from IndexedDB into the in-memory cache. Idempotent.
- * MUST be awaited in each page's boot before the first preset read.
+ * Load all preset records into the in-memory cache. Idempotent. MUST be awaited in
+ * each page's boot before the first preset read. On desktop (Tauri) the native FS is
+ * the source of truth; on web it's IndexedDB.
  */
 export async function hydrate() {
     if (_hydrated) return;
+
+    if (_isTauri()) {
+        await _hydrateTauri();
+        return;
+    }
 
     let records = [];
     try {
@@ -164,6 +190,45 @@ export async function hydrate() {
         // Mark migrated only if the write path didn't throw (or there was nothing to migrate).
         if (records.length === list.length) {
             try { localStorage.setItem(MIGRATED_FLAG, String(Date.now())); } catch { /* non-fatal */ }
+        }
+    }
+
+    _cache = new Map();
+    for (const r of records) {
+        if (r && r.id) _cache.set(r.id, r);
+    }
+    _hydrated = true;
+}
+
+// Desktop hydrate: FS authoritative. First run with the FS mirror has an empty FS, so
+// migrate from the best available source (IndexedDB from the web/Phase-0 path, else the
+// raw localStorage snapshot) and write each record to disk. IDB + localStorage are left
+// intact as backstops (never deleted here).
+async function _hydrateTauri() {
+    let records = [];
+    try {
+        const jsons = await _tauriGetAll();
+        records = (jsons || [])
+            .map(j => { try { return JSON.parse(j); } catch { return null; } })
+            .filter(r => r && r.id);
+    } catch (e) {
+        console.warn('[presetStore] Tauri get_all_presets failed:', e);
+    }
+
+    if (records.length === 0) {
+        let source = [];
+        try { source = (await _idbGetAll()).filter(r => r && r.id); } catch { /* ignore */ }
+        if (source.length === 0) {
+            source = Object.values(_readLegacyLocalStorage()).filter(r => r && r.id);
+        }
+        if (source.length) {
+            let written = 0;
+            for (const r of source) {
+                try { await _tauriStorePreset(r); written++; }
+                catch (e) { console.error('[presetStore] Tauri migrate write failed for', r.id, e); }
+            }
+            records = source;
+            console.log(`[presetStore] Migrated ${written}/${source.length} preset(s) → Tauri FS`);
         }
     }
 
@@ -224,6 +289,12 @@ export function putRecord(record) {
         clean = record;
     }
     _ensureCache().set(clean.id, clean);
+
+    if (_isTauri()) {
+        // Desktop: FS is authoritative (eviction-proof). Plain-JSON, no base64.
+        _tauriStorePreset(clean).catch((e) => console.error('[presetStore] Tauri store_preset failed:', e));
+        return;
+    }
     _idbPut(clean).catch((e) => {
         if (e && e.name === 'QuotaExceededError') {
             console.error('[presetStore] IndexedDB quota exceeded on put — preset is in memory but may not persist:', e);
@@ -233,8 +304,12 @@ export function putRecord(record) {
     });
 }
 
-/** Delete a record: sync cache delete + async IndexedDB delete. */
+/** Delete a record: sync cache delete + async persist (native FS on desktop, else IDB). */
 export function deleteRecord(id) {
     _ensureCache().delete(id);
+    if (_isTauri()) {
+        _tauriDelete(id).catch((e) => console.error('[presetStore] Tauri delete_preset failed:', e));
+        return;
+    }
     _idbDelete(id).catch((e) => console.error('[presetStore] IndexedDB delete failed:', e));
 }
