@@ -1,17 +1,40 @@
 # MilkDrop Pack Import — Research & Feature Spec
 
-Status: **✅ Phase 0 SHIPPED & VERIFIED + Phase 4 Tauri-FS mirror BUILT (desktop parity). Pack strategy steered to small/curated, AVOID mega (§2.5). 📋 Phase 1 engine AUDITED + DEEP-PLANNED, ready to build next session (§13). No engine code written yet.**
-Last updated: 2026-06-02
+_Last updated: 2026-06-03. The block below is the single source of truth — everything
+under the Table of Contents is detail & history._
 
-> Goal: Expand the existing import modal to let users browse and install curated
-> MilkDrop preset packs directly from GitHub — turning DiscoCast into a platform
-> where users can stack thousands (even tens of thousands) of additional presets
-> with a single click.
+---
 
-> **2026-06-02 headline:** The codebase audit (§0, §11) confirmed a storage upgrade
-> we need **regardless of community packs** — custom preset *metadata* still lives
-> in localStorage and already throws "Storage full" at users. That upgrade is now
-> **Phase 0** (a unified IndexedDB preset store), and community packs plug into it.
+## 📍 AT A GLANCE — start here
+
+**What this feature is:** let users browse & install curated MilkDrop preset packs from
+inside DiscoCast, layered on top of the 1,144 bundled presets — installed packs play exactly
+like the bundled ones.
+
+**Where we are (2026-06-03):**
+| | Phase | What | State |
+|---|---|---|---|
+| ✅ | **0** | Storage rebuild: custom presets localStorage → **IndexedDB** (kills the ~200-preset "Storage full" wall) | **SHIPPED & verified** — web + macOS |
+| ✅ | **4** | **Tauri-FS mirror** — native-file preset storage on desktop (platform parity) | **BUILT** into a notarized macOS DMG · Windows needs its GH-Actions build (you trigger) |
+| 📋 | **1** | **The import ENGINE** — community preset store + install/uninstall pipeline | **PLANNED & pick-up-ready (§13)** ← **NEXT** · no code yet |
+| ⬜ | **2** | Manifest + "Browse Packs" UI — **design decided (§4): one shared tabbed modal** (`From File` + `Community Packs`); **progress UX specced (§2c): real % download + live "N / M installed" counts, inline per-card, cancellable, honest partial-success** | not started (design done) |
+| ⬜ | **3** | `.milk` converter → ship curated **Cream-of-the-Crop** themed JSON packs | not started |
+
+> Phase 4 ran ahead of 1–3 because it completed the **storage/parity foundation** (same track as
+> Phase 0). The community-pack feature itself is Phases 1→2→3.
+
+**▶️ NEXT SESSION:** build the engine — follow the ordered checklist in **§13.7**. First step:
+confirm `jszip`, then add the community store to `presetStore.js`. Key design (verified, §13.1):
+community presets register like **bundled** presets (raw JSON), **IndexedDB-only**, and **skip**
+`refreshCustomPresets`.
+
+**📦 Pack strategy (locked — §2.5):** ship **small, curated** themed packs; **AVOID the mega dumps**
+(Ansorre 15k is unsorted + unlicensed; Cream 9.8k / WACUP 100k too big). The curated "best of" is
+**Cream of the Crop** — convert one of its 11 themed categories at a time into a hosted drop-in JSON
+pack (needs the Phase 3 converter).
+
+**🗂 Where to read more:** §13 = the build plan · §11 = verified code audit · §2.5 = pack strategy ·
+§5/§9 = storage architecture · §10 = full phase tracker (now superseded up here for status).
 
 ---
 
@@ -34,6 +57,9 @@ Last updated: 2026-06-02
 ---
 
 ## 0. Headline — The Storage Upgrade Is Phase 0 (and stands alone)
+
+> 📜 _Historical context — Phase 0 is now SHIPPED & verified (see "At a Glance" up top). This
+> section explains why it was the foundation; kept for the reasoning, not for current status._
 
 **This is the part that matters even if community packs never ship.**
 
@@ -128,29 +154,27 @@ consumes. No conversion needed.
 | **Baron Community Pack** | `butterchurn-presets-baron` (npm) | ~762 | Individual JSON files | MIT | Already bundled via `import.meta.glob`. JSON files at `dist/presets/*.json`. |
 | Ansorre Mega Collection | [ansorre/tens-of-thousands-milkdrop-presets-for-butterchurn](https://github.com/ansorre/tens-of-thousands-milkdrop-presets-for-butterchurn) | **15,056** | single ZIP of JSON | ⚠️ **NO license stated** | Pre-converted JSON (drop-in). BUT: **mega, a single unsorted ZIP (no categories/best-of), and no license** — verified 2026-06-02. Re-evaluated DOWN (see §2.5): too big + unsorted + unclear redistribution rights. Useful only as a *slice* to smoke-test the import engine, not as a shipped product. |
 
-### Tier 2: Raw .milk Files (Require Conversion)
+### Tier 2: Curated `.milk` SOURCES we slice small (need the Phase 3 converter)
 
-These are in native MilkDrop format and need the `milkdrop-preset-converter`
-pipeline (milkdrop-import-dev.md Phase 1–3).
+We do **NOT** install these wholesale. We convert **one curated category at a time** into a small
+hosted JSON pack (§2.5). These are *sources*, not packs we ship as-is.
 
-| Pack | Source | Presets | Notes |
-|---|---|---|---|
-| **Cream of the Crop** | [projectM-visualizer/presets-cream-of-the-crop](https://github.com/projectM-visualizer/presets-cream-of-the-crop) | **9,795** | Gold standard curated pack by Jason Fletcher (ISOSCELES). Every preset hand-tested and rated 5/5. Organized into 11 categories: Dancer, Drawing, Fractal, Geometric, Hypnotic, Particles, Reaction, Sparkle, Supernova, Waveform, Transition. Default pack for projectM. |
-| **Original MilkDrop** | [projectM-visualizer/presets-milkdrop-original](https://github.com/projectM-visualizer/presets-milkdrop-original) | ~400 | The original presets shipped with Winamp's MilkDrop 1/2. Historical/nostalgic value. |
-| **MilkDrop 3.0** | [milkdrop2077/MilkDrop3](https://github.com/milkdrop2077/MilkDrop3) | Large bundle | Modern presets with advanced shader support. Contains `.milk2` double-preset format — our converter can't handle these. |
-| **MilkDrop Texture Pack** | [projectM-visualizer/presets-milkdrop-texture-pack](https://github.com/projectM-visualizer/presets-milkdrop-texture-pack) | Textures only | Image assets required by some presets. Not presets themselves, but a dependency for full-fidelity rendering. |
-| **WACUP MegaPacks** | [WACUP Forums](https://getwacup.com/) | **100,000+** | Community mega-packs (Incubo's packs). Uncurated, massive. .milk format. |
-| **Internet Archive** | [archive.org — Milkdrop 52k Collection](https://archive.org/details/milkdrop-2-52k-preset-collection) | 52,000+ | Archived mega-collection. .milk format. |
-
-### Summary of scale
-
-| Scenario | Presets available | Conversion needed? |
+| Source | Size | How we use it |
 |---|---|---|
-| Ansorre JSON pack only | **15,056** | ❌ None — drop-in JSON |
-| + Cream of the Crop | **+9,795** | ✅ .milk → JSON (browser converter) |
-| + Original MilkDrop | **+400** | ✅ .milk → JSON |
-| + WACUP MegaPack | **+100,000** | ✅ .milk → JSON |
-| **Maximum potential** | **125,000+** | Mixed |
+| **Cream of the Crop** (ISOSCELES) — [repo](https://github.com/projectM-visualizer/presets-cream-of-the-crop) | 9,795 across 11 themed categories | THE best-of. Convert **ONE category at a time** (e.g. Geometric ~400, Waveform ~300) → a small drop-in pack. **Never the whole 9,795.** |
+| **Original MilkDrop** (Nullsoft) — [repo](https://github.com/projectM-visualizer/presets-milkdrop-original) | ~400 | Small enough to ship whole; classic/nostalgia. |
+
+### ❌ EXPLICITLY EXCLUDED — do NOT pursue (mega / unusable)
+
+The mandate is **small & curated only** (§2.5). These are recorded here so nobody re-proposes them:
+
+| Source | Why it's out |
+|---|---|
+| **Ansorre 15k** (JSON) | mega + single unsorted ZIP + **no license**. Smoke-test *slice* only (§13.4), never shipped. |
+| **WACUP MegaPacks** (100k+) | mega, uncurated. |
+| **"Internet Archive 52k collection"** | mega — **and the link is dead** (`archive.org/details/milkdrop-2-52k-preset-collection` 404s, confirmed 2026-06-03). Removed. |
+| **MilkDrop 3.0** ([milkdrop2077](https://github.com/milkdrop2077/MilkDrop3)) | uses `.milk2` double-preset format our converter can't handle. |
+| **MilkDrop Texture Pack** | not presets — image dependencies only. |
 
 ---
 
@@ -225,37 +249,23 @@ file) that lists all available packs, their download URLs, and metadata. The app
 fetches this manifest to populate the "Browse Packs" modal.
 
 ```jsonc
-// Example: hosted at our domain or GitHub repo
+// Example manifest — SMALL CURATED PACKS ONLY (§2.5). Canonical schema lives in Phase 2a.
 {
   "version": 1,
   "packs": [
     {
-      "id": "ansorre-mega",
-      "name": "MilkDrop Mega Collection",
-      "author": "ansorre",
-      "description": "15,056 presets converted to Butterchurn JSON",
-      "presetCount": 15056,
-      "format": "butterchurn-json-zip",
-      "downloadUrl": "https://cdn.jsdelivr.net/gh/ansorre/tens-of-thousands-milkdrop-presets-for-butterchurn@master/milkdrop-presets-for-butterchurn.zip",
-      "sizeEstimate": "~180 MB",
-      "categories": ["All"],
-      "rating": 5,
-      "tags": ["mega", "community", "pre-converted"]
-    },
-    {
-      "id": "cream-of-the-crop",
-      "name": "Cream of the Crop",
+      "id": "cream-geometric",
+      "name": "Cream — Geometric",
       "author": "Jason Fletcher (ISOSCELES)",
-      "description": "9,795 hand-curated best-of-the-best presets",
-      "presetCount": 9795,
-      "format": "milk-files",
-      "downloadUrl": "https://cdn.jsdelivr.net/gh/projectM-visualizer/presets-cream-of-the-crop@main/...",
-      "sizeEstimate": "~50 MB",
-      "categories": ["Dancer", "Fractal", "Geometric", "Hypnotic", "Particles", "Sparkle", "Supernova", "Waveform"],
+      "description": "~400 hand-curated Geometric presets (one Cream-of-the-Crop category)",
+      "presetCount": 400,
+      "format": "butterchurn-json-zip",   // we host pre-converted JSON
+      "downloadUrl": "https://cdn.jsdelivr.net/gh/<our-registry>/cream-geometric.zip",
+      "sizeEstimate": "~4 MB",
       "rating": 5,
-      "tags": ["curated", "best-of", "categories"]
+      "tags": ["curated", "geometric", "themed"]
     }
-    // ... more packs
+    // ... more small themed packs (Waveform, Sparkle, Classic MilkDrop, …)
   ]
 }
 ```
@@ -270,6 +280,29 @@ fetches this manifest to populate the "Browse Packs" modal.
 ---
 
 ## 4. Proposed Import Menu Architecture
+
+### ✅ DECISION (2026-06-03): one shared modal now, settings page later
+
+The question was *modal vs. a settings page*. **Answer: the modal — reached from the Import
+buttons that already exist** (player + Preset Studio). Reasoning:
+
+- **Reuse the entry points users already know** — the player and Studio both have an Import
+  button today (§11.5). Turn those into the tabbed modal; no new navigation to learn. A settings
+  page is a new surface to build, route, and teach.
+- **The "Community Packs" tab IS the management surface** — browse / install / uninstall /
+  "what's installed" / storage used all live there. No separate settings page needed for packs.
+- **Don't build a settings page for one feature** (would be premature). A Settings page earns its
+  place *later*, once there are several things to hold (output defaults, audio defaults, packs…).
+  When that happens, the pack panel **lifts out of the modal into settings cleanly — IF** we build
+  it as a self-contained module now.
+- **One shared component, not 3 copies.** Inject a single `packBrowser.js` (+ one shared
+  stylesheet) into each page. Do NOT duplicate per-page — the result-modal CSS is already
+  triplicated across `style.css` / `editor/style.css` / `timeline/style.css` and that's a known
+  maintenance pain ([[feedback_no_help_in_editor]] neighbours this lesson).
+
+**Tabs:** `From File` (today: `.dcshow.json`; **later: `.milk` lands in this same tab** via the
+Phase 3 converter) · `Community Packs` (browse + install + manage). This is exactly the
+"one clear interface for files OR packs OR future .milk" the user described.
 
 ### The Modal: Two-Tab Design
 
@@ -289,27 +322,25 @@ fetches this manifest to populate the "Browse Packs" modal.
 │                                                      │
 │  ─── OR ───                                          │
 │                                                      │
-│  Tab 2: COMMUNITY PACKS (new)                        │
+│  Tab 2: COMMUNITY PACKS (new)  — small, curated      │
 │  ┌─────────────────────────────────────────────┐    │
-│  │  ⭐ MilkDrop Mega Collection     [Install]  │    │
-│  │     15,056 presets · by ansorre              │    │
-│  │     Pre-converted Butterchurn JSON           │    │
-│  │     ~180 MB download                         │    │
+│  │  ⭐ Cream — Geometric           [Install]   │    │
+│  │     ~400 curated presets · ISOSCELES         │    │
+│  │     Hand-picked best-of · ~3 MB              │    │
 │  ├─────────────────────────────────────────────┤    │
-│  │  ⭐ Cream of the Crop            [Install]  │    │
-│  │     9,795 curated presets · by ISOSCELES     │    │
-│  │     11 categories · Best of 52k collection   │    │
-│  │     ~50 MB · Requires conversion             │    │
+│  │  ⭐ Cream — Waveform            [✓ Installed]│    │
+│  │     ~300 curated presets · ISOSCELES  [Remove]    │
 │  ├─────────────────────────────────────────────┤    │
-│  │  📦 Original MilkDrop              [Install] │    │
-│  │     ~400 classic presets · by Nullsoft        │    │
-│  │     The originals from Winamp                │    │
-│  │     ~2 MB · Requires conversion              │    │
+│  │  📦 Classic MilkDrop             [Install]   │    │
+│  │     ~400 originals · Nullsoft · ~2 MB        │    │
 │  └─────────────────────────────────────────────┘    │
 │                                                      │
-│  ℹ️ Installed: 1,144 bundled + 0 community presets   │
+│  ℹ️ Installed: 1,144 bundled + 300 community presets │
 └──────────────────────────────────────────────────────┘
 ```
+
+> Mockup reflects the §2.5 strategy: **small curated themed packs** (Cream-of-the-Crop categories,
+> Classic MilkDrop) — NOT the mega dumps. Each is the output of converting one curated category.
 
 ### Pack card states
 
@@ -319,12 +350,13 @@ fetches this manifest to populate the "Browse Packs" modal.
 - **Installed** → "✓ Installed" badge + [Remove] button (secondary)
 - **Update available** → [Update] button (if manifest version changed)
 
-### Entry points
+### Entry points (per the 2026-06-03 decision)
 
-The modal should be reachable from:
-1. **Main player drawer** — Import button (existing, extend)
-2. **Preset Studio Library** — Import button (existing, extend)
-3. **Settings/About** — "Manage Preset Packs" link
+The shared modal opens from the **Import buttons that already exist** — no new nav:
+1. **Main player drawer** — `btn-import-presets` (today opens a file picker → swap to the modal)
+2. **Preset Studio Library** — `#btn-import` (same swap)
+3. **Settings/About link — DEFERRED.** Not built now; the modal's Packs tab already covers
+   management. Add a "Manage Preset Packs" entry here only if/when a Settings page is created.
 
 ---
 
@@ -388,31 +420,40 @@ Community presets should use a prefix to avoid collisions: `community:<packId>:<
 
 ## 6. Import Pipeline — How 1,000s of Presets Flow In
 
-### Path A: Pre-converted JSON packs (Ansorre, Baron-style)
+### Path A: Pre-converted JSON packs (our hosted small themed packs)
 
 ```
-User clicks [Install] on "Mega Collection"
-  → Fetch ZIP from jsDelivr CDN (~180 MB)
+User clicks [Install] on "Cream — Geometric"
+  → Fetch ZIP from jsDelivr CDN (~4 MB)
   → Unzip in browser (JSZip, lazy-loaded)
-  → Iterate JSON files
+  → Iterate JSON files (~400)
   → For each: validate shape (baseVals/shapes/waves present)
   → Store in IndexedDB (community presets store)
   → Update pack metadata (installed: true, presetCount)
-  → Refresh registry
-  → Show result modal: "15,056 presets installed"
+  → Refresh registry (engine.loadCommunityPresets())
+  → Show result modal: "~400 presets installed"
 ```
 
-**Performance estimate:**
-- Download: ~30–60s on typical broadband
-- Unzip: ~5–10s (JSZip is fast for iteration)
-- IndexedDB writes: ~10–30s for 15k puts (batched transactions)
-- **Total: ~1–2 minutes** for the full mega collection
+**Performance estimate (small themed pack, ~400):**
+- Download: ~1–2s (~4 MB)
+- Unzip: <1s
+- IndexedDB writes: ~1–3s for ~400 puts (one batched transaction)
+- **Total: a few seconds.** (Small packs are the point — no minutes-long mega installs.)
 
-### Path B: Raw .milk packs (Cream of the Crop)
+### Path B — NOTE: we do the `.milk` conversion at BUILD time, not in the user's browser
+
+> Originally Path B converted `.milk` in-browser at install. Per §2.5 we instead **convert curated
+> Cream categories to JSON ourselves (once)** and host them — so the *user's* install is always the
+> fast Path A above. The in-browser converter (below) is only relevant if we ever let users import
+> their own raw `.milk` files (Phase 3 / milkdrop-import-dev.md). Kept for that case:
 
 ```
-User clicks [Install] on "Cream of the Crop"
-  → Fetch ZIP from jsDelivr CDN (~50 MB)
+[build-time, by us] convert one Cream category (.milk → JSON) → host the JSON pack
+[user] just installs the hosted JSON pack via Path A
+
+[only for user-supplied .milk files, Phase 3:]
+User clicks [Install] on a raw .milk source
+  → Fetch ZIP from jsDelivr CDN
   → Unzip in browser (JSZip)
   → Filter *.milk files
   → Lazy-load milkdrop-preset-converter (776 KB)
@@ -1071,10 +1112,15 @@ MODIFY  src/presetRegistry.js  (if used by editor; player uses engine directly)
 
 ---
 
-### Phase 1c — Ansorre Pack Install (No UI)
+### Phase 1c — Smoke-test install (No UI)
 
-**Goal:** Hard-coded function to download + install the Ansorre 15k pack.
-Callable from browser console. Proves the full pipeline before building UI.
+> ⚠️ **Superseded by §13.4.** Original text below installed the *whole* Ansorre 15k — we do NOT do
+> that (§2.5). The smoke test now installs a **small ~300-file SLICE** of the Ansorre ZIP purely to
+> prove the pipeline, then is thrown away. The code below is illustrative of the pipeline shape only.
+
+**Goal (revised):** Hard-coded console function to download the Ansorre ZIP, take the **first ~300
+`.json` only**, and run them through the install pipeline. Proves fetch→unzip→store→register before
+building UI. Throwaway — not shipped, not the full 15k.
 
 **Deliverables:**
 ```
@@ -1156,29 +1202,31 @@ NEW  public/pack-manifest.json    (ships with app, can be overridden by CDN)
 {
   "version": 1,
   "updatedAt": "2026-06-01",
+  // SMALL CURATED PACKS ONLY (§2.5). Each Cream entry is ONE converted category, NOT the 9,795.
+  // The packs below are JSON we host (post-conversion), so they install drop-in like bundled.
   "packs": [
     {
-      "id": "ansorre-mega",
-      "name": "MilkDrop Mega Collection",
-      "author": "ansorre",
-      "description": "15,056 presets converted to Butterchurn JSON — the largest pre-converted collection available.",
-      "presetCount": 15056,
-      "format": "butterchurn-json-zip",    // "butterchurn-json-zip" | "milk-zip" | "milk-files"
-      "downloadUrl": "https://cdn.jsdelivr.net/gh/ansorre/tens-of-thousands-milkdrop-presets-for-butterchurn@master/milkdrop-presets-for-butterchurn.zip",
-      "sizeEstimateMB": 180,
-      "tags": ["mega", "community", "pre-converted"],
-      "icon": "📦"
+      "id": "cream-geometric",
+      "name": "Cream — Geometric",
+      "author": "Jason Fletcher (ISOSCELES)",
+      "description": "~400 hand-curated Geometric presets — one themed category from Cream of the Crop.",
+      "presetCount": 400,
+      "format": "butterchurn-json-zip",   // we host pre-converted JSON; no client-side conversion
+      "downloadUrl": "https://cdn.jsdelivr.net/gh/<our-registry>/cream-geometric.zip",
+      "sizeEstimateMB": 4,
+      "tags": ["curated", "geometric", "themed"],
+      "icon": "⭐"
     },
     {
-      "id": "cream-of-the-crop",
-      "name": "Cream of the Crop",
+      "id": "cream-waveform",
+      "name": "Cream — Waveform",
       "author": "Jason Fletcher (ISOSCELES)",
-      "description": "9,795 hand-curated best presets, distilled from 52k+ community presets. Organized into 11 categories.",
-      "presetCount": 9795,
-      "format": "milk-zip",
-      "downloadUrl": "...",
-      "sizeEstimateMB": 50,
-      "tags": ["curated", "best-of", "categories"],
+      "description": "~300 hand-curated Waveform presets — one themed category from Cream of the Crop.",
+      "presetCount": 300,
+      "format": "butterchurn-json-zip",
+      "downloadUrl": "https://cdn.jsdelivr.net/gh/<our-registry>/cream-waveform.zip",
+      "sizeEstimateMB": 3,
+      "tags": ["curated", "waveform", "themed"],
       "icon": "⭐"
     },
     {
@@ -1187,8 +1235,8 @@ NEW  public/pack-manifest.json    (ships with app, can be overridden by CDN)
       "author": "Nullsoft / Ryan Geiss",
       "description": "The ~400 original presets shipped with Winamp's MilkDrop. Pure nostalgia.",
       "presetCount": 400,
-      "format": "milk-zip",
-      "downloadUrl": "...",
+      "format": "butterchurn-json-zip",
+      "downloadUrl": "https://cdn.jsdelivr.net/gh/<our-registry>/milkdrop-original.zip",
       "sizeEstimateMB": 2,
       "tags": ["classic", "original"],
       "icon": "🏛️"
@@ -1232,13 +1280,13 @@ dc-pack-modal-backdrop
             dc-pack-card-icon
             dc-pack-card-info
               dc-pack-card-name
-              dc-pack-card-meta        "15,056 presets · ~180 MB"
+              dc-pack-card-meta        "~400 presets · ~4 MB"
               dc-pack-card-desc
             dc-pack-card-action
               [Install] | [✓ Installed] | progress bar
 
         dc-pack-footer
-          "Installed: 1,144 bundled + 15,056 community + 3 custom"
+          "Installed: 1,144 bundled + 700 community + 3 custom"
 ```
 
 **Exported API:**
@@ -1250,29 +1298,59 @@ export function showPackBrowser({ engine, onImportFile })
 
 ---
 
-### Phase 2c — Install Flow + Progress Bar
+### Phase 2c — Install/Upload Flow + Progress UX
 
-**Goal:** Click [Install] → download → unzip → store → progress feedback.
+**Goal:** great, honest progress feedback for BOTH directions — **download** (installing a
+community pack) and **upload** (importing a `.dcshow.json` / future `.milk` file). Show users real
+numbers (% downloaded, N / M installed), not a fake spinner.
 
-**Modify:** `src/packInstaller.js` (generalize from Phase 1c) +
-`src/packBrowser.js` (progress UI).
+**Modify:** `src/packInstaller.js` (install pipeline) + `src/packBrowser.js` (progress UI) +
+reuse `importResultModal.js` for the final summary.
 
-**Progress states per card:**
+#### What is actually measurable (so the bar is real, not faked)
+
+| Step | Signal | UX |
+|---|---|---|
+| **Download** (pack) | `fetch` + `body.getReader()`, `received / Content-Length` | true **%** bar + bytes ("2.1 / 4.0 MB") |
+| **Unzip** | JSZip `loadAsync` (whole archive) | brief **indeterminate** shimmer (sub-second for small packs) |
+| **Store / Install** | we iterate entries → count | true **count** ("Installing 240 / 400") |
+| **Upload** (file import) | iterate presets in the parsed file → count | true **count** ("Importing 12 / 40") |
+
+> Because packs are small (§2.5: ~400 / ~4 MB), the whole flow is **a few seconds** — design for
+> *snappy + satisfying*, not a long grind. A quick determinate bar that lands on a clear success
+> count beats a slow crawling one.
+
+#### Per-card states (inline — the [Install] button morphs in place)
 ```
-IDLE        → [Install] button (primary accent)
-DOWNLOADING → "Downloading... 45%" (progress bar, spinner)
-EXTRACTING  → "Extracting presets..." (indeterminate)
-STORING     → "Storing: 8,432 / 15,056" (progress bar)
-DONE        → "✓ 15,056 presets installed" (success, then → INSTALLED)
-INSTALLED   → "✓ Installed" badge + [Remove] button (secondary)
-ERROR       → "⚠ Failed: ..." + [Retry]
+IDLE         → [Install]
+DOWNLOADING  → ▓▓▓▓░░░░ 45%  · "2.1 / 4.0 MB"        (determinate, real %)
+EXTRACTING   → ░▒▓▒░ "Unzipping…"                     (brief indeterminate)
+INSTALLING   → ▓▓▓▓▓▓░░ "Installing 240 / 400"        (determinate, real count)
+DONE         → ✓ "400 presets installed"  (1.5s)  →  settles to INSTALLED
+INSTALLED    → ✓ Installed   [Remove]
+PARTIAL      → ⚠ "392 installed · 8 skipped"  [Details]   (honest, not hidden)
+ERROR        → ⚠ "Download failed"  [Retry]            (network/CDN error)
 ```
 
-**Download with progress:**
+#### UX principles (match the app)
+- **Inline, not a separate modal** — progress lives on the pack's own card, so context stays.
+- **Cancellable** — `AbortController` on the fetch; a ✕ on the progress bar aborts cleanly and
+  rolls back (don't leave a half-installed pack — delete partial keys on cancel).
+- **Honest partial success** — if K presets fail validation, say "392 installed · 8 skipped" and
+  let [Details] open the shared `importResultModal` (which already lists per-item failures). Never
+  imply a clean import when it wasn't.
+- **Non-blocking** — all async; small packs won't jank, but keep stores batched so the UI stays
+  live even on the largest themed pack.
+- **Aesthetic** — glassmorphic, neutral dark; if any of this ever appears over the Timeline canvas,
+  use neutral greys, NOT accent hues ([[feedback_no_accent_color_timeline_ui]]).
+- **Reduced-motion** — respect `prefers-reduced-motion` (no shimmer; just the numbers).
+
+**Download with real progress (the core mechanism):**
 ```js
-const response = await fetch(url);
+const ctrl = new AbortController();                       // ← cancel support
+const response = await fetch(url, { signal: ctrl.signal });
 const reader = response.body.getReader();
-const contentLength = +response.headers.get('Content-Length');
+const total = +response.headers.get('Content-Length') || 0;   // 0 → show indeterminate
 let received = 0;
 const chunks = [];
 while (true) {
@@ -1280,9 +1358,14 @@ while (true) {
     if (done) break;
     chunks.push(value);
     received += value.length;
-    onProgress({ phase: 'download', current: received, total: contentLength });
+    onProgress({ phase: 'download', current: received, total });   // → "% · MB / MB"
 }
+// then: JSZip.loadAsync(new Blob(chunks)) → iterate → onProgress({phase:'install', current, total})
 ```
+
+**Upload (file import) progress** reuses the same `onProgress({phase:'import', current, total})`
+shape — `importFromFile()` already returns `{ imported, names, failed }`; we just emit a count as it
+loops so a big bulk backup shows "Importing 12 / 40" instead of a frozen UI, then the result modal.
 
 ---
 
@@ -1335,7 +1418,7 @@ document.getElementById('btn-import')?.addEventListener('click', () => {
 
 **Changes:**
 - Pack card [Remove] button → `uninstallPack(packId)` + `deleteCommunityPresetsByPack(packId)`
-- Confirm dialog: "Remove 15,056 presets? This frees ~150 MB."
+- Confirm dialog: "Remove ~400 presets? This frees ~4 MB."
 - Also clean up favorites/hidden that reference removed community presets
 - Refresh engine preset names
 
@@ -1461,7 +1544,7 @@ install that `.exe` on shadow.tech → verify save/relaunch persistence + the `p
   IndexedDB. Mirror the `_storeImageTauri` / `_getImageTauri` pattern from
   `customPresets.js`.
 - **Deduplication:** Skip community presets whose names match bundled ones (by
-  display name, case-insensitive). Or auto-prefix: "ansorre-mega: Preset Name".
+  display name, case-insensitive). Or auto-prefix: "cream-geometric: Preset Name".
 - **User Guide:** Add "Community Packs" section to help modal (index.html + help.html).
 - **Pack update detection:** Compare manifest `version` field with stored
   `installedAt` to show "Update available" badge.
@@ -1594,7 +1677,7 @@ was the thing that could have turned Phase 0 from "easy" into "messy"; it didn't
 | Phase | Doable? | Effort | Risk | Why |
 |---|---|---|---|---|
 | **0 — Storage upgrade** | ✅ Yes | ~1 day | **Low** | IndexedDB + in-memory cache is textbook. Migration is idempotent (localStorage kept as backstop until verified). Ripple is small *because* of the cache: ~4 write sites change, readers untouched, one boot line per entry point. Only care item is boot ordering — and that's **already verified feasible**. |
-| **1 — Community namespace + Ansorre 15k (no UI)** | ✅ Yes | ~1 day | Low–Med | `loadPreset()` is already async → lazy community resolution is clean. The "watch this" items are known quantities, not research: a ~180 MB download, JSZip unzip, ~15k batched IDB writes (~1–2 min). That's a progress bar, not a hard problem. |
+| **1 — Community engine + small-pack install (no UI)** | ✅ Yes | ~1 day | Low | Community presets register like bundled (§13.1). A small themed pack (~400) = ~4 MB download, fast unzip, one batched IDB tx → installs in seconds. Smoke-tested with a small Ansorre *slice* (§13.4), not the 15k. |
 | **2 — Manifest + browse modal + install flow** | ✅ Yes | ~2–3 days | Low–Med | Straight UI work over a static manifest + jsDelivr (CORS-clean, no rate limits). Reuses the existing import-button wiring (§11.5). Download-with-progress via `fetch` + `ReadableStream` reader (§ Phase 2c) is standard. |
 | **3 — .milk pack support (Cream of the Crop)** | ✅ Yes, but **the hard one** | ~3–5 days | **Med–High** | ~10k `.milk` files × ~10–100 ms each = minutes of CPU → **needs a Web Worker** to avoid freezing the UI. Depends on `milkdrop-import-dev.md` shipping the converter first. Some presets will fail conversion (`.milk2` double-presets, exotic shaders) — needs per-file try/catch + a failure summary. This is the only part with real engineering risk, and it's correctly parked behind everything else. |
 | **4 — Polish (Tauri FS mirror, dedup, User Guide)** | ✅ Yes | ~1 day | Low | Tauri-FS metadata mirror reuses the proven `_storeImageTauri`/`_getImageTauri` pattern. Dedup + docs are mechanical. |
@@ -1618,12 +1701,12 @@ was the thing that could have turned Phase 0 from "easy" into "messy"; it didn't
   fallback); the Tauri-FS mirror lands in Phase 4. A mega-pack on the desktop app without the
   mirror could theoretically be evicted — acceptable for the foundation, must-fix before
   promoting mega-packs as a headline desktop feature.
-- **.milk conversion fidelity & failure rate.** Browser-side conversion is lower-fidelity
-  than the native mojoshader path (which is *why* the pre-converted Ansorre JSON pack is the
-  Phase 1 quick win). Expect a non-trivial failure count on raw `.milk` mega-packs — the UI
-  must surface "N converted, M failed" honestly rather than imply a clean import.
-- **Disk footprint expectations.** A user installing the Ansorre pack commits ~150–180 MB to
-  IDB. The install modal should state the size up front (the manifest carries `sizeEstimateMB`).
+- **.milk conversion fidelity & failure rate.** Browser-side conversion is lower-fidelity than the
+  native path — which is why **we convert curated Cream categories ourselves at build time** and
+  hand-check the output, rather than converting in the user's browser (§2.5). Expect to drop a few
+  presets per category during our conversion; that's fine since we curate the result before hosting.
+- **Disk footprint.** Small themed packs are a few MB each (~400 presets ≈ ~4 MB). The install modal
+  still states size up front (`sizeEstimateMB`), but there are no more 150 MB mega installs.
 
 ---
 
@@ -1732,15 +1815,14 @@ survive reload, and uninstall cleanly. **Not shipped** — just proves the pipel
 
 ## Sources & References
 
-### Preset collections
-- [jberg/butterchurn-presets](https://github.com/jberg/butterchurn-presets) — Official Butterchurn presets (MIT)
-- [ansorre/tens-of-thousands-milkdrop-presets-for-butterchurn](https://github.com/ansorre/tens-of-thousands-milkdrop-presets-for-butterchurn) — **15,056 pre-converted** JSON presets
-- [projectM-visualizer/presets-cream-of-the-crop](https://github.com/projectM-visualizer/presets-cream-of-the-crop) — 9,795 curated .milk presets by ISOSCELES
-- [projectM-visualizer/presets-milkdrop-original](https://github.com/projectM-visualizer/presets-milkdrop-original) — Original MilkDrop presets
-- [projectM-visualizer/presets-milkdrop-texture-pack](https://github.com/projectM-visualizer/presets-milkdrop-texture-pack) — Texture assets
-- [milkdrop2077/MilkDrop3](https://github.com/milkdrop2077/MilkDrop3) — MilkDrop 3.0 (advanced shaders)
-- [WACUP Community MegaPacks](https://getwacup.com/) — 100k+ presets (forum downloads)
-- [Internet Archive — 52k Collection](https://archive.org/details/milkdrop-2-52k-preset-collection) — Archived mega-collection
+### Preset collections — IN SCOPE (small / curated)
+- [jberg/butterchurn-presets](https://github.com/jberg/butterchurn-presets) — Official Butterchurn presets (MIT) — already bundled
+- [projectM-visualizer/presets-cream-of-the-crop](https://github.com/projectM-visualizer/presets-cream-of-the-crop) — the curated best-of; **we convert ONE category at a time** (§2.5)
+- [projectM-visualizer/presets-milkdrop-original](https://github.com/projectM-visualizer/presets-milkdrop-original) — ~400 classic originals (small enough to ship whole)
+
+### ❌ Excluded (mega / unusable — see §2 excluded table)
+- ansorre 15k (unsorted, unlicensed — smoke-test slice only) · WACUP 100k+ · MilkDrop3 (`.milk2`, unsupported) · texture-pack (deps, not presets)
+- ~~Internet Archive "52k collection"~~ — **dead link (404), removed 2026-06-03**
 
 ### Conversion tools
 - [jberg/milkdrop-preset-converter](https://github.com/jberg/milkdrop-preset-converter) — Browser-side .milk → JSON (MIT)
