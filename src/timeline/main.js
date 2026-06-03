@@ -212,6 +212,15 @@ async function boot(connectAudioFn) {
 
     // Load custom presets (not included in engine.init())
     engine.refreshCustomPresets();
+    // Phase 1: register installed community-pack presets (behave like bundled).
+    await engine.loadCommunityPresets();
+    // Dev-only pack-engine console hook (tree-shaken from prod).
+    if (import.meta.env.DEV) {
+        import('../packInstaller.js').then((m) => {
+            window.__dcPacks = { ...m, engine };
+            console.log('[dev] window.__dcPacks ready · try: await __dcPacks.smokeFromBundled(__dcPacks.engine)');
+        });
+    }
 
     // Create the editor
     editor = new TimelineEditor({ engine, canvasContainer });

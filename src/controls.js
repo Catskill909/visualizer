@@ -13,6 +13,7 @@ import {
   CUSTOM_PREFIX,
 } from './customPresets.js';
 import { showImportResult } from './importResultModal.js';
+import { showPackBrowser } from './packBrowser.js';
 import { pickAndConnect } from './devicePicker.js';
 import { initOutputUI } from './output/outputUI.js';
 
@@ -294,7 +295,12 @@ export class ControlPanel {
 
     // --- Backup / Restore custom presets ---
     els.btnExportAll.addEventListener('click', () => this.exportAllCustomPresets());
-    els.btnImportPresets.addEventListener('click', () => els.importFileInput.click());
+    // Phase 2: the Import button opens the Browse-Packs modal (Community Packs + From File tabs)
+    // instead of a bare file picker. The File tab reuses importCustomPresetsFromFile.
+    els.btnImportPresets.addEventListener('click', () => showPackBrowser({
+      engine: this.engine,
+      onImportFile: (file) => this.importCustomPresetsFromFile(file),
+    }));
     els.importFileInput.addEventListener('change', (e) => {
       const file = e.target.files && e.target.files[0];
       if (file) this.importCustomPresetsFromFile(file);

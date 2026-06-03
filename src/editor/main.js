@@ -323,10 +323,11 @@ async function mountMicWidget(deviceId, label) {
 // Searchable modal that lists all 1,144 bundled library presets.
 // Opens from the "Remix…" footer button; calls loadBundledPreset on selection.
 
-let _rpNames = null; // cached bundled preset name list — built once after engine init
+let _rpNames = null; // bundled + community preset keys (rebuilt on each open)
 
 function _rpBuild() {
-    if (_rpNames || !engine) return;
+    if (!engine) return;
+    // Rebuild every open so freshly-installed community packs appear without a reload.
     _rpNames = engine.getPresetNames().filter(n => !n.startsWith(CUSTOM_PREFIX));
 }
 
@@ -341,7 +342,7 @@ function _rpRender(filter) {
     const cap = Math.min(hits.length, 800);
     for (let i = 0; i < cap; i++) {
         const li = document.createElement('li');
-        li.textContent = hits[i];
+        li.textContent = engine.displayName(hits[i]);   // clean label (strips community:/custom: prefix)
         li.dataset.name = hits[i];
         li.addEventListener('click', () => _rpSelect(hits[i]));
         frag.appendChild(li);
@@ -439,6 +440,15 @@ async function boot(connectAudioFn) {
 
     engine = new VisualizerEngine();
     engine.init(canvasEl);
+    // Phase 1: register installed community-pack presets so they're available here too.
+    await engine.loadCommunityPresets();
+    // Dev-only pack-engine console hook (tree-shaken from prod). Same as the player's.
+    if (import.meta.env.DEV) {
+        import('../packInstaller.js').then((m) => {
+            window.__dcPacks = { ...m, engine };
+            console.log('[dev] window.__dcPacks ready · try: await __dcPacks.smokeFromBundled(__dcPacks.engine)');
+        });
+    }
     sizeCanvas();
     window.addEventListener('resize', sizeCanvas);
 

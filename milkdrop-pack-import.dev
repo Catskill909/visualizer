@@ -16,17 +16,27 @@ like the bundled ones.
 |---|---|---|---|
 | ✅ | **0** | Storage rebuild: custom presets localStorage → **IndexedDB** (kills the ~200-preset "Storage full" wall) | **SHIPPED & verified** — web + macOS |
 | ✅ | **4** | **Tauri-FS mirror** — native-file preset storage on desktop (platform parity) | **BUILT** into a notarized macOS DMG · Windows needs its GH-Actions build (you trigger) |
-| 📋 | **1** | **The import ENGINE** — community preset store + install/uninstall pipeline | **PLANNED & pick-up-ready (§13)** ← **NEXT** · no code yet |
-| ⬜ | **2** | Manifest + "Browse Packs" UI — **design decided (§4): one shared tabbed modal** (`From File` + `Community Packs`); **progress UX specced (§2c): real % download + live "N / M installed" counts, inline per-card, cancellable, honest partial-success** | not started (design done) |
+| ✅ | **1** | **The import ENGINE** — community preset store + install/uninstall pipeline | **BUILT & VERIFIED 2026-06-03** — headless-browser smoke test **5/5** (`npm run verify:packs`): 8 community presets register, a preset loads via WebGL, displayName strips prefix, uninstall→0 |
+| ✅ | **2** | Manifest + "Browse Packs" modal UI (install/uninstall + progress) | **BUILT & VERIFIED 2026-06-03** — `packBrowser.js` modal, `public/pack-manifest.json`, local fixture pack; wired to **player + Preset Studio** Import buttons; headless **8/8** (open→install 24→remove). (Timeline "Import" is show-import — community presets are available there via the shared store, no separate button.) Real installable packs come from Phase 3 |
 | ⬜ | **3** | `.milk` converter → ship curated **Cream-of-the-Crop** themed JSON packs | not started |
 
 > Phase 4 ran ahead of 1–3 because it completed the **storage/parity foundation** (same track as
 > Phase 0). The community-pack feature itself is Phases 1→2→3.
 
-**▶️ NEXT SESSION:** build the engine — follow the ordered checklist in **§13.7**. First step:
-confirm `jszip`, then add the community store to `presetStore.js`. Key design (verified, §13.1):
-community presets register like **bundled** presets (raw JSON), **IndexedDB-only**, and **skip**
-`refreshCustomPresets`.
+**📍 WHERE WE ARE:** Phases **0, 1, 2 DONE & verified** (web). **Now: a macOS parity check** before
+Phase 3 — confirming the import-packs pipeline works in the packaged Mac app with a *same-origin*
+(bundled) pack. **NEXT after that: Phase 3** (the `.milk` converter → real Cream packs).
+
+**🔧 PARITY — what's done / what's left (§14):**
+- ✅ **macOS DONE & VERIFIED 2026-06-03** — Tauri `connect-src` same-origin fix shipped in a notarized
+  DMG; user installed it and confirmed Import → Install Starter Essentials → search "Starter" works.
+  Import-packs pipeline proven on the Mac app.
+- 🔬 **Windows — pending verify** (user testing soon). The **same** `tauri.conf.json` CSP fix already
+  covers it (one config, both desktop platforms). NOTE: the Windows `.exe` is built by **GitHub Actions
+  from the pushed repo** — so the feature must be **committed/pushed first** before a Windows build
+  includes it (currently all local per the keep-local-until-done plan).
+- ⬜ **Remote/CDN allowlist** — NOT done, NOT needed yet. Only for an online catalog (Phase 3): add the
+  host to `connect-src` in BOTH `nginx.conf` (web) + `tauri.conf.json` (desktop).
 
 **📦 Pack strategy (locked — §2.5):** ship **small, curated** themed packs; **AVOID the mega dumps**
 (Ansorre 15k is unsorted + unlicensed; Cream 9.8k / WACUP 100k too big). The curated "best of" is
@@ -52,7 +62,8 @@ pack (needs the Phase 3 converter).
 10. [Phased Implementation Plan](#10-phased-implementation-plan)
 11. [Verified Code Audit (2026-06-02)](#11-verified-code-audit-2026-06-02)
 12. [Doability Assessment & Risk Tiers](#12-doability-assessment--risk-tiers-2026-06-02)
-13. [Phase 1 Engine — Pick-Up-Ready Execution Plan](#13-phase-1-engine--pick-up-ready-execution-plan-post-phase-0-2026-06-02) ⭐ **start here next session**
+13. [Phase 1 Engine — Pick-Up-Ready Execution Plan](#13-phase-1-engine--pick-up-ready-execution-plan-post-phase-0-2026-06-02)
+14. [Cross-Platform Parity Audit](#14-cross-platform-parity-audit-2026-06-03) ⚠️ **CSP work before Phase 3 packs**
 
 ---
 
@@ -303,6 +314,27 @@ buttons that already exist** (player + Preset Studio). Reasoning:
 **Tabs:** `From File` (today: `.dcshow.json`; **later: `.milk` lands in this same tab** via the
 Phase 3 converter) · `Community Packs` (browse + install + manage). This is exactly the
 "one clear interface for files OR packs OR future .milk" the user described.
+
+### ✅ WHAT SHIPPED (2026-06-03 — modal built & headless-verified 8/8)
+
+- **`src/packBrowser.js`** — the shared modal: `showPackBrowser({ engine, onImportFile })`. Two tabs
+  (`Community Packs` default, `From File`). Self-injects its styles (one component, not triplicated).
+  Per-card §2c progress (download % · unzip · install N/M), cancel via AbortController, honest
+  "N installed · M skipped", install/uninstall calling `packInstaller`, footer counts.
+- **`public/pack-manifest.json`** — catalog the modal fetches (same-origin).
+- **Local dev fixture** — `scripts/make-test-pack.mjs` builds `public/packs/starter-essentials.zip`
+  (24 real Butterchurn presets) so installs are genuine locally with no remote/CORS/converter.
+  *Dev fixture only — real packs arrive via Phase 3 (Cream).*
+- **Wired to the player** Import button (`controls.js` → `showPackBrowser`, File tab reuses
+  `importCustomPresetsFromFile`). **Dev hook** `__dcPacks.openBrowser()`.
+- **Verified:** `npm run verify:packs` drives the real modal — open → Install (24 register live) →
+  Remove (→ 0). 8/8.
+
+**Phase 2 button wiring COMPLETE (2026-06-03):** **player** (`controls.js`) + **Preset Studio**
+(`presetLibrary.js #btn-import`) Import buttons both open `showPackBrowser`. The **timeline's**
+"Import" is *show*-import (a timeline bundle), NOT preset-pack import — so it's intentionally left
+alone; community presets are still available in the timeline via the shared store +
+`loadCommunityPresets()` at boot. Real installable packs depend on Phase 3 (the fixture is dev-only).
 
 ### The Modal: Two-Tab Design
 
@@ -1799,6 +1831,38 @@ survive reload, and uninstall cleanly. **Not shipped** — just proves the pipel
 3. **Pack-meta storage** — small IDB `community_packs` store vs a localStorage index (tiny, fine).
 4. **Eager vs lazy** — confirm eager-load is acceptable given the small-pack cap (recommended yes).
 
+### 13.8 ✅ WHAT SHIPPED (2026-06-03 — engine built)
+
+Phase 1 engine is built and compiles clean; the IndexedDB data layer passed a headless test (7/7).
+
+- **`src/presetStore.js`** — DB bumped to **v2** with `community` (keyPath `key`, `packId` index) +
+  `community_packs` stores; CRUD: `storeCommunityBatch`, `loadAllCommunity`, `deletePackPresets`
+  (via the index), `recordPack` / `listInstalledPacks` / `removePack`; `COMMUNITY_PREFIX` export.
+  IndexedDB-only, all platforms (§13.2).
+- **`src/visualizer.js`** — `loadCommunityPresets()` registers community presets like bundled
+  (rebuild order bundled→community→custom; skips `refreshCustomPresets`); `displayName()` strips the
+  `community:` prefix; `refreshCustomPresets` preserves community keys.
+- **Boot wiring** — `await engine.loadCommunityPresets()` in `main.js`, `editor/main.js`,
+  `timeline/main.js`.
+- **`src/packInstaller.js`** (new) — `installPackFromZip(pack,{engine,onProgress,signal,limit})`
+  (fetch+unzip+validate+store+record+refresh, real progress + AbortController), `uninstallPack`,
+  + dev helpers `smokeFromBundled` (zero-network) and `installAnsorreSlice` (heavy real-path test).
+- **`jszip`** added (lazy-imported, only during install). **Dev-only `window.__dcPacks`** console
+  hook in `main.js` (tree-shaken from prod).
+
+**✅ VERIFIED headlessly (2026-06-03) — `npm run verify:packs`** (with the dev server running). A
+reusable Playwright harness (`scripts/verify-packs.mjs`) drives real Chromium (WebGL via SwiftShader)
+and asserts **5/5**: engine boots + `__dcPacks` present → `smokeFromBundled` registers 8 community
+presets → one **loads via `engine.loadPreset()`** (real WebGL path) → `displayName` strips the
+`community:` prefix → `uninstallPack` removes all (→ 0). **Reuse this harness for Phase 2/3.**
+
+Manual console equivalents (any dev surface — player/editor/timeline expose the hook):
+```js
+await __dcPacks.smokeFromBundled(__dcPacks.engine)                          // 8 bundled → community pack
+await __dcPacks.uninstallPack('smoke-test', { engine: __dcPacks.engine })   // remove them
+await __dcPacks.installAnsorreSlice({ engine: __dcPacks.engine, count: 200, onProgress: console.log }) // heavy real download+unzip
+```
+
 ### 13.7 ✅ PICK UP HERE (ordered build steps, next session)
 
 1. `presetStore.js`: add the `community` object store + CRUD (13.3). Unit-test in console.
@@ -1810,6 +1874,57 @@ survive reload, and uninstall cleanly. **Not shipped** — just proves the pipel
 
 **Prereq check before coding:** confirm `jszip` install is acceptable; re-read §13.1–13.2 so the
 "community = bundled-like, IndexedDB-only, skips refreshCustomPresets" model is fresh.
+
+---
+
+## 14. Cross-Platform Parity Audit (2026-06-03)
+
+Audit of whether the pack-import feature works on the macOS (Tauri/WKWebView) and Windows
+(Tauri/WebView2) desktop apps, vs web.
+
+### 14.1 What's already fine on all platforms ✅
+- **Storage** — custom presets: Tauri-FS mirror on desktop (Phase 4) + IndexedDB on web; community
+  presets: **IndexedDB on every platform** (incl. Tauri — re-downloadable, eviction = reinstall, so
+  no FS mirror needed). IndexedDB is available in WKWebView + WebView2.
+- **Modal UI + jszip + the engine** — pure DOM/JS; runs identically in both webviews.
+
+### 14.2 The gap — CSP `connect-src` blocks pack downloads ⚠️ (Phase-3 prerequisite)
+
+`fetch()` is governed by CSP `connect-src`. Current state (verified 2026-06-03):
+
+| Layer | `connect-src` | Same-origin fixture | Remote CDN pack (Phase 3) |
+|---|---|---|---|
+| **Web** [nginx.conf](nginx.conf) | `'self'` | ✅ works | ❌ blocked |
+| **Tauri** macOS+Windows [tauri.conf.json](src-tauri/tauri.conf.json) | `ipc: http://ipc.localhost asset: https://asset.localhost` (no `'self'`/`tauri:`) | ⚠️ **may even block the local manifest fetch — must verify in a packaged build** | ❌ blocked |
+
+**Why it works today:** the Starter fixture is served same-origin from `public/`, so web's
+`'self'` passes it. Real packs from a host will be blocked on both platforms; the Tauri
+`connect-src` is narrow enough it may block the same-origin manifest fetch too.
+
+### 14.3 Parity work — status
+
+**STAGE 1 — same-origin (bundled) packs on desktop · IN PROGRESS (2026-06-03):**
+- ✅ **DONE — Tauri `connect-src` now includes `'self' tauri: https://tauri.localhost`**
+  ([tauri.conf.json](src-tauri/tauri.conf.json)) so the Mac/Windows app can fetch its own bundled
+  `pack-manifest.json` + `/packs/*.zip`. One config, covers both desktop platforms.
+- ✅ **macOS VERIFIED 2026-06-03** — test DMG (`DiscoCast Visualizer-1.0.20260603.1349.dmg`, notarized)
+  installed; Import → Install Starter Essentials → search "Starter" works in the packaged Mac app. The
+  same-origin CSP fix is correct. **Import-packs is DONE for macOS.**
+- 🔬 **Windows `.exe` — pending** (user testing soon). Same `tauri.conf.json` fix covers it; built by
+  GitHub Actions, so the feature must be **pushed first**.
+
+**STAGE 2 — remote/CDN packs · NOT YET (only needed for an online catalog, Phase 3):**
+1. **Decide the pack host** — jsDelivr-from-a-GitHub-repo (zero-cost, CORS-clean) vs our own domain.
+   Recommend bundling the **manifest** in `public/` (same-origin) and hosting only pack **ZIPs** on
+   the CDN, so only the ZIP host needs allowlisting.
+2. **Web:** add the host to `connect-src` in `nginx.conf` (e.g. `connect-src 'self' https://cdn.jsdelivr.net`).
+3. **Tauri:** add the host to `connect-src` in `tauri.conf.json` (alongside the `'self'` already added).
+4. **Verify** a real remote pack installs in the macOS DMG **and** Windows `.exe`.
+
+### 14.4 Installers
+The currently-shipped DMG + Windows `.exe` **predate this feature** — they don't have it. New builds
+come after Phase 3 + commit: macOS via `./build-and-sign.sh`; Windows via GitHub Actions (user
+triggers — see [[feedback_manual_ci_builds]]).
 
 ---
 

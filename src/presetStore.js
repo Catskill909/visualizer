@@ -28,8 +28,14 @@
  */
 
 const DB_NAME       = 'discocast_presets';
-const DB_VERSION    = 1;
+const DB_VERSION    = 2;   // v2: added community + community_packs stores (Phase 1)
 const STORE         = 'presets';
+// Community packs (milkdrop-pack-import.dev Phase 1 / §13): downloaded preset packs.
+// IndexedDB-ONLY on every platform (incl. Tauri) — packs are re-downloadable, so eviction
+// just means reinstall, not data loss → no native-FS mirror needed (§13.2).
+const COMMUNITY_STORE = 'community';        // key: `community:<packId>:<name>`, value: {key, packId, preset}
+const PACKS_STORE     = 'community_packs';  // key: packId, value: pack metadata
+export const COMMUNITY_PREFIX = 'community:'; // registry-key namespace for community presets
 const LS_KEY        = 'discocast_custom_presets';
 const LS_LEGACY     = 'milkscreen_custom_presets';   // pre-DiscoCast MilkScreen key
 const MIGRATED_FLAG = 'dc_presets_migrated_v1';
@@ -50,6 +56,14 @@ function _openDB() {
             const db = e.target.result;
             if (!db.objectStoreNames.contains(STORE)) {
                 db.createObjectStore(STORE, { keyPath: 'id' });
+            }
+            // v2 — community pack stores (added without touching the existing `presets` store)
+            if (!db.objectStoreNames.contains(COMMUNITY_STORE)) {
+                const cs = db.createObjectStore(COMMUNITY_STORE, { keyPath: 'key' });
+                cs.createIndex('packId', 'packId', { unique: false }); // for fast per-pack delete
+            }
+            if (!db.objectStoreNames.contains(PACKS_STORE)) {
+                db.createObjectStore(PACKS_STORE, { keyPath: 'id' });
             }
         };
         req.onsuccess = (e) => resolve(e.target.result);
@@ -312,4 +326,82 @@ export function deleteRecord(id) {
         return;
     }
     _idbDelete(id).catch((e) => console.error('[presetStore] IndexedDB delete failed:', e));
+}
+
+// ---------------------------------------------------------------------------
+// Community packs — downloaded preset packs (Phase 1 / §13)
+// IndexedDB-only on every platform (re-downloadable → no FS mirror, §13.2). These are raw
+// Butterchurn JSON; the engine registers them like BUNDLED presets, so they NEVER go through
+// the custom cache / refreshCustomPresets eq-loop (§13.1).
+// ---------------------------------------------------------------------------
+
+/**
+ * Bulk-store community presets in a single transaction.
+ * @param {{key:string, packId:string, preset:object}[]} entries
+ */
+export function storeCommunityBatch(entries) {
+    return _openDB().then(db => new Promise((resolve, reject) => {
+        const tx = db.transaction(COMMUNITY_STORE, 'readwrite');
+        const os = tx.objectStore(COMMUNITY_STORE);
+        for (const e of entries) os.put(e);
+        tx.oncomplete = () => resolve();
+        tx.onerror = (ev) => reject(ev.target.error);
+    }));
+}
+
+/** All community records → [{ key, packId, preset }]. Used by engine.loadCommunityPresets(). */
+export function loadAllCommunity() {
+    return _openDB().then(db => new Promise((resolve, reject) => {
+        const tx = db.transaction(COMMUNITY_STORE, 'readonly');
+        const req = tx.objectStore(COMMUNITY_STORE).getAll();
+        req.onsuccess = (e) => resolve(e.target.result || []);
+        req.onerror = (e) => reject(e.target.error);
+    }));
+}
+
+/** Delete every community preset belonging to a pack (via the packId index). Resolves to count. */
+export function deletePackPresets(packId) {
+    return _openDB().then(db => new Promise((resolve, reject) => {
+        const tx = db.transaction(COMMUNITY_STORE, 'readwrite');
+        const cursorReq = tx.objectStore(COMMUNITY_STORE).index('packId').openCursor(IDBKeyRange.only(packId));
+        let n = 0;
+        cursorReq.onsuccess = (e) => {
+            const cur = e.target.result;
+            if (cur) { cur.delete(); n++; cur.continue(); }
+        };
+        tx.oncomplete = () => resolve(n);
+        tx.onerror = (e) => reject(e.target.error);
+    }));
+}
+
+// --- Installed-pack metadata ---
+
+/** Record/replace a pack's metadata. @param {{id:string, name, presetCount, installedAt, ...}} meta */
+export function recordPack(meta) {
+    return _openDB().then(db => new Promise((resolve, reject) => {
+        const tx = db.transaction(PACKS_STORE, 'readwrite');
+        tx.objectStore(PACKS_STORE).put(meta);
+        tx.oncomplete = () => resolve();
+        tx.onerror = (e) => reject(e.target.error);
+    }));
+}
+
+/** All installed pack metadata → PackMeta[]. */
+export function listInstalledPacks() {
+    return _openDB().then(db => new Promise((resolve, reject) => {
+        const tx = db.transaction(PACKS_STORE, 'readonly');
+        const req = tx.objectStore(PACKS_STORE).getAll();
+        req.onsuccess = (e) => resolve(e.target.result || []);
+        req.onerror = (e) => reject(e.target.error);
+    }));
+}
+
+/** Remove a pack's metadata row (call deletePackPresets separately for its presets). */
+export function removePack(packId) {
+    return _openDB().then(db => new Promise((resolve, reject) => {
+        const tx = db.transaction(PACKS_STORE, 'readwrite');
+        tx.objectStore(PACKS_STORE).delete(packId);
+        tx.oncomplete = () => resolve();
+        tx.onerror = (e) => reject(e.target.error);
+    }));
 }

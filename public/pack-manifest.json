@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "updatedAt": "2026-06-03",
+  "packs": [
+    {
+      "id": "starter-essentials",
+      "name": "Starter Essentials",
+      "brand": "Starter",
+      "author": "Butterchurn",
+      "description": "A 24-preset sampler of classic Butterchurn visuals — a quick taste of how community packs install and play.",
+      "presetCount": 24,
+      "format": "butterchurn-json-zip",
+      "downloadUrl": "/packs/starter-essentials.zip",
+      "sizeEstimateMB": 0.05,
+      "tags": ["starter", "sampler"],
+      "icon": "✨"
+    }
+  ]
+}

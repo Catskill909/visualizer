@@ -11,6 +11,7 @@ import butterchurnPresetsExtra from 'butterchurn-presets/lib/butterchurnPresetsE
 import butterchurnPresetsExtra2 from 'butterchurn-presets/lib/butterchurnPresetsExtra2.min.js';
 import butterchurnPresetsMD1 from 'butterchurn-presets/lib/butterchurnPresetsMD1.min.js';
 import { loadAllCustomPresets, CUSTOM_PREFIX, registryKey, getImage, buildMotionReactFrameEqs, buildWaveReactFrameEqs, buildAnimFrameEqs, buildMotionEngineFrameEqs, buildShapeMotionEqs, buildWarpShader } from './customPresets.js';
+import { loadAllCommunity, COMMUNITY_PREFIX } from './presetStore.js';
 import { parseGIF, decompressFrames } from 'gifuct-js';
 // animation-dev.md — drive entrance/exit/idle in the player & timeline (not just
 // the editor). animation.js is the same GSAP driver the editor uses; gsap here is
@@ -455,9 +456,10 @@ export class VisualizerEngine {
 
   getPresetNames() { return this.presetNames; }
 
-  /** Strip the `custom:<id>:` prefix from a registry key for display. */
+  /** Strip the `custom:<id>:` / `community:<packId>:` prefix from a registry key for display. */
   displayName(name) {
-    if (name && name.startsWith(CUSTOM_PREFIX)) {
+    if (name && (name.startsWith(CUSTOM_PREFIX) || name.startsWith(COMMUNITY_PREFIX))) {
+      // custom:<id>:<name> and community:<packId>:<name> — name may contain ':', so slice after 2nd
       const parts = name.split(':');
       return parts.slice(2).join(':');
     }
@@ -619,12 +621,46 @@ export class VisualizerEngine {
       }
       this.presets[key] = preset;
     }
-    // Rebuild sorted name list: bundled (no prefix) then custom
-    const bundled = this.presetNames.filter(n => !n.startsWith(CUSTOM_PREFIX));
+    // Rebuild sorted name list: bundled → community → custom (community preserved in place)
+    const bundled = this.presetNames.filter(n => !n.startsWith(CUSTOM_PREFIX) && !n.startsWith(COMMUNITY_PREFIX));
+    const community = this.presetNames.filter(n => n.startsWith(COMMUNITY_PREFIX));
     const custom = Object.keys(this.presets)
       .filter(n => n.startsWith(CUSTOM_PREFIX))
       .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-    this.presetNames = [...bundled, ...custom];
+    this.presetNames = [...bundled, ...community, ...custom];
+  }
+
+  /**
+   * Register downloaded community-pack presets (Phase 1 / §13). They behave like BUNDLED
+   * presets — raw Butterchurn JSON in this.presets under `community:<packId>:<name>` keys —
+   * so they SKIP refreshCustomPresets()'s eq-build loop and the custom image/animation paths
+   * (those gate on CUSTOM_PREFIX). IndexedDB-only; safe to call at boot and after install/uninstall.
+   */
+  async loadCommunityPresets() {
+    let records;
+    try {
+      records = await loadAllCommunity();
+    } catch (e) {
+      console.warn('[DiscoCast Visualizer] Community presets load failed:', e?.message || e);
+      return 0;
+    }
+    // Drop any previously-registered community keys first (clean refresh after install/uninstall)
+    for (const name of Object.keys(this.presets)) {
+      if (name.startsWith(COMMUNITY_PREFIX)) delete this.presets[name];
+    }
+    let n = 0;
+    for (const rec of records) {
+      if (rec && rec.key && rec.preset) { this.presets[rec.key] = rec.preset; n++; }
+    }
+    // Rebuild name list: bundled → community → custom (each sorted)
+    const sortCI = (arr) => arr.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+    const keys = Object.keys(this.presets);
+    const bundled   = sortCI(keys.filter(k => !k.startsWith(CUSTOM_PREFIX) && !k.startsWith(COMMUNITY_PREFIX)));
+    const community = sortCI(keys.filter(k => k.startsWith(COMMUNITY_PREFIX)));
+    const custom    = sortCI(keys.filter(k => k.startsWith(CUSTOM_PREFIX)));
+    this.presetNames = [...bundled, ...community, ...custom];
+    console.log(`[DiscoCast Visualizer] Community: ${n} preset${n === 1 ? '' : 's'} registered`);
+    return n;
   }
 
   setSize(width, height) {

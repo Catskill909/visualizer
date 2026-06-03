@@ -15,6 +15,7 @@ import {
 } from '../customPresets.js';
 import { showToast } from './inspector.js';
 import { showImportResult } from '../importResultModal.js';
+import { showPackBrowser } from '../packBrowser.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -130,8 +131,13 @@ export class PresetLibrary {
             this._exportAll();
         });
 
+        // Phase 2: open the Browse-Packs modal (Community Packs + From File) instead of a bare
+        // file picker. The File tab reuses _importFrom for .dcshow.json imports.
         document.getElementById('btn-import')?.addEventListener('click', () => {
-            document.getElementById('import-file-input')?.click();
+            showPackBrowser({
+                engine: this._engine,
+                onImportFile: (file) => this._importFrom(file),
+            });
         });
 
         document.getElementById('import-file-input')?.addEventListener('change', e => {

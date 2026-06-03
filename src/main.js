@@ -42,7 +42,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Re-sync the favorite pool after so custom-preset favorites pass the
     // this.presets[n] check in _cyclePool (ControlPanel syncs before refresh).
     engine.refreshCustomPresets();
+    // Register installed community-pack presets (Phase 1) — they behave like bundled presets.
+    await engine.loadCommunityPresets();
     controls.syncFavoritePool();
+
+    // Dev-only console hook for the pack engine (no UI yet — Phase 2). Tree-shaken out of
+    // production builds. Try: await __dcPacks.smokeFromBundled(__dcPacks.engine)
+    if (import.meta.env.DEV) {
+      Promise.all([import('./packInstaller.js'), import('./packBrowser.js')]).then(([pi, pb]) => {
+        window.__dcPacks = { ...pi, ...pb, engine,
+          openBrowser: () => pb.showPackBrowser({ engine, onImportFile: (f) => controls.importCustomPresetsFromFile(f) }) };
+        console.log('[dev] window.__dcPacks ready · try: __dcPacks.openBrowser() or await __dcPacks.smokeFromBundled(__dcPacks.engine)');
+      });
+    }
 
     // Initial canvas sizing
     engine.setSize(window.innerWidth, window.innerHeight);
