@@ -1,5 +1,5 @@
 /**
- * packInstaller.js — Community pack install / uninstall pipeline (Phase 1 / milkdrop-pack-import.dev §13).
+ * packInstaller.js — Community pack install / uninstall pipeline (Phase 1 / milkdrop-pack-import.md §13).
  *
  * Flow: fetch ZIP → unzip (JSZip, lazy) → validate Butterchurn JSON → storeCommunityBatch →
  * recordPack → engine.loadCommunityPresets(). Community presets register like BUNDLED presets,
@@ -64,7 +64,10 @@ async function _extractPresetsFromZip(blob, { onProgress = noop, limit = Infinit
         try {
             const preset = JSON.parse(await f.async('text'));
             if (!_isValidPreset(preset)) { failed.push({ name: f.name, error: 'not a Butterchurn preset' }); continue; }
-            const name = decodeURIComponent(f.name.split('/').pop().replace(/\.json$/i, ''));
+            // Zip entry names are literal preset names — guard decodeURIComponent so a literal
+            // '%' (common in MilkDrop names) doesn't throw URIError and drop the preset.
+            const base = f.name.split('/').pop().replace(/\.json$/i, '');
+            let name; try { name = decodeURIComponent(base); } catch { name = base; }
             presets.push({ name, preset });
         } catch (e) {
             failed.push({ name: f.name, error: e.message });

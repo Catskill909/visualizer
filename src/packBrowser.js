@@ -1,5 +1,5 @@
 /**
- * packBrowser.js — the shared Import / Browse-Packs modal (Phase 2 / milkdrop-pack-import.dev §4).
+ * packBrowser.js — the shared Import / Browse-Packs modal (Phase 2 / milkdrop-pack-import.md §4).
  *
  * ONE component injected into any page (player / editor / timeline) — not duplicated per page.
  * Two tabs: "From File" (the existing .dcshow.json import, handed to onImportFile) and
@@ -104,6 +104,17 @@ function _activateTab(name) {
 async function _renderPacks(engine) {
     const list = _root.querySelector('.dc-pack-list');
     const foot = _root.querySelector('.dc-pack-foot');
+
+    // Community packs are bundled in the DESKTOP app only (not served on the web — §15).
+    // Show them in the Tauri app, or in dev (so headless verify + local testing work).
+    const onDesktop = typeof window !== 'undefined' && !!window.__TAURI__;
+    const inDev = !!(import.meta && import.meta.env && import.meta.env.DEV);
+    if (!onDesktop && !inDev) {
+        list.innerHTML = `<div class="dc-pack-empty">Community packs install in the <b>DiscoCast desktop app</b>.
+          <br><span class="dc-pack-dim">Get the Mac/Windows app to browse &amp; install preset packs. The <b>From File</b> tab works here.</span></div>`;
+        return;
+    }
+
     let manifest, installed;
     try {
         [manifest, installed] = await Promise.all([
@@ -116,23 +127,62 @@ async function _renderPacks(engine) {
     }
     const installedById = new Map(installed.map((p) => [p.id, p]));
     const packs = manifest.packs || [];
-    list.innerHTML = packs.length ? '' : `<div class="dc-pack-empty">No packs available yet.</div>`;
+    list.innerHTML = '';
     for (const pack of packs) list.appendChild(_packCard(pack, installedById.get(pack.id), engine, foot, installed));
+    // Orphans: installed packs no longer in the catalog (e.g. a renamed/removed pack) — show them
+    // so they're removable. Without this they'd linger uninstallable in storage.
+    const manifestIds = new Set(packs.map((p) => p.id));
+    for (const meta of installed) {
+        if (!manifestIds.has(meta.id)) list.appendChild(_orphanCard(meta, engine));
+    }
+    if (!list.children.length) list.innerHTML = `<div class="dc-pack-empty">No packs available yet.</div>`;
     _renderFoot(foot, engine, installed);
+}
+
+// Card for an installed pack that's no longer in the manifest — Remove only.
+function _orphanCard(meta, engine) {
+    const card = document.createElement('div');
+    card.className = 'dc-pack-row';
+    card.innerHTML = `
+      <div class="dc-pack-ic">📦</div>
+      <div class="dc-pack-info">
+        <div class="dc-pack-name">${_esc(meta.name || meta.id)}</div>
+        <div class="dc-pack-meta">${meta.presetCount || '?'} presets · installed</div>
+        <div class="dc-pack-desc dc-pack-dim">No longer in the catalog</div>
+      </div>
+      <div class="dc-pack-act"><div class="dc-pack-badge">✓ Installed</div></div>`;
+    const rm = document.createElement('button');
+    rm.className = 'dc-pack-btn';
+    rm.textContent = 'Remove';
+    rm.addEventListener('click', async () => { rm.disabled = true; await uninstallPack(meta.id, { engine }); _renderPacks(engine); });
+    card.querySelector('.dc-pack-act').appendChild(rm);
+    return card;
 }
 
 function _packCard(pack, installedMeta, engine, foot) {
     const card = document.createElement('div');
     card.className = 'dc-pack-row';
     const sizeStr = pack.sizeEstimateMB ? (pack.sizeEstimateMB < 1 ? `${Math.round(pack.sizeEstimateMB * 1024)} KB` : `${pack.sizeEstimateMB} MB`) : '';
+    const credit = pack.sourceUrl
+        ? `<div class="dc-pack-src">Source: <a class="dc-pack-link" href="${_esc(pack.sourceUrl)}" target="_blank" rel="noopener">${_esc(pack.author || 'source')}</a>${pack.license ? ' · ' + _esc(pack.license) : ''}</div>`
+        : (pack.author ? `<div class="dc-pack-src">Source: ${_esc(pack.author)}${pack.license ? ' · ' + _esc(pack.license) : ''}</div>` : '');
     card.innerHTML = `
       <div class="dc-pack-ic">${pack.icon || '📦'}</div>
       <div class="dc-pack-info">
         <div class="dc-pack-name">${_esc(pack.name)}</div>
-        <div class="dc-pack-meta">${pack.presetCount} presets${pack.author ? ' · ' + _esc(pack.author) : ''}${sizeStr ? ' · ' + sizeStr : ''}</div>
+        <div class="dc-pack-meta">${pack.presetCount} presets${sizeStr ? ' · ' + sizeStr : ''}</div>
         <div class="dc-pack-desc">${_esc(pack.description || '')}</div>
+        ${credit}
       </div>
       <div class="dc-pack-act"></div>`;
+    // External link → open in the system browser on desktop (Tauri), normal link on web.
+    const link = card.querySelector('.dc-pack-link');
+    if (link) link.addEventListener('click', (e) => {
+        if (typeof window !== 'undefined' && window.__TAURI__ && window.__TAURI__.shell && window.__TAURI__.shell.open) {
+            e.preventDefault();
+            window.__TAURI__.shell.open(link.href).catch(() => {});
+        }
+    });
     const act = card.querySelector('.dc-pack-act');
     _setCardState(act, installedMeta ? 'installed' : 'idle', { pack, engine, foot });
     return card;
@@ -247,6 +297,8 @@ function _injectStyles() {
     .dc-pack-tab{background:transparent;border:1px solid transparent;color:#9aa0ad;padding:7px 13px;border-radius:9px;
       cursor:pointer;font-weight:600;font-size:13px}
     .dc-pack-tab.on{background:rgba(255,255,255,.07);color:#fff;border-color:rgba(255,255,255,.12)}
+    /* No focus ring on mouse-click; keyboard nav still gets one via :focus-visible */
+    .dc-pack-tab:focus:not(:focus-visible),.dc-pack-x:focus:not(:focus-visible),.dc-pack-btn:focus:not(:focus-visible){outline:none}
     .dc-pack-x{background:transparent;border:0;color:#9aa0ad;font-size:16px;cursor:pointer;padding:6px 8px;border-radius:8px}
     .dc-pack-x:hover{background:rgba(255,255,255,.07);color:#fff}
     .dc-pack-body{overflow:auto;padding:14px}
@@ -259,6 +311,9 @@ function _injectStyles() {
     .dc-pack-name{font-weight:700}
     .dc-pack-meta{color:#9aa0ad;font-size:12px;margin:2px 0}
     .dc-pack-desc{color:#b9bdc7;font-size:12.5px}
+    .dc-pack-src{font-size:11px;color:#6b7080;margin-top:3px}
+    .dc-pack-link{color:#7aa0ff;text-decoration:none}
+    .dc-pack-link:hover{text-decoration:underline}
     .dc-pack-dim{color:#6b7080}
     .dc-pack-act{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:5px;min-width:128px}
     .dc-pack-btn{border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);color:#e8e9ee;

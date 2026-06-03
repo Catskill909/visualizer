@@ -316,7 +316,7 @@ export class PresetLibrary {
             const next = input.value.trim() || prev;
             // Phase 0: route through saveCustomPreset (presetStore) instead of a raw
             // localStorage write — a raw write here would desync the cache + IndexedDB.
-            // See milkdrop-pack-import.dev §11.3 (the "hidden 5th writer").
+            // See milkdrop-pack-import.md §11.3 (the "hidden 5th writer").
             const record = loadAllCustomPresets()[id];
             if (record) {
                 try {

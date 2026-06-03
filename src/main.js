@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Phase 0: hydrate the preset cache from IndexedDB BEFORE the first read.
     // refreshCustomPresets() below reads loadAllCustomPresets() synchronously, so the
-    // cache must be populated first (see milkdrop-pack-import.dev §0 / Phase 0c).
+    // cache must be populated first (see milkdrop-pack-import.md §0 / Phase 0c).
     await hydratePresets();
 
     // Load custom presets into engine.presets immediately so favorites cycling

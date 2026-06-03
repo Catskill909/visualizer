@@ -41,6 +41,10 @@ macos-app-generate.md
 build-log.txt
 src-tauri/target/
 
+# Community pack ZIPs — derived from node_modules via scripts/make-pack.mjs; NOT committed
+# (kept out of git/Coolify per 2026-06-03 decision). Regenerated at build time, bundled locally.
+public/packs/*.zip
+
 # Allow the stable download in promo/ (served to users via Coolify)
 !promo/DiscoCast-Visualizer.dmg
 

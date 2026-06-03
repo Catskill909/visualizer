@@ -435,7 +435,7 @@ document.getElementById('remix-picker-search')?.addEventListener('input', e => {
 
 async function boot(connectAudioFn) {
     // Phase 0: hydrate the preset cache from IndexedDB before the inspector mounts or
-    // the Library reads loadAllCustomPresets() (see milkdrop-pack-import.dev §0).
+    // the Library reads loadAllCustomPresets() (see milkdrop-pack-import.md §0).
     await hydratePresets();
 
     engine = new VisualizerEngine();

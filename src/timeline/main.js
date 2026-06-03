@@ -207,7 +207,7 @@ async function boot(connectAudioFn) {
     shellEl.hidden = false;
 
     // Phase 0: hydrate the preset cache from IndexedDB before the first read
-    // (see milkdrop-pack-import.dev §0). refreshCustomPresets() reads synchronously.
+    // (see milkdrop-pack-import.md §0). refreshCustomPresets() reads synchronously.
     await hydratePresets();
 
     // Load custom presets (not included in engine.init())

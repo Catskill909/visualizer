@@ -1,7 +1,7 @@
 /**
  * presetStore.js — Unified IndexedDB preset-metadata store + boot-hydrated cache.
  *
- * WHY THIS EXISTS (milkdrop-pack-import.dev §0, Phase 0):
+ * WHY THIS EXISTS (milkdrop-pack-import.md §0, Phase 0):
  * Custom preset *metadata* used to live in localStorage (`discocast_custom_presets`),
  * which has a hard ~5–10 MB wall — a power user hits "Storage full" at a few hundred
  * presets. This store moves metadata into IndexedDB (browser-managed, gigabytes) while
@@ -30,7 +30,7 @@
 const DB_NAME       = 'discocast_presets';
 const DB_VERSION    = 2;   // v2: added community + community_packs stores (Phase 1)
 const STORE         = 'presets';
-// Community packs (milkdrop-pack-import.dev Phase 1 / §13): downloaded preset packs.
+// Community packs (milkdrop-pack-import.md Phase 1 / §13): downloaded preset packs.
 // IndexedDB-ONLY on every platform (incl. Tauri) — packs are re-downloadable, so eviction
 // just means reinstall, not data loss → no native-FS mirror needed (§13.2).
 const COMMUNITY_STORE = 'community';        // key: `community:<packId>:<name>`, value: {key, packId, preset}

@@ -214,7 +214,7 @@ async fn delete_blob(app: tauri::AppHandle, image_id: String) -> Result<(), Stri
 // blob commands above (one directory over: app_data_dir/presets/<id>.json). On the
 // desktop app the filesystem is authoritative for metadata because WKWebView/WebView2
 // can evict IndexedDB under storage pressure. JSON is plain UTF-8 text (not base64).
-// See milkdrop-pack-import.dev Phase 4.
+// See milkdrop-pack-import.md Phase 4.
 #[tauri::command]
 async fn store_preset(app: tauri::AppHandle, id: String, json: String) -> Result<(), String> {
     let data_dir = app.path_resolver().app_data_dir()

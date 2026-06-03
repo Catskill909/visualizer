@@ -3,7 +3,7 @@
  *
  * Metadata:  IndexedDB `discocast_presets` via presetStore.js (boot-hydrated cache).
  *            Migrated off localStorage `discocast_custom_presets` in Phase 0 — see
- *            milkdrop-pack-import.dev §0. The public CRUD API below is UNCHANGED in
+ *            milkdrop-pack-import.md §0. The public CRUD API below is UNCHANGED in
  *            signature; it now reads/writes the cache instead of localStorage, so the
  *            ~5–10 MB preset wall is gone.
  * Blobs:     IndexedDB `discocast_images` (or Tauri FS) — image/video blob per imageId.

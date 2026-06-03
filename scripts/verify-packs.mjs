@@ -2,8 +2,12 @@
 // Requires the dev server running (npm run dev). Run: node scripts/verify-packs.mjs
 // Reusable for Phase 2/3 — drives the real app in headless Chromium (WebGL via SwiftShader).
 import { chromium } from 'playwright';
+import fs from 'node:fs';
 
 const URL = process.env.DC_URL || 'http://localhost:5173/index.html';
+// First pack in the manifest drives the modal test (id + expected count).
+const manifest = JSON.parse(fs.readFileSync('public/pack-manifest.json', 'utf8'));
+const PACK = manifest.packs[0];
 let pass = 0, fail = 0;
 const ok = (label, cond, extra = '') => { (cond ? pass++ : fail++); console.log(`  ${cond ? '✓' : '✗'} ${label}${cond ? '' : '  — ' + extra}`); };
 
@@ -46,22 +50,29 @@ ok('a community preset loads via engine.loadPreset()', r.loaded === true, `loade
 ok(`displayName strips prefix ("${r.disp}")`, r.displayOk === true);
 ok('uninstall removes all (→ 0)', r.left === 0, `left ${r.left}`);
 
-// --- Modal UI test: open Browse-Packs → install the starter pack → remove ---
-console.log('\n  — modal (Browse Packs) —');
+// --- Modal UI test: open Browse-Packs → install ALL manifest packs → verify total → remove all ---
+const packs = manifest.packs;
+const expectedTotal = packs.reduce((s, p) => s + p.presetCount, 0);
+console.log(`\n  — modal (Browse Packs) · ${packs.length} pack(s), expect ${expectedTotal} total —`);
+const countCommunity = () => page.evaluate(() => window.__dcPacks.engine.getPresetNames().filter((n) => n.startsWith('community:')).length);
 try {
     await page.evaluate(() => window.__dcPacks.openBrowser());
     await page.waitForSelector('.dc-pack-row', { timeout: 10000 });
-    ok('modal opens with a pack card', (await page.locator('.dc-pack-row').count()) >= 1);
+    const rowCount = await page.locator('.dc-pack-row').count();
+    ok(`modal shows all ${packs.length} packs`, rowCount === packs.length, `got ${rowCount}`);
 
-    await page.locator('.dc-pack-row .dc-pack-btn.primary').first().click();
-    await page.waitForSelector('.dc-pack-badge', { timeout: 20000 }); // install of the 46 KB local zip
-    const reg = await page.evaluate(() => window.__dcPacks.engine.getPresetNames().filter((n) => n.startsWith('community:starter-essentials:')).length);
-    ok('modal Install → 24 community presets registered', reg === 24, `got ${reg}`);
+    for (let i = 0; i < rowCount; i++) {
+        const row = page.locator('.dc-pack-row').nth(i);
+        await row.locator('.dc-pack-btn.primary').click();
+        await row.locator('.dc-pack-badge').waitFor({ timeout: 30000 });
+    }
+    const total = await countCommunity();
+    ok(`all packs installed → ${expectedTotal} unique presets (no collisions)`, total === expectedTotal, `got ${total}`);
 
-    await page.locator('.dc-pack-row .dc-pack-btn', { hasText: 'Remove' }).first().click();
-    await page.waitForSelector('.dc-pack-row .dc-pack-btn.primary', { timeout: 10000 });
-    const left = await page.evaluate(() => window.__dcPacks.engine.getPresetNames().filter((n) => n.startsWith('community:starter-essentials:')).length);
-    ok('modal Remove → 0 left', left === 0, `left ${left}`);
+    const removeBtns = page.locator('.dc-pack-row .dc-pack-btn', { hasText: 'Remove' });
+    while (await removeBtns.count()) { await removeBtns.first().click(); await page.waitForTimeout(150); }
+    const left = await countCommunity();
+    ok('remove all → 0 left', left === 0, `left ${left}`);
 } catch (e) {
     ok('modal install/remove flow', false, e.message);
 }
