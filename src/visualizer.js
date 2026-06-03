@@ -494,7 +494,7 @@ export class VisualizerEngine {
           el.onerror = rej;
           el.src = dataURL;
         });
-        this.setUserTexture(img.texName, { data: dataURL, width: imgEl.naturalWidth, height: imgEl.naturalHeight, isGif, gifSpeed: img.gifSpeed || 1.0 });
+        this.setUserTexture(img.texName, { data: dataURL, width: imgEl.naturalWidth, height: imgEl.naturalHeight, isGif, gifSpeed: img.gifSpeed || 1.0, gifStability: img.gifStability || 0 });
         console.log('[DiscoCast Visualizer] Image bound:', img.texName, imgEl.naturalWidth + 'x' + imgEl.naturalHeight);
       } catch (e) {
         console.warn('[DiscoCast Visualizer] Failed to bind image for', img.texName, e.message);
@@ -966,7 +966,7 @@ export class VisualizerEngine {
       // reset frameIndex to 0 and clobber the live speed set via setGifAnimationSpeed.
       if (this._gifAnimations.has(name)) return;
       const optimizedData = texObj.optimizedGifData || null;
-      this._loadGifTexture(name, texObj.data, texObj.gifSpeed || 1.0, optimizedData);
+      this._loadGifTexture(name, texObj.data, texObj.gifSpeed || 1.0, optimizedData, texObj.gifStability || 0);
       return;
     }
     if (texObj.isVideo && texObj.videoElement) {
@@ -1233,7 +1233,7 @@ export class VisualizerEngine {
    * precision on semi-transparent pixels and produces the colour shift we observed.
    * Uploading a raw Uint8ClampedArray to texImage2D bypasses all of that.
    */
-  async _loadGifTexture(name, dataURL, speed = 1.0, optimizedData = null) {
+  async _loadGifTexture(name, dataURL, speed = 1.0, optimizedData = null, stability = 0) {
     try {
       const imgTextures = this.visualizer?.renderer?.image;
       if (!imgTextures?.gl) {
@@ -1272,7 +1272,7 @@ export class VisualizerEngine {
           width,
           height,
           speed,
-          stability: 0,
+          stability,
           avgDelay: avgDelay0
         });
 
@@ -1351,7 +1351,7 @@ export class VisualizerEngine {
 
       // Start deadline AFTER frame 0's delay so frame 0 shows first
       const avgDelayStd = delays.reduce((a, b) => a + b, 0) / delays.length;
-      this._gifAnimations.set(name, { frames, delays, gl, texture, frameIndex: 0, nextFrameAt: performance.now() + delays[0], width: W, height: H, speed, stability: 0, avgDelay: avgDelayStd });
+      this._gifAnimations.set(name, { frames, delays, gl, texture, frameIndex: 0, nextFrameAt: performance.now() + delays[0], width: W, height: H, speed, stability, avgDelay: avgDelayStd });
     } catch (e) {
       console.warn('[DiscoCast Visualizer] _loadGifTexture failed for', name, e.message);
     }

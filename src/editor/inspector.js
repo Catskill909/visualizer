@@ -4828,6 +4828,7 @@ export class EditorInspector {
             height: optimizedGifData ? optimizedGifData.height : resized.height,
             isGif: resized.isGif || false,
             gifSpeed: entry.gifSpeed,
+            gifStability: entry.gifStability,
             optimizedGifData // Pass pre-processed frames to visualizer if available
         };
         this._mountLayerCard(entry, texObj);
@@ -6928,6 +6929,10 @@ export class EditorInspector {
                     const pos = parseFloat(gifSpeedSl.value);
                     const v = 0.25 * Math.pow(32, pos);
                     entry.gifSpeed = v;
+                    // Keep the cached texObj in sync so any future re-decode
+                    // (_applyToEngine after the gif is removed/re-added) honors
+                    // the current speed instead of reverting to the mount-time value.
+                    if (this._imageTextures[entry.texName]) this._imageTextures[entry.texName].gifSpeed = v;
                     gifSpeedVal.textContent = `${v.toFixed(2)}×`;
                     gifSpeedSl.style.setProperty('--pct', `${(pos * 100).toFixed(1)}%`);
                     this.engine.setGifAnimationSpeed(entry.texName, v);
@@ -6950,6 +6955,9 @@ export class EditorInspector {
                 gifStabilitySl.addEventListener('input', () => {
                     const v = parseFloat(gifStabilitySl.value);
                     entry.gifStability = v;
+                    // Mirror the gifSpeed sync: keep the cached texObj current so a
+                    // later re-decode restores this stability instead of 0.
+                    if (this._imageTextures[entry.texName]) this._imageTextures[entry.texName].gifStability = v;
                     gifStabilityVal.textContent = v.toFixed(2);
                     gifStabilitySl.style.setProperty('--pct', `${(v * 100).toFixed(1)}%`);
                     this.engine.setGifAnimationStability(entry.texName, v);
@@ -10151,7 +10159,7 @@ export class EditorInspector {
                 });
 
                 const entry = this._normalizeImageEntry(deepClone(savedEntry));
-                const texObj = { data: dataUrl, width, height, isGif: !!entry.isGif };
+                const texObj = { data: dataUrl, width, height, isGif: !!entry.isGif, gifSpeed: entry.gifSpeed, gifStability: entry.gifStability };
 
                 this.currentState.images.push(entry);
                 this._mountLayerCard(entry, texObj);
