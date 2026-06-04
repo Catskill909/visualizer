@@ -641,11 +641,21 @@
             </button>
             <div class="welcome-rail-children" id="studio-sub">
               <button class="welcome-rail-child" type="button" data-section="studio" data-subsection="overview">Overview</button>
-              <button class="welcome-rail-child" type="button" data-section="studio" data-subsection="palette">Color & Palette</button>
-              <button class="welcome-rail-child" type="button" data-section="studio" data-subsection="motion">Motion & Wave</button>
-              <button class="welcome-rail-child" type="button" data-section="studio" data-subsection="layers">Layers</button>
-              <button class="welcome-rail-child" type="button" data-section="studio" data-subsection="effects">Effects & Animation</button>
-              <button class="welcome-rail-child" type="button" data-section="studio" data-subsection="text">Text Layers</button>
+              <button class="welcome-rail-child" type="button" data-section="studio" data-subsection="palette">Colour · Motion · Wave</button>
+              <button class="welcome-rail-child" type="button" data-section="studio" data-subsection="workflow">Workflow</button>
+            </div>
+            <button class="welcome-rail-btn has-children" type="button" role="tab" data-section="layers" data-expand="layers-sub">
+              <span class="rail-icon">🖼️</span>Layers
+              <span class="rail-expand">›</span>
+            </button>
+            <div class="welcome-rail-children" id="layers-sub">
+              <button class="welcome-rail-child" type="button" data-section="layers" data-subsection="images">Image &amp; Video</button>
+              <button class="welcome-rail-child" type="button" data-section="layers" data-subsection="meld">Meld ✨</button>
+              <button class="welcome-rail-child" type="button" data-section="layers" data-subsection="animation">Animation</button>
+              <button class="welcome-rail-child" type="button" data-section="layers" data-subsection="gifs">Animated GIFs</button>
+              <button class="welcome-rail-child" type="button" data-section="layers" data-subsection="video">Video &amp; Transparency</button>
+              <button class="welcome-rail-child" type="button" data-section="layers" data-subsection="text">Text Layers</button>
+              <button class="welcome-rail-child" type="button" data-section="layers" data-subsection="effects">Per-Layer Effects</button>
             </div>
             <button class="welcome-rail-btn has-children" type="button" role="tab" data-section="timeline" data-expand="timeline-sub">
               <span class="rail-icon">🎬</span>Timeline Editor
@@ -967,7 +977,35 @@
               <p style="margin-top:12px"><strong>The icon footer (5 big buttons with instant tooltips):</strong> <strong>＋ New</strong> (blank baseline), <strong>🎲 Random</strong> (one-click loads a random preset from the 1,144 bundled library as your editing base — turns the Studio into 1,144 starting points instead of one; click again to reroll), <strong>🎲 Remix ✨</strong> (rolls a <em>complete</em> new preset in one press — a moving colour field + three contrasting colours + a motion + a flow + a wave, all pulsing to the audio; open <strong>🎲 Remix locks</strong> just above the footer to pin the parts you love — Colours / Field / Motion / Flow / Reactivity — and re-roll only the rest), <strong>💾 Save</strong>, <strong>↺ Reset</strong>. Two universal shortcuts: double-click any slider label to reset it to its default value, and pair 🎲 Random (load a bundled preset) with the Color adjustments + Color Reactivity to re-mood any of the 1,144 presets.</p>
             </div>
 
-            <div class="welcome-feature" data-subsection="layers">
+            <div class="welcome-feature" data-subsection="workflow">
+              <div class="welcome-feature-title">Workflow</div>
+              <ul class="welcome-list">
+                <li><strong>Undo / Redo</strong> — 50-deep stack. <kbd>⌘Z</kbd> / <kbd>⌘⇧Z</kbd>.</li>
+                <li><strong>A/B compare</strong> — hold the button to preview the saved state; release to restore.</li>
+                <li><strong>Save</strong> — writes to your browser (localStorage + IndexedDB for images). Saved presets
+                  appear in the <em>My Presets</em> tab of the main app.</li>
+                <li><strong>Reset a slider</strong> — double-click its label to snap it back to the default
+                  value instantly. Works on every slider in every layer card.</li>
+                <li><strong>Preview mode</strong> — click the expand icon in the top-right corner of the topbar
+                  (or press <kbd>\</kbd>) to hide the panel and see the full canvas. Click anywhere on the canvas
+                  to restore the panel.</li>
+                <li><strong>First-use tips</strong> — a tips modal appears when you open the editor. Dismiss it
+                  freely or click "Never show again" to stop it appearing. Reset with
+                  <code>localStorage.removeItem('discocast_onboarding_never')</code> in the browser console.</li>
+                <li><strong>Dev HUD</strong> — press <kbd>`</kbd> (backtick) to overlay frame time, estimated VRAM,
+                  active layer count, and last shader rebuild time.</li>
+              </ul>
+            </div>
+          </section>
+
+          <!-- ============================================================
+               LAYERS — its own deep section (image / video / GIF / text + Meld)
+               ============================================================ -->
+          <section class="welcome-section" data-section="layers" role="tabpanel">
+            <h4>🖼️ Layers</h4>
+            <p>Add up to 5 image, GIF, video, or text layers on top of <em>any</em> preset — always, no exceptions. Each layer has a full motion, transform, 12-control colour-grading, and VJ-effects pipeline, all wired to the music independently. And with <strong>Meld ✨</strong>, a layer can be fed <em>into</em> the preset itself.</p>
+
+            <div class="welcome-feature" data-subsection="images">
               <div class="welcome-feature-title">Image &amp; Video Layers <span class="feature-badge feature-badge--pro">Pro</span></div>
               <p>Add up to 5 image, GIF, or video layers in a collapsible smart-accordion stack. Drag any card to reorder. Each
                 layer has:</p>
@@ -1000,7 +1038,28 @@
               </ul>
             </div>
 
-            <div class="welcome-feature" data-subsection="effects">
+            <div class="welcome-feature" data-subsection="meld">
+              <div class="welcome-feature-title">Meld — melt an image INTO the preset ✨ <span class="feature-badge feature-badge--new">New</span></div>
+              <p>Every image, GIF, and video layer has a <strong>Meld</strong> button in its header. Flip it and
+                that layer is fed straight into the preset's own warp engine — instead of compositing on top, the
+                picture gets <strong>melted, tunneled, kaleidoscoped, smeared, and pulsed to the audio</strong> by
+                the preset itself. A logo dissolves into plasma; a face melts through a tunnel on the beat; a photo
+                becomes liquid. The card swaps to the Meld controls:</p>
+              <ul class="welcome-list">
+                <li><strong>Flow</strong> — the melt motion: Tunnel, Spiral, Ripple, Swirl, Plasma, Liquid, Kaleido, Bloom, Smoke, Melt. Click to explore.</li>
+                <li><strong>Size &amp; Position</strong> — scale the image and place it (drag the pad); below full size it dissolves into the melt at its edges instead of tiling.</li>
+                <li><strong>Mirror</strong> — H / V / Quad / Kaleido fold of the melted image, with a Kaleido spin speed.</li>
+                <li><strong>Speed &amp; Depth</strong> — Speed is true slow-motion (drag it down for a hypnotic, gooey slow melt that stays just as rich); Depth sets how hard it warps.</li>
+                <li><strong>Spin / Zoom Pulse / Flow Pulse ✨</strong> — beat-reactive melt motion, hardwired to the kick.</li>
+                <li><strong>Luma Key</strong> — key the dark parts of the image out so the melt/feedback shows through cleanly.</li>
+                <li><strong>Presence + Audio</strong> — how present the image stays in the loop, pulsing in on the beat (Bass / Mid / Treble / Volume).</li>
+              </ul>
+              <p>Only one layer melds at a time, its overlay hides while it drives, and <strong>🎲 Remix</strong>
+                rolls the whole melt look for you — lock <strong>Flow</strong> in the Remix locks to keep a melt
+                you love and re-roll everything around it. Works with still images, GIFs, and live video.</p>
+            </div>
+
+            <div class="welcome-feature" data-subsection="animation">
               <div class="welcome-feature-title">Layer Animation ✨ <span class="feature-badge feature-badge--new">New</span></div>
               <p>Every layer card now has a <strong>✦ Animate</strong> button in its header that opens a focused modal — a creative planning tool for how each layer arrives, leaves, and breathes on screen. The modal is a draggable floating panel so the canvas stays visible and live while you tune. Three tabs:</p>
               <ul class="welcome-list">
@@ -1014,7 +1073,7 @@
               <p style="margin-top:12px"><strong>Composes with audio reactivity.</strong> Animation is "when" — entrance / exit / idle. Reactivity is "how it behaves moment-to-moment." Both run independently on the same layer: a layer can fade in (animation) while already pulsing to the kick (reactivity). The accent dot on the ✦ button lights up whenever any animation is active so you can see at a glance which layers are animated.</p>
             </div>
 
-            <div class="welcome-feature" data-subsection="layers">
+            <div class="welcome-feature" data-subsection="gifs">
               <div class="welcome-feature-title">Animated GIFs</div>
               <p>Drop a <strong>.gif</strong> file into any image-layer slot and it animates inside the visualizer — not
                 as an overlay, but as a real texture, so every layer effect (tile, mirror, spin, orbit, beat-pulse, hue
@@ -1034,7 +1093,7 @@
               </ul>
             </div>
 
-            <div class="welcome-feature" data-subsection="layers">
+            <div class="welcome-feature" data-subsection="video">
               <div class="welcome-feature-title">Video Layers <span class="feature-badge feature-badge--new">New</span></div>
               <p>Drop <strong>MP4</strong> or <strong>WebM</strong> video files directly into presets — videos render as
                 real-time GPU textures with full playback controls and effects. <strong>Auto-transcoding:</strong> 1080p and 4K videos are automatically optimized to 720p on upload.</p>
@@ -1090,7 +1149,7 @@
               </ul>
             </div>
 
-            <div class="welcome-feature">
+            <div class="welcome-feature" data-subsection="effects">
               <div class="welcome-feature-title">Chromatic Aberration</div>
               <p>RGB channel split with animated offset — creates a glitchy color-fringe effect. Found in the <strong>Visual
                   Effects</strong> section (between Tint and Audio Reactivity) on each image layer.</p>
@@ -1331,25 +1390,6 @@
               </ul>
             </div>
 
-            <div class="welcome-feature">
-              <div class="welcome-feature-title">Workflow</div>
-              <ul class="welcome-list">
-                <li><strong>Undo / Redo</strong> — 50-deep stack. <kbd>⌘Z</kbd> / <kbd>⌘⇧Z</kbd>.</li>
-                <li><strong>A/B compare</strong> — hold the button to preview the saved state; release to restore.</li>
-                <li><strong>Save</strong> — writes to your browser (localStorage + IndexedDB for images). Saved presets
-                  appear in the <em>My Presets</em> tab of the main app.</li>
-                <li><strong>Reset a slider</strong> — double-click its label to snap it back to the default
-                  value instantly. Works on every slider in every layer card.</li>
-                <li><strong>Preview mode</strong> — click the expand icon in the top-right corner of the topbar
-                  (or press <kbd>\</kbd>) to hide the panel and see the full canvas. Click anywhere on the canvas
-                  to restore the panel.</li>
-                <li><strong>First-use tips</strong> — a tips modal appears when you open the editor. Dismiss it
-                  freely or click "Never show again" to stop it appearing. Reset with
-                  <code>localStorage.removeItem('discocast_onboarding_never')</code> in the browser console.</li>
-                <li><strong>Dev HUD</strong> — press <kbd>`</kbd> (backtick) to overlay frame time, estimated VRAM,
-                  active layer count, and last shader rebuild time.</li>
-              </ul>
-            </div>
           </section>
 
           <!-- Timeline Editor -->

@@ -1,5 +1,5 @@
 # Meld (Image-as-Texture) — feeding images INTO MilkDrop presets
-
+ca
 Status: **🟢 SHIPPED & ACTIVELY BUILDING OUT (updated 2026-06-04).** Image-as-texture is a real,
 committed feature: feedback-melt engine (§12), per-card **Overlay\|Drive** UX (§13), Tier 1/2 reactivity
 (§13.6), **Size · Position pad · Luma Key** (§14). Currently building the **melding-tools** category (§16)
