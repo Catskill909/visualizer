@@ -13,7 +13,7 @@
  *  All three swatches can be freely overridden after applying a palette.
  */
 
-import { createCustomPreset, saveCustomPreset, getImage, storeImage, generateId, buildMotionReactFrameEqs, buildWaveReactFrameEqs, buildAnimFrameEqs, buildMotionEngineFrameEqs, buildShapeMotionEqs, MOTION_ENGINES, buildWarpShader, WARP_STYLES } from '../customPresets.js';
+import { createCustomPreset, saveCustomPreset, getImage, storeImage, generateId, buildMotionReactFrameEqs, buildWaveReactFrameEqs, buildAnimFrameEqs, buildMotionEngineFrameEqs, buildShapeMotionEqs, MOTION_ENGINES, buildWarpShader, buildImageWarp, WARP_STYLES } from '../customPresets.js';
 import {
     parseGifFile, processGifFrames, generateFrameStrip,
     shouldOptimize, getRecommendedSettings, formatBytes,
@@ -537,6 +537,10 @@ const BLANK = {
     // overlay (no save/load surgery).
     motionEngine: { id: 'none', speed: 1.0, depth: 0.5 },
     flowStyle: { id: 'none', speed: 1.0, depth: 0.5, density: 0.5 },  // Phase 7 — per-preset warp field
+    // Image-as-texture (image-texture-dev.md Phase 2) — melt a loaded image layer
+    // INTO the feedback loop. `texName` references one of `images[]`. When enabled it
+    // OVERRIDES flowStyle's warp via buildImageWarp. Round-trips via the BLANK overlay.
+    imageWarp: { enabled: false, texName: '', flow: 'liquid', speed: 1.0, depth: 0.5, reseed: 0.20, audioSource: 'none', audioAmt: 0.50 },
     motionReact: {
         source: 'bass',
         curve: 'linear',
@@ -973,6 +977,7 @@ export class EditorInspector {
         this._bindPaletteOpacity();
         this._buildSolidFxPanel();
         this._buildFlowStyleSection();
+        this._buildImageWarpSection();
         this._buildMotionEngineSection();
         this._buildMotionPresetsGrid();
         this._bindSurpriseButton();
@@ -2214,6 +2219,150 @@ export class EditorInspector {
             if (valEl) valEl.textContent = Number(v).toFixed(2);
             input.style.setProperty('--pct', `${((v - min) / (max - min)) * 100}%`);
         });
+    }
+
+    // ─── Drive preset with image (image-texture-dev.md Phase 2) ─────────────────
+    // Melt a loaded image LAYER into the preset's feedback loop. Reuses an existing
+    // layer's texture (already uploaded + bound by the overlay system) and overrides
+    // the warp via buildImageWarp. Self-contained in the Images tab; the Flow select
+    // reuses WARP_STYLES for the melt motion.
+    _buildImageWarpSection() {
+        // Flow as a click-to-explore chip grid (like the Palette → Field selector),
+        // not a dropdown — far better for discovering the melt motions.
+        const flowGrid = document.getElementById('image-warp-flow-grid');
+        if (flowGrid && !flowGrid.children.length) {
+            WARP_STYLES.filter(fs => fs.id && fs.id !== 'none').forEach(fs => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'lseg';
+                b.dataset.flow = fs.id;
+                b.textContent = fs.name;
+                if (fs.desc) b.dataset.tooltip = fs.desc;
+                b.addEventListener('click', () => {
+                    this.currentState.imageWarp.flow = fs.id;
+                    flowGrid.querySelectorAll('.lseg').forEach(x => x.classList.toggle('active', x === b));
+                    this._applyToEngine();
+                });
+                flowGrid.appendChild(b);
+            });
+        }
+        document.getElementById('image-warp-audio')?.addEventListener('change', (e) => {
+            this.currentState.imageWarp.audioSource = e.target.value;
+            const amtRow = document.getElementById('image-warp-audio-amt-row');
+            if (amtRow) amtRow.style.display = e.target.value === 'none' ? 'none' : '';
+            this._applyToEngine();
+        });
+        this._bindImageWarpSlider('image-warp-speed-sl', 'speed');
+        this._bindImageWarpSlider('image-warp-depth-sl', 'depth');
+        this._bindImageWarpSlider('image-warp-reseed-sl', 'reseed');
+        this._bindImageWarpSlider('image-warp-audio-amt-sl', 'audioAmt');
+        // Double-click a slider's label to reset it to default — matches every other
+        // fader in the editor. The panel moves between cards/home, so the handler lives
+        // on the panel itself; defaults are stamped from BLANK.imageWarp.
+        const iwDefaults = { 'image-warp-speed-sl': 1.0, 'image-warp-depth-sl': 0.5, 'image-warp-reseed-sl': 0.2, 'image-warp-audio-amt-sl': 0.5 };
+        for (const [id, def] of Object.entries(iwDefaults)) {
+            const sl = document.getElementById(id);
+            if (!sl) continue;
+            sl.dataset.defaultPos = def;
+            sl.closest('.layer-slider-row')?.querySelector('.layer-ctrl-label')?.classList.add('is-resettable');
+        }
+        document.getElementById('image-warp-controls')?.addEventListener('dblclick', (e) => {
+            const label = e.target.closest('.is-resettable');
+            if (!label) return;
+            e.stopPropagation();  // don't also fire the host card's delegated reset
+            const sl = label.closest('.layer-slider-row')?.querySelector('input[type=range]');
+            if (!sl || sl.dataset.defaultPos === undefined) return;
+            sl.value = sl.dataset.defaultPos;
+            sl.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+        this._syncImageWarpSection();
+    }
+
+    _bindImageWarpSlider(id, key) {
+        const sl = document.getElementById(id);
+        const valEl = document.getElementById(`${id}-val`);
+        if (!sl) return;
+        sl.addEventListener('pointerdown', () => this._preSnap());
+        sl.addEventListener('input', () => {
+            const v = parseFloat(sl.value);
+            if (valEl) valEl.textContent = v.toFixed(2);
+            const min = parseFloat(sl.min), max = parseFloat(sl.max);
+            sl.style.setProperty('--pct', `${((v - min) / (max - min)) * 100}%`);
+            this.currentState.imageWarp[key] = v;
+            this._applyToEngine();
+        });
+        sl.addEventListener('pointerup', () => this._postSnap());
+    }
+
+    /** Per-card Overlay|Drive switch. Clicking Drive on a card makes THAT image drive the
+     *  preset (radio — turns Drive off everywhere else); clicking it again returns to
+     *  Overlay. Moves the shared Drive panel into the active card and seeds decay so the
+     *  melt persists (mirrors _applyFlowStyle's wake; no wave seed — the image IS content). */
+    _toggleCardDrive(entry) {
+        const iw = this.currentState.imageWarp || (this.currentState.imageWarp = deepClone(BLANK.imageWarp));
+        const turningOn = !(iw.enabled && iw.texName === entry.texName);
+        this._preSnap();
+        if (turningOn) {
+            iw.texName = entry.texName;
+            iw.enabled = true;
+            if (this.currentState.baseVals.decay < FLOW_FILL_DECAY) {
+                this.currentState.baseVals.decay = FLOW_FILL_DECAY;
+            }
+        } else {
+            iw.enabled = false;
+        }
+        this._postSnap();
+        this._buildCompShader();   // imageWarp.enabled now counts as feedback content
+        this._applyToEngine();
+        this._syncImageWarpSection();
+        this._syncTrailSlider?.();
+        this._syncSlider('ps-decay', this.currentState.baseVals.decay, 0.85, 0.999, 3);
+    }
+
+    /** Park the Drive panel back in its hidden home (so it survives card deletes/reorders
+     *  and isn't removed with a card). */
+    _homeDrivePanel() {
+        const panel = document.getElementById('image-warp-controls');
+        const home = document.getElementById('image-warp-home');
+        if (panel && home && panel.parentElement !== home) home.appendChild(panel);
+    }
+
+    /** Reflect imageWarp state into the cards: place the Drive panel inside the driving
+     *  card (or home it), toggle each card's drive-mode class + Drive button, and sync the
+     *  panel's control values. Called on every add/delete/load via _updateLayersBar and on
+     *  toggle. Graceful degrade: if the source layer is gone, Drive auto-disables. */
+    _syncImageWarpSection() {
+        const iw = this.currentState.imageWarp || (this.currentState.imageWarp = deepClone(BLANK.imageWarp));
+        const imgs = this.currentState.images || [];
+        if (iw.enabled && !imgs.some(e => e.texName === iw.texName)) iw.enabled = false; // source vanished
+        const panel = document.getElementById('image-warp-controls');
+        const cards = document.querySelectorAll('#image-layers .image-layer-card');
+        let activeCard = null;
+        cards.forEach(card => {
+            const isDriving = iw.enabled && card.dataset.texName === iw.texName;
+            card.classList.toggle('drive-mode', isDriving);
+            const btn = card.querySelector('.layer-drive');
+            if (btn) { btn.classList.toggle('active', isDriving); btn.setAttribute('aria-pressed', isDriving ? 'true' : 'false'); }
+            if (isDriving) activeCard = card;
+        });
+        // Relocate the single shared panel into the driving card (after its overlay body,
+        // which CSS hides in drive-mode), or back home when nothing drives.
+        if (activeCard && panel && panel.parentElement !== activeCard) {
+            activeCard.appendChild(panel);
+        } else if (!activeCard) {
+            this._homeDrivePanel();
+        }
+        // Sync the panel control values from imageWarp.
+        const flow = iw.flow || 'liquid';
+        document.querySelectorAll('#image-warp-flow-grid .lseg').forEach(b => b.classList.toggle('active', b.dataset.flow === flow));
+        const audioSel = document.getElementById('image-warp-audio');
+        if (audioSel) audioSel.value = iw.audioSource || 'none';
+        const amtRow = document.getElementById('image-warp-audio-amt-row');
+        if (amtRow) amtRow.style.display = (iw.audioSource && iw.audioSource !== 'none') ? '' : 'none';
+        this._syncSlider('image-warp-speed-sl', iw.speed ?? 1.0, 0.1, 4, 2);
+        this._syncSlider('image-warp-depth-sl', iw.depth ?? 0.5, 0, 1, 2);
+        this._syncSlider('image-warp-reseed-sl', iw.reseed ?? 0.2, 0, 1, 2);
+        this._syncSlider('image-warp-audio-amt-sl', iw.audioAmt ?? 0.5, 0, 1, 2);
     }
 
     _buildMotionPresetsGrid() {
@@ -4374,6 +4523,8 @@ export class EditorInspector {
         const imgs = this.currentState.images || [];
         if (countEl) countEl.textContent = `Layers: ${imgs.length} / ${MAX_LAYERS}`;
         if (dropzone) dropzone.classList.toggle('disabled', imgs.length >= MAX_LAYERS);
+        // Keep the image-drive source picker in sync — this runs on every add/delete/load.
+        this._syncImageWarpSection?.();
     }
 
     // ─── Phase 1: delete confirmation modal ────────────────────────────────────
@@ -4440,6 +4591,10 @@ export class EditorInspector {
         if (entry._gsapProxy) gsap.killTweensOf(entry._gsapProxy);
         const idx = this.currentState.images.indexOf(entry);
         if (idx !== -1) this.currentState.images.splice(idx, 1);
+        // If this layer was driving the preset, disable Drive and park the panel back
+        // home FIRST — otherwise card.remove() below would take the panel with it.
+        const _iw = this.currentState.imageWarp;
+        if (_iw && _iw.texName === texName) { _iw.enabled = false; this._homeDrivePanel(); }
         // Clean up video blob URL if present
         const texObj = this._imageTextures[texName];
         if (texObj?._videoUrl) {
@@ -5427,6 +5582,8 @@ export class EditorInspector {
                 ${entry.isHd ? '<span class="layer-hd-badge" data-tooltip="Uploaded at HD (2048px). Re-upload to change.">HD</span>' : ''}
               </div>
               <div class="layer-header-row2-actions">
+                <button class="layer-action-btn layer-drive" type="button"
+                        aria-pressed="false" data-tooltip="Drive the preset: melt THIS image into the warp engine (hides its overlay)">Drive</button>
                 <button class="layer-action-btn layer-solo" type="button"
                         aria-pressed="false" data-tooltip="Solo (show only this layer)">Solo</button>
                 <button class="layer-action-btn layer-mute" type="button"
@@ -7971,6 +8128,14 @@ export class EditorInspector {
         const dragHandle = card.querySelector('.layer-drag-handle');
         this._wireDragReorder(card, entry, dragHandle);
 
+        // ── Image-as-texture (Phase 2.5): per-card Overlay|Drive switch. Toggling
+        // Drive moves the shared Drive panel into THIS card, hides its overlay body,
+        // and radio-disables Drive on every other card.
+        card.querySelector('.layer-drive')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this._toggleCardDrive(entry);
+        });
+
         // ── Phase 4: inline name edit ────────────────────────────────────────
         // Stop clicks on the input from toggling collapse. Commit on Enter/blur,
         // cancel on Escape. preSnap/postSnap make rename undoable.
@@ -8308,6 +8473,16 @@ export class EditorInspector {
         // in refreshCustomPresets for parity.
         const flowWarp = buildWarpShader(state.flowStyle);
         if (flowWarp) runtime.warp = flowWarp;
+        // Image-as-texture (Phase 2): when enabled AND its source layer still exists,
+        // the image-warp OVERRIDES flowStyle's warp — the preset's motion now melts the
+        // image through the feedback loop. Player mirrors this in refreshCustomPresets.
+        const iw = state.imageWarp;
+        if (iw && iw.enabled && iw.texName && (state.images || []).some(e => e.texName === iw.texName)) {
+            runtime.warp = buildImageWarp({
+                imgName: iw.texName, flow: iw.flow, speed: iw.speed, depth: iw.depth,
+                reseed: iw.reseed, audioSource: iw.audioSource, audioAmt: iw.audioAmt,
+            });
+        }
         // Engine runs first (a living motion baseline), then motionReact/waveReact
         // punch audio on top. All additive + clamped, so order only affects which
         // clamp wins on extremes — engine-before-react reads cleanest.
@@ -8358,9 +8533,17 @@ export class EditorInspector {
         // Phase 4: solo / mute filter. If any layer is soloed, only soloed
         // layers render; otherwise everything except muted layers renders.
         const anySolo = images.some(img => img.solo);
-        const visibleImages = anySolo
+        let visibleImages = anySolo
             ? images.filter(img => img.solo)
             : images.filter(img => !img.muted);
+        // Image-as-texture (Phase 2): the layer DRIVING the preset must not also sit on
+        // top as a flat overlay — it's being melted into the feedback loop instead. Drop
+        // it from the comp composite while Drive is on (its texture stays bound for the
+        // warp; toggling Drive off restores the overlay).
+        const _iw = this.currentState.imageWarp;
+        if (_iw && _iw.enabled && _iw.texName) {
+            visibleImages = visibleImages.filter(img => img.texName !== _iw.texName);
+        }
         const _po = this.currentState.paletteOpacity ?? 1.0;
         // Transparent background (Phase 1) — only meaningful for layers-only presets
         // (_imagesOnly). Gated this way so MilkDrop/solid modes are byte-identical
@@ -8417,7 +8600,10 @@ export class EditorInspector {
         // blacked out (the old "wake feedback → clear solid → black" path is gone).
         // No-op when the buffer is black, so a pure flat colour is unchanged.
         const _hasShapes = (this.currentState.shapes || []).some(s => s && s.baseVals && s.baseVals.enabled !== 0);
-        const _flowActive = !!(this.currentState.flowStyle && this.currentState.flowStyle.id && this.currentState.flowStyle.id !== 'none');
+        // Image-drive also actively writes the feedback buffer (its warp seeds the image),
+        // so treat it like an active flow for the Solid-mode composite + content checks.
+        const _imageWarpActive = !!(this.currentState.imageWarp && this.currentState.imageWarp.enabled && this.currentState.imageWarp.texName);
+        const _flowActive = _imageWarpActive || !!(this.currentState.flowStyle && this.currentState.flowStyle.id && this.currentState.flowStyle.id !== 'none');
         const _meActive = !!(this.currentState.motionEngine && this.currentState.motionEngine.id && this.currentState.motionEngine.id !== 'none');
         const _waveVisible = (this.currentState.baseVals.wave_a ?? 0) > 0.001;
         // Composite the feedback buffer whenever anything could be drawing into it.
@@ -9812,6 +9998,7 @@ export class EditorInspector {
     _syncAllControls() {
         this._syncColorSwatches();
         this._syncFlowStyle();
+        this._syncImageWarpSection();
         this._syncMotionEngine();
         this._renderShapeCards();
         this._syncMotionSliders();

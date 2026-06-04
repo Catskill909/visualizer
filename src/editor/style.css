@@ -1042,6 +1042,14 @@ html, body {
 /* Solo active = warm accent, Mute active = cooler */
 .layer-action-btn.layer-solo.active  { background: rgba(255, 200, 60, 0.22); border-color: rgba(255, 200, 60, 0.55); color: #ffe29a; }
 .layer-action-btn.layer-mute.active  { background: rgba(160, 160, 160, 0.18); border-color: rgba(200, 200, 200, 0.35); color: #ccc; }
+/* Drive active = violet "melt" accent. Drive mode swaps the card body: overlay
+   controls hide, the moved-in Drive panel shows in their place. */
+.layer-action-btn.layer-drive.active { background: rgba(140, 90, 255, 0.24); border-color: rgba(150, 110, 255, 0.6); color: #cdbcff; }
+.image-layer-card.drive-mode { border-color: rgba(150, 110, 255, 0.45); }
+.image-layer-card.drive-mode > .layer-controls { display: none; }
+.image-warp-panel { padding: 10px 12px 4px; }
+.image-warp-panel > .layer-section-label { color: #cdbcff; margin-bottom: 8px; }
+.image-layer-card.collapsed > .image-warp-panel { display: none; }
 /* Animate (✦) button — dot indicator appears when any animation is set */
 .layer-action-btn.layer-animate { position: relative; font-size: 13px; padding: 4px 8px; }
 .layer-animate-dot {

@@ -725,6 +725,49 @@
                                     hidden />
                             </div>
                             <div class="image-layers" id="image-layers"></div>
+
+                            <!-- Image-as-texture (image-texture-dev.md Phase 2/2.5): the Drive panel.
+                                 Lives here hidden ("home") and is MOVED into whichever image-layer card
+                                 is in Drive mode (per-card Overlay|Drive switch). One element, single IDs,
+                                 single binding — relocated, never duplicated. NOT a .image-layer-card, so
+                                 the per-card slider sweep (inspector.js) never touches it. -->
+                            <div id="image-warp-home" hidden>
+                                <div class="image-warp-panel" id="image-warp-controls">
+                                    <span class="layer-ctrl-label" data-tooltip="The melt motion the preset runs on the image — click to explore">Flow</span>
+                                    <div id="image-warp-flow-grid" class="layer-react-curve" role="group"
+                                        aria-label="Melt flow style" style="margin:6px 0 10px"></div>
+                                    <div class="layer-slider-row">
+                                        <span class="layer-ctrl-label" data-tooltip="Melt motion speed">Speed</span>
+                                        <input type="range" id="image-warp-speed-sl" class="slider" min="0.1" max="4" step="0.05" value="1">
+                                        <span class="lsv" id="image-warp-speed-sl-val">1.00</span>
+                                    </div>
+                                    <div class="layer-slider-row">
+                                        <span class="layer-ctrl-label" data-tooltip="Melt displacement strength — how hard it tunnels/ripples">Depth</span>
+                                        <input type="range" id="image-warp-depth-sl" class="slider" min="0" max="1" step="0.01" value="0.5">
+                                        <span class="lsv" id="image-warp-depth-sl-val">0.50</span>
+                                    </div>
+                                    <div class="layer-slider-row">
+                                        <span class="layer-ctrl-label" data-tooltip="Image presence: high = stays sharp, low = melts into the trails">Presence</span>
+                                        <input type="range" id="image-warp-reseed-sl" class="slider" min="0" max="1" step="0.01" value="0.2">
+                                        <span class="lsv" id="image-warp-reseed-sl-val">0.20</span>
+                                    </div>
+                                    <div class="layer-slider-row">
+                                        <span class="layer-ctrl-label" data-tooltip="Pulse the image presence on the beat — the melt breathing with the music">Audio</span>
+                                        <select id="image-warp-audio" class="layer-react-source">
+                                            <option value="none">None</option>
+                                            <option value="bass">Bass</option>
+                                            <option value="mid">Mid</option>
+                                            <option value="treb">Treble</option>
+                                            <option value="vol">Volume</option>
+                                        </select>
+                                    </div>
+                                    <div class="layer-slider-row" id="image-warp-audio-amt-row" style="display:none">
+                                        <span class="layer-ctrl-label" data-tooltip="How hard the beat drives the image in">Amount</span>
+                                        <input type="range" id="image-warp-audio-amt-sl" class="slider" min="0" max="1" step="0.01" value="0.5">
+                                        <span class="lsv" id="image-warp-audio-amt-sl-val">0.50</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 

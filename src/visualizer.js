@@ -10,7 +10,7 @@ import butterchurnPresetsImport from 'butterchurn-presets';
 import butterchurnPresetsExtra from 'butterchurn-presets/lib/butterchurnPresetsExtra.min.js';
 import butterchurnPresetsExtra2 from 'butterchurn-presets/lib/butterchurnPresetsExtra2.min.js';
 import butterchurnPresetsMD1 from 'butterchurn-presets/lib/butterchurnPresetsMD1.min.js';
-import { loadAllCustomPresets, CUSTOM_PREFIX, registryKey, getImage, buildMotionReactFrameEqs, buildWaveReactFrameEqs, buildAnimFrameEqs, buildMotionEngineFrameEqs, buildShapeMotionEqs, buildWarpShader } from './customPresets.js';
+import { loadAllCustomPresets, CUSTOM_PREFIX, registryKey, getImage, buildMotionReactFrameEqs, buildWaveReactFrameEqs, buildAnimFrameEqs, buildMotionEngineFrameEqs, buildShapeMotionEqs, buildWarpShader, buildImageWarp } from './customPresets.js';
 import { loadAllCommunity, COMMUNITY_PREFIX } from './presetStore.js';
 import { parseGIF, decompressFrames } from 'gifuct-js';
 // animation-dev.md — drive entrance/exit/idle in the player & timeline (not just
@@ -608,6 +608,16 @@ export class VisualizerEngine {
       // plays identically in the player/timeline. '' when none → keep own warp.
       const flowWarp = buildWarpShader(preset.flowStyle);
       if (flowWarp) preset.warp = flowWarp;
+      // Image-as-texture (image-texture-dev.md Phase 2) — mirror the editor's
+      // _buildRuntimePreset: when enabled and its source layer still exists, the
+      // image-warp OVERRIDES flowStyle's warp so the melt plays identically here.
+      const iw = preset.imageWarp;
+      if (iw && iw.enabled && iw.texName && Array.isArray(preset.images) && preset.images.some(e => e.texName === iw.texName)) {
+        preset.warp = buildImageWarp({
+          imgName: iw.texName, flow: iw.flow, speed: iw.speed, depth: iw.depth,
+          reseed: iw.reseed, audioSource: iw.audioSource, audioAmt: iw.audioAmt,
+        });
+      }
       // Phase 3 — regenerate per-shape motion eqs (Spin/Pulse/Orbit) from each
       // shape's stored motion params, mirroring the editor's _buildRuntimePreset
       // so custom shapes animate identically in the player/timeline.

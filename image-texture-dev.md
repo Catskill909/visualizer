@@ -20,8 +20,8 @@ _Single source of truth for status. Detail in the numbered sections below._
 |---|---|---|
 | **Spike / Audit** | Feasibility — pipeline exists (`setUserTexture`) + **warp shader can sample a user texture** → no engine fork (§9, §11) | ✅ **DONE 2026-06-03** |
 | **1 — Feedback-melt engine** | `buildImageWarp(opts)` generator shipped (§12) — blends `sampler_<imgName>` into the feedback loop, reusing the SAME flow math as `buildWarpShader` (shared `_flowParts`). Knobs: `flow` · `reseed` · **audio-reactive blend** (`audioSource`/`audioAmt`). **Minimal live wire-up shipped** (`window.__imgWarp.drive/clear`, dev-only). | ✅ **GENERATOR + LIVE WIRE DONE — tune look by eye next** |
-| **2 — UX** | "Drive the preset" **mode** + the ~3 knobs, in the **Images tab**; image loads via the existing path. *(Audio-reactive blend already landed in the generator.)* | ⬜ not started |
-| **3 — More sources** | Video / GIF / webcam frames (all already `setUserTexture`-supported) | ⬜ not started |
+| **2 — UX** | **Per-card `Overlay \| Drive` switch** (§13, §13.5): each image layer card has a Drive button; flipping it melts THAT image into the preset (radio — one at a time), hides its overlay, and swaps the card body to the Drive panel (Flow · Speed · Depth · Presence · Audio+Amount). Overrides Flow Style; round-trips via BLANK; player parity in `refreshCustomPresets`. | ✅ **DONE 2026-06-03 — per-card editor round-trip verified 12/12** |
+| **3 — More sources** | Video / GIF / webcam frames (all already `setUserTexture`-supported) | ⬜ next |
 | **4 — Named-texture path (optional)** | "Photo-reactive" presets that sample a known user sampler + ship the **22 built-in texture assets** (`milkdrop-pack-import.md` §16.1) so the ~66 texture presets render right | ⬜ optional |
 
 **▶️ PICK UP AT PHASE 1 (live wire-up):** the generator `buildImageWarp(opts)` is ✅ built
@@ -288,6 +288,102 @@ not just nonzero — the first thresholds (`luma > 0`) falsely green-lit the bla
 weaken them. Latest run: baseline luma 37 → **driven 158** (image clearly in the loop), audio-reactive
 variant 155, 5/5 pass.
 
-**Not yet done:** aesthetic tuning by eye (the actual *look* — reseed × flow × the preset's own decay;
-headless proves it's bright + reactive, not that it's pretty), and the real Images-tab UX (Phase 2).
-The wire-up is a dev hook, not user-facing.
+**Phase 2 superseded the dev hook as the real UX** — see §13. The `__imgWarp` dev hook stays for
+quick console tuning but is no longer the only path.
+
+---
+
+## 13. PHASE 2 — "Drive preset with image" UX (2026-06-03) ✅
+
+The user-facing feature: an image LAYER can drive the preset's feedback loop. Lives as a self-contained
+section in the **Images tab** ([editor.html](editor.html), `#image-warp-section`).
+
+**Data model:** `currentState.imageWarp = { enabled, texName, flow, reseed, audioSource, audioAmt }`
+added to `BLANK` ([inspector.js](src/editor/inspector.js)) → round-trips with the saved preset for free
+(like `flowStyle`/`motionEngine`, no save/load surgery).
+
+**Source = an existing image layer.** The picker lists `currentState.images[]`; `texName` references one.
+**Zero new upload/store/bind plumbing** — that layer's texture is already uploaded + bound by the overlay
+system, and the warp just samples the same `sampler_<texName>`.
+
+**Driving layer drops out of the overlay** (user feedback 2026-06-03): when Drive is on, the source layer
+must NOT also composite flat on top — it's being melted into the feedback loop instead. `_buildCompShader`
+filters the driving `texName` out of `visibleImages` (its texture stays bound for the warp; toggling Drive
+off restores the overlay). Comp is rebuilt on Drive-toggle AND on Source-change. Parity is automatic — the
+editor bakes the overlay-excluded `comp` into the saved preset, so the player just uses it.
+
+**Two independent audio stages (NOT redundant).** A layer's own AUDIO REACTIVITY section drives *overlay*
+effects (pulse/bounce/shake/opacity) — inert while driving, since the overlay is hidden. The Drive
+section's **Audio/Amount** drives a *different* stage: the image's re-injection (presence) INTO the
+feedback loop on the beat — the melt breathing with the music. It's the only audio control that matters
+while driving, and the on-brand "image reactivity" headline.
+
+**Warp override (the crux).** `preset.warp` was owned by `flowStyle` (`buildWarpShader`). When
+`imageWarp.enabled` AND its `texName` still exists in `images[]`, `buildImageWarp` OVERRIDES it. Wired at
+**both parity sites**: editor `_buildRuntimePreset` and player/timeline `refreshCustomPresets`
+([visualizer.js](src/visualizer.js)) — identical playback.
+
+**Feedback wake.** `_buildCompShader`'s `_flowActive` now also counts `imageWarp.enabled`, so the melt
+composites over Solid mode. On enable, seed `decay ≥ FLOW_FILL_DECAY` (mirrors `_applyFlowStyle`). NO wave
+seed needed — `buildImageWarp` injects the image itself, so the feedback loop always has content.
+
+**Graceful degrade.** If the source layer is deleted, `_syncImageWarpSection` (called from the shared
+`_updateLayersBar` hook on every add/delete/load) auto-disables drive and the build skips it → no dangling
+sampler, no black frame.
+
+**Controls:** Enable toggle · Source picker · Flow `<select>` (reuses `WARP_STYLES`) · Presence slider
+(= reseed) · Audio source + Amount. The section is a standalone block, NOT a `.image-layer-card`, so the
+per-card slider sweep ([inspector.js:6860](src/editor/inspector.js#L6860), [[feedback_image_layer_slider_pattern]])
+never touches it.
+
+**Verified — [scripts/verify-image-warp-editor.mjs](scripts/verify-image-warp-editor.mjs)** boots the REAL
+Preset Studio headless (SwiftShader), and through the inspector's own methods: adds a layer → toggles
+drive → confirms the runtime warp is the image-warp (overriding flowStyle) → **live preview renders bright
+(luma > 20, not black)** → save→reload restores `imageWarp` + rebuilds the melt → deleting the layer
+auto-disables, AND the driving layer drops out of the overlay (comp no longer declares its sampler) +
+returns when Drive is off.
+
+### 13.5 Per-card Overlay|Drive switch (2026-06-03) — UX redesign per user feedback
+The standalone bottom section felt disconnected ("which image does this control?"). Replaced with a
+**per-card mode switch**: each image-layer card header has a **Drive** action button (next to Solo/Mute).
+Flipping it makes THAT image drive the preset — radio (one warp slot), so it releases any other driver.
+
+**Implementation — move the panel, don't duplicate it.** There's ONE Drive panel element
+(`#image-warp-controls`, single IDs, single binding — all the verified Phase-2 wiring untouched). It
+lives hidden in `#image-warp-home`; on Drive-enable it's **relocated into the active card**
+(`activeCard.appendChild(panel)`); on disable/delete it's parked back home. CSS swaps the card body:
+`.image-layer-card.drive-mode > .layer-controls { display:none }` hides the overlay controls so only the
+Drive panel shows. This avoids per-card panel duplication (no duplicate-ID problem) and the engine model
+is unchanged (still one per-preset `imageWarp`).
+
+**New methods:** `_toggleCardDrive(entry)` (radio + decay seed + rebuild), `_homeDrivePanel()`,
+rewritten `_syncImageWarpSection` (places panel in the driving card, toggles `drive-mode` + Drive-button
+`.active`, syncs control values — called from the shared `_updateLayersBar` hook on every add/delete/load).
+Delete edge: `_performDeleteLayer` homes the panel BEFORE `card.remove()` so it isn't removed with the card.
+
+**Tier 1 melt controls added:** **Speed** + **Depth** sliders (already supported by `buildImageWarp` via
+`_flowParts`; now exposed). Model: `imageWarp` gained `speed`/`depth`; passed at both build sites.
+The Source dropdown is GONE (the card you flip IS the source).
+
+**Two audio stages (reaffirmed):** the layer's own AUDIO REACTIVITY section drives overlay effects (inert
+while driving); the Drive panel's Audio/Amount drives the image's re-injection into the feedback loop on
+the beat — the only audio that matters while driving. Tier 2 (Flow Pulse / Spin / Zoom Pulse — new warp-
+shader reactivity) is the next melt-richness pass; all controls are exclusive to the Drive panel (the melt
+samples the RAW texture, so no layer-card control reaches it — by design).
+
+**UX polish (2026-06-03, user feedback):**
+- **Flow is a click-to-explore chip grid** (`.lseg` chips, like Palette → Field), not a dropdown —
+  built from `WARP_STYLES` into `#image-warp-flow-grid`. Far better for discovering the melt motions.
+- **Double-click a slider label to reset** to default — matches every other fader. The panel moves
+  between cards/home, so the handler lives on the panel; defaults stamped from `BLANK.imageWarp`.
+  (The card's own delegated reset only stamps sliders present at mount, so the moved-in panel needs
+  its own — `e.stopPropagation()` avoids a double-fire when the panel is inside a card.)
+- Removed the cheesy "🫠 Driving the preset…" header — the violet card border + active Drive button
+  already signal the mode.
+
+**Verified — [scripts/verify-image-warp-editor.mjs](scripts/verify-image-warp-editor.mjs): 14/14** incl.
+per-card toggle, panel-moves-into-card, **radio releases the previous driver**, overlay drop-out + restore
++ panel re-home, live-preview luma, **Flow chip grid**, **double-click-reset**, save/reload, graceful degrade.
+
+**Not yet done:** aesthetic tuning by eye (the *look*); Tier 2 melt reactivity (Flow Pulse / Spin / Zoom
+Pulse); Phase 3 (video/GIF/webcam as the driving source — all already `setUserTexture`-supported).
