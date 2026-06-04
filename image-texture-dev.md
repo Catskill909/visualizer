@@ -1,11 +1,14 @@
 # Meld (Image-as-Texture) — feeding images INTO MilkDrop presets
 
-Status: **🟢 SHIPPED & ACTIVELY BUILDING OUT (updated 2026-06-04).** This is the **Meld** feature:
-feedback-melt engine (§12), per-card **Overlay\|Meld** UX (§13), Tier 1/2 reactivity (§13.6),
-**Size · Position pad · Luma Key · Mirror/Kaleido** (§14), **perceptual log Speed w/ true slow-motion**
-(§17), and **🎲 Remix rolls the melt** (Phase 7). Renamed Drive→Meld; in-app + promo docs updated.
-macOS + Coolify web verified; Windows build pending. **Now building Phase 6 melding tools — Blend mode
-first (§16).** The Phase Tracker below is the live status. Origin: `milkdrop-pack-import.md` §16.2.
+Status: **🟢 SHIPPED & STABLE (updated 2026-06-04).** The **Meld** feature is feature-complete for v1 and
+cross-platform-verified: feedback-melt engine (§12), per-card **Overlay\|Meld** UX (§13), Tier 1/2 reactivity
+(§13.6), **Size · Position pad · Luma Key · Mirror/Kaleido** (§14a) + **Colour/Grade** (Brightness/Contrast/
+Saturation/Hue/Invert, §14.2), **perceptual log Speed w/ true slow-motion** (§17), **Blend mode** (the first
+melding tool, §16), and **🎲 Remix rolls the WHOLE melt** — incl. framing, blend, colour, with a "present
+meld" bias so the source image stays recognizable (Phase 7). **Verified end-to-end:** headless 37/37, tested
+locally + macOS build + Coolify web; **a melded-remix preset exported locally imports & remixes correctly in
+the macOS install** (Windows build pending). **▶️ NEXT SESSION: Displacement** — the next melding tool (§16.A,
+"locked & loaded"). The Phase Tracker below is the live status. Origin: `milkdrop-pack-import.md` §16.2.
 
 > **📚 Doc map:** Tracker + §§12–17 = current/shipped (read these). **§§3–8, 10–11 are PRE-BUILD scoping
 > (2026-06-03) kept as historical record — superseded by what shipped; don't treat as TODO.**
@@ -33,16 +36,20 @@ _Single source of truth for status. Detail in the numbered sections below._
 | **2.5 — Per-card + Tier 1/2** | Per-card mode + chip-grid Flow + dbl-click reset + Speed/Depth (Tier 1) + Spin/Zoom Pulse/Flow Pulse (Tier 2, §13.6) + collapse fixes + Drive-pill in row1. | ✅ **DONE 2026-06-03 — verified 18/18** |
 | **4 — Build-out: parallel layer controls** | **SHIPPED 2026-06-04:** Size · Position pad · Luma Key · Mirror/Kaleido (§14.1a) · **4b Colour/Grade** (Brightness/Contrast/Saturation/Hue/Invert, §14.2, verified 36/36). Aspect deferred. See §14. | 🟢 **4a + 4b DONE** |
 | **4-speed — Perceptual Speed fader** | Speed mapped **logarithmically** (~0.02 → 4.0) — slow/extreme-slowdown range gets fine resolution, top still reaches fast. ONE fader, smarter mapping (§17). Applied to **Drive panel Speed AND Flow Style Speed**. Model stores real speed (engine/saved presets unchanged); only UI mapping is non-linear. | ✅ **DONE 2026-06-04 — verified 24/24** |
-| **6 — Melding tools** ⭐ | The strategic category (§16): controls for HOW an asset *integrates into* the preset's machinery. **Blend mode SHIPPED 2026-06-04 (verified 33/33)** — Mix/Add/Screen/Multiply/Difference/Overlay chip-row; gated (`mix`=no-op); all 6 render bright (min luma 114); Remix rolls it (bias to bright family). Next melding tools: **Displacement** (image luma warps the melt) → **Mask** → image-driven flow. | 🟢 **Blend mode DONE — Displacement next** |
+| **6 — Melding tools** ⭐ | The strategic category (§16): controls for HOW an asset *integrates into* the preset's machinery. **Blend mode SHIPPED 2026-06-04 (verified 33/33)** — Mix/Add/Screen/Multiply/Difference/Overlay chip-row; gated; all 6 render; Remix rolls it. **▶️ NEXT: Displacement — fully spec'd & locked in §16.A.** Then Mask → image-driven flow → palette-from-image. | 🟢 **Blend mode DONE — Displacement spec'd (§16.A), next session** |
 | **3 — More sources** | Video / GIF / webcam as the driving texture. **GIF + video CONFIRMED WORKING in real use 2026-06-03** (user) — same `setUserTexture` sampler the warp reads each frame, so the melt animates for free. Remaining: webcam + per-source polish. | 🟢 **GIF/video work; webcam TODO** |
 | **(opt) — Named-texture path** | "Photo-reactive" presets that sample a known user sampler + ship the **22 built-in texture assets** (`milkdrop-pack-import.md` §16.1). | ⬜ optional |
 | **7 — Drive 🎲 (Remix)** | **GLOBAL 🎲 Remix rolls the WHOLE Meld (verified 33/33):** the Remix "Flow" axis gambles flow/speed/depth/spin/zoom/flow-pulse/mirror/luma-key/**blend-mode**/presence/audio **AND framing (size/position)** via `_rollImageWarp`; panel re-syncs (sliders + chips + pad follow), every roll renders, **Flow lock** keeps the melt. **Tuned 2026-06-04:** rolls framing too ("move also"; ⅓ full-frame, rest in-bounds); biased gently away from blown white (add/screen rolled less + lower presence); **~45% "present meld" rolls** (`_present` flag → high presence + gentler depth/speed, no obliterating kaleido, image-faithful blend → the source image stays RECOGNIZABLE; the rest keep the abstract/dissolved variety). Only which image drives is left alone. Remaining (optional): a dedicated 🎲 button IN the Meld panel. | 🟢 **Remix→Meld DONE — incl. framing, blend, present-bias** |
 
-**▶️ CURRENT (2026-06-04):** Shipped + verified — Size · Position pad · Luma Key · Mirror/Kaleido (§14, 27/27),
-perceptual log Speed + true slow-motion (§17, 24/24), **🎲 Remix→Meld** (Phase 7, 31/31), renamed Drive→**Meld**,
-in-app help (Layers got its own menu) + promo docs updated. **Building now: Phase 6 Blend mode** (§16 — the first
-melding tool). **Next after:** 4b Colour/Grade → more melding tools (Displacement/Mask) → Phase 7 Meld 🎲 button →
-Phase 3 webcam source. All committed + pushed (user); macOS + Coolify web verified, Windows pending.
+**▶️ NEXT SESSION — pick up at DISPLACEMENT (§16.A).** Everything else is shipped, committed, pushed, and
+cross-platform-verified (37/37 headless; macOS + web; export/import round-trips on the macOS install).
+Displacement is the next melding tool and is fully spec'd in **§16.A** — start there. After it: Mask → image-
+driven flow → (optional) a dedicated 🎲 button in the Meld panel → Phase 3 webcam source → Aspect (§14.1a).
+The verify harness to extend each time: [scripts/verify-image-warp-editor.mjs](scripts/verify-image-warp-editor.mjs)
+(currently 37/37). Build pattern (unchanged): gated `buildImageWarp` op (neutral = byte-identical no-op) →
+`imageWarp` model field → Meld-panel control (dbl-click reset) → BOTH build sites → `_rollImageWarp` axis →
+headless verify (bakes + renders + round-trips). Standing rules: [[project_one_click_vs_pro_tools]] (one
+musical knob, boring-not-broken/luma) + [[project_remix_batch_perf]] (`_rolling`).
 
 **Key facts (so you don't re-derive):** NO engine fork — reuses `setUserTexture` (upload, exists) +
 warp-shader injection (exists, = Flow Style). Cross-platform (pure WebGL2). Machine limits a
@@ -544,17 +551,20 @@ win than per-knob routing.
   here, so most overlap/conflict. Maybe a slow **Drift** of the sample center later; skip the rest.
 
 ### 14.6 Build order (updated 2026-06-04 — see the Phase Tracker for live status)
-Done: 4a Size + Position pad + Luma Key + §17 perceptual Speed fader. Remaining within/after 4:
-**Mirror/Kaleido** (§14.1a) → **4b Colour/grade** (big reuse) → **4c Stylize** → **Phase 6 Melding tools**
-(Blend mode first, §16) → **Phase 7 Drive 🎲** (rolls across the now-rich space) → **Phase 3 GIF/video
-source**. Each sub-phase: add to `buildImageWarp` (gated so 0/neutral = no-op), model fields on `imageWarp`,
-control in the Drive panel (dbl-click reset), pass at BOTH build sites, headless-verify (bakes + still
-renders bright). Standing rule from [[project_one_click_vs_pro_tools]]: one obvious musical knob each;
-every value must render (boring-not-broken, luma>20).
+**DONE:** 4a Size + Position pad + Luma Key + Mirror/Kaleido, §17 log Speed + slow-motion, 4b Colour/Grade,
+Phase 6 **Blend mode**, Phase 7 Remix→Meld (framing + blend + present-bias). **NEXT:** Phase 6 **Displacement**
+(§16.A, spec'd) → Mask → image-driven flow → 4c Stylize (Edge/Posterize/etc.) → Phase 3 webcam → Aspect (§14.1a).
+Each sub-phase follows the proven pattern: add to `buildImageWarp` (gated so 0/neutral = byte-identical no-op),
+model field on `imageWarp`, one control in the Meld panel (dbl-click reset), pass at BOTH build sites, roll it
+in `_rollImageWarp`, headless-verify. Standing rule [[project_one_click_vs_pro_tools]]: one obvious musical
+knob each; every value must render (boring-not-broken, luma>20).
 
 ---
 
-## 15. END-OF-DAY AUDIT — 2026-06-03 (clean handoff)
+## 15. END-OF-DAY AUDIT — 2026-06-03 (HISTORICAL SNAPSHOT — superseded; see the Tracker for live status)
+
+> ⚠️ Dated 2026-06-03 handoff, kept for the record. Its "Tomorrow / commit before Phase 4" notes are long
+> done — current status is the Phase Tracker + Status line at the top.
 
 **Shipped today (image-as-texture, 0→a real feature):**
 - **Spike/Audit** → feasible, no engine fork (§9–11).
@@ -619,6 +629,45 @@ boring-not-broken/luma>20), model field on `imageWarp`, one control in the Drive
 headless verify. All axes must be **Remix-rollable** (Phase 7 Drive 🎲 + the global Remix, respecting
 `_rolling` per [[project_remix_batch_perf]]). Applies beyond images too — video/GIF sources (Phase 3) and,
 longer-term, other layer assets melding into the preset.
+
+### 16.A — DISPLACEMENT (▶️ NEXT SESSION — locked & loaded, 2026-06-04)
+
+**What it is:** the image's brightness *physically warps the melt* — the picture becomes a heightmap that
+bends the feedback, so the **logo's shape ripples the plasma**, a face's contours push the tunnel around.
+Distinct from Blend mode (which contributes COLOUR); Displacement contributes SHAPE. The headline "the image
+deforms the preset" melding tool.
+
+**Mechanism — where it slots in `buildImageWarp`:** the melt samples the feedback at the flow coordinate
+(`fbExpr` from `_flowParts`, e.g. `texture(sampler_main, _zuv + _flow).rgb * _dec`). Displacement adds an
+image-derived offset `_disp` to that sample coord → `texture(sampler_main, _zuv + _flow + _disp)`.
+- **`_disp` (v1, simplest):** push by the image's luma. Define before `_fb`:
+  ```glsl
+  float _dl = dot(texture(sampler_<img>, uv_orig).rgb, vec3(0.299,0.587,0.114));   // image luma at this pixel
+  vec2 _disp = (_dl - 0.5) * ${disp.toFixed(4)} * 0.08 * normalize(uv_orig - 0.5 + 1e-5);  // radial push by brightness
+  ```
+  (bright areas push out, dark pull in — the image "embosses" into the melt). One knob: **Displace** amount.
+- **`_disp` (v2, "edges ripple"):** finite-difference gradient of the image luma (2 extra taps) → push along
+  the gradient. Richer (edges carry the melt) but pricier. Ship v1 first, offer v2 if it sings.
+
+**Integration gotcha (the one real wrinkle):** `fbExpr` is built in the shared `_flowParts` and comes in
+THREE forms — hard (`_zuv + _flow`), soft (blur mix, also `_zuv + _flow`), and **kaleido (`_kuv`, no `_flow`)**.
+To inject the offset, in `buildImageWarp` string-replace the feedback sample coordinate when `disp > 0`:
+`_zuv + _flow` → `(_zuv + _flow + _disp)` and `_kuv` → `(_kuv + _disp)` (mirror how Flow-Pulse already
+special-cases kaleido). Gated: `disp === 0` → no `_disp` line, fbExpr untouched → **byte-identical no-op**.
+
+**Checklist (the proven pattern):**
+1. `buildImageWarp`: add `disp` param + the `_disp` define + the fbExpr coord-swap (guarded `disp>0`).
+2. Model: `imageWarp.disp = 0.0` in `BLANK`.
+3. UI: a **Displace** slider in the Meld panel (near Blend/Colour), dbl-click reset, `_bindImageWarpSlider`.
+4. Both build sites (`_buildRuntimePreset` + `refreshCustomPresets`) pass `disp: iw.disp`.
+5. `_rollImageWarp`: roll it (e.g. `iw.disp = Math.random()<0.4 ? rnd(0.2,0.8) : 0`); keep present-meld rolls
+   gentle (high disp obliterates → maybe `_present ? 0..0.3 : …`).
+6. `scripts/verify-image-warp-editor.mjs`: assert disp=0 no-op, disp>0 bakes `_disp` + swaps the coord, melt
+   still renders bright. (Suite is at 37/37 — add ~2 assertions.)
+
+Heads-up: displacement reads the image at the SCREEN pixel (`uv_orig`), independent of Size/Position framing
+(which transform `_iuv` for the *colour* sample). That's fine for v1 (the whole-screen image embosses the
+melt); if you want displacement to follow the framed image, use `_iuv` for `_dl` instead — decide by eye.
 
 ---
 
