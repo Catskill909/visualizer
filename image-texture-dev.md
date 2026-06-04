@@ -1,10 +1,11 @@
 # Meld (Image-as-Texture) — feeding images INTO MilkDrop presets
-ca
-Status: **🟢 SHIPPED & ACTIVELY BUILDING OUT (updated 2026-06-04).** Image-as-texture is a real,
-committed feature: feedback-melt engine (§12), per-card **Overlay\|Drive** UX (§13), Tier 1/2 reactivity
-(§13.6), **Size · Position pad · Luma Key** (§14). Currently building the **melding-tools** category (§16)
-+ a perceptual Speed fader (§17). **The Phase Tracker below is the live status.** Origin:
-`milkdrop-pack-import.md` §16.2.
+
+Status: **🟢 SHIPPED & ACTIVELY BUILDING OUT (updated 2026-06-04).** This is the **Meld** feature:
+feedback-melt engine (§12), per-card **Overlay\|Meld** UX (§13), Tier 1/2 reactivity (§13.6),
+**Size · Position pad · Luma Key · Mirror/Kaleido** (§14), **perceptual log Speed w/ true slow-motion**
+(§17), and **🎲 Remix rolls the melt** (Phase 7). Renamed Drive→Meld; in-app + promo docs updated.
+macOS + Coolify web verified; Windows build pending. **Now building Phase 6 melding tools — Blend mode
+first (§16).** The Phase Tracker below is the live status. Origin: `milkdrop-pack-import.md` §16.2.
 
 > **📚 Doc map:** Tracker + §§12–17 = current/shipped (read these). **§§3–8, 10–11 are PRE-BUILD scoping
 > (2026-06-03) kept as historical record — superseded by what shipped; don't treat as TODO.**
@@ -30,18 +31,18 @@ _Single source of truth for status. Detail in the numbered sections below._
 | **1 — Feedback-melt engine** | `buildImageWarp(opts)` generator shipped (§12) — blends `sampler_<imgName>` into the feedback loop, reusing the SAME flow math as `buildWarpShader` (shared `_flowParts`). Knobs: `flow` · `reseed` · **audio-reactive blend** (`audioSource`/`audioAmt`). **Minimal live wire-up shipped** (`window.__imgWarp.drive/clear`, dev-only). | ✅ **GENERATOR + LIVE WIRE DONE — tune look by eye next** |
 | **2 — UX** | **Per-card `Overlay \| Meld` switch** (§13, §13.5; button renamed Drive→**Meld** 2026-06-04): each image layer card has a Meld button; flipping it melts THAT image into the preset (radio — one at a time), hides its overlay, and swaps the card body to the Drive panel (Flow · Speed · Depth · Presence · Audio+Amount). Overrides Flow Style; round-trips via BLANK; player parity in `refreshCustomPresets`. | ✅ **DONE 2026-06-03 — per-card editor round-trip verified 12/12** |
 | **2.5 — Per-card + Tier 1/2** | Per-card mode + chip-grid Flow + dbl-click reset + Speed/Depth (Tier 1) + Spin/Zoom Pulse/Flow Pulse (Tier 2, §13.6) + collapse fixes + Drive-pill in row1. | ✅ **DONE 2026-06-03 — verified 18/18** |
-| **4 — Build-out: parallel layer controls** | **SHIPPED 2026-06-04 (verified 27/27):** Size · Position pad · Luma Key · **Mirror/Kaleido** (§14.1a). Next: 4b Colour/grade. Aspect deferred. See §14. | 🟢 **Size/Pos/LumaKey/Mirror DONE — 4b Colour next** |
+| **4 — Build-out: parallel layer controls** | **SHIPPED 2026-06-04:** Size · Position pad · Luma Key · Mirror/Kaleido (§14.1a) · **4b Colour/Grade** (Brightness/Contrast/Saturation/Hue/Invert, §14.2, verified 36/36). Aspect deferred. See §14. | 🟢 **4a + 4b DONE** |
 | **4-speed — Perceptual Speed fader** | Speed mapped **logarithmically** (~0.02 → 4.0) — slow/extreme-slowdown range gets fine resolution, top still reaches fast. ONE fader, smarter mapping (§17). Applied to **Drive panel Speed AND Flow Style Speed**. Model stores real speed (engine/saved presets unchanged); only UI mapping is non-linear. | ✅ **DONE 2026-06-04 — verified 24/24** |
-| **6 — Melding tools** ⭐ | The strategic category (§16): controls for HOW an asset *integrates into* the preset's machinery (not overlay) — **Blend mode** (image add/multiply/screen/difference into the feedback), **Displacement** (image luma warps the melt), **Mask** (image gates where the preset's own content shows), **image-driven flow**. Luma Key/fade/mix are the first ones. High strategic value; rollable by Remix. | ⬜ **planned — prioritize Blend mode** |
+| **6 — Melding tools** ⭐ | The strategic category (§16): controls for HOW an asset *integrates into* the preset's machinery. **Blend mode SHIPPED 2026-06-04 (verified 33/33)** — Mix/Add/Screen/Multiply/Difference/Overlay chip-row; gated (`mix`=no-op); all 6 render bright (min luma 114); Remix rolls it (bias to bright family). Next melding tools: **Displacement** (image luma warps the melt) → **Mask** → image-driven flow. | 🟢 **Blend mode DONE — Displacement next** |
 | **3 — More sources** | Video / GIF / webcam as the driving texture. **GIF + video CONFIRMED WORKING in real use 2026-06-03** (user) — same `setUserTexture` sampler the warp reads each frame, so the melt animates for free. Remaining: webcam + per-source polish. | 🟢 **GIF/video work; webcam TODO** |
 | **(opt) — Named-texture path** | "Photo-reactive" presets that sample a known user sampler + ship the **22 built-in texture assets** (`milkdrop-pack-import.md` §16.1). | ⬜ optional |
-| **7 — Drive 🎲 (Remix)** | **GLOBAL 🎲 Remix now rolls the Drive melt (SHIPPED 2026-06-04, verified 31/31):** when a layer is driving, the Remix "Flow" axis gambles the melt look (flow/speed/depth/spin/zoom/flow-pulse/mirror/luma-key/presence/audio) via `_rollImageWarp` instead of flowStyle; panel re-syncs (was the user's bug — sliders now follow), framing (size/cx/cy) preserved, every roll renders bright, **Flow lock** keeps the melt. Remaining (optional): a dedicated 🎲 button IN the Drive section + Blend mode axis once §16 lands. | 🟢 **Global Remix→Drive DONE** |
+| **7 — Drive 🎲 (Remix)** | **GLOBAL 🎲 Remix rolls the WHOLE Meld (verified 33/33):** the Remix "Flow" axis gambles flow/speed/depth/spin/zoom/flow-pulse/mirror/luma-key/**blend-mode**/presence/audio **AND framing (size/position)** via `_rollImageWarp`; panel re-syncs (sliders + chips + pad follow), every roll renders, **Flow lock** keeps the melt. **Tuned 2026-06-04:** rolls framing too (user: "move also"; ⅓ full-frame, rest reframed in-bounds) + biased gently away from blown white (add/screen rolled less + paired with lower presence). Only which image drives is left alone. Remaining (optional): a dedicated 🎲 button IN the Meld panel. | 🟢 **Remix→Meld DONE (rolls everything incl. framing + blend)** |
 
-**▶️ CURRENT (2026-06-04):** 4a (Size · Position pad · Luma Key) shipped + verified 23/23. **Building now:**
-the perceptual Speed fader (§17, Drive + Flow Style). **Next:** Mirror/Kaleido (§14.1a) → 4b Colour/grade →
-Phase 6 Melding tools (Blend mode first) → Phase 7 Drive 🎲. Out-of-bounds = FADE (settled).
-**⚠️ COMMIT STATE: HEAD `a5ffe71` = Tier 2. ALL of 4a (Size, Position pad, Luma Key) + §17 Speed are
-UNCOMMITTED** — commit when ready.
+**▶️ CURRENT (2026-06-04):** Shipped + verified — Size · Position pad · Luma Key · Mirror/Kaleido (§14, 27/27),
+perceptual log Speed + true slow-motion (§17, 24/24), **🎲 Remix→Meld** (Phase 7, 31/31), renamed Drive→**Meld**,
+in-app help (Layers got its own menu) + promo docs updated. **Building now: Phase 6 Blend mode** (§16 — the first
+melding tool). **Next after:** 4b Colour/Grade → more melding tools (Displacement/Mask) → Phase 7 Meld 🎲 button →
+Phase 3 webcam source. All committed + pushed (user); macOS + Coolify web verified, Windows pending.
 
 **Key facts (so you don't re-derive):** NO engine fork — reuses `setUserTexture` (upload, exists) +
 warp-shader injection (exists, = Flow Style). Cross-platform (pure WebGL2). Machine limits a
@@ -514,13 +515,16 @@ pixels progressively drop OUT of the injection so the melt shows through them *c
 darken); at 1 only bright parts seed. Composes with the framing fade (`_inb * _key`). Verified: cranked still
 renders bright. One knob, gated, boring-not-broken. (Same family as the layer `lumaKeyLo/Hi` but one-knob.)
 
-### 14.2 Phase 4b — Colour / Grade (re-mood the image as it melts) — mostly REUSE
-Apply the per-layer colour-grade GLSL to `_img` *before* it mixes into the feedback. High value, low risk
-(the grade math already exists in the layer card → lift it into a shared helper or inline):
-Brightness · Contrast · Gamma · Saturation · Hue · Tint (R/G/B) · Colour Temp · Sepia · Fade ·
-Shadows/Highlights · Lift/Gain. Note: the feedback loop *also* recolours over time, so a static grade on
-the injected image reads cleanly (no conflict). Ties to [[project_mood_dim_control_idea]] — a luminance↓/
-saturation↑ "mood" could live here too.
+### 14.2 Phase 4b — Colour / Grade ✅ SHIPPED 2026-06-04 (verified 36/36)
+Grades `_img` *before* it blends into the feedback (after sampling, before the blend/mix). Focused set
+(one-knob ethos, not the full 12): **Brightness** (0–2, darken/brighten — also the "club-dark / less white"
+lever), **Contrast**, **Saturation** (0=grey→2=vivid), **Hue** (0–360° rotate about the grey axis), and an
+**Invert** Off/On seg ("reverse"). Each gated → all-neutral (bright/contrast/sat=1, hue=0, invert off) adds
+NO GLSL lines (byte-identical). `clamp` only emitted when something grades. Model: `imageWarp` gained
+`bright`/`contrast`/`sat`/`hue`/`invert`; passed both build sites; sliders+seg in the Drive panel under a
+**Colour** label (after Blend). **Remix rolls it** — Brightness biased toward ≤1 (often darker → also helps
+the blown-white goal), plus occasional vivify / hue-shift / 12%-invert. Ties to [[project_mood_dim_control_idea]].
+Deferred (the rest of the 12): Gamma · Temp · Sepia · Fade · Shadows/Highlights · Lift/Gain · Tint — add if wanted.
 
 ### 14.3 Phase 4c — Stylize (trippy one-offs on the injected image)
 Edge/Sobel (neon line-art melting) · Posterize · Threshold · Pixelate · Invert · Solarize. Each = a small
@@ -593,11 +597,14 @@ combines with the preset's own content in a chosen way. That's the headline diff
 single opinionated knob/toggle; together they're a deep, rollable space.
 
 **Roadmap (rough value order):**
-1. **Blend mode** ⭐ (prioritize) — today the image `mix`es into the feedback (linear). Add a mode picker:
-   **Add** (image adds light → glow/bloom melt), **Screen** (soft lighten), **Multiply** (image darkens/
-   stamps the melt), **Difference** (psychedelic inversion), **Overlay** (contrast-y), vs the current
-   **Mix**. Each is a totally different integration character from ONE chip-row. Biggest bang-for-buck
-   melding tool — `ret = blend(_fb, _img, presence, mode)`.
+1. **Blend mode** ⭐ **✅ SHIPPED 2026-06-04 (verified 33/33).** `imageWarp.blendMode` chip-row in the Drive
+   panel: **Mix** (default, linear) · **Add** (additive light → glow) · **Screen** (soft lighten) ·
+   **Multiply** (stamp/burn, darkens) · **Difference** (psychedelic inversion) · **Overlay** (contrast).
+   In `buildImageWarp` the final line became `ret = mix(_fb, <blended>, presence)` where `<blended>` is a
+   per-mode GLSL expr (`mix`→`_img` = byte-identical no-op). Switch emits only KNOWN exprs (injection-safe;
+   bad mode → falls back to mix). Composes with presence/luma-key/framing. Remix rolls it (70% bright family
+   mix/add/screen/overlay, 30% multiply/difference). Verified every mode renders bright (mix 216 · add 248 ·
+   screen 248 · multiply 114 · difference 211 · overlay 187 — none dead).
 2. **Displacement** — use the image's luma/gradient to **warp the feedback** (the image becomes a
    heightmap that bends the melt), not just contribute colour. "The logo's shape ripples the plasma."
    `_fb` sampled at `uv + grad(_img)*amt`.

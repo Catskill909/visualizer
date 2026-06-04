@@ -792,6 +792,44 @@
                                         <input type="range" id="image-warp-lumakey-sl" class="slider" min="0" max="1" step="0.01" value="0">
                                         <span class="lsv" id="image-warp-lumakey-sl-val">0.00</span>
                                     </div>
+                                    <span class="layer-ctrl-label" data-tooltip="How the image fuses with the melt — Mix blends, Add glows, Multiply stamps/darkens, Difference inverts, Screen lightens, Overlay punches contrast">Blend</span>
+                                    <div id="image-warp-blend-grid" class="layer-react-curve" role="group"
+                                        aria-label="Blend mode" style="margin:6px 0 10px">
+                                        <button class="lseg active" data-blend="mix">Mix</button>
+                                        <button class="lseg" data-blend="add">Add</button>
+                                        <button class="lseg" data-blend="screen">Screen</button>
+                                        <button class="lseg" data-blend="multiply">Multiply</button>
+                                        <button class="lseg" data-blend="difference">Difference</button>
+                                        <button class="lseg" data-blend="overlay">Overlay</button>
+                                    </div>
+                                    <span class="layer-ctrl-label" data-tooltip="Colour-grade the image before it melts in">Colour</span>
+                                    <div class="layer-slider-row">
+                                        <span class="layer-ctrl-label" data-tooltip="Darken or brighten the image (1 = neutral). Pull down for darker, club-friendly melts">Brightness</span>
+                                        <input type="range" id="image-warp-bright-sl" class="slider" min="0" max="2" step="0.01" value="1">
+                                        <span class="lsv" id="image-warp-bright-sl-val">1.00</span>
+                                    </div>
+                                    <div class="layer-slider-row">
+                                        <span class="layer-ctrl-label" data-tooltip="Contrast / punch (1 = neutral)">Contrast</span>
+                                        <input type="range" id="image-warp-contrast-sl" class="slider" min="0" max="2" step="0.01" value="1">
+                                        <span class="lsv" id="image-warp-contrast-sl-val">1.00</span>
+                                    </div>
+                                    <div class="layer-slider-row">
+                                        <span class="layer-ctrl-label" data-tooltip="Saturation — 0 = grey, 1 = neutral, 2 = vivid">Saturation</span>
+                                        <input type="range" id="image-warp-sat-sl" class="slider" min="0" max="2" step="0.01" value="1">
+                                        <span class="lsv" id="image-warp-sat-sl-val">1.00</span>
+                                    </div>
+                                    <div class="layer-slider-row">
+                                        <span class="layer-ctrl-label" data-tooltip="Hue rotate the image colours (degrees)">Hue</span>
+                                        <input type="range" id="image-warp-hue-sl" class="slider" min="0" max="360" step="1" value="0">
+                                        <span class="lsv" id="image-warp-hue-sl-val">0</span>
+                                    </div>
+                                    <div class="layer-slider-row">
+                                        <span class="layer-ctrl-label" data-tooltip="Reverse / invert the image colours">Invert</span>
+                                        <div id="image-warp-invert-seg" class="layer-react-curve" role="group" aria-label="Invert" style="flex:1">
+                                            <button class="lseg active" data-invert="0">Off</button>
+                                            <button class="lseg" data-invert="1">On</button>
+                                        </div>
+                                    </div>
                                     <div class="layer-slider-row">
                                         <span class="layer-ctrl-label" data-tooltip="Image presence: high = stays sharp, low = melts into the trails">Presence</span>
                                         <input type="range" id="image-warp-reseed-sl" class="slider" min="0" max="1" step="0.01" value="0.2">

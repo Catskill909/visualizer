@@ -155,21 +155,22 @@ const r = await page.evaluate(async () => {
     out.lumaKeyLuma = await luma();
     insp.currentState.imageWarp.lumaKey = 0;
 
-    // Phase 7 — Remix rolls the Drive melt look + the panel re-syncs + framing is preserved.
+    // Phase 7 — Remix rolls the Drive melt look (incl. framing now) + the panel re-syncs.
     Object.assign(insp.currentState.imageWarp, { size: 0.7, cx: 0.45, cy: 0.5, flow: 'liquid' });
     insp._remixLock = {};
     const flows = new Set();
-    let rollFramingKept = true, rollChipSynced = true;
-    for (let k = 0; k < 6; k++) {
+    let rollFramingMoved = false, rollChipSynced = true, blends = new Set();
+    for (let k = 0; k < 8; k++) {
         insp._rollFullStack();
         const iw = insp.currentState.imageWarp;
-        flows.add(iw.flow);
-        if (iw.size !== 0.7 || iw.cx !== 0.45 || iw.cy !== 0.5) rollFramingKept = false;
+        flows.add(iw.flow); blends.add(iw.blendMode);
+        if (iw.size !== 0.7 || iw.cx !== 0.45 || iw.cy !== 0.5) rollFramingMoved = true;  // Remix now reframes
+        if (iw.size < 0.1 || iw.size > 2 || iw.cx < 0 || iw.cx > 1 || iw.cy < 0 || iw.cy > 1) rollChipSynced = false; // bounds
         const active = document.querySelector('#image-warp-flow-grid .lseg.active');
         if (!active || active.dataset.flow !== iw.flow) rollChipSynced = false;
     }
-    out.remixRollsDrive = flows.size >= 2;
-    out.remixFramingKept = rollFramingKept;
+    out.remixRollsDrive = flows.size >= 2 && blends.size >= 2;
+    out.remixFramingMoved = rollFramingMoved;
     out.remixChipSynced = rollChipSynced;
     // Flow lock keeps the melt untouched.
     insp._remixLock = { flow: true };
@@ -199,6 +200,39 @@ const r = await page.evaluate(async () => {
     out.mirrorLuma = await luma();
     [...document.querySelectorAll('#image-warp-mirror-grid .lseg')].find(b => b.dataset.mirror === 'none').click();
     out.kaleidoRowHidden = document.getElementById('image-warp-kaleido-speed-row').style.display === 'none';
+
+    // Blend mode (§16) — each of the 6 modes bakes its expression + renders bright (boring-not-broken);
+    // clicking a chip syncs the model.
+    const blendExpr = { mix: 'mix(_fb, _img,', add: '(_fb + _img)', screen: '_fb + _img - _fb * _img',
+        multiply: '(_fb * _img)', difference: 'abs(_fb - _img)', overlay: 'step(0.5, _fb)' };
+    let blendAllBake = true, blendMinLuma = 999;  // leave flow/reseed as-is for the round-trip check below
+    for (const m of ['mix', 'add', 'screen', 'multiply', 'difference', 'overlay']) {
+        [...document.querySelectorAll('#image-warp-blend-grid .lseg')].find(b => b.dataset.blend === m).click();
+        if (insp.currentState.imageWarp.blendMode !== m) blendAllBake = false;
+        const warp = insp._buildRuntimePreset(insp.currentState).warp;
+        if (!warp.includes(blendExpr[m])) blendAllBake = false;
+        for (let k = 0; k < 40; k++) await luma();
+        blendMinLuma = Math.min(blendMinLuma, await luma());
+    }
+    out.blendAllBake = blendAllBake;
+    out.blendMinLuma = +blendMinLuma.toFixed(1);
+    [...document.querySelectorAll('#image-warp-blend-grid .lseg')].find(b => b.dataset.blend === 'mix').click();
+
+    // Phase 4b — Colour/Grade: all-neutral = no-op; ops bake; invert seg works; graded melt renders.
+    Object.assign(insp.currentState.imageWarp, { bright: 1, contrast: 1, sat: 1, hue: 0, invert: false });  // clear any rolled grade
+    out.gradeNeutralNoop = !insp._buildRuntimePreset(insp.currentState).warp.includes('_img *=')
+        && !insp._buildRuntimePreset(insp.currentState).warp.includes('_img = 1.0 - _img');
+    Object.assign(insp.currentState.imageWarp, { bright: 0.6, contrast: 1.2, sat: 1.5, hue: 120 });
+    document.querySelector('#image-warp-invert-seg .lseg[data-invert="1"]').click();  // Invert On
+    insp._applyToEngine();
+    const gWarp = insp._buildRuntimePreset(insp.currentState).warp;
+    out.gradeBakes = gWarp.includes('_img *= 0.6000') && gWarp.includes('mix(vec3(dot(_img')
+        && gWarp.includes('_ha = 2.09440') && gWarp.includes('_img = 1.0 - _img') && insp.currentState.imageWarp.invert === true;
+    for (let k = 0; k < 40; k++) await luma();
+    out.gradeLuma = await luma();
+    // reset grade to neutral
+    Object.assign(insp.currentState.imageWarp, { bright: 1, contrast: 1, sat: 1, hue: 0, invert: false });
+    document.querySelector('#image-warp-invert-seg .lseg[data-invert="0"]').click();
 
     // Overlay must DROP OUT while driving: the comp shader no longer declares the
     // driving layer's sampler. Toggling Drive off restores it.
@@ -252,9 +286,14 @@ ok('Speed fader is log-mapped (pos 0 → ~0.02 slow, pos 1 → ~4.0 fast)', r.lo
 ok('Mirror/Kaleido bakes a fold into the warp + reveals its speed row', r.mirrorBaked && r.kaleidoRowShown);
 ok('Mirrored melt STILL renders bright, not black (luma > 20)', r.mirrorLuma > 20, `luma ${r.mirrorLuma?.toFixed(1)}`);
 ok('Kaleido speed row hides when Mirror is Off', r.kaleidoRowHidden);
+ok('all 6 Blend modes bake their expr + chip syncs the model', r.blendAllBake);
+ok('every Blend mode renders bright, none dead (min luma > 40)', r.blendMinLuma > 40, `min luma ${r.blendMinLuma}`);
+ok('Colour/Grade all-neutral = no-op (no grade lines)', r.gradeNeutralNoop);
+ok('Colour/Grade bakes (bright/sat/hue/invert) + Invert seg works', r.gradeBakes);
+ok('graded melt still renders (darken+grade, not black; luma > 15)', r.gradeLuma > 15, `luma ${r.gradeLuma}`);
 ok('Remix rolls the Drive melt look (variety across rolls)', r.remixRollsDrive);
 ok('Remix re-syncs the Drive panel (flow chip matches rolled value)', r.remixChipSynced);
-ok('Remix preserves the user framing (size/cx/cy untouched)', r.remixFramingKept);
+ok('Remix now rolls framing too (size/position move, stay in bounds)', r.remixFramingMoved && r.remixChipSynced);
 ok('Flow lock keeps the melt (Remix does not roll it)', r.remixFlowLock);
 ok('driving layer drops out of the overlay (not stacked on top)', r.overlayHiddenWhileDriving);
 ok('toggling back to Overlay restores it + parks the panel home', r.overlayRestoredWhenOff && r.panelHomedWhenOff);

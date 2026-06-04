@@ -550,7 +550,7 @@ const BLANK = {
     // Image-as-texture (image-texture-dev.md Phase 2) — melt a loaded image layer
     // INTO the feedback loop. `texName` references one of `images[]`. When enabled it
     // OVERRIDES flowStyle's warp via buildImageWarp. Round-trips via the BLANK overlay.
-    imageWarp: { enabled: false, texName: '', flow: 'liquid', size: 1.0, cx: 0.5, cy: 0.5, mirror: 'none', kaleidoSpeed: 0.0, speed: 1.0, depth: 0.5, spin: 0.0, zoomPulse: 0.0, flowPulse: 0.0, lumaKey: 0.0, reseed: 0.20, audioSource: 'none', audioAmt: 0.50 },
+    imageWarp: { enabled: false, texName: '', flow: 'liquid', size: 1.0, cx: 0.5, cy: 0.5, mirror: 'none', kaleidoSpeed: 0.0, blendMode: 'mix', bright: 1.0, contrast: 1.0, sat: 1.0, hue: 0, invert: false, speed: 1.0, depth: 0.5, spin: 0.0, zoomPulse: 0.0, flowPulse: 0.0, lumaKey: 0.0, reseed: 0.20, audioSource: 'none', audioAmt: 0.50 },
     motionReact: {
         source: 'bass',
         curve: 'linear',
@@ -2017,9 +2017,9 @@ export class EditorInspector {
 
     /** Remix the Drive melt LOOK (image-texture-dev.md Phase 7). Mutates currentState.imageWarp
      *  only — no engine reload (respects the _rolling batch; the final _applyToEngine +
-     *  _syncAllControls in _rollFullStack do the one rebuild + slider re-sync). Leaves the user's
-     *  framing (size/cx/cy) and which image drives (texName/enabled) UNTOUCHED — gambles the melt
-     *  character, not the composition. Every rolled combo renders bright (boring-not-broken). */
+     *  _syncAllControls in _rollFullStack do the one rebuild + slider re-sync). Rolls the full melt
+     *  incl. framing (size/position) — only which image drives (texName/enabled) is left alone.
+     *  Biased gently AWAY from blown-out white. Every rolled combo renders (boring-not-broken). */
     _rollImageWarp(pick, rnd) {
         const iw = this.currentState.imageWarp;
         if (!iw) return;
@@ -2032,10 +2032,29 @@ export class EditorInspector {
         iw.lumaKey = Math.random() < 0.5 ? rnd(0.3, 0.8) : 0;
         iw.mirror = Math.random() < 0.35 ? pick(['h', 'v', 'quad', 'kaleido']) : 'none';
         iw.kaleidoSpeed = iw.mirror === 'kaleido' ? rnd(0.05, 0.6) : 0;
-        iw.reseed = rnd(0.12, 0.35);
+        // Blend mode — weighted. The white-LIGHTENING modes (add/screen) blow out to bright white, so
+        // roll them a bit LESS and pair them with a gentler presence (user: "roll bright white a little
+        // less"). mix/overlay/multiply/difference don't blow white.
+        const _bm = Math.random();
+        iw.blendMode = _bm < 0.42 ? 'mix' : _bm < 0.62 ? 'overlay' : _bm < 0.76 ? 'add'
+            : _bm < 0.86 ? 'screen' : _bm < 0.94 ? 'multiply' : 'difference';
+        const _lightens = (iw.blendMode === 'add' || iw.blendMode === 'screen');
+        iw.reseed = _lightens ? rnd(0.10, 0.22) : rnd(0.12, 0.35);  // lower presence on the white-blowers
         // Audio reactivity is the differentiator — Remix exercises it.
         iw.audioSource = Math.random() < 0.6 ? pick(['bass', 'mid', 'treb']) : 'none';
         iw.audioAmt = rnd(0.3, 0.7);
+        // Colour/Grade (Phase 4b) — Brightness biased toward ≤1 (often a bit darker → also helps the
+        // "less blown white" goal); occasional vivify / hue-shift / reverse.
+        iw.bright = Math.random() < 0.5 ? rnd(0.55, 1.0) : 1.0;
+        iw.contrast = rnd(0.85, 1.3);
+        iw.sat = rnd(0.7, 1.6);
+        iw.hue = Math.random() < 0.4 ? Math.round(rnd(0, 360)) : 0;
+        iw.invert = Math.random() < 0.12;
+        // Full-chaos reframe (user: "move also") — Remix now also moves/resizes the image. ~⅓ land
+        // full-frame centered; the rest reframe, kept on-screen (centre in the middle ⅓) so it never
+        // flies off. Size/Position sliders + pad re-sync via _syncAllControls.
+        if (Math.random() < 0.35) { iw.size = 1.0; iw.cx = 0.5; iw.cy = 0.5; }
+        else { iw.size = rnd(0.45, 1.25); iw.cx = rnd(0.32, 0.68); iw.cy = rnd(0.32, 0.68); }
     }
 
     /** Add one randomised, audio-reactive editor shape for a Remix roll — a blob or
@@ -2315,6 +2334,14 @@ export class EditorInspector {
             });
         });
         this._bindImageWarpSlider('image-warp-kaleido-speed-sl', 'kaleidoSpeed');
+        // Blend chip-row (Mix/Add/Screen/Multiply/Difference/Overlay) — HOW the image fuses with the melt.
+        document.querySelectorAll('#image-warp-blend-grid .lseg').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.currentState.imageWarp.blendMode = btn.dataset.blend;
+                document.querySelectorAll('#image-warp-blend-grid .lseg').forEach(b => b.classList.toggle('active', b === btn));
+                this._applyToEngine();
+            });
+        });
         this._bindImageWarpSlider('image-warp-depth-sl', 'depth');
         this._bindImageWarpSlider('image-warp-spin-sl', 'spin');
         this._bindImageWarpSlider('image-warp-zoom-sl', 'zoomPulse');
@@ -2322,11 +2349,23 @@ export class EditorInspector {
         this._bindImageWarpSlider('image-warp-lumakey-sl', 'lumaKey');
         this._bindImageWarpSlider('image-warp-reseed-sl', 'reseed');
         this._bindImageWarpSlider('image-warp-audio-amt-sl', 'audioAmt');
+        // Phase 4b — Colour/Grade on the melted image.
+        this._bindImageWarpSlider('image-warp-bright-sl', 'bright');
+        this._bindImageWarpSlider('image-warp-contrast-sl', 'contrast');
+        this._bindImageWarpSlider('image-warp-sat-sl', 'sat');
+        this._bindImageWarpSlider('image-warp-hue-sl', 'hue');
+        document.querySelectorAll('#image-warp-invert-seg .lseg').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.currentState.imageWarp.invert = btn.dataset.invert === '1';
+                document.querySelectorAll('#image-warp-invert-seg .lseg').forEach(b => b.classList.toggle('active', b === btn));
+                this._applyToEngine();
+            });
+        });
         // Double-click a slider's label to reset it to default — matches every other
         // fader in the editor. The panel moves between cards/home, so the handler lives
         // on the panel itself; defaults are stamped from BLANK.imageWarp.
         // NB: speed slider is position-mapped (log); its default POSITION = _speedToPos(1.0).
-        const iwDefaults = { 'image-warp-size-sl': 1.0, 'image-warp-speed-sl': _speedToPos(1.0), 'image-warp-depth-sl': 0.5, 'image-warp-spin-sl': 0.0, 'image-warp-zoom-sl': 0.0, 'image-warp-flowpulse-sl': 0.0, 'image-warp-kaleido-speed-sl': 0.0, 'image-warp-lumakey-sl': 0.0, 'image-warp-reseed-sl': 0.2, 'image-warp-audio-amt-sl': 0.5 };
+        const iwDefaults = { 'image-warp-size-sl': 1.0, 'image-warp-speed-sl': _speedToPos(1.0), 'image-warp-depth-sl': 0.5, 'image-warp-spin-sl': 0.0, 'image-warp-zoom-sl': 0.0, 'image-warp-flowpulse-sl': 0.0, 'image-warp-kaleido-speed-sl': 0.0, 'image-warp-lumakey-sl': 0.0, 'image-warp-bright-sl': 1.0, 'image-warp-contrast-sl': 1.0, 'image-warp-sat-sl': 1.0, 'image-warp-hue-sl': 0, 'image-warp-reseed-sl': 0.2, 'image-warp-audio-amt-sl': 0.5 };
         for (const [id, def] of Object.entries(iwDefaults)) {
             const sl = document.getElementById(id);
             if (!sl) continue;
@@ -2504,6 +2543,14 @@ export class EditorInspector {
         const krow = document.getElementById('image-warp-kaleido-speed-row');
         if (krow) krow.style.display = mir === 'kaleido' ? '' : 'none';
         this._syncSlider('image-warp-kaleido-speed-sl', iw.kaleidoSpeed ?? 0, 0, 1, 2);
+        const blend = iw.blendMode || 'mix';
+        document.querySelectorAll('#image-warp-blend-grid .lseg').forEach(b => b.classList.toggle('active', b.dataset.blend === blend));
+        this._syncSlider('image-warp-bright-sl', iw.bright ?? 1, 0, 2, 2);
+        this._syncSlider('image-warp-contrast-sl', iw.contrast ?? 1, 0, 2, 2);
+        this._syncSlider('image-warp-sat-sl', iw.sat ?? 1, 0, 2, 2);
+        this._syncSlider('image-warp-hue-sl', iw.hue ?? 0, 0, 360, 0);
+        const inv = iw.invert ? '1' : '0';
+        document.querySelectorAll('#image-warp-invert-seg .lseg').forEach(b => b.classList.toggle('active', b.dataset.invert === inv));
         const audioSel = document.getElementById('image-warp-audio');
         if (audioSel) audioSel.value = iw.audioSource || 'none';
         const amtRow = document.getElementById('image-warp-audio-amt-row');
@@ -8654,7 +8701,8 @@ export class EditorInspector {
         if (iw && iw.enabled && iw.texName && (state.images || []).some(e => e.texName === iw.texName)) {
             runtime.warp = buildImageWarp({
                 imgName: iw.texName, flow: iw.flow, size: iw.size, cx: iw.cx, cy: iw.cy,
-                mirror: iw.mirror, kaleidoSpeed: iw.kaleidoSpeed,
+                mirror: iw.mirror, kaleidoSpeed: iw.kaleidoSpeed, blendMode: iw.blendMode,
+                bright: iw.bright, contrast: iw.contrast, sat: iw.sat, hue: iw.hue, invert: iw.invert,
                 speed: iw.speed, depth: iw.depth,
                 spin: iw.spin, zoomPulse: iw.zoomPulse, flowPulse: iw.flowPulse, lumaKey: iw.lumaKey,
                 reseed: iw.reseed, audioSource: iw.audioSource, audioAmt: iw.audioAmt,

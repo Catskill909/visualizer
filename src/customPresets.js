@@ -718,6 +718,10 @@ export function buildWarpShader(flow) {
  *   lumaKey  – 0..1 key dark image pixels OUT of the injection (the melt shows through them) instead
  *              of darkening. 0 = inject the whole image (emergent dark-suppression only); 1 = only the
  *              bright parts seed the loop.
+ *   bright/contrast/sat – colour grade on the image before it blends (1 = neutral). hue – degrees (0 = none).
+ *   invert   – reverse the image colours (bool). All gated: neutral grade adds no GLSL.
+ *   blendMode– 'mix'|'add'|'screen'|'multiply'|'difference'|'overlay' — HOW the image fuses with the
+ *              feedback (the first melding tool). 'mix' = default (linear blend, byte-identical no-op).
  *   mirror   – 'none'|'h'|'v'|'quad'|'kaleido' — fold the image-sample coord (mirror/kaleidoscope the
  *              melt). Fills via reflection (overrides the framing fade). kaleidoSpeed spins the kaleido.
  *   spin     – 0..1 melt rotation: gentle time-drift + a bass kick. 0 = no rotation.
@@ -823,6 +827,21 @@ export function buildImageWarp(opts) {
     } else {
         imgSample = `  vec3 _img = texture(sampler_${imgName}, uv_orig).rgb;\n`;
     }
+    // Phase 4b — Colour / Grade. Re-mood the image BEFORE it blends into the feedback (darken, punch,
+    // vivify, hue-shift, reverse). Each op is gated to no-op at neutral → all-neutral adds no lines
+    // (byte-identical). `clamp` only emitted when something graded (keeps the blend modes well-behaved).
+    const bright = Number(o.bright ?? 1), contrast = Number(o.contrast ?? 1), sat = Number(o.sat ?? 1);
+    const hue = Number(o.hue ?? 0), invert = !!o.invert;
+    let grade = '';
+    if (bright !== 1) grade += `  _img *= ${bright.toFixed(4)};\n`;
+    if (contrast !== 1) grade += `  _img = (_img - 0.5) * ${contrast.toFixed(4)} + 0.5;\n`;
+    if (sat !== 1) grade += `  _img = mix(vec3(dot(_img, vec3(0.299, 0.587, 0.114))), _img, ${sat.toFixed(4)});\n`;
+    if (hue !== 0) {
+        const a = (hue * Math.PI / 180).toFixed(5);  // degrees → radians; rotate about the (1,1,1) grey axis
+        grade += `  { vec3 _hk = vec3(0.57735); float _ha = ${a}; _img = _img * cos(_ha) + cross(_hk, _img) * sin(_ha) + _hk * dot(_hk, _img) * (1.0 - cos(_ha)); }\n`;
+    }
+    if (invert) grade += `  _img = 1.0 - _img;\n`;
+    if (grade) grade += `  _img = clamp(_img, 0.0, 1.0);\n`;
     // Presence = reseed, gated by the framing fade (_inb) and/or the Luma Key (_key). Both are
     // gated to no-op at neutral, so size=1/cx=cy=0.5/lumaKey=0 → exactly `mix(_fb,_img,reseed)`.
     let gate = '';
@@ -841,7 +860,20 @@ export function buildImageWarp(opts) {
         gate += `  float _key = mix(1.0, smoothstep(0.05, 0.45, dot(_img, vec3(0.299, 0.587, 0.114))), ${lumaKey.toFixed(4)});\n`;
         presence += ` * _key`;
     }
-    const mix = gate + `  ret = mix(_fb, _img, ${presence});\n`;
+    // Blend mode (§16 — the first MELDING tool). HOW the image fuses with the feedback, not just how
+    // MUCH (that's presence). 'mix' (default) → `mix(_fb,_img,presence)` = byte-identical no-op. Others
+    // compute a blended colour, still scaled by presence so the dial still works. The switch only emits
+    // KNOWN GLSL exprs (no user string reaches the shader → injection-safe by construction).
+    let _blended;
+    switch (String(o.blendMode || 'mix')) {
+        case 'add':        _blended = '(_fb + _img)'; break;                  // additive light → glowing melt
+        case 'screen':     _blended = '(_fb + _img - _fb * _img)'; break;     // soft lighten
+        case 'multiply':   _blended = '(_fb * _img)'; break;                  // stamp / burn (darkens)
+        case 'difference': _blended = 'abs(_fb - _img)'; break;              // psychedelic inversion
+        case 'overlay':    _blended = 'mix(2.0 * _fb * _img, 1.0 - 2.0 * (1.0 - _fb) * (1.0 - _img), step(0.5, _fb))'; break;
+        default:           _blended = '_img'; break;                         // 'mix' (+ any unknown) → no-op
+    }
+    const mix = gate + `  ret = mix(_fb, ${_blended}, ${presence});\n`;
 
     // The user sampler MUST be declared in the shader HEADER (before shader_body):
     // butterchurn's getShaderParts splits on `shader_body`, scans the header with
@@ -851,6 +883,7 @@ export function buildImageWarp(opts) {
     return `uniform sampler2D sampler_${imgName};\nshader_body {\n${pre}` +
         `  vec3 _fb = ${fbExpr};\n` +
         imgSample +
+        grade +
         mix + `}`;
 }
 
