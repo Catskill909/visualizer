@@ -159,16 +159,18 @@ const r = await page.evaluate(async () => {
     Object.assign(insp.currentState.imageWarp, { size: 0.7, cx: 0.45, cy: 0.5, flow: 'liquid' });
     insp._remixLock = {};
     const flows = new Set();
-    let rollFramingMoved = false, rollChipSynced = true, blends = new Set();
-    for (let k = 0; k < 8; k++) {
+    let rollFramingMoved = false, rollChipSynced = true, blends = new Set(), presentRolls = 0;
+    for (let k = 0; k < 20; k++) {
         insp._rollFullStack();
         const iw = insp.currentState.imageWarp;
         flows.add(iw.flow); blends.add(iw.blendMode);
+        if (iw.reseed >= 0.5) presentRolls++;  // a "present meld" roll — image reads clearly
         if (iw.size !== 0.7 || iw.cx !== 0.45 || iw.cy !== 0.5) rollFramingMoved = true;  // Remix now reframes
         if (iw.size < 0.1 || iw.size > 2 || iw.cx < 0 || iw.cx > 1 || iw.cy < 0 || iw.cy > 1) rollChipSynced = false; // bounds
         const active = document.querySelector('#image-warp-flow-grid .lseg.active');
         if (!active || active.dataset.flow !== iw.flow) rollChipSynced = false;
     }
+    out.remixPresentRolls = presentRolls;  // expect a healthy chunk of 20 to be present
     out.remixRollsDrive = flows.size >= 2 && blends.size >= 2;
     out.remixFramingMoved = rollFramingMoved;
     out.remixChipSynced = rollChipSynced;
@@ -292,6 +294,7 @@ ok('Colour/Grade all-neutral = no-op (no grade lines)', r.gradeNeutralNoop);
 ok('Colour/Grade bakes (bright/sat/hue/invert) + Invert seg works', r.gradeBakes);
 ok('graded melt still renders (darken+grade, not black; luma > 15)', r.gradeLuma > 15, `luma ${r.gradeLuma}`);
 ok('Remix rolls the Drive melt look (variety across rolls)', r.remixRollsDrive);
+ok('Remix lands "present meld" rolls often (image stays visible)', r.remixPresentRolls >= 4 && r.remixPresentRolls <= 16, `${r.remixPresentRolls}/20 present`);
 ok('Remix re-syncs the Drive panel (flow chip matches rolled value)', r.remixChipSynced);
 ok('Remix now rolls framing too (size/position move, stay in bounds)', r.remixFramingMoved && r.remixChipSynced);
 ok('Flow lock keeps the melt (Remix does not roll it)', r.remixFlowLock);

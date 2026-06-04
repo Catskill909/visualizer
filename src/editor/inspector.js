@@ -2023,23 +2023,35 @@ export class EditorInspector {
     _rollImageWarp(pick, rnd) {
         const iw = this.currentState.imageWarp;
         if (!iw) return;
+        // ~45% of rolls land a "PRESENT meld" — the source image stays recognizable (high presence +
+        // gentler depth/speed, no obliterating kaleido, full image visible). The rest keep the abstract,
+        // dissolved variety. (User: bump the odds of actually SEEING the meld image, without killing the
+        // variation — same philosophy as the white tweak.)
+        const _present = Math.random() < 0.45;
         iw.flow = pick(['tunnel', 'spiral', 'ripple', 'swirl', 'plasma', 'liquid', 'kaleido', 'bloom', 'smoke', 'melt']);
-        iw.speed = rnd(0.1, 2.2);                                          // wide range incl. the gorgeous slow end
-        iw.depth = rnd(0.35, 0.9);
+        iw.speed = _present ? rnd(0.4, 1.4) : rnd(0.1, 2.2);              // gentler evolution when present
+        iw.depth = _present ? rnd(0.2, 0.5) : rnd(0.35, 0.9);            // softer warp → image not obliterated
         iw.spin = Math.random() < 0.4 ? rnd(0.1, 0.6) : 0;
         iw.zoomPulse = Math.random() < 0.4 ? rnd(0.2, 0.6) : 0;
         iw.flowPulse = Math.random() < 0.4 ? rnd(0.3, 0.8) : 0;
-        iw.lumaKey = Math.random() < 0.5 ? rnd(0.3, 0.8) : 0;
-        iw.mirror = Math.random() < 0.35 ? pick(['h', 'v', 'quad', 'kaleido']) : 'none';
+        iw.lumaKey = (!_present && Math.random() < 0.5) ? rnd(0.3, 0.8) : 0;  // keep the whole image when present
+        // Present rolls rarely kaleido (it folds the image into a pattern → unrecognizable).
+        iw.mirror = Math.random() < (_present ? 0.15 : 0.35) ? pick(_present ? ['h', 'v', 'quad'] : ['h', 'v', 'quad', 'kaleido']) : 'none';
         iw.kaleidoSpeed = iw.mirror === 'kaleido' ? rnd(0.05, 0.6) : 0;
         // Blend mode — weighted. The white-LIGHTENING modes (add/screen) blow out to bright white, so
         // roll them a bit LESS and pair them with a gentler presence (user: "roll bright white a little
         // less"). mix/overlay/multiply/difference don't blow white.
         const _bm = Math.random();
-        iw.blendMode = _bm < 0.42 ? 'mix' : _bm < 0.62 ? 'overlay' : _bm < 0.76 ? 'add'
-            : _bm < 0.86 ? 'screen' : _bm < 0.94 ? 'multiply' : 'difference';
+        iw.blendMode = _present
+            // Present roll → image-faithful blends (skip Difference; rare Multiply) so the source reads.
+            ? (_bm < 0.5 ? 'mix' : _bm < 0.7 ? 'overlay' : _bm < 0.85 ? 'add' : _bm < 0.95 ? 'screen' : 'multiply')
+            : (_bm < 0.42 ? 'mix' : _bm < 0.62 ? 'overlay' : _bm < 0.76 ? 'add'
+                : _bm < 0.86 ? 'screen' : _bm < 0.94 ? 'multiply' : 'difference');
         const _lightens = (iw.blendMode === 'add' || iw.blendMode === 'screen');
-        iw.reseed = _lightens ? rnd(0.10, 0.22) : rnd(0.12, 0.35);  // lower presence on the white-blowers
+        // Presence: HIGH on a present roll (image reads clearly); otherwise the dissolved/abstract range.
+        // Lightening blends keep a gentler presence (white-blow guard) even when present.
+        iw.reseed = _present ? (_lightens ? rnd(0.32, 0.5) : rnd(0.5, 0.78))
+                             : (_lightens ? rnd(0.10, 0.22) : rnd(0.15, 0.40));
         // Audio reactivity is the differentiator — Remix exercises it.
         iw.audioSource = Math.random() < 0.6 ? pick(['bass', 'mid', 'treb']) : 'none';
         iw.audioAmt = rnd(0.3, 0.7);
