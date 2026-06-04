@@ -1,10 +1,13 @@
 # Image-as-Texture — feeding images INTO MilkDrop presets
 
-Status: **💡 Scoped + AUDITED + SPIKED 2026-06-03 — ✅ FEASIBLE, NO ENGINE FORK.** Audit (§9): the
-user-image→GL-texture pipeline already exists. Spike (§11): a **warp shader can sample a user
-texture** (headless luma 75) → image melts into the feedback loop by reusing `setUserTexture` +
-warp-injection (like Flow Style). Remaining = build + visual tuning, not feasibility. Origin:
+Status: **🟢 SHIPPED & ACTIVELY BUILDING OUT (updated 2026-06-04).** Image-as-texture is a real,
+committed feature: feedback-melt engine (§12), per-card **Overlay\|Drive** UX (§13), Tier 1/2 reactivity
+(§13.6), **Size · Position pad · Luma Key** (§14). Currently building the **melding-tools** category (§16)
++ a perceptual Speed fader (§17). **The Phase Tracker below is the live status.** Origin:
 `milkdrop-pack-import.md` §16.2.
+
+> **📚 Doc map:** Tracker + §§12–17 = current/shipped (read these). **§§3–8, 10–11 are PRE-BUILD scoping
+> (2026-06-03) kept as historical record — superseded by what shipped; don't treat as TODO.**
 
 > **One-liner:** let a user's image/video/GIF become a **texture the MilkDrop preset itself
 > processes** — so it gets melted, tunneled, kaleidoscoped, smeared, and pulsed to the audio by the
@@ -22,16 +25,18 @@ _Single source of truth for status. Detail in the numbered sections below._
 | **1 — Feedback-melt engine** | `buildImageWarp(opts)` generator shipped (§12) — blends `sampler_<imgName>` into the feedback loop, reusing the SAME flow math as `buildWarpShader` (shared `_flowParts`). Knobs: `flow` · `reseed` · **audio-reactive blend** (`audioSource`/`audioAmt`). **Minimal live wire-up shipped** (`window.__imgWarp.drive/clear`, dev-only). | ✅ **GENERATOR + LIVE WIRE DONE — tune look by eye next** |
 | **2 — UX** | **Per-card `Overlay \| Drive` switch** (§13, §13.5): each image layer card has a Drive button; flipping it melts THAT image into the preset (radio — one at a time), hides its overlay, and swaps the card body to the Drive panel (Flow · Speed · Depth · Presence · Audio+Amount). Overrides Flow Style; round-trips via BLANK; player parity in `refreshCustomPresets`. | ✅ **DONE 2026-06-03 — per-card editor round-trip verified 12/12** |
 | **2.5 — Per-card + Tier 1/2** | Per-card mode + chip-grid Flow + dbl-click reset + Speed/Depth (Tier 1) + Spin/Zoom Pulse/Flow Pulse (Tier 2, §13.6) + collapse fixes + Drive-pill in row1. | ✅ **DONE 2026-06-03 — verified 18/18** |
-| **4 — Build-out: parallel layer controls** | Flesh out the Drive panel toward the richness of regular layers — **Size/framing is #1** (melt currently fills the screen). See §14 for the weighed, phased plan. | ⬜ **NEXT (tomorrow)** |
-| **5 — Drive 🎲** | Roll a whole melt look (flow+speed+depth+spin+zoom+flow-pulse+audio target). Tier 2 gave it a rich space; boring-not-broken bar guarantees every roll renders. | ⬜ planned |
-| **3 — More sources** | Video / GIF / webcam as the driving texture (all already `setUserTexture`-supported → the melt animates). | ⬜ planned |
+| **4 — Build-out: parallel layer controls** | **4a Size SHIPPED + Position as the 2D Center pad SHIPPED + Luma Key SHIPPED (2026-06-04, verified 23/23).** Next: Mirror/Kaleido (recommended), then 4b colour/grade. Aspect deferred. See §14. | 🟢 **4a + Luma Key DONE — Mirror next** |
+| **4-speed — Perceptual Speed fader** | Speed mapped **logarithmically** (~0.02 → 4.0) — slow/extreme-slowdown range gets fine resolution, top still reaches fast. ONE fader, smarter mapping (§17). Applied to **Drive panel Speed AND Flow Style Speed**. Model stores real speed (engine/saved presets unchanged); only UI mapping is non-linear. | ✅ **DONE 2026-06-04 — verified 24/24** |
+| **6 — Melding tools** ⭐ | The strategic category (§16): controls for HOW an asset *integrates into* the preset's machinery (not overlay) — **Blend mode** (image add/multiply/screen/difference into the feedback), **Displacement** (image luma warps the melt), **Mask** (image gates where the preset's own content shows), **image-driven flow**. Luma Key/fade/mix are the first ones. High strategic value; rollable by Remix. | ⬜ **planned — prioritize Blend mode** |
+| **3 — More sources** | Video / GIF / webcam as the driving texture. **GIF + video CONFIRMED WORKING in real use 2026-06-03** (user) — same `setUserTexture` sampler the warp reads each frame, so the melt animates for free. Remaining: webcam + per-source polish. | 🟢 **GIF/video work; webcam TODO** |
 | **(opt) — Named-texture path** | "Photo-reactive" presets that sample a known user sampler + ship the **22 built-in texture assets** (`milkdrop-pack-import.md` §16.1). | ⬜ optional |
+| **7 — Drive 🎲 (Remix), NEAR THE END** | A 🎲 in the Drive section that rolls a WHOLE melt look at once (flow + size + position + speed/depth + spin/zoom/flow-pulse + luma-key + blend mode + audio target). Deliberately last — it needs the rich melding space (Phases 4 + 6) to roll into. Boring-not-broken bar = every roll renders bright. Also wire these axes into the GLOBAL 🎲 Remix (respect `_rolling`, [[project_remix_batch_perf]]). | ⬜ **planned (end)** |
 
-**▶️ PICK UP TOMORROW AT PHASE 4 (§14): Size & framing first.** The melt samples `texture(sampler_<img>,
-uv_orig)` → the image is stretched to fill the screen with no size control. That's the #1 gap. §14 has the
-full weighed plan (which layer controls translate to the feedback-seed mechanism and which don't).
-**Before coding Size, settle the out-of-bounds decision** (tile / clamp / fade) — that's the one real design
-fork. Everything is uncommitted since the last commit EXCEPT what the user already pushed — **commit first.**
+**▶️ CURRENT (2026-06-04):** 4a (Size · Position pad · Luma Key) shipped + verified 23/23. **Building now:**
+the perceptual Speed fader (§17, Drive + Flow Style). **Next:** Mirror/Kaleido (§14.1a) → 4b Colour/grade →
+Phase 6 Melding tools (Blend mode first) → Phase 7 Drive 🎲. Out-of-bounds = FADE (settled).
+**⚠️ COMMIT STATE: HEAD `a5ffe71` = Tier 2. ALL of 4a (Size, Position pad, Luma Key) + §17 Speed are
+UNCOMMITTED** — commit when ready.
 
 **Key facts (so you don't re-derive):** NO engine fork — reuses `setUserTexture` (upload, exists) +
 warp-shader injection (exists, = Flow Style). Cross-platform (pure WebGL2). Machine limits a
@@ -71,6 +76,12 @@ reactivity. A genuinely novel, demo-able, headline creator feature.
 Both can coexist — overlay layers stay; this is a new, deeper mode.
 
 ---
+
+## 3–8, 10–11. PRE-BUILD SCOPING (2026-06-03) — historical record
+
+> ⚠️ **These sections are the original scoping/spike notes, kept for the record. Everything here was
+> answered or superseded by what shipped (§§12–17). The spike's conclusion held: Approach A
+> (feedback-melt via warp injection) with NO engine fork. Skip to §12+ for current reality.**
 
 ## 3. Technical approaches (to evaluate in a spike)
 
@@ -422,19 +433,74 @@ a modulation of the flow. Below: what translates, how, and what doesn't.
 
 ### 14.1 Phase 4a — Size & Framing (THE PRIORITY — melt currently fills the screen)
 Today: `texture(sampler_<img>, uv_orig)` → uv 0..1 stretches the image to fill, no size/position/aspect.
-This is the #1 gap the user hit. Controls to add (all = transform the sample UV around a center):
-- **Size / Scale** — `_suv = (uv_orig - center) / size + center`. size<1 = image bigger (zoom in), size>1
-  = image smaller, surrounded by… → **THE design fork: out-of-bounds behavior.** Options: **tile/repeat**
-  (`fract` — trippy, kaleidoscopic), **clamp** (edge-stretch), or **fade to feedback/transparent** (image
-  floats in the melt). Likely want a mode toggle (Repeat / Once) like the layer Tile system. SETTLE THIS
-  BEFORE CODING 4a.
-- **Position (cx/cy)** — translate the sample center. Easy.
-- **Aspect / Fit** — preserve the image's aspect instead of stretching to screen (use `texsize`/`aspect`
-  uniforms, both available in the warp header). Probably a Fit toggle (Fill / Fit / Stretch).
-- **Tile** — repeat N× across the field before melting (reuse the layer tile concept; pairs with Size
-  Repeat mode).
-- **Mirror / Kaleido** — fold the sample UV (h/v/quad/kaleido); reuse the existing fold math from
-  `_buildCompShader`'s `uvFold` / the kaleido block.
+This is the #1 gap the user hit.
+
+**✅ OUT-OF-BOUNDS DECISION — SETTLED 2026-06-04: FADE (and it's NOT a user-facing choice).** When the
+image is scaled down, outside its bounds we inject NOTHING → only the feedback (the melt trails) shows, so
+the image becomes a **finite thing dissolving into the loop** (the purest expression of the feature's
+thesis). A `smoothstep` feather makes the dissolve literal — the image melts away at its own border.
+Rationale: clamp = edge-smear artifact (cut entirely, never expose); tile = a deliberate *creative* look
+(repeated melting copies), so it becomes its OWN optional toggle later — NOT an "out-of-bounds mode."
+This kills the geeky mode-picker: **Size just scales + fades, no question asked** (one-knob ethos,
+[[project_one_click_vs_pro_tools]]).
+
+Shader (gated so neutral = today's full-screen no-op):
+```glsl
+// center default 0.5,0.5; size default 1.0 (=fill). _img sample coord:
+vec2 _suv = (uv_orig - vec2(cx, cy)) / size + 0.5;        // scale + position about center
+float _inx = smoothstep(0.0, edge, _suv.x) * smoothstep(0.0, edge, 1.0 - _suv.x);
+float _iny = smoothstep(0.0, edge, _suv.y) * smoothstep(0.0, edge, 1.0 - _suv.y);
+float _inside = _inx * _iny;                               // 1 inside (feathered), 0 outside
+vec3 _img = texture(sampler_<img>, clamp(_suv, 0.0, 1.0)).rgb;
+ret = mix(_fb, _img, reseed * _inside);                    // outside → pure feedback
+```
+At size=1, cx=cy=0.5 this must reduce to the current `mix(_fb, _img, reseed)` (full-screen) — verify
+byte-stability / luma parity. `clamp` on the sample coord (not the gate) avoids GL wrap garbage in the
+fractional border texels; the gate is what actually fades it.
+
+**Controls for 4a:**
+- **Size / Scale** ✅ SHIPPED 2026-06-04 — `_iuv=(uv_orig-vec2(cx,cy))/size+0.5`, feathered `_inb` gate,
+  `clamp`ed sample, `mix(_fb,_img,reseed*_inb)`. Default 1.0. Composes with Spin/Zoom (one `_iuv`
+  pipeline). Gated: size=1,cx=cy=0.5 → byte-identical no-op. `imageWarp.size`.
+- **Position** ✅ SHIPPED 2026-06-04 — the **2D Center pad** (drag the dot + reset ↺), the SAME control
+  regular layers use, NOT faders (`#image-warp-xy-pad`, `_buildImageWarpPad`, violet dot). Bound to
+  `imageWarp.cx`/`cy`; pad redrawn from `_iwPadDraw` in `_syncImageWarpSection`.
+- **Tile** — DEFERRED to its own optional toggle (the deliberate repeated-copies look); not part of the
+  Size out-of-bounds behavior.
+
+### 14.1a Aspect & Mirror — AUDIT + PLAN (2026-06-04)
+Audited the layer equivalents to plan how they map to the melt's different mechanism.
+
+**Mirror / Kaleido — RECOMMEND BUILD (high value, low risk).** Layers use `mirror: none/h/v/quad/kaleido`
+(+ `kaleidoSpeed`); the **fold math already exists** in `_buildCompShader`'s `uvFold` + kaleido block.
+For the melt: fold `_iuv` in the coordinate pipeline *before* sampling (after size/position/spin/zoom),
+gated so `none` = byte-identical no-op. Adds `imageWarp.mirror` (chip seg) + `imageWarp.kaleidoSpeed`
+(slider, shown only for kaleido). `mirrorScope` (tile/field) is tile-specific → SKIP until Tile exists.
+Trippy, on-brand, ~all reuse. → do this next.
+
+**Aspect / Fit — PLAN, lower priority (defer or fold into aspect-ratio.md).** The melt samples `uv_orig`
+0..1 across the screen → a square image stretches to the screen's shape. To preserve the image's native
+ratio we must **bake the image AR (w/h) as a literal** into `buildImageWarp` (the warp's `aspect`/`texsize`
+uniforms only know the SCREEN, not the user texture) and correct one UV axis by `screenAR/imgAR` around the
+center. Caveats: (1) the build sites must pass the image's dimensions (available from the layer entry /
+`_imageTextures`); (2) one-sided aspect correction is exactly the portrait-reshape nuance [[project_aspect_ratio_modes]]
+flags — reuse that math, don't reinvent; (3) **for a melt the stretch matters LESS** (the image is being
+destroyed/tunneled anyway), and Size already addresses the user's actual complaint (fill-screen). So a
+Lock/Fluid toggle is a nice-to-have, not urgent. Recommend: build Mirror now; do Aspect after 4b, or bundle
+it with the broader aspect-ratio.md pass.
+
+**Verified — 20/20** (verify-image-warp-editor.mjs): Size/Position bake the framing + fade gate; a framed
+melt (size 0.6, off-centre) still renders bright (boring-not-broken); save/reload round-trips.
+
+### 14.1b Luma Key (2026-06-04) ✅ — explaining + controlling the "emergent key"
+User noticed a driven image looks luma-keyed (dark areas drop out) even though we never coded a key.
+**It's emergent:** mixing the image into a *decaying* feedback loop means bright regions seed + bloom while
+dark regions pull the feedback toward black / let the preset show through → looks keyed. Made it an explicit,
+adjustable control: **Luma Key** slider (`imageWarp.lumaKey`, default 0). `presence *= mix(1.0,
+smoothstep(0.05,0.45, luma(_img)), lumaKey)` — at 0 = byte-identical no-op (today's look); turned up, dark
+pixels progressively drop OUT of the injection so the melt shows through them *cleanly* (pass-through, not
+darken); at 1 only bright parts seed. Composes with the framing fade (`_inb * _key`). Verified: cranked still
+renders bright. One knob, gated, boring-not-broken. (Same family as the layer `lumaKeyLo/Hi` but one-knob.)
 
 ### 14.2 Phase 4b — Colour / Grade (re-mood the image as it melts) — mostly REUSE
 Apply the per-layer colour-grade GLSL to `_img` *before* it mixes into the feedback. High value, low risk
@@ -461,11 +527,12 @@ win than per-knob routing.
 - **Orbit / Sway / Wander / Bounce / Pan** — these are overlay *motion*; the **flow IS the motion engine**
   here, so most overlap/conflict. Maybe a slow **Drift** of the sample center later; skip the rest.
 
-### 14.6 Build order (proposed)
-4a Size & framing (settle out-of-bounds first) → 4b Colour/grade (big reuse, high value) → 4c Stylize
-(2–3 picks) → then **Phase 5 Drive 🎲** (rolls across the now-rich 4a/4b/4c space) → **Phase 3 GIF/video
+### 14.6 Build order (updated 2026-06-04 — see the Phase Tracker for live status)
+Done: 4a Size + Position pad + Luma Key + §17 perceptual Speed fader. Remaining within/after 4:
+**Mirror/Kaleido** (§14.1a) → **4b Colour/grade** (big reuse) → **4c Stylize** → **Phase 6 Melding tools**
+(Blend mode first, §16) → **Phase 7 Drive 🎲** (rolls across the now-rich space) → **Phase 3 GIF/video
 source**. Each sub-phase: add to `buildImageWarp` (gated so 0/neutral = no-op), model fields on `imageWarp`,
-sliders in the Drive panel (with dbl-click reset), pass at BOTH build sites, headless-verify (bakes + still
+control in the Drive panel (dbl-click reset), pass at BOTH build sites, headless-verify (bakes + still
 renders bright). Standing rule from [[project_one_click_vs_pro_tools]]: one obvious musical knob each;
 every value must render (boring-not-broken, luma>20).
 
@@ -496,3 +563,66 @@ save/reload, degrade). Plus [scripts/verify-image-warp.mjs](scripts/verify-image
 chip grid, collapse fixes, Drive row1 relocation. → **commit before starting Phase 4 tomorrow.**
 
 **Tomorrow:** Phase 4a (Size & framing). First decision: out-of-bounds mode (tile/clamp/fade) — see §14.1.
+
+---
+
+## 16. MELDING TOOLS — the strategic category (planned 2026-06-04)
+
+User's strategic call: the controls that make a user asset **integrate INTO the preset's machinery**
+(blend into the feedback loop, get warped/keyed/displaced by the engine) — as opposed to *overlaying* on
+top — are a **key category** worth building out deliberately. They're what let custom presets, effects,
+and assets "meld" together, and they're prime Remix material. Luma Key (§14.1b), the edge-fade (§14.1),
+and the base `mix(_fb,_img,presence)` are the first three; this is the roadmap for more.
+
+**Why it matters:** overlay = the asset sits apart (its own transform/opacity, no interaction). Melding =
+the asset becomes *part of the living preset* — the engine processes it, the audio drives it, and it
+combines with the preset's own content in a chosen way. That's the headline differentiator (ties to
+[[project_one_click_vs_pro_tools]] and "audio reactivity is the differentiator"). Each melding tool is a
+single opinionated knob/toggle; together they're a deep, rollable space.
+
+**Roadmap (rough value order):**
+1. **Blend mode** ⭐ (prioritize) — today the image `mix`es into the feedback (linear). Add a mode picker:
+   **Add** (image adds light → glow/bloom melt), **Screen** (soft lighten), **Multiply** (image darkens/
+   stamps the melt), **Difference** (psychedelic inversion), **Overlay** (contrast-y), vs the current
+   **Mix**. Each is a totally different integration character from ONE chip-row. Biggest bang-for-buck
+   melding tool — `ret = blend(_fb, _img, presence, mode)`.
+2. **Displacement** — use the image's luma/gradient to **warp the feedback** (the image becomes a
+   heightmap that bends the melt), not just contribute colour. "The logo's shape ripples the plasma."
+   `_fb` sampled at `uv + grad(_img)*amt`.
+3. **Mask** — use the image (or its luma) to gate WHERE the preset's OWN content vs the image shows
+   (Luma Key is a primitive 1-image version; a real mask channel is more). Great for logos/shapes.
+4. **Image-driven flow** — the image's gradient steers the flow *direction* (edges of the picture carry
+   the melt). Deeper, more experimental.
+5. **Palette-from-image** — tint the feedback/preset by the image's dominant colours.
+
+**Build rules (same as always):** each = a gated addition to `buildImageWarp` (neutral = no-op,
+boring-not-broken/luma>20), model field on `imageWarp`, one control in the Drive panel, both build sites,
+headless verify. All axes must be **Remix-rollable** (Phase 7 Drive 🎲 + the global Remix, respecting
+`_rolling` per [[project_remix_batch_perf]]). Applies beyond images too — video/GIF sources (Phase 3) and,
+longer-term, other layer assets melding into the preset.
+
+---
+
+## 17. PERCEPTUAL (LOG) SPEED FADER (2026-06-04)
+
+User: some flows (Melt, Liquid) need to slow WAY down — extreme slowdown produces amazing effects — and a
+single linear fader can't tune that variety. Root cause: speed is perceptually **logarithmic** (0.1→0.2 is
+a 2× change; 3.5→4.0 is invisible), but the fader was **linear** 0.1–4.0, so all the gorgeous slow range was
+crammed into the bottom ~5%.
+
+**Fix (one fader, smarter mapping):** map the slider position `t∈[0,1]` geometrically to speed:
+`speed = SMIN * (SMAX/SMIN)^t` with **SMIN≈0.02, SMAX≈4.0**. Bottom half of travel ≈ 0.02–0.28 (fine slow
+control), top half ramps to fast. Inverse `t = log(speed/SMIN)/log(SMAX/SMIN)` for sync. Readout shows the
+real speed value. Keeps the one-knob ethos ([[project_one_click_vs_pro_tools]]) — no second control.
+
+**Scope:** the **Drive panel Speed** AND the **Flow Style Speed** (Motion tab) — same flows (`_flowParts`),
+same linear-range problem. Needs a dedicated log binder (the generic linear slider binder writes the raw
+value through). Verify: slow end has fine resolution + renders; fast end still reachable; round-trips.
+
+**✅ SHIPPED 2026-06-04.** Module helpers `_speedToPos`/`_posToSpeed` (SPEED_MIN 0.02, SPEED_MAX 4.0) +
+`_bindLogSpeedSlider(id, get, set)` / `_syncLogSpeed(id, speed)` ([inspector.js](src/editor/inspector.js)).
+Drive Speed slider → native range 0..1 (position), default position `_speedToPos(1.0)`≈0.738 (so "1.0×"
+sits at ~¾ travel, bottom ¾ = 0.02–1.0 slow detail). Flow Style `fl-speed` converted the same way
+(Depth/Density stay linear). Both readouts show the real speed. dbl-click reset → position for 1.0×.
+Verified 24/24 (pos 0 → 0.02, pos 1 → 4.0, monotonic). Motion-Engine `me-speed` left linear (different
+control; revisit if it needs it).

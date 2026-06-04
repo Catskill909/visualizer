@@ -614,8 +614,9 @@ export class VisualizerEngine {
       const iw = preset.imageWarp;
       if (iw && iw.enabled && iw.texName && Array.isArray(preset.images) && preset.images.some(e => e.texName === iw.texName)) {
         preset.warp = buildImageWarp({
-          imgName: iw.texName, flow: iw.flow, speed: iw.speed, depth: iw.depth,
-          spin: iw.spin, zoomPulse: iw.zoomPulse, flowPulse: iw.flowPulse,
+          imgName: iw.texName, flow: iw.flow, size: iw.size, cx: iw.cx, cy: iw.cy,
+          speed: iw.speed, depth: iw.depth,
+          spin: iw.spin, zoomPulse: iw.zoomPulse, flowPulse: iw.flowPulse, lumaKey: iw.lumaKey,
           reseed: iw.reseed, audioSource: iw.audioSource, audioAmt: iw.audioAmt,
         });
       }

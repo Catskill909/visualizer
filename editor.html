@@ -737,8 +737,20 @@
                                     <div id="image-warp-flow-grid" class="layer-react-curve" role="group"
                                         aria-label="Melt flow style" style="margin:6px 0 10px"></div>
                                     <div class="layer-slider-row">
-                                        <span class="layer-ctrl-label" data-tooltip="Melt motion speed">Speed</span>
-                                        <input type="range" id="image-warp-speed-sl" class="slider" min="0.1" max="4" step="0.05" value="1">
+                                        <span class="layer-ctrl-label" data-tooltip="Image size on screen — below 1 it shrinks and dissolves into the melt; above 1 zooms in">Size</span>
+                                        <input type="range" id="image-warp-size-sl" class="slider" min="0.1" max="2" step="0.01" value="1">
+                                        <span class="lsv" id="image-warp-size-sl-val">1.00</span>
+                                    </div>
+                                    <div class="layer-center-row">
+                                        <span class="layer-ctrl-label" style="margin-bottom:5px">Position</span>
+                                        <div class="xy-pad-wrap">
+                                            <canvas id="image-warp-xy-pad" class="xy-pad" width="96" height="96" data-tooltip="Drag to position the image"></canvas>
+                                            <button id="image-warp-xy-reset" class="xy-reset" type="button" data-tooltip="Reset to center">↺</button>
+                                        </div>
+                                    </div>
+                                    <div class="layer-slider-row">
+                                        <span class="layer-ctrl-label" data-tooltip="Melt motion speed — log-scaled: the lower half is all slow-motion (Melt/Liquid get hypnotic)">Speed</span>
+                                        <input type="range" id="image-warp-speed-sl" class="slider" min="0" max="1" step="0.001" value="0.738">
                                         <span class="lsv" id="image-warp-speed-sl-val">1.00</span>
                                     </div>
                                     <div class="layer-slider-row">
@@ -760,6 +772,11 @@
                                         <span class="layer-ctrl-label" data-tooltip="The flow lunges on the bass — tunnel/ripple surges with the kick">Flow Pulse</span>
                                         <input type="range" id="image-warp-flowpulse-sl" class="slider" min="0" max="1" step="0.01" value="0">
                                         <span class="lsv" id="image-warp-flowpulse-sl-val">0.00</span>
+                                    </div>
+                                    <div class="layer-slider-row">
+                                        <span class="layer-ctrl-label" data-tooltip="Key dark areas of the image OUT of the melt — the feedback shows through them. 0 = whole image, 1 = only bright parts seed">Luma Key</span>
+                                        <input type="range" id="image-warp-lumakey-sl" class="slider" min="0" max="1" step="0.01" value="0">
+                                        <span class="lsv" id="image-warp-lumakey-sl-val">0.00</span>
                                     </div>
                                     <div class="layer-slider-row">
                                         <span class="layer-ctrl-label" data-tooltip="Image presence: high = stays sharp, low = melts into the trails">Presence</span>

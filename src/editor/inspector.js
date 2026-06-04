@@ -23,6 +23,16 @@ import { transcodeTo720p, needsTranscode, stripAudio } from '../videoTranscoder.
 import { gsap } from 'gsap';
 import { playEntranceAnimation, playExitAnimation, startIdleAnimation, stopIdleAnimation, ENTRANCE_EASES, EXIT_EASES } from './animation.js';
 
+// ─── Perceptual (log) Speed mapping (image-texture-dev.md §17) ────────────────
+// Flow Speed is perceptually logarithmic — a linear fader crams all the slow/extreme-
+// slowdown range (where Melt/Liquid get hypnotic) into the bottom few %. These map a
+// slider POSITION t∈[0,1] ↔ actual speed geometrically over [SPEED_MIN, SPEED_MAX], so
+// the slow end gets fine resolution while the top still reaches fast. The MODEL stores
+// the real speed (engine/saved presets unchanged); only the UI mapping is non-linear.
+const SPEED_MIN = 0.02, SPEED_MAX = 4.0;
+const _speedToPos = (s) => Math.log(Math.min(SPEED_MAX, Math.max(SPEED_MIN, Number(s) || SPEED_MIN)) / SPEED_MIN) / Math.log(SPEED_MAX / SPEED_MIN);
+const _posToSpeed = (t) => SPEED_MIN * Math.pow(SPEED_MAX / SPEED_MIN, Math.min(1, Math.max(0, t)));
+
 // ─── Phase 1: layer limits + upload resize ───────────────────────────────────
 // Cap surface area for Phase 1. Internals (shader builder, state array) are
 // N-generic — raising this later is a one-line change.
@@ -540,7 +550,7 @@ const BLANK = {
     // Image-as-texture (image-texture-dev.md Phase 2) — melt a loaded image layer
     // INTO the feedback loop. `texName` references one of `images[]`. When enabled it
     // OVERRIDES flowStyle's warp via buildImageWarp. Round-trips via the BLANK overlay.
-    imageWarp: { enabled: false, texName: '', flow: 'liquid', speed: 1.0, depth: 0.5, spin: 0.0, zoomPulse: 0.0, flowPulse: 0.0, reseed: 0.20, audioSource: 'none', audioAmt: 0.50 },
+    imageWarp: { enabled: false, texName: '', flow: 'liquid', size: 1.0, cx: 0.5, cy: 0.5, speed: 1.0, depth: 0.5, spin: 0.0, zoomPulse: 0.0, flowPulse: 0.0, lumaKey: 0.0, reseed: 0.20, audioSource: 'none', audioAmt: 0.50 },
     motionReact: {
         source: 'bass',
         curve: 'linear',
@@ -2145,10 +2155,13 @@ export class EditorInspector {
         const knobWrap = document.getElementById('flow-style-knobs');
         if (knobWrap) {
             const fl = this.currentState.flowStyle;
-            const speedIn = makeSlider(knobWrap, { id: 'fl-speed', label: 'Speed', min: 0.1, max: 4.0, step: 0.05, value: fl.speed });
+            // Speed is log-mapped (§17): slider value is the position 0..1; model stores real speed.
+            makeSlider(knobWrap, { id: 'fl-speed', label: 'Speed', min: 0, max: 1, step: 0.001, value: _speedToPos(fl.speed) });
             const depthIn = makeSlider(knobWrap, { id: 'fl-depth', label: 'Depth', min: 0.0, max: 1.0, step: 0.01, value: fl.depth });
             const densIn = makeSlider(knobWrap, { id: 'fl-density', label: 'Density', min: 0.0, max: 1.0, step: 0.01, value: fl.density ?? 0.5 });
-            this._bindFlowKnob(speedIn, 'speed');
+            this._bindLogSpeedSlider('fl-speed',
+                () => this.currentState.flowStyle.speed,
+                (s) => { this.currentState.flowStyle.speed = s; });
             this._bindFlowKnob(depthIn, 'depth');
             this._bindFlowKnob(densIn, 'density');
         }
@@ -2210,7 +2223,8 @@ export class EditorInspector {
         document.querySelectorAll('.motion-engine-btn[data-flow]').forEach(el => {
             el.classList.toggle('active', el.dataset.flow === fl.id);
         });
-        [['fl-speed', 'speed', 0.1, 4.0], ['fl-depth', 'depth', 0.0, 1.0], ['fl-density', 'density', 0.0, 1.0]].forEach(([id, key, min, max]) => {
+        this._syncLogSpeed('fl-speed', fl.speed);  // §17 log Speed
+        [['fl-depth', 'depth', 0.0, 1.0], ['fl-density', 'density', 0.0, 1.0]].forEach(([id, key, min, max]) => {
             const input = document.getElementById(id);
             if (!input) return;
             const v = fl[key];
@@ -2252,17 +2266,23 @@ export class EditorInspector {
             if (amtRow) amtRow.style.display = e.target.value === 'none' ? 'none' : '';
             this._applyToEngine();
         });
-        this._bindImageWarpSlider('image-warp-speed-sl', 'speed');
+        this._bindImageWarpSlider('image-warp-size-sl', 'size');
+        this._buildImageWarpPad();   // Position via the same 2D Center pad regular layers use
+        this._bindLogSpeedSlider('image-warp-speed-sl',  // §17 perceptual (log) Speed
+            () => this.currentState.imageWarp.speed,
+            (s) => { this.currentState.imageWarp.speed = s; });
         this._bindImageWarpSlider('image-warp-depth-sl', 'depth');
         this._bindImageWarpSlider('image-warp-spin-sl', 'spin');
         this._bindImageWarpSlider('image-warp-zoom-sl', 'zoomPulse');
         this._bindImageWarpSlider('image-warp-flowpulse-sl', 'flowPulse');
+        this._bindImageWarpSlider('image-warp-lumakey-sl', 'lumaKey');
         this._bindImageWarpSlider('image-warp-reseed-sl', 'reseed');
         this._bindImageWarpSlider('image-warp-audio-amt-sl', 'audioAmt');
         // Double-click a slider's label to reset it to default — matches every other
         // fader in the editor. The panel moves between cards/home, so the handler lives
         // on the panel itself; defaults are stamped from BLANK.imageWarp.
-        const iwDefaults = { 'image-warp-speed-sl': 1.0, 'image-warp-depth-sl': 0.5, 'image-warp-spin-sl': 0.0, 'image-warp-zoom-sl': 0.0, 'image-warp-flowpulse-sl': 0.0, 'image-warp-reseed-sl': 0.2, 'image-warp-audio-amt-sl': 0.5 };
+        // NB: speed slider is position-mapped (log); its default POSITION = _speedToPos(1.0).
+        const iwDefaults = { 'image-warp-size-sl': 1.0, 'image-warp-speed-sl': _speedToPos(1.0), 'image-warp-depth-sl': 0.5, 'image-warp-spin-sl': 0.0, 'image-warp-zoom-sl': 0.0, 'image-warp-flowpulse-sl': 0.0, 'image-warp-lumakey-sl': 0.0, 'image-warp-reseed-sl': 0.2, 'image-warp-audio-amt-sl': 0.5 };
         for (const [id, def] of Object.entries(iwDefaults)) {
             const sl = document.getElementById(id);
             if (!sl) continue;
@@ -2295,6 +2315,83 @@ export class EditorInspector {
             this._applyToEngine();
         });
         sl.addEventListener('pointerup', () => this._postSnap());
+    }
+
+    /** Bind a Speed slider with LOGARITHMIC mapping (§17): the slider's native value is the
+     *  position t∈[0,1]; the model stores the real speed (_posToSpeed). `get`/`set` read/write
+     *  the speed on the owning object; the readout shows the real speed value. */
+    _bindLogSpeedSlider(id, get, set) {
+        const sl = document.getElementById(id);
+        const valEl = document.getElementById(`${id}-val`);
+        if (!sl) return;
+        sl.addEventListener('pointerdown', () => this._preSnap());
+        sl.addEventListener('input', () => {
+            const t = parseFloat(sl.value);
+            const s = _posToSpeed(t);
+            set(s);
+            if (valEl) valEl.textContent = s.toFixed(2);
+            sl.style.setProperty('--pct', `${t * 100}%`);
+            this._applyToEngine();
+        });
+        sl.addEventListener('pointerup', () => this._postSnap());
+    }
+
+    /** Reflect a real speed value onto a log Speed slider (position + readout). */
+    _syncLogSpeed(id, speed) {
+        const sl = document.getElementById(id);
+        if (!sl) return;
+        const t = _speedToPos(speed);
+        sl.value = t;
+        sl.style.setProperty('--pct', `${t * 100}%`);
+        const valEl = document.getElementById(`${id}-val`);
+        if (valEl) valEl.textContent = Number(speed).toFixed(2);
+    }
+
+    /** Position via the SAME 2D Center pad regular layers use (drag the dot), bound to
+     *  imageWarp.cx/cy. The panel is a single moved-around element, so the pad is built once;
+     *  `this._iwPadDraw` lets _syncImageWarpSection redraw the dot after load/state changes. */
+    _buildImageWarpPad() {
+        const pad = document.getElementById('image-warp-xy-pad');
+        if (!pad) return;
+        const ctx = pad.getContext('2d');
+        const PAD = 96;
+        const iw = () => this.currentState.imageWarp || (this.currentState.imageWarp = deepClone(BLANK.imageWarp));
+        const draw = () => {
+            ctx.clearRect(0, 0, PAD, PAD);
+            ctx.fillStyle = 'rgba(255,255,255,0.04)';
+            ctx.beginPath(); ctx.roundRect(0, 0, PAD, PAD, 4); ctx.fill();
+            ctx.strokeStyle = 'rgba(255,255,255,0.10)'; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(PAD / 2, 0); ctx.lineTo(PAD / 2, PAD); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, PAD / 2); ctx.lineTo(PAD, PAD / 2); ctx.stroke();
+            ctx.strokeRect(0.5, 0.5, PAD - 1, PAD - 1);
+            const w = iw();
+            ctx.beginPath(); ctx.arc((w.cx ?? 0.5) * PAD, (w.cy ?? 0.5) * PAD, 5, 0, Math.PI * 2);
+            ctx.fillStyle = '#cdbcff';  // violet dot to match the Drive accent
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 1.5; ctx.stroke();
+        };
+        this._iwPadDraw = draw;
+        draw();
+        const move = (e) => {
+            const rect = pad.getBoundingClientRect();
+            const px = e.touches ? e.touches[0].clientX : e.clientX;
+            const py = e.touches ? e.touches[0].clientY : e.clientY;
+            const w = iw();
+            w.cx = Math.max(0, Math.min(1, (px - rect.left) / rect.width));
+            w.cy = Math.max(0, Math.min(1, (py - rect.top) / rect.height));
+            draw();
+            this._applyToEngine();
+        };
+        let dragging = false;
+        pad.addEventListener('mousedown', (e) => { dragging = true; this._preSnap(); move(e); });
+        pad.addEventListener('touchstart', (e) => { dragging = true; this._preSnap(); move(e); e.preventDefault(); }, { passive: false });
+        window.addEventListener('mousemove', (e) => { if (dragging) move(e); });
+        window.addEventListener('mouseup', () => { if (dragging) { dragging = false; this._postSnap(); } });
+        window.addEventListener('touchmove', (e) => { if (dragging) move(e); }, { passive: true });
+        window.addEventListener('touchend', () => { if (dragging) { dragging = false; this._postSnap(); } });
+        document.getElementById('image-warp-xy-reset')?.addEventListener('click', () => {
+            const w = iw(); this._preSnap(); w.cx = 0.5; w.cy = 0.5; draw(); this._applyToEngine(); this._postSnap();
+        });
     }
 
     /** Per-card Overlay|Drive switch. Clicking Drive on a card makes THAT image drive the
@@ -2362,11 +2459,14 @@ export class EditorInspector {
         if (audioSel) audioSel.value = iw.audioSource || 'none';
         const amtRow = document.getElementById('image-warp-audio-amt-row');
         if (amtRow) amtRow.style.display = (iw.audioSource && iw.audioSource !== 'none') ? '' : 'none';
-        this._syncSlider('image-warp-speed-sl', iw.speed ?? 1.0, 0.1, 4, 2);
+        this._syncSlider('image-warp-size-sl', iw.size ?? 1.0, 0.1, 2, 2);
+        this._iwPadDraw?.();  // redraw the Position pad dot from imageWarp.cx/cy
+        this._syncLogSpeed('image-warp-speed-sl', iw.speed ?? 1.0);  // §17 log Speed
         this._syncSlider('image-warp-depth-sl', iw.depth ?? 0.5, 0, 1, 2);
         this._syncSlider('image-warp-spin-sl', iw.spin ?? 0, 0, 1, 2);
         this._syncSlider('image-warp-zoom-sl', iw.zoomPulse ?? 0, 0, 1, 2);
         this._syncSlider('image-warp-flowpulse-sl', iw.flowPulse ?? 0, 0, 1, 2);
+        this._syncSlider('image-warp-lumakey-sl', iw.lumaKey ?? 0, 0, 1, 2);
         this._syncSlider('image-warp-reseed-sl', iw.reseed ?? 0.2, 0, 1, 2);
         this._syncSlider('image-warp-audio-amt-sl', iw.audioAmt ?? 0.5, 0, 1, 2);
     }
@@ -8504,8 +8604,9 @@ export class EditorInspector {
         const iw = state.imageWarp;
         if (iw && iw.enabled && iw.texName && (state.images || []).some(e => e.texName === iw.texName)) {
             runtime.warp = buildImageWarp({
-                imgName: iw.texName, flow: iw.flow, speed: iw.speed, depth: iw.depth,
-                spin: iw.spin, zoomPulse: iw.zoomPulse, flowPulse: iw.flowPulse,
+                imgName: iw.texName, flow: iw.flow, size: iw.size, cx: iw.cx, cy: iw.cy,
+                speed: iw.speed, depth: iw.depth,
+                spin: iw.spin, zoomPulse: iw.zoomPulse, flowPulse: iw.flowPulse, lumaKey: iw.lumaKey,
                 reseed: iw.reseed, audioSource: iw.audioSource, audioAmt: iw.audioAmt,
             });
         }

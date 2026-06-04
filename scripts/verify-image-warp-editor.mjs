@@ -132,6 +132,38 @@ const r = await page.evaluate(async () => {
     // reset the trio so the save/reload check stays about flow/reseed only
     Object.assign(insp.currentState.imageWarp, { spin: 0, zoomPulse: 0, flowPulse: 0 });
 
+    // Phase 4a — Size & framing. Shrink + offset the image: the framing + fade gate must bake
+    // in, and the framed melt must STILL render bright (image dissolves into feedback, not black).
+    Object.assign(insp.currentState.imageWarp, { size: 0.6, cx: 0.4, cy: 0.55 });  // leave flow as-is for the round-trip check
+    insp._applyToEngine();
+    const szWarp = insp._buildRuntimePreset(insp.currentState).warp;
+    out.sizeBaked = szWarp.includes('/ 0.6000 + 0.5') && szWarp.includes('_inb');
+    for (let k = 0; k < 50; k++) await luma();
+    out.sizeLuma = await luma();
+    // Position is the 2D Center pad (like regular layers) — its reset recenters cx/cy.
+    insp.currentState.imageWarp.cx = 0.2; insp.currentState.imageWarp.cy = 0.8;
+    document.getElementById('image-warp-xy-reset').click();
+    out.padResetWorks = !!document.getElementById('image-warp-xy-pad')
+        && insp.currentState.imageWarp.cx === 0.5 && insp.currentState.imageWarp.cy === 0.5;
+    Object.assign(insp.currentState.imageWarp, { size: 1, cx: 0.5, cy: 0.5 });  // reset for round-trip
+
+    // Luma Key — dark pixels drop out of the injection; bakes a _key gate + still renders bright.
+    insp.currentState.imageWarp.lumaKey = 0.8;
+    insp._applyToEngine();
+    out.lumaKeyBaked = insp._buildRuntimePreset(insp.currentState).warp.includes('float _key = mix(1.0, smoothstep');
+    for (let k = 0; k < 50; k++) await luma();
+    out.lumaKeyLuma = await luma();
+    insp.currentState.imageWarp.lumaKey = 0;
+
+    // §17 perceptual Speed: slider position maps LOGARITHMICALLY to real speed (slow end has range).
+    const spSl = document.getElementById('image-warp-speed-sl');
+    spSl.value = '0'; spSl.dispatchEvent(new Event('input', { bubbles: true }));
+    const slowSpeed = insp.currentState.imageWarp.speed;
+    spSl.value = '1'; spSl.dispatchEvent(new Event('input', { bubbles: true }));
+    const fastSpeed = insp.currentState.imageWarp.speed;
+    out.logSpeed = slowSpeed < 0.05 && fastSpeed > 3.5 && slowSpeed < fastSpeed;
+    insp.currentState.imageWarp.speed = 1.0;
+
     // Overlay must DROP OUT while driving: the comp shader no longer declares the
     // driving layer's sampler. Toggling Drive off restores it.
     out.overlayHiddenWhileDriving = !insp.currentState.comp.includes(`sampler_${texName}`);
@@ -175,6 +207,12 @@ ok('Flow is a click-to-explore chip grid, not a dropdown', r.flowChips >= 10, `c
 ok('double-click slider label resets it to default', r.dblclickReset);
 ok('Tier 2 (Spin/Zoom/Flow Pulse) bakes into the warp', r.tier2Baked);
 ok('all Tier-2 knobs cranked STILL render bright, not broken (luma > 20)', r.tier2Luma > 20, `luma ${r.tier2Luma?.toFixed(1)}`);
+ok('Size/Position bakes framing + fade gate into the warp', r.sizeBaked);
+ok('framed (size 0.6, off-center) STILL renders bright, not black (luma > 20)', r.sizeLuma > 20, `luma ${r.sizeLuma?.toFixed(1)}`);
+ok('Position is a 2D Center pad (reset recenters cx/cy)', r.padResetWorks);
+ok('Luma Key bakes a _key gate into the warp', r.lumaKeyBaked);
+ok('Luma Key cranked STILL renders bright, not black (luma > 20)', r.lumaKeyLuma > 20, `luma ${r.lumaKeyLuma?.toFixed(1)}`);
+ok('Speed fader is log-mapped (pos 0 → ~0.02 slow, pos 1 → ~4.0 fast)', r.logSpeed);
 ok('driving layer drops out of the overlay (not stacked on top)', r.overlayHiddenWhileDriving);
 ok('toggling back to Overlay restores it + parks the panel home', r.overlayRestoredWhenOff && r.panelHomedWhenOff);
 ok('imageWarp serializes into the saved preset JSON', r.savedHasImageWarp);

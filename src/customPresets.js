@@ -712,6 +712,12 @@ export function buildWarpShader(flow) {
  *              (bass/mid/treb/vol + _att variants). When set, `reseed` becomes the
  *              baseline and the image pulses in around it. Omit/`'none'` = static.
  *   audioAmt – 0..~1 strength of the audio modulation (default 0.5 when a source is set).
+ *   size     – image on-screen scale (1 = fill, <1 = smaller + fades into the melt, >1 = zoom-in).
+ *   cx/cy    – where the image CENTER sits on screen (0..1, default 0.5). Framed (size≠1 or off-centre)
+ *              → outside the image fades to pure feedback (image dissolves into the loop).
+ *   lumaKey  – 0..1 key dark image pixels OUT of the injection (the melt shows through them) instead
+ *              of darkening. 0 = inject the whole image (emergent dark-suppression only); 1 = only the
+ *              bright parts seed the loop.
  *   spin     – 0..1 melt rotation: gentle time-drift + a bass kick. 0 = no rotation.
  *   zoomPulse– 0..1 the image pumps inward on the bass hit. 0 = no pump.
  *   flowPulse– 0..1 the flow displacement surges on the bass (tunnel/ripple lunges). 0 = steady.
@@ -742,26 +748,66 @@ export function buildImageWarp(opts) {
         : base.toFixed(4);
 
     const spin = Number(o.spin ?? 0), zoom = Number(o.zoomPulse ?? 0), flowPulse = Number(o.flowPulse ?? 0);
+    // Phase 4a — Size & framing. `size` = the image's on-screen scale (1 = fill, <1 = smaller,
+    // >1 = zoom-in); cx/cy = where the image CENTER sits on screen. When the image is framed
+    // (scaled/moved off full-screen) the area outside its bounds FADES to pure feedback so the
+    // image dissolves INTO the melt (§14.1) — NOT tiled, NOT edge-smeared.
+    const size = Number(o.size ?? 1), cx = Number(o.cx ?? 0.5), cy = Number(o.cy ?? 0.5);
+    const framed = (size !== 1 || cx !== 0.5 || cy !== 0.5);
+
     // Flow Pulse: surge the per-frame displacement on the bass. `_flow` only exists for the
     // standard flows (kaleido reconstructs `_kuv` directly), so guard on it.
     let pre = p.pre;
     if (flowPulse > 0 && flowId !== 'kaleido') {
         pre += `  _flow *= 1.0 + ${flowPulse.toFixed(4)} * 0.9 * (bass - 1.0);\n`;
     }
-    // Spin + Zoom Pulse act on where we SAMPLE the user image. At 0/0 this collapses to
-    // exactly `texture(sampler_<img>, uv_orig)` (no-op) — so default melts are unchanged.
+
+    // Build the image-sample coordinate `_iuv`. At size=1, cx=cy=0.5, spin=0, zoom=0 this whole
+    // block is skipped → exactly `texture(sampler, uv_orig)` + `mix(_fb,_img,reseed)` (no-op),
+    // so default melts (and the shipped spin/zoom-only path) are unchanged.
+    const needCoord = framed || spin > 0 || zoom > 0;
+    const lumaKey = Number(o.lumaKey ?? 0);
     let imgSample;
-    if (spin > 0 || zoom > 0) {
-        imgSample =
-            `  vec2 _ic = uv_orig - 0.5;\n` +
-            `  float _spang = time * ${spin.toFixed(4)} * 1.2 + (bass - 1.0) * ${spin.toFixed(4)} * 0.6;\n` +
-            `  float _spc = cos(_spang), _sps = sin(_spang);\n` +
-            `  vec2 _iuv = vec2(_ic.x * _spc - _ic.y * _sps, _ic.x * _sps + _ic.y * _spc);\n` +
-            `  _iuv = _iuv * (1.0 - ${zoom.toFixed(4)} * 0.4 * (bass - 1.0)) + 0.5;\n` +
-            `  vec3 _img = texture(sampler_${imgName}, _iuv).rgb;\n`;
+    if (needCoord) {
+        let lines = framed
+            ? `  vec2 _iuv = (uv_orig - vec2(${cx.toFixed(4)}, ${cy.toFixed(4)})) / ${size.toFixed(4)} + 0.5;\n`
+            : `  vec2 _iuv = uv_orig;\n`;
+        if (spin > 0) {
+            lines +=
+                `  { vec2 _ic = _iuv - 0.5;\n` +
+                `    float _spang = time * ${spin.toFixed(4)} * 1.2 + (bass - 1.0) * ${spin.toFixed(4)} * 0.6;\n` +
+                `    float _spc = cos(_spang), _sps = sin(_spang);\n` +
+                `    _iuv = vec2(_ic.x * _spc - _ic.y * _sps, _ic.x * _sps + _ic.y * _spc) + 0.5; }\n`;
+        }
+        if (zoom > 0) {
+            lines += `  _iuv = (_iuv - 0.5) * (1.0 - ${zoom.toFixed(4)} * 0.4 * (bass - 1.0)) + 0.5;\n`;
+        }
+        // Framed → clamp the coord (kills wrap garbage in the feathered border texels; the gate
+        // below does the actual fade). Unframed (spin/zoom-only) → sample raw, as shipped.
+        lines += `  vec3 _img = texture(sampler_${imgName}, ${framed ? 'clamp(_iuv, 0.0, 1.0)' : '_iuv'}).rgb;\n`;
+        imgSample = lines;
     } else {
         imgSample = `  vec3 _img = texture(sampler_${imgName}, uv_orig).rgb;\n`;
     }
+    // Presence = reseed, gated by the framing fade (_inb) and/or the Luma Key (_key). Both are
+    // gated to no-op at neutral, so size=1/cx=cy=0.5/lumaKey=0 → exactly `mix(_fb,_img,reseed)`.
+    let gate = '';
+    let presence = `${reseed}`;
+    if (framed) {
+        // Feathered in-bounds gate → outside the image, presence→0 so only feedback shows.
+        gate +=
+            `  float _inb = smoothstep(0.0, 0.04, _iuv.x) * smoothstep(0.0, 0.04, 1.0 - _iuv.x)\n` +
+            `             * smoothstep(0.0, 0.04, _iuv.y) * smoothstep(0.0, 0.04, 1.0 - _iuv.y);\n`;
+        presence += ` * _inb`;
+    }
+    if (lumaKey > 0) {
+        // Luma Key: dark image pixels progressively drop OUT of the injection (the melt/feedback
+        // shows through them cleanly) instead of darkening it. lumaKey blends full→keyed.
+        gate += `  float _key = mix(1.0, smoothstep(0.05, 0.45, dot(_img, vec3(0.299, 0.587, 0.114))), ${lumaKey.toFixed(4)});\n`;
+        presence += ` * _key`;
+    }
+    const mix = gate + `  ret = mix(_fb, _img, ${presence});\n`;
+
     // The user sampler MUST be declared in the shader HEADER (before shader_body):
     // butterchurn's getShaderParts splits on `shader_body`, scans the header with
     // /uniform sampler2D sampler_(.+?);/ (getUserSamplers), and uses that list BOTH to
@@ -770,7 +816,7 @@ export function buildImageWarp(opts) {
     return `uniform sampler2D sampler_${imgName};\nshader_body {\n${pre}` +
         `  vec3 _fb = ${p.fbExpr};\n` +
         imgSample +
-        `  ret = mix(_fb, _img, ${reseed});\n}`;
+        mix + `}`;
 }
 
 /**
