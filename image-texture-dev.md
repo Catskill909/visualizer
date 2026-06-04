@@ -1,4 +1,4 @@
-# Image-as-Texture — feeding images INTO MilkDrop presets
+# Meld (Image-as-Texture) — feeding images INTO MilkDrop presets
 
 Status: **🟢 SHIPPED & ACTIVELY BUILDING OUT (updated 2026-06-04).** Image-as-texture is a real,
 committed feature: feedback-melt engine (§12), per-card **Overlay\|Drive** UX (§13), Tier 1/2 reactivity
@@ -8,6 +8,11 @@ committed feature: feedback-melt engine (§12), per-card **Overlay\|Drive** UX (
 
 > **📚 Doc map:** Tracker + §§12–17 = current/shipped (read these). **§§3–8, 10–11 are PRE-BUILD scoping
 > (2026-06-03) kept as historical record — superseded by what shipped; don't treat as TODO.**
+>
+> **🏷️ NAME (2026-06-04): the user-facing feature is "MELD"** (renamed from "Drive" — more intuitive: the
+> image *melds INTO* the preset). The per-card button says **Meld**. **Internal CODE names are unchanged**
+> to avoid churn — `imageWarp`, `drive-mode` class, `.layer-drive`, `_toggleCardDrive`, `#image-warp-*`,
+> `buildImageWarp` all keep their names. So in this doc "Drive" = the code/mechanism, "Meld" = the UI label.
 
 > **One-liner:** let a user's image/video/GIF become a **texture the MilkDrop preset itself
 > processes** — so it gets melted, tunneled, kaleidoscoped, smeared, and pulsed to the audio by the
@@ -23,7 +28,7 @@ _Single source of truth for status. Detail in the numbered sections below._
 |---|---|---|
 | **Spike / Audit** | Feasibility — pipeline exists (`setUserTexture`) + **warp shader can sample a user texture** → no engine fork (§9, §11) | ✅ **DONE 2026-06-03** |
 | **1 — Feedback-melt engine** | `buildImageWarp(opts)` generator shipped (§12) — blends `sampler_<imgName>` into the feedback loop, reusing the SAME flow math as `buildWarpShader` (shared `_flowParts`). Knobs: `flow` · `reseed` · **audio-reactive blend** (`audioSource`/`audioAmt`). **Minimal live wire-up shipped** (`window.__imgWarp.drive/clear`, dev-only). | ✅ **GENERATOR + LIVE WIRE DONE — tune look by eye next** |
-| **2 — UX** | **Per-card `Overlay \| Drive` switch** (§13, §13.5): each image layer card has a Drive button; flipping it melts THAT image into the preset (radio — one at a time), hides its overlay, and swaps the card body to the Drive panel (Flow · Speed · Depth · Presence · Audio+Amount). Overrides Flow Style; round-trips via BLANK; player parity in `refreshCustomPresets`. | ✅ **DONE 2026-06-03 — per-card editor round-trip verified 12/12** |
+| **2 — UX** | **Per-card `Overlay \| Meld` switch** (§13, §13.5; button renamed Drive→**Meld** 2026-06-04): each image layer card has a Meld button; flipping it melts THAT image into the preset (radio — one at a time), hides its overlay, and swaps the card body to the Drive panel (Flow · Speed · Depth · Presence · Audio+Amount). Overrides Flow Style; round-trips via BLANK; player parity in `refreshCustomPresets`. | ✅ **DONE 2026-06-03 — per-card editor round-trip verified 12/12** |
 | **2.5 — Per-card + Tier 1/2** | Per-card mode + chip-grid Flow + dbl-click reset + Speed/Depth (Tier 1) + Spin/Zoom Pulse/Flow Pulse (Tier 2, §13.6) + collapse fixes + Drive-pill in row1. | ✅ **DONE 2026-06-03 — verified 18/18** |
 | **4 — Build-out: parallel layer controls** | **SHIPPED 2026-06-04 (verified 27/27):** Size · Position pad · Luma Key · **Mirror/Kaleido** (§14.1a). Next: 4b Colour/grade. Aspect deferred. See §14. | 🟢 **Size/Pos/LumaKey/Mirror DONE — 4b Colour next** |
 | **4-speed — Perceptual Speed fader** | Speed mapped **logarithmically** (~0.02 → 4.0) — slow/extreme-slowdown range gets fine resolution, top still reaches fast. ONE fader, smarter mapping (§17). Applied to **Drive panel Speed AND Flow Style Speed**. Model stores real speed (engine/saved presets unchanged); only UI mapping is non-linear. | ✅ **DONE 2026-06-04 — verified 24/24** |

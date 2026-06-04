@@ -5748,7 +5748,7 @@ export class EditorInspector {
                        aria-label="Layer name" />
               </div>
               <button class="layer-action-btn layer-drive layer-drive-pill" type="button"
-                      aria-pressed="false" data-tooltip="Drive the preset: melt THIS image into the warp engine (hides its overlay)">Drive</button>
+                      aria-pressed="false" data-tooltip="Meld THIS image INTO the preset — its warp engine melts, tunnels & pulses the image (replaces its overlay)">Meld</button>
               <svg class="layer-chevron" width="10" height="10" viewBox="0 0 12 12" aria-hidden="true">
                 <path d="M2 4 L6 8 L10 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
