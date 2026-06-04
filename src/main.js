@@ -5,7 +5,7 @@
 import { VisualizerEngine } from './visualizer.js';
 import { ControlPanel } from './controls.js';
 import { initAuthGate } from './auth-gate.js';
-import { hydratePresets } from './customPresets.js';
+import { hydratePresets, buildImageWarp } from './customPresets.js';
 
 // Wait for DOM
 document.addEventListener('DOMContentLoaded', async () => {
@@ -54,6 +54,48 @@ document.addEventListener('DOMContentLoaded', async () => {
           openBrowser: () => pb.showPackBrowser({ engine, onImportFile: (f) => controls.importCustomPresetsFromFile(f) }) };
         console.log('[dev] window.__dcPacks ready · try: __dcPacks.openBrowser() or await __dcPacks.smokeFromBundled(__dcPacks.engine)');
       });
+
+      // image-texture-dev.md Phase 1 — minimal live wire-up. Melt a user image INTO
+      // the current preset's feedback loop so you can tune the look by eye.
+      //   await __imgWarp.drive('https://…/pic.jpg', { flow:'liquid', reseed:0.25, audioSource:'bass', audioAmt:0.6 })
+      //   __imgWarp.clear()   // restore the current preset
+      const IMG_WARP_TEX = 'imgwarp';
+      const loadImage = (src) => new Promise((resolve, reject) => {
+        // src may be a URL/dataURL string or a File/Blob.
+        const url = (src instanceof Blob) ? URL.createObjectURL(src) : src;
+        const im = new Image();
+        im.crossOrigin = 'anonymous';
+        im.onload = () => {
+          const dataURL = (typeof src === 'string') ? src : url; // pass URL straight through
+          resolve({ data: dataURL, width: im.naturalWidth, height: im.naturalHeight, _objUrl: (src instanceof Blob) ? url : null });
+        };
+        im.onerror = (e) => reject(new Error('image load failed: ' + (e && e.message || src)));
+        im.src = url;
+      });
+      window.__imgWarp = {
+        engine,
+        async drive(src, opts = {}) {
+          const name = engine.getCurrentPresetName();
+          const base = engine.presets[name];
+          if (!base) { console.warn('[__imgWarp] no current preset'); return false; }
+          const img = await loadImage(src);
+          const patched = JSON.parse(JSON.stringify(base));
+          patched.warp = buildImageWarp({ imgName: IMG_WARP_TEX, ...opts });
+          // Order matters: butterchurn wipes samplers on loadPreset, so bind AFTER load
+          // (see visualizer.js loadPreset comment). Static image → one upload persists.
+          engine.loadPresetObject(patched, opts.blend ?? 0.5);
+          engine.setUserTexture(IMG_WARP_TEX, { data: img.data, width: img.width, height: img.height });
+          if (img._objUrl) setTimeout(() => URL.revokeObjectURL(img._objUrl), 4000);
+          console.log(`[__imgWarp] driving "${name}" with flow=${opts.flow || 'liquid'} reseed=${opts.reseed ?? 0.2}${opts.audioSource ? ' audio=' + opts.audioSource : ''}`);
+          return true;
+        },
+        clear() {
+          const name = engine.getCurrentPresetName();
+          if (name) engine.loadPreset(name, 0.5);
+          console.log('[__imgWarp] cleared → restored', name);
+        },
+      };
+      console.log("[dev] window.__imgWarp ready · try: await __imgWarp.drive('<image-url>', { flow:'liquid', reseed:0.25, audioSource:'bass', audioAmt:0.6 })");
     }
 
     // Initial canvas sizing

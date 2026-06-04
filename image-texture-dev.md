@@ -19,15 +19,16 @@ _Single source of truth for status. Detail in the numbered sections below._
 | Phase | What | State |
 |---|---|---|
 | **Spike / Audit** | Feasibility — pipeline exists (`setUserTexture`) + **warp shader can sample a user texture** → no engine fork (§9, §11) | ✅ **DONE 2026-06-03** |
-| **1 — Feedback-melt engine** | A generated **warp-injection** (à la `buildWarpShader`) that blends a user texture into the feedback loop, with **reseed/persistence + blend** knobs (optionally audio-reactive). Image supplied via `setUserTexture`. **Tune the melt look in a real browser.** | ⬜ **NEXT** |
-| **2 — UX** | "Drive the preset" **mode** + the ~3 knobs, in the **Images tab**; image loads via the existing path | ⬜ not started |
+| **1 — Feedback-melt engine** | `buildImageWarp(opts)` generator shipped (§12) — blends `sampler_<imgName>` into the feedback loop, reusing the SAME flow math as `buildWarpShader` (shared `_flowParts`). Knobs: `flow` · `reseed` · **audio-reactive blend** (`audioSource`/`audioAmt`). **Minimal live wire-up shipped** (`window.__imgWarp.drive/clear`, dev-only). | ✅ **GENERATOR + LIVE WIRE DONE — tune look by eye next** |
+| **2 — UX** | "Drive the preset" **mode** + the ~3 knobs, in the **Images tab**; image loads via the existing path. *(Audio-reactive blend already landed in the generator.)* | ⬜ not started |
 | **3 — More sources** | Video / GIF / webcam frames (all already `setUserTexture`-supported) | ⬜ not started |
 | **4 — Named-texture path (optional)** | "Photo-reactive" presets that sample a known user sampler + ship the **22 built-in texture assets** (`milkdrop-pack-import.md` §16.1) so the ~66 texture presets render right | ⬜ optional |
 
-**▶️ PICK UP AT PHASE 1:** write `buildImageWarp(opts)` (mirrors `customPresets.js buildWarpShader`)
-that blends `sampler_<userimg>` into `sampler_main` with reseed + blend params; wire an image in via
-`setUserTexture`; **iterate the blend/decay live in a browser** (headless proved the *mechanism* —
-the *look* needs eyes). Self-verify the mechanism headlessly (luma > 0), tune aesthetics by eye.
+**▶️ PICK UP AT PHASE 1 (live wire-up):** the generator `buildImageWarp(opts)` is ✅ built
+([customPresets.js](src/customPresets.js), §12). NEXT is the minimal engine wire-up so it can be
+seen/tuned: in a real preset, set `preset.warp = buildImageWarp({ imgName, flow, reseed })` and
+upload the image via `visualizer.setUserTexture(imgName, …)` — then **iterate `reseed` + `flow` +
+the preset's own decay live in a browser** (headless proved the *mechanism* — the *look* needs eyes).
 
 **Key facts (so you don't re-derive):** NO engine fork — reuses `setUserTexture` (upload, exists) +
 warp-shader injection (exists, = Flow Style). Cross-platform (pure WebGL2). Machine limits a
@@ -220,3 +221,73 @@ look is Phase-1 implementation + visual tuning (best done with eyes in a real br
 3. **Phase 3:** extend to video/GIF/webcam (all already supported by `setUserTexture`).
 
 → Risk dropped from "engine fork + unknown" to "reuse two proven systems + visual tuning."
+
+---
+
+## 12. PHASE 1 — `buildImageWarp` generator (2026-06-03)
+
+Shipped the feedback-melt warp generator in [customPresets.js](src/customPresets.js).
+
+**What changed (one file, no engine fork):**
+- Extracted the per-flow GLSL into a shared **`_flowParts(flow)`** helper returning `{ pre, fbExpr }`
+  (the warp setup block + the warped/decayed feedback-sample expression). Covers all 11 flow
+  styles incl. kaleido. ONE source of truth for the motion math.
+- **`buildWarpShader(flow)`** refactored to compose around `_flowParts` — **verified byte-identical**
+  output across all 11 flows × 3 param sets (the Flow Style path is load-bearing; zero regression).
+- **`buildImageWarp(opts)`** added. It emits a warp `shader_body` that:
+  1. runs the chosen flow displacement on the feedback (`vec3 _fb = <fbExpr>;` — the melt/tunnel/…),
+  2. samples the user texture `vec3 _img = texture(sampler_<imgName>, uv_orig).rgb;`,
+  3. re-injects each frame: `ret = mix(_fb, _img, <reseed>);`.
+
+**Params:** `imgName` (→ `sampler_<imgName>`, sanitized to a bare GLSL identifier) · `flow` (motion,
+default `'liquid'`) · `reseed` 0..1 (image presence — high = stays sharp/present, low = faint seed
+that melts into the feedback over frames; default 0.2) · `speed`/`depth`/`density` passed to the flow.
+
+**Note on knobs:** the original scope said "reseed/persistence **+ blend**", but post-build those
+collapse to ONE meaningful knob at the injection point (`reseed` IS the image-vs-feedback mix).
+Persistence of the *melt* is already governed by the preset's own `decay`. Didn't invent a second
+knob that would do the same thing. A distinct audio-reactive blend can come in Phase 2 if wanted.
+
+**Verified:** generator output is valid GLSL for standard + kaleido flows; sampler-name sanitization
+works (`my-pic!` → `mypic`). The *mechanism* (warp samples user tex → visible render) was proven in
+the spike (§11).
+
+### 12.1 Audio-reactive blend (Phase 2 enhancement, 2026-06-03)
+`buildImageWarp` now takes optional `audioSource` + `audioAmt`. When a source is set, the injection
+mix becomes `clamp(reseed + audioAmt * (<src> - 1.0), 0.0, 1.0)` so the image **pulses in on the
+beat**. Sources are whitelisted to the engine's audio uniforms (`bass`/`mid`/`treb`/`vol` + `_att`
+variants — confirmed present in the butterchurn warp/comp shader header; normalized ~1.0 at average,
+so `(src-1.0)` is the beat deviation). The whitelist is also an **injection guard** — any non-listed
+string falls back to a static literal (unit-tested: `'bass); evil('` → rejected).
+
+### 12.2 Minimal live wire-up (2026-06-03) — `window.__imgWarp` (dev-only)
+Added a dev-only console hook in [main.js](src/main.js) (gated by `import.meta.env.DEV`, tree-shaken
+from prod — same pattern as `__dcPacks`) so the melt can be **tuned by eye** before any real UI:
+- `await __imgWarp.drive(src, opts)` — `src` = image URL/dataURL or a File/Blob. Clones the **current**
+  preset, sets `.warp = buildImageWarp({ imgName:'imgwarp', ...opts })`, calls `loadPresetObject`,
+  **then** `setUserTexture('imgwarp', …)`. Ordering is load-THEN-bind because butterchurn wipes
+  samplers on `loadPreset` ([visualizer.js:350-352](src/visualizer.js#L350)). A still image uploads
+  once and persists (no per-frame reupload needed).
+- `__imgWarp.clear()` — reloads the current preset by name to restore it.
+- `opts`: `flow` · `reseed` · `audioSource` · `audioAmt` · `blend` (load blendTime).
+
+### 12.3 GOTCHA — the user sampler MUST be declared in the shader header
+Headless verify caught a black-frame/`WebGL: too many errors` bug on the first run: butterchurn's
+`getShaderParts` splits the warp on `shader_body`, and `getUserSamplers` scans only the **header**
+(`/uniform sampler2D sampler_(.+?);/`) — using that list BOTH to declare the GLSL uniform AND to bind
+our uploaded texture each frame. Referencing `sampler_imgwarp` only inside the body = undeclared
+identifier → warp won't compile → black. **Fix:** `buildImageWarp` now prepends
+`uniform sampler2D sampler_<imgName>;\n` before `shader_body`. (Same rule will apply to any future
+named-texture preset path, §16.1.)
+
+### 12.4 Headless verification — [scripts/verify-image-warp.mjs](scripts/verify-image-warp.mjs)
+Run: `node scripts/verify-image-warp.mjs` (dev server up). Drives the real app in headless Chromium
+(SwiftShader), pushes a synthetic vivid checker image through `__imgWarp.drive()`, and reads back
+canvas luma via the engine's post-render capture hook. **Asserts real brightness** (driven luma > 20),
+not just nonzero — the first thresholds (`luma > 0`) falsely green-lit the black frame above; don't
+weaken them. Latest run: baseline luma 37 → **driven 158** (image clearly in the loop), audio-reactive
+variant 155, 5/5 pass.
+
+**Not yet done:** aesthetic tuning by eye (the actual *look* — reseed × flow × the preset's own decay;
+headless proves it's bright + reactive, not that it's pretty), and the real Images-tab UX (Phase 2).
+The wire-up is a dev hook, not user-facing.

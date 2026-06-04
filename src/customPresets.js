@@ -573,102 +573,175 @@ export const WARP_STYLES = [
  * Shared by editor (_buildRuntimePreset) and player (refreshCustomPresets).
  * @param {object} flow - preset.flowStyle { id, speed, depth } (may be null)
  */
-export function buildWarpShader(flow) {
+/**
+ * Shared per-flow GLSL parts for a flow style. Returns `{ pre, fbExpr }` where
+ * `pre` is the statement block that sets up the warp (centre vectors, the per-style
+ * `_flow` displacement, the density zoom `_zuv` — or, for kaleido, the folded
+ * `_kuv`) and `fbExpr` is the vec3 expression that samples the warped/decayed
+ * feedback. Both `buildWarpShader` (Flow Style) and `buildImageWarp`
+ * (image-as-texture) compose around this so the motion math has ONE source of
+ * truth. Returns null for none/unknown ids.
+ *
+ * `_c`/`_r` = vector/distance from centre; `ang`/`time` provided by the engine.
+ * Density bakes a gentle per-frame zoom-out-of-centre (_zuv): content magnifies
+ * outward and accumulates through the feedback loop → thin lines bloom into a
+ * full field (MilkDrop's real screen-fill mechanic). 0 = no zoom, 1 ≈ 3%/frame.
+ */
+function _flowParts(flow) {
     const f = flow || {};
-    if (!f.id || f.id === 'none') return '';
+    if (!f.id || f.id === 'none') return null;
     const sp = Number(f.speed ?? 1).toFixed(4);
     const dp = Number(f.depth ?? 0.5).toFixed(4);
     const dn = Number(f.density ?? 0.5).toFixed(4);
-    // All flows sample the previous frame at the mesh-warped `uv` plus a per-style
-    // displacement, faded by `decay` (so the Trail slider still controls smear).
-    // `_c`/`_r` = vector/distance from centre; `ang` is provided by the engine.
-    // Density bakes a gentle per-frame zoom-out-of-centre (_zuv): content magnifies
-    // outward and accumulates through the feedback loop → thin lines bloom into a
-    // full field (MilkDrop's real screen-fill mechanic). 0 = no zoom, 1 ≈ 3%/frame.
     const head = '  vec2 _c = uv_orig - 0.5;\n  float _r = length(_c) + 1e-4;\n';
     const zoom = `  float _z = ${dn} * 0.03;\n  vec2 _zuv = (uv - 0.5) * (1.0 - _z) + 0.5;\n`;
-    const wrap = (body) => `shader_body {\n${head}${body}\n${zoom}  ret = texture(sampler_main, _zuv + _flow).rgb * decay;\n}`;
+    // Hard flows sample the previous frame at the mesh-warped `uv` plus a per-style
+    // displacement, faded by `decay` (so the Trail slider still controls smear).
+    const hardExpr = 'texture(sampler_main, _zuv + _flow).rgb * decay';
     // Soft flows (Phase 15): sample mostly the BLURRED feedback (sampler_blur1) so the
     // high-decay fill accumulates as soft broad glow instead of sharp threads. Mixing
     // in a little sharp keeps some structure. Referencing sampler_blur1 makes the
     // engine auto-run the blur pass (getHighestBlur scans the warp text).
-    const wrapSoft = (body) => `shader_body {\n${head}${body}\n${zoom}  ret = mix(texture(sampler_main, _zuv + _flow), texture(sampler_blur1, _zuv + _flow), 0.8).rgb * decay;\n}`;
+    const softExpr = 'mix(texture(sampler_main, _zuv + _flow), texture(sampler_blur1, _zuv + _flow), 0.8).rgb * decay';
+    const std = (body, soft) => ({ pre: `${head}${body}\n${zoom}`, fbExpr: soft ? softExpr : hardExpr });
     switch (f.id) {
         case 'tunnel':
             // Radial push + a gentle perpendicular swirl, oscillating on time*speed
             // → content rushes through a tunnel.
-            return wrap(
+            return std(
                 `  float _pull = ${dp} * 0.05 * (0.6 + 0.4 * sin(time * ${sp} * 0.7));\n` +
-                `  vec2 _flow = (_c / _r) * _pull + vec2(-_c.y, _c.x) * ${dp} * 0.03;`
+                `  vec2 _flow = (_c / _r) * _pull + vec2(-_c.y, _c.x) * ${dp} * 0.03;`,
+                false
             );
         case 'spiral':
             // Rotation that grows with radius + slight inward pull → spirals inward.
-            return wrap(
+            return std(
                 `  float _t = time * ${sp} * 0.5;\n` +
-                `  vec2 _flow = vec2(-_c.y, _c.x) * ${dp} * 0.06 * (0.7 + 0.3 * sin(_t)) + (_c / _r) * ${dp} * 0.02;`
+                `  vec2 _flow = vec2(-_c.y, _c.x) * ${dp} * 0.06 * (0.7 + 0.3 * sin(_t)) + (_c / _r) * ${dp} * 0.02;`,
+                false
             );
         case 'ripple':
             // Concentric waves: radial displacement modulated by sin(rad - time).
-            return wrap(
+            return std(
                 `  float _w = sin(_r * 22.0 - time * ${sp} * 2.0) * ${dp} * 0.02;\n` +
-                `  vec2 _flow = (_c / _r) * _w;`
+                `  vec2 _flow = (_c / _r) * _w;`,
+                false
             );
         case 'swirl':
             // Whirlpool — rotation stronger near the centre (1/(_r+k)).
-            return wrap(
-                `  vec2 _flow = vec2(-_c.y, _c.x) * (${dp} * 0.05 / (_r + 0.18)) * (0.8 + 0.2 * sin(time * ${sp} * 0.4));`
+            return std(
+                `  vec2 _flow = vec2(-_c.y, _c.x) * (${dp} * 0.05 / (_r + 0.18)) * (0.8 + 0.2 * sin(time * ${sp} * 0.4));`,
+                false
             );
         case 'plasma':
             // Higher-frequency sin/cos field → flowing plasma displacement.
-            return wrap(
+            return std(
                 `  vec2 _flow = vec2(\n` +
                 `    sin(uv_orig.y * 11.0 + time * ${sp} * 1.3),\n` +
                 `    cos(uv_orig.x * 11.0 + time * ${sp} * 1.1)\n` +
-                `  ) * ${dp} * 0.014;`
+                `  ) * ${dp} * 0.014;`,
+                false
             );
         case 'liquid':
             // Low-frequency domain-warped sin → slow, smooth liquid drift.
-            return wrap(
+            return std(
                 `  vec2 _flow = vec2(\n` +
                 `    sin((uv_orig.y + time * ${sp} * 0.10) * 5.0),\n` +
                 `    sin((uv_orig.x + time * ${sp} * 0.13) * 5.0)\n` +
-                `  ) * ${dp} * 0.022;`
+                `  ) * ${dp} * 0.022;`,
+                false
             );
         case 'bloom':
             // Gentle outward push, blur-sampled → soft blooming glow that fills.
-            return wrapSoft(`  vec2 _flow = (_c / _r) * ${dp} * 0.02;`);
+            return std(`  vec2 _flow = (_c / _r) * ${dp} * 0.02;`, true);
         case 'smoke':
             // Turbulent low-frequency domain warp, blur-sampled → broad drifting smoke.
-            return wrapSoft(
+            return std(
                 `  vec2 _flow = vec2(\n` +
                 `    sin(uv_orig.y * 3.5 + time * ${sp} * 0.4) + 0.5 * sin(uv_orig.x * 6.0 - time * ${sp} * 0.3),\n` +
                 `    cos(uv_orig.x * 3.5 + time * ${sp} * 0.35) + 0.5 * cos(uv_orig.y * 6.0 + time * ${sp} * 0.25)\n` +
-                `  ) * ${dp} * 0.016;`
+                `  ) * ${dp} * 0.016;`,
+                true
             );
         case 'melt':
             // Slow downward drift + horizontal wobble, blur-sampled → melting flow.
-            return wrapSoft(
-                `  vec2 _flow = vec2(sin(uv_orig.x * 4.0 + time * ${sp} * 0.2) * ${dp} * 0.01, ${dp} * 0.018);`
+            return std(
+                `  vec2 _flow = vec2(sin(uv_orig.x * 4.0 + time * ${sp} * 0.2) * ${dp} * 0.01, ${dp} * 0.018);`,
+                true
             );
-        case 'kaleido': {
+        case 'kaleido':
             // Mirror-fold kaleidoscope — the proven scene-mirror fold: recompute the
             // angle/radius from centre, reflect into N sectors, reconstruct the sample
             // UV with cos/sin·radius. Depth → sector count (2→12); Speed → slow spin.
             // Samples the reconstructed coord directly (a kaleido is its own field).
-            return `shader_body {
-  vec2 _kp = uv_orig - 0.5;
-  float _kang = atan(_kp.y, _kp.x) + time * ${sp} * 0.15;
-  float _krad = length(_kp);
-  float _kseg = 6.2831853 / (2.0 + floor(${dp} * 10.0));
-  float _ka = mod(_kang, _kseg);
-  if (_ka > _kseg * 0.5) _ka = _kseg - _ka;
-  vec2 _kuv = vec2(cos(_ka), sin(_ka)) * _krad * (1.0 - ${dn} * 0.03) + 0.5;
-  ret = texture(sampler_main, _kuv).rgb * decay;
-}`;
-        }
+            return {
+                pre:
+                    `  vec2 _kp = uv_orig - 0.5;\n` +
+                    `  float _kang = atan(_kp.y, _kp.x) + time * ${sp} * 0.15;\n` +
+                    `  float _krad = length(_kp);\n` +
+                    `  float _kseg = 6.2831853 / (2.0 + floor(${dp} * 10.0));\n` +
+                    `  float _ka = mod(_kang, _kseg);\n` +
+                    `  if (_ka > _kseg * 0.5) _ka = _kseg - _ka;\n` +
+                    `  vec2 _kuv = vec2(cos(_ka), sin(_ka)) * _krad * (1.0 - ${dn} * 0.03) + 0.5;\n`,
+                fbExpr: 'texture(sampler_main, _kuv).rgb * decay'
+            };
         default:
-            return '';
+            return null;
     }
+}
+
+export function buildWarpShader(flow) {
+    const p = _flowParts(flow);
+    if (!p) return '';
+    return `shader_body {\n${p.pre}  ret = ${p.fbExpr};\n}`;
+}
+
+/**
+ * Image-as-texture (image-texture-dev.md Phase 1). Build a warp shader that melts a
+ * user image INTO the preset's feedback loop: it runs a flow-style displacement on
+ * the previous frame (`fbExpr`, the melt/tunnel/etc.) AND re-injects the user texture
+ * `sampler_<imgName>` each frame, so the preset's own motion engine then warps/decays
+ * the image. Reuses the SAME flow math as buildWarpShader via `_flowParts`.
+ *
+ * @param {object} opts
+ *   imgName  – the user-texture name uploaded via visualizer.setUserTexture (→ sampler_<imgName>)
+ *   flow     – flow-style id for the melt motion (tunnel/spiral/ripple/liquid/melt/kaleido/…); default 'liquid'
+ *   reseed   – 0..1 per-frame image injection. High = image stays sharp/present;
+ *              low = faint seed that melts into the feedback over time. Default 0.2.
+ *   audioSource – optional engine audio uniform to drive the injection on the beat
+ *              (bass/mid/treb/vol + _att variants). When set, `reseed` becomes the
+ *              baseline and the image pulses in around it. Omit/`'none'` = static.
+ *   audioAmt – 0..~1 strength of the audio modulation (default 0.5 when a source is set).
+ *   speed/depth/density – passed through to the flow math (optional).
+ * @returns {string} warp shader_body, or '' for an unknown flow.
+ */
+// Whitelisted engine audio uniforms (butterchurn warp/comp shader header) — these
+// are normalized ~1.0 at average, so `(src - 1.0)` is the beat deviation. Gated to
+// prevent arbitrary text reaching the generated GLSL.
+const _AUDIO_SOURCES = new Set(['bass', 'mid', 'treb', 'vol', 'bass_att', 'mid_att', 'treb_att', 'vol_att']);
+
+export function buildImageWarp(opts) {
+    const o = opts || {};
+    // Sampler names are bare identifiers in GLSL — strip anything that isn't one.
+    const imgName = String(o.imgName || 'userimg').replace(/[^a-zA-Z0-9_]/g, '') || 'userimg';
+    const base = Number(o.reseed ?? 0.2);
+    const flowId = (o.flow && o.flow !== 'none') ? o.flow : 'liquid';
+    const p = _flowParts({ id: flowId, speed: o.speed, depth: o.depth, density: o.density });
+    if (!p) return '';
+    // Audio-reactive injection: pulse the image presence around `base` on the beat.
+    const src = o.audioSource && o.audioSource !== 'none' ? String(o.audioSource) : null;
+    const reseed = (src && _AUDIO_SOURCES.has(src))
+        ? `clamp(${base.toFixed(4)} + ${Number(o.audioAmt ?? 0.5).toFixed(4)} * (${src} - 1.0), 0.0, 1.0)`
+        : base.toFixed(4);
+    // The user sampler MUST be declared in the shader HEADER (before shader_body):
+    // butterchurn's getShaderParts splits on `shader_body`, scans the header with
+    // /uniform sampler2D sampler_(.+?);/ (getUserSamplers), and uses that list BOTH to
+    // declare the GLSL uniform AND to bind our uploaded texture each frame. Omit it and
+    // sampler_<name> is an undeclared identifier → warp fails to compile → black frame.
+    return `uniform sampler2D sampler_${imgName};\nshader_body {\n${p.pre}` +
+        `  vec3 _fb = ${p.fbExpr};\n` +
+        `  vec3 _img = texture(sampler_${imgName}, uv_orig).rgb;\n` +
+        `  ret = mix(_fb, _img, ${reseed});\n}`;
 }
 
 /**
