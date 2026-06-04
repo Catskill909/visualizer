@@ -25,12 +25,12 @@ _Single source of truth for status. Detail in the numbered sections below._
 | **1 — Feedback-melt engine** | `buildImageWarp(opts)` generator shipped (§12) — blends `sampler_<imgName>` into the feedback loop, reusing the SAME flow math as `buildWarpShader` (shared `_flowParts`). Knobs: `flow` · `reseed` · **audio-reactive blend** (`audioSource`/`audioAmt`). **Minimal live wire-up shipped** (`window.__imgWarp.drive/clear`, dev-only). | ✅ **GENERATOR + LIVE WIRE DONE — tune look by eye next** |
 | **2 — UX** | **Per-card `Overlay \| Drive` switch** (§13, §13.5): each image layer card has a Drive button; flipping it melts THAT image into the preset (radio — one at a time), hides its overlay, and swaps the card body to the Drive panel (Flow · Speed · Depth · Presence · Audio+Amount). Overrides Flow Style; round-trips via BLANK; player parity in `refreshCustomPresets`. | ✅ **DONE 2026-06-03 — per-card editor round-trip verified 12/12** |
 | **2.5 — Per-card + Tier 1/2** | Per-card mode + chip-grid Flow + dbl-click reset + Speed/Depth (Tier 1) + Spin/Zoom Pulse/Flow Pulse (Tier 2, §13.6) + collapse fixes + Drive-pill in row1. | ✅ **DONE 2026-06-03 — verified 18/18** |
-| **4 — Build-out: parallel layer controls** | **4a Size SHIPPED + Position as the 2D Center pad SHIPPED + Luma Key SHIPPED (2026-06-04, verified 23/23).** Next: Mirror/Kaleido (recommended), then 4b colour/grade. Aspect deferred. See §14. | 🟢 **4a + Luma Key DONE — Mirror next** |
+| **4 — Build-out: parallel layer controls** | **SHIPPED 2026-06-04 (verified 27/27):** Size · Position pad · Luma Key · **Mirror/Kaleido** (§14.1a). Next: 4b Colour/grade. Aspect deferred. See §14. | 🟢 **Size/Pos/LumaKey/Mirror DONE — 4b Colour next** |
 | **4-speed — Perceptual Speed fader** | Speed mapped **logarithmically** (~0.02 → 4.0) — slow/extreme-slowdown range gets fine resolution, top still reaches fast. ONE fader, smarter mapping (§17). Applied to **Drive panel Speed AND Flow Style Speed**. Model stores real speed (engine/saved presets unchanged); only UI mapping is non-linear. | ✅ **DONE 2026-06-04 — verified 24/24** |
 | **6 — Melding tools** ⭐ | The strategic category (§16): controls for HOW an asset *integrates into* the preset's machinery (not overlay) — **Blend mode** (image add/multiply/screen/difference into the feedback), **Displacement** (image luma warps the melt), **Mask** (image gates where the preset's own content shows), **image-driven flow**. Luma Key/fade/mix are the first ones. High strategic value; rollable by Remix. | ⬜ **planned — prioritize Blend mode** |
 | **3 — More sources** | Video / GIF / webcam as the driving texture. **GIF + video CONFIRMED WORKING in real use 2026-06-03** (user) — same `setUserTexture` sampler the warp reads each frame, so the melt animates for free. Remaining: webcam + per-source polish. | 🟢 **GIF/video work; webcam TODO** |
 | **(opt) — Named-texture path** | "Photo-reactive" presets that sample a known user sampler + ship the **22 built-in texture assets** (`milkdrop-pack-import.md` §16.1). | ⬜ optional |
-| **7 — Drive 🎲 (Remix), NEAR THE END** | A 🎲 in the Drive section that rolls a WHOLE melt look at once (flow + size + position + speed/depth + spin/zoom/flow-pulse + luma-key + blend mode + audio target). Deliberately last — it needs the rich melding space (Phases 4 + 6) to roll into. Boring-not-broken bar = every roll renders bright. Also wire these axes into the GLOBAL 🎲 Remix (respect `_rolling`, [[project_remix_batch_perf]]). | ⬜ **planned (end)** |
+| **7 — Drive 🎲 (Remix)** | **GLOBAL 🎲 Remix now rolls the Drive melt (SHIPPED 2026-06-04, verified 31/31):** when a layer is driving, the Remix "Flow" axis gambles the melt look (flow/speed/depth/spin/zoom/flow-pulse/mirror/luma-key/presence/audio) via `_rollImageWarp` instead of flowStyle; panel re-syncs (was the user's bug — sliders now follow), framing (size/cx/cy) preserved, every roll renders bright, **Flow lock** keeps the melt. Remaining (optional): a dedicated 🎲 button IN the Drive section + Blend mode axis once §16 lands. | 🟢 **Global Remix→Drive DONE** |
 
 **▶️ CURRENT (2026-06-04):** 4a (Size · Position pad · Luma Key) shipped + verified 23/23. **Building now:**
 the perceptual Speed fader (§17, Drive + Flow Style). **Next:** Mirror/Kaleido (§14.1a) → 4b Colour/grade →
@@ -375,6 +375,12 @@ rewritten `_syncImageWarpSection` (places panel in the driving card, toggles `dr
 `.active`, syncs control values — called from the shared `_updateLayersBar` hook on every add/delete/load).
 Delete edge: `_performDeleteLayer` homes the panel BEFORE `card.remove()` so it isn't removed with the card.
 
+**Drive-panel layout cleanup (2026-06-04):** the panel's labels are longer than a card's ("Kaleido Speed",
+"Zoom Pulse", "Luma Key", "Presence") and were overflowing the card's fixed 42px label column onto the
+sliders. Panel-scoped CSS widens the slider-row label column to 82px and makes the standalone section
+labels (Flow / Position / Mirror) block-level with top margin so they're not flush against the control
+above. Verified headless (10 rows, zero label/slider overlaps; Mirror has a 12px gap above the pad).
+
 **Tier 1 melt controls added:** **Speed** + **Depth** sliders (already supported by `buildImageWarp` via
 `_flowParts`; now exposed). Model: `imageWarp` gained `speed`/`depth`; passed at both build sites.
 The Source dropdown is GONE (the card you flip IS the source).
@@ -471,12 +477,13 @@ fractional border texels; the gate is what actually fades it.
 ### 14.1a Aspect & Mirror — AUDIT + PLAN (2026-06-04)
 Audited the layer equivalents to plan how they map to the melt's different mechanism.
 
-**Mirror / Kaleido — RECOMMEND BUILD (high value, low risk).** Layers use `mirror: none/h/v/quad/kaleido`
-(+ `kaleidoSpeed`); the **fold math already exists** in `_buildCompShader`'s `uvFold` + kaleido block.
-For the melt: fold `_iuv` in the coordinate pipeline *before* sampling (after size/position/spin/zoom),
-gated so `none` = byte-identical no-op. Adds `imageWarp.mirror` (chip seg) + `imageWarp.kaleidoSpeed`
-(slider, shown only for kaleido). `mirrorScope` (tile/field) is tile-specific → SKIP until Tile exists.
-Trippy, on-brand, ~all reuse. → do this next.
+**Mirror / Kaleido — ✅ SHIPPED 2026-06-04 (verified 27/27).** `imageWarp.mirror` (none/h/v/quad/kaleido)
+folds `_iuv` in the coordinate pipeline *before* sampling, reusing the scene-mirror/kaleido fold math.
+Gated: `none` = byte-identical no-op. Mirror **fills via reflection → overrides the framing fade** (the
+`_inb` gate is skipped when mirrored); sample is clamped to kill fold-seam wrap. `imageWarp.kaleidoSpeed`
+(0..1) spins the kaleido; its slider shows only in kaleido mode. UI = a chip-row (Off/↔H/↕V/⊞Quad/✦Kaleido)
+after the Position pad. `mirrorScope` (tile/field) SKIPPED (tile-specific). Verified: mirrored melt still
+renders bright; kaleido row toggles; round-trips.
 
 **Aspect / Fit — PLAN, lower priority (defer or fold into aspect-ratio.md).** The melt samples `uv_orig`
 0..1 across the screen → a square image stretches to the screen's shape. To preserve the image's native
@@ -618,6 +625,20 @@ real speed value. Keeps the one-knob ethos ([[project_one_click_vs_pro_tools]]) 
 **Scope:** the **Drive panel Speed** AND the **Flow Style Speed** (Motion tab) — same flows (`_flowParts`),
 same linear-range problem. Needs a dedicated log binder (the generic linear slider binder writes the raw
 value through). Verify: slow end has fine resolution + renders; fast end still reachable; round-trips.
+
+**⚠️ FOLLOW-UP FIX 2026-06-04 (two iterations) — Speed = true slow-motion.** Root cause: `_flowParts`
+only scaled the sin OSCILLATION FREQUENCY by speed (`time*sp`), NOT the per-frame displacement. `melt`'s
+signature drip is a **constant** `dp*0.018`, so Speed was nearly inert for it.
+- **v1 (wrong):** scale `_flow *= speed`. This slowed it but ALSO shrank the displacement → the effect
+  *weakened/vanished* at low speed ("takes speed down only removes the effects"). A feedback loop's
+  visible richness = displacement/(1−decay), so shrinking the step shrinks the look.
+- **v2 (correct):** scale `_flow *= speed` AND compensate persistence `_dec = 1 − speed*(1−decay)`,
+  replacing `* decay` → `* _dec` in the feedback sample. This keeps the steady-state trail length
+  **identical** (richness preserved) while the per-frame step — the RATE of evolution — scales by speed.
+  True slow-motion: same rich look, evolving slower/faster. Non-kaleido (kaleido already slows via its
+  `time*sp` spin); gated so speed=1 → no lines → byte-identical no-op. Verified (real editor): at speed 0.1
+  vs 1.0 the melt **richness/luma is preserved (219≈219)** — no longer "removed" — while it flows slower.
+  Scoped to the Drive melt (`buildImageWarp`); Flow Style's `buildWarpShader` untouched.
 
 **✅ SHIPPED 2026-06-04.** Module helpers `_speedToPos`/`_posToSpeed` (SPEED_MIN 0.02, SPEED_MAX 4.0) +
 `_bindLogSpeedSlider(id, get, set)` / `_syncLogSpeed(id, speed)` ([inspector.js](src/editor/inspector.js)).

@@ -155,6 +155,32 @@ const r = await page.evaluate(async () => {
     out.lumaKeyLuma = await luma();
     insp.currentState.imageWarp.lumaKey = 0;
 
+    // Phase 7 — Remix rolls the Drive melt look + the panel re-syncs + framing is preserved.
+    Object.assign(insp.currentState.imageWarp, { size: 0.7, cx: 0.45, cy: 0.5, flow: 'liquid' });
+    insp._remixLock = {};
+    const flows = new Set();
+    let rollFramingKept = true, rollChipSynced = true;
+    for (let k = 0; k < 6; k++) {
+        insp._rollFullStack();
+        const iw = insp.currentState.imageWarp;
+        flows.add(iw.flow);
+        if (iw.size !== 0.7 || iw.cx !== 0.45 || iw.cy !== 0.5) rollFramingKept = false;
+        const active = document.querySelector('#image-warp-flow-grid .lseg.active');
+        if (!active || active.dataset.flow !== iw.flow) rollChipSynced = false;
+    }
+    out.remixRollsDrive = flows.size >= 2;
+    out.remixFramingKept = rollFramingKept;
+    out.remixChipSynced = rollChipSynced;
+    // Flow lock keeps the melt untouched.
+    insp._remixLock = { flow: true };
+    const _b = JSON.stringify(insp.currentState.imageWarp);
+    insp._rollFullStack();
+    out.remixFlowLock = JSON.stringify(insp.currentState.imageWarp) === _b;
+    insp._remixLock = {};
+    // restore a clean known state for the round-trip checks below
+    Object.assign(insp.currentState.imageWarp, { flow: 'tunnel', size: 1, cx: 0.5, cy: 0.5, reseed: 0.6, spin: 0, zoomPulse: 0, flowPulse: 0, lumaKey: 0, mirror: 'none' });
+    insp._syncImageWarpSection();
+
     // §17 perceptual Speed: slider position maps LOGARITHMICALLY to real speed (slow end has range).
     const spSl = document.getElementById('image-warp-speed-sl');
     spSl.value = '0'; spSl.dispatchEvent(new Event('input', { bubbles: true }));
@@ -163,6 +189,16 @@ const r = await page.evaluate(async () => {
     const fastSpeed = insp.currentState.imageWarp.speed;
     out.logSpeed = slowSpeed < 0.05 && fastSpeed > 3.5 && slowSpeed < fastSpeed;
     insp.currentState.imageWarp.speed = 1.0;
+
+    // Mirror / Kaleido — fold bakes into the warp + still renders bright; kaleido shows its speed row.
+    const kaleidoBtn = [...document.querySelectorAll('#image-warp-mirror-grid .lseg')].find(b => b.dataset.mirror === 'kaleido');
+    kaleidoBtn.click();
+    out.mirrorBaked = insp._buildRuntimePreset(insp.currentState).warp.includes('_ksect');
+    out.kaleidoRowShown = document.getElementById('image-warp-kaleido-speed-row').style.display !== 'none';
+    for (let k = 0; k < 50; k++) await luma();
+    out.mirrorLuma = await luma();
+    [...document.querySelectorAll('#image-warp-mirror-grid .lseg')].find(b => b.dataset.mirror === 'none').click();
+    out.kaleidoRowHidden = document.getElementById('image-warp-kaleido-speed-row').style.display === 'none';
 
     // Overlay must DROP OUT while driving: the comp shader no longer declares the
     // driving layer's sampler. Toggling Drive off restores it.
@@ -213,6 +249,13 @@ ok('Position is a 2D Center pad (reset recenters cx/cy)', r.padResetWorks);
 ok('Luma Key bakes a _key gate into the warp', r.lumaKeyBaked);
 ok('Luma Key cranked STILL renders bright, not black (luma > 20)', r.lumaKeyLuma > 20, `luma ${r.lumaKeyLuma?.toFixed(1)}`);
 ok('Speed fader is log-mapped (pos 0 → ~0.02 slow, pos 1 → ~4.0 fast)', r.logSpeed);
+ok('Mirror/Kaleido bakes a fold into the warp + reveals its speed row', r.mirrorBaked && r.kaleidoRowShown);
+ok('Mirrored melt STILL renders bright, not black (luma > 20)', r.mirrorLuma > 20, `luma ${r.mirrorLuma?.toFixed(1)}`);
+ok('Kaleido speed row hides when Mirror is Off', r.kaleidoRowHidden);
+ok('Remix rolls the Drive melt look (variety across rolls)', r.remixRollsDrive);
+ok('Remix re-syncs the Drive panel (flow chip matches rolled value)', r.remixChipSynced);
+ok('Remix preserves the user framing (size/cx/cy untouched)', r.remixFramingKept);
+ok('Flow lock keeps the melt (Remix does not roll it)', r.remixFlowLock);
 ok('driving layer drops out of the overlay (not stacked on top)', r.overlayHiddenWhileDriving);
 ok('toggling back to Overlay restores it + parks the panel home', r.overlayRestoredWhenOff && r.panelHomedWhenOff);
 ok('imageWarp serializes into the saved preset JSON', r.savedHasImageWarp);

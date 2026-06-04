@@ -718,6 +718,8 @@ export function buildWarpShader(flow) {
  *   lumaKey  – 0..1 key dark image pixels OUT of the injection (the melt shows through them) instead
  *              of darkening. 0 = inject the whole image (emergent dark-suppression only); 1 = only the
  *              bright parts seed the loop.
+ *   mirror   – 'none'|'h'|'v'|'quad'|'kaleido' — fold the image-sample coord (mirror/kaleidoscope the
+ *              melt). Fills via reflection (overrides the framing fade). kaleidoSpeed spins the kaleido.
  *   spin     – 0..1 melt rotation: gentle time-drift + a bass kick. 0 = no rotation.
  *   zoomPulse– 0..1 the image pumps inward on the bass hit. 0 = no pump.
  *   flowPulse– 0..1 the flow displacement surges on the bass (tunnel/ripple lunges). 0 = steady.
@@ -754,10 +756,28 @@ export function buildImageWarp(opts) {
     // image dissolves INTO the melt (§14.1) — NOT tiled, NOT edge-smeared.
     const size = Number(o.size ?? 1), cx = Number(o.cx ?? 0.5), cy = Number(o.cy ?? 0.5);
     const framed = (size !== 1 || cx !== 0.5 || cy !== 0.5);
+    // Mirror / Kaleido (Phase 4) — fold the image-sample coord before sampling (reuses the scene-
+    // mirror fold math). `none` = no-op. Mirror fills via reflection, so it overrides the fade gate.
+    const mirror = (o.mirror && o.mirror !== 'none') ? String(o.mirror) : null;
+    const ks = Number(o.kaleidoSpeed ?? 0).toFixed(4);
 
-    // Flow Pulse: surge the per-frame displacement on the bass. `_flow` only exists for the
-    // standard flows (kaleido reconstructs `_kuv` directly), so guard on it.
+    // `_flow` (the per-frame displacement) exists for all standard flows (kaleido reconstructs
+    // `_kuv` directly), so the next steps all guard on non-kaleido.
     let pre = p.pre;
+    let fbExpr = p.fbExpr;
+    // Speed = MOTION RATE (true slow-motion). _flowParts only scaled the sin OSCILLATION frequency,
+    // so several flows (esp. `melt`, whose drip is a constant) barely moved with Speed. Now scale the
+    // per-frame displacement `_flow` by speed too — BUT that alone just weakens the effect (a feedback
+    // loop's visible richness = displacement/(1-decay)). So compensate persistence: `_dec = 1 -
+    // speed*(1-decay)` keeps the steady-state trail IDENTICAL while the step (the rate of evolution)
+    // scales by speed. Net: same rich look, evolving slower/faster. Gated: speed=1 → no lines (no-op).
+    const fSpeed = Number(o.speed ?? 1);
+    if (fSpeed !== 1 && flowId !== 'kaleido') {
+        pre += `  _flow *= ${fSpeed.toFixed(4)};\n`;
+        pre += `  float _dec = 1.0 - ${fSpeed.toFixed(4)} * (1.0 - decay);\n`;
+        fbExpr = fbExpr.replace(/\* decay$/, '* _dec');  // preserve trail richness while slowing
+    }
+    // Flow Pulse: surge the per-frame displacement on the bass.
     if (flowPulse > 0 && flowId !== 'kaleido') {
         pre += `  _flow *= 1.0 + ${flowPulse.toFixed(4)} * 0.9 * (bass - 1.0);\n`;
     }
@@ -765,7 +785,7 @@ export function buildImageWarp(opts) {
     // Build the image-sample coordinate `_iuv`. At size=1, cx=cy=0.5, spin=0, zoom=0 this whole
     // block is skipped → exactly `texture(sampler, uv_orig)` + `mix(_fb,_img,reseed)` (no-op),
     // so default melts (and the shipped spin/zoom-only path) are unchanged.
-    const needCoord = framed || spin > 0 || zoom > 0;
+    const needCoord = framed || spin > 0 || zoom > 0 || mirror;
     const lumaKey = Number(o.lumaKey ?? 0);
     let imgSample;
     if (needCoord) {
@@ -782,9 +802,23 @@ export function buildImageWarp(opts) {
         if (zoom > 0) {
             lines += `  _iuv = (_iuv - 0.5) * (1.0 - ${zoom.toFixed(4)} * 0.4 * (bass - 1.0)) + 0.5;\n`;
         }
-        // Framed → clamp the coord (kills wrap garbage in the feathered border texels; the gate
-        // below does the actual fade). Unframed (spin/zoom-only) → sample raw, as shipped.
-        lines += `  vec3 _img = texture(sampler_${imgName}, ${framed ? 'clamp(_iuv, 0.0, 1.0)' : '_iuv'}).rgb;\n`;
+        // Mirror fold (reuses the scene-mirror / kaleido math from _buildCompShader).
+        if (mirror === 'h') lines += `  _iuv.x = 1.0 - abs(_iuv.x * 2.0 - 1.0);\n`;
+        else if (mirror === 'v') lines += `  _iuv.y = 1.0 - abs(_iuv.y * 2.0 - 1.0);\n`;
+        else if (mirror === 'quad') lines += `  _iuv = 1.0 - abs(_iuv * 2.0 - 1.0);\n`;
+        else if (mirror === 'kaleido') {
+            lines +=
+                `  { vec2 _kp = _iuv - 0.5;\n` +
+                `    float _kang = atan(_kp.y, _kp.x) + time * ${ks} * 6.28318;\n` +
+                `    float _krad = length(_kp);\n` +
+                `    float _ksect = 6.28318530718 / 6.0;\n` +
+                `    float _ka = mod(_kang, _ksect);\n` +
+                `    if (_ka > _ksect * 0.5) _ka = _ksect - _ka;\n` +
+                `    _iuv = vec2(cos(_ka), sin(_ka)) * _krad + 0.5; }\n`;
+        }
+        // Clamp the sample coord when framed OR mirrored (kills wrap garbage at borders / fold seams).
+        const clampSample = framed || mirror;
+        lines += `  vec3 _img = texture(sampler_${imgName}, ${clampSample ? 'clamp(_iuv, 0.0, 1.0)' : '_iuv'}).rgb;\n`;
         imgSample = lines;
     } else {
         imgSample = `  vec3 _img = texture(sampler_${imgName}, uv_orig).rgb;\n`;
@@ -793,8 +827,9 @@ export function buildImageWarp(opts) {
     // gated to no-op at neutral, so size=1/cx=cy=0.5/lumaKey=0 → exactly `mix(_fb,_img,reseed)`.
     let gate = '';
     let presence = `${reseed}`;
-    if (framed) {
+    if (framed && !mirror) {
         // Feathered in-bounds gate → outside the image, presence→0 so only feedback shows.
+        // (Skipped when mirrored — the fold fills the screen via reflection, no out-of-bounds.)
         gate +=
             `  float _inb = smoothstep(0.0, 0.04, _iuv.x) * smoothstep(0.0, 0.04, 1.0 - _iuv.x)\n` +
             `             * smoothstep(0.0, 0.04, _iuv.y) * smoothstep(0.0, 0.04, 1.0 - _iuv.y);\n`;
@@ -814,7 +849,7 @@ export function buildImageWarp(opts) {
     // declare the GLSL uniform AND to bind our uploaded texture each frame. Omit it and
     // sampler_<name> is an undeclared identifier → warp fails to compile → black frame.
     return `uniform sampler2D sampler_${imgName};\nshader_body {\n${pre}` +
-        `  vec3 _fb = ${p.fbExpr};\n` +
+        `  vec3 _fb = ${fbExpr};\n` +
         imgSample +
         mix + `}`;
 }

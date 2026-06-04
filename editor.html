@@ -748,6 +748,20 @@
                                             <button id="image-warp-xy-reset" class="xy-reset" type="button" data-tooltip="Reset to center">↺</button>
                                         </div>
                                     </div>
+                                    <span class="layer-ctrl-label" data-tooltip="Mirror / kaleidoscope the melted image">Mirror</span>
+                                    <div id="image-warp-mirror-grid" class="layer-react-curve" role="group"
+                                        aria-label="Mirror mode" style="margin:6px 0 10px">
+                                        <button class="lseg active" data-mirror="none">Off</button>
+                                        <button class="lseg" data-mirror="h">↔ H</button>
+                                        <button class="lseg" data-mirror="v">↕ V</button>
+                                        <button class="lseg" data-mirror="quad">⊞ Quad</button>
+                                        <button class="lseg" data-mirror="kaleido">✦ Kaleido</button>
+                                    </div>
+                                    <div class="layer-slider-row" id="image-warp-kaleido-speed-row" style="display:none">
+                                        <span class="layer-ctrl-label" data-tooltip="Kaleidoscope spin speed">Kaleido Speed</span>
+                                        <input type="range" id="image-warp-kaleido-speed-sl" class="slider" min="0" max="1" step="0.01" value="0">
+                                        <span class="lsv" id="image-warp-kaleido-speed-sl-val">0.00</span>
+                                    </div>
                                     <div class="layer-slider-row">
                                         <span class="layer-ctrl-label" data-tooltip="Melt motion speed — log-scaled: the lower half is all slow-motion (Melt/Liquid get hypnotic)">Speed</span>
                                         <input type="range" id="image-warp-speed-sl" class="slider" min="0" max="1" step="0.001" value="0.738">

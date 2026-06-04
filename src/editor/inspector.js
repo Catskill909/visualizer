@@ -550,7 +550,7 @@ const BLANK = {
     // Image-as-texture (image-texture-dev.md Phase 2) — melt a loaded image layer
     // INTO the feedback loop. `texName` references one of `images[]`. When enabled it
     // OVERRIDES flowStyle's warp via buildImageWarp. Round-trips via the BLANK overlay.
-    imageWarp: { enabled: false, texName: '', flow: 'liquid', size: 1.0, cx: 0.5, cy: 0.5, speed: 1.0, depth: 0.5, spin: 0.0, zoomPulse: 0.0, flowPulse: 0.0, lumaKey: 0.0, reseed: 0.20, audioSource: 'none', audioAmt: 0.50 },
+    imageWarp: { enabled: false, texName: '', flow: 'liquid', size: 1.0, cx: 0.5, cy: 0.5, mirror: 'none', kaleidoSpeed: 0.0, speed: 1.0, depth: 0.5, spin: 0.0, zoomPulse: 0.0, flowPulse: 0.0, lumaKey: 0.0, reseed: 0.20, audioSource: 'none', audioAmt: 0.50 },
     motionReact: {
         source: 'bass',
         curve: 'linear',
@@ -1957,13 +1957,22 @@ export class EditorInspector {
         //    (bloom/smoke/melt) over the sharp ones, because sharp flow + high decay
         //    smears bright content into thin "string" threads (Phase 15.3 anti-string).
         if (!L.flow) {
-            this.currentState.flowStyle.speed = rnd(0.4, 2.2);
-            this.currentState.flowStyle.depth = rnd(0.3, 0.9);
-            this.currentState.flowStyle.density = rnd(0.3, 0.8);
-            const _flowId = Math.random() < 0.35 ? 'none'
-                : (Math.random() < 0.65 ? pick(['bloom', 'smoke', 'melt'])
-                    : pick(['tunnel', 'spiral', 'ripple', 'swirl', 'plasma', 'liquid', 'kaleido']));
-            this._applyFlowStyle(_flowId);
+            const _iw = this.currentState.imageWarp;
+            const _driving = _iw && _iw.enabled && (this.currentState.images || []).some(e => e.texName === _iw.texName);
+            if (_driving) {
+                // A Drive layer is active → the melt IS the warp/flow (it overrides flowStyle).
+                // Gamble the melt LOOK (flow/speed/depth/spin/zoom/flow-pulse/mirror/luma-key/
+                // presence/audio) instead of flowStyle. Sliders re-sync via _syncAllControls below.
+                this._rollImageWarp(pick, rnd);
+            } else {
+                this.currentState.flowStyle.speed = rnd(0.4, 2.2);
+                this.currentState.flowStyle.depth = rnd(0.3, 0.9);
+                this.currentState.flowStyle.density = rnd(0.3, 0.8);
+                const _flowId = Math.random() < 0.35 ? 'none'
+                    : (Math.random() < 0.65 ? pick(['bloom', 'smoke', 'melt'])
+                        : pick(['tunnel', 'spiral', 'ripple', 'swirl', 'plasma', 'liquid', 'kaleido']));
+                this._applyFlowStyle(_flowId);
+            }
         }
         // ── Content — rolled LAST (authoritative): the Motion/Flow applies above call
         //    _ensureFeedbackContent, which would otherwise re-seed a thin wave onto a
@@ -2004,6 +2013,29 @@ export class EditorInspector {
         this._syncAllControls();
         const anyLocked = REMIX_LOCK_GROUPS.some(k => L[k]);
         showToast?.(anyLocked ? '🎲 Remixed — locks kept' : '🎲 Remixed');
+    }
+
+    /** Remix the Drive melt LOOK (image-texture-dev.md Phase 7). Mutates currentState.imageWarp
+     *  only — no engine reload (respects the _rolling batch; the final _applyToEngine +
+     *  _syncAllControls in _rollFullStack do the one rebuild + slider re-sync). Leaves the user's
+     *  framing (size/cx/cy) and which image drives (texName/enabled) UNTOUCHED — gambles the melt
+     *  character, not the composition. Every rolled combo renders bright (boring-not-broken). */
+    _rollImageWarp(pick, rnd) {
+        const iw = this.currentState.imageWarp;
+        if (!iw) return;
+        iw.flow = pick(['tunnel', 'spiral', 'ripple', 'swirl', 'plasma', 'liquid', 'kaleido', 'bloom', 'smoke', 'melt']);
+        iw.speed = rnd(0.1, 2.2);                                          // wide range incl. the gorgeous slow end
+        iw.depth = rnd(0.35, 0.9);
+        iw.spin = Math.random() < 0.4 ? rnd(0.1, 0.6) : 0;
+        iw.zoomPulse = Math.random() < 0.4 ? rnd(0.2, 0.6) : 0;
+        iw.flowPulse = Math.random() < 0.4 ? rnd(0.3, 0.8) : 0;
+        iw.lumaKey = Math.random() < 0.5 ? rnd(0.3, 0.8) : 0;
+        iw.mirror = Math.random() < 0.35 ? pick(['h', 'v', 'quad', 'kaleido']) : 'none';
+        iw.kaleidoSpeed = iw.mirror === 'kaleido' ? rnd(0.05, 0.6) : 0;
+        iw.reseed = rnd(0.12, 0.35);
+        // Audio reactivity is the differentiator — Remix exercises it.
+        iw.audioSource = Math.random() < 0.6 ? pick(['bass', 'mid', 'treb']) : 'none';
+        iw.audioAmt = rnd(0.3, 0.7);
     }
 
     /** Add one randomised, audio-reactive editor shape for a Remix roll — a blob or
@@ -2271,6 +2303,18 @@ export class EditorInspector {
         this._bindLogSpeedSlider('image-warp-speed-sl',  // §17 perceptual (log) Speed
             () => this.currentState.imageWarp.speed,
             (s) => { this.currentState.imageWarp.speed = s; });
+        // Mirror chip-row (Off/H/V/Quad/Kaleido) — folds the image-sample coord. Shows the
+        // Kaleido Speed slider only in kaleido mode.
+        document.querySelectorAll('#image-warp-mirror-grid .lseg').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.currentState.imageWarp.mirror = btn.dataset.mirror;
+                document.querySelectorAll('#image-warp-mirror-grid .lseg').forEach(b => b.classList.toggle('active', b === btn));
+                const krow = document.getElementById('image-warp-kaleido-speed-row');
+                if (krow) krow.style.display = btn.dataset.mirror === 'kaleido' ? '' : 'none';
+                this._applyToEngine();
+            });
+        });
+        this._bindImageWarpSlider('image-warp-kaleido-speed-sl', 'kaleidoSpeed');
         this._bindImageWarpSlider('image-warp-depth-sl', 'depth');
         this._bindImageWarpSlider('image-warp-spin-sl', 'spin');
         this._bindImageWarpSlider('image-warp-zoom-sl', 'zoomPulse');
@@ -2282,7 +2326,7 @@ export class EditorInspector {
         // fader in the editor. The panel moves between cards/home, so the handler lives
         // on the panel itself; defaults are stamped from BLANK.imageWarp.
         // NB: speed slider is position-mapped (log); its default POSITION = _speedToPos(1.0).
-        const iwDefaults = { 'image-warp-size-sl': 1.0, 'image-warp-speed-sl': _speedToPos(1.0), 'image-warp-depth-sl': 0.5, 'image-warp-spin-sl': 0.0, 'image-warp-zoom-sl': 0.0, 'image-warp-flowpulse-sl': 0.0, 'image-warp-lumakey-sl': 0.0, 'image-warp-reseed-sl': 0.2, 'image-warp-audio-amt-sl': 0.5 };
+        const iwDefaults = { 'image-warp-size-sl': 1.0, 'image-warp-speed-sl': _speedToPos(1.0), 'image-warp-depth-sl': 0.5, 'image-warp-spin-sl': 0.0, 'image-warp-zoom-sl': 0.0, 'image-warp-flowpulse-sl': 0.0, 'image-warp-kaleido-speed-sl': 0.0, 'image-warp-lumakey-sl': 0.0, 'image-warp-reseed-sl': 0.2, 'image-warp-audio-amt-sl': 0.5 };
         for (const [id, def] of Object.entries(iwDefaults)) {
             const sl = document.getElementById(id);
             if (!sl) continue;
@@ -2455,6 +2499,11 @@ export class EditorInspector {
         // Sync the panel control values from imageWarp.
         const flow = iw.flow || 'liquid';
         document.querySelectorAll('#image-warp-flow-grid .lseg').forEach(b => b.classList.toggle('active', b.dataset.flow === flow));
+        const mir = iw.mirror || 'none';
+        document.querySelectorAll('#image-warp-mirror-grid .lseg').forEach(b => b.classList.toggle('active', b.dataset.mirror === mir));
+        const krow = document.getElementById('image-warp-kaleido-speed-row');
+        if (krow) krow.style.display = mir === 'kaleido' ? '' : 'none';
+        this._syncSlider('image-warp-kaleido-speed-sl', iw.kaleidoSpeed ?? 0, 0, 1, 2);
         const audioSel = document.getElementById('image-warp-audio');
         if (audioSel) audioSel.value = iw.audioSource || 'none';
         const amtRow = document.getElementById('image-warp-audio-amt-row');
@@ -8605,6 +8654,7 @@ export class EditorInspector {
         if (iw && iw.enabled && iw.texName && (state.images || []).some(e => e.texName === iw.texName)) {
             runtime.warp = buildImageWarp({
                 imgName: iw.texName, flow: iw.flow, size: iw.size, cx: iw.cx, cy: iw.cy,
+                mirror: iw.mirror, kaleidoSpeed: iw.kaleidoSpeed,
                 speed: iw.speed, depth: iw.depth,
                 spin: iw.spin, zoomPulse: iw.zoomPulse, flowPulse: iw.flowPulse, lumaKey: iw.lumaKey,
                 reseed: iw.reseed, audioSource: iw.audioSource, audioAmt: iw.audioAmt,
