@@ -74,18 +74,22 @@ const r = await page.evaluate(async () => {
         && runtime.warp.includes(`texture(sampler_${texName}, uv_orig)`);
 
     // Radio: driving a SECOND layer must release the first (one warp slot).
-    await insp._addImageLayer(await mkFile());
+    await insp._addImageLayer(await mkFile());  // entry was driving when this ran
     const entry2 = insp.currentState.images[1];
-    insp._toggleCardDrive(entry2);
     const cardOf = (t) => [...document.querySelectorAll('#image-layers .image-layer-card')].find(c => c.dataset.texName === t);
+    // The driving card must NOT be squashed by the accordion when a new layer is added.
+    out.driverStaysOpenOnAdd = !cardOf(texName)?.classList.contains('collapsed');
+    insp._toggleCardDrive(entry2);
     out.radioReleasedFirst = !cardOf(texName)?.classList.contains('drive-mode')
         && !!cardOf(entry2.texName)?.classList.contains('drive-mode')
         && insp.currentState.imageWarp.texName === entry2.texName;
     // Return to the first layer driving for the rest of the checks.
     insp._toggleCardDrive(entry);
     insp.currentState.images.splice(1, 1);  // drop the 2nd helper layer
-    insp._updateLayersBar();
     cardOf(entry2.texName)?.remove();
+    insp._updateLayersBar();
+    insp._updateLayerIndices();             // mirrors a real delete → enforces sole-layer-open
+    out.soleLayerOpen = !cardOf(texName)?.classList.contains('collapsed');
 
     // Live preview must actually RENDER the melt (not a black frame). The editor pushes
     // state to the same engine via _applyToEngine; read back canvas luma after a settle.
@@ -115,6 +119,18 @@ const r = await page.evaluate(async () => {
         .dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
     out.dblclickReset = Math.abs(bumped - 0.85) < 1e-6 && Math.abs(insp.currentState.imageWarp.reseed - 0.2) < 1e-6;
     insp.currentState.imageWarp.reseed = 0.6;     // restore for the round-trip check below
+
+    // Tier 2 melt reactivity (Spin / Zoom Pulse / Flow Pulse) — crank all three and
+    // confirm (a) they bake into the warp and (b) the melt STILL renders bright
+    // (boring-not-broken: no knob combo may produce a dead frame).
+    Object.assign(insp.currentState.imageWarp, { flow: 'tunnel', spin: 0.8, zoomPulse: 0.7, flowPulse: 0.9 });
+    insp._applyToEngine();
+    const t2warp = insp._buildRuntimePreset(insp.currentState).warp;
+    out.tier2Baked = t2warp.includes('_spang') && t2warp.includes('_iuv') && t2warp.includes('_flow *=');
+    for (let k = 0; k < 50; k++) await luma();
+    out.tier2Luma = await luma();
+    // reset the trio so the save/reload check stays about flow/reseed only
+    Object.assign(insp.currentState.imageWarp, { spin: 0, zoomPulse: 0, flowPulse: 0 });
 
     // Overlay must DROP OUT while driving: the comp shader no longer declares the
     // driving layer's sampler. Toggling Drive off restores it.
@@ -151,10 +167,14 @@ ok('image layer added via real upload path', r.layerAdded);
 ok('per-card Drive toggle enables drive on that layer', r.enabled && r.sourceAutoPicked);
 ok('card enters drive-mode + the Drive panel moves INTO the card', r.cardInDriveMode && r.panelMovedIntoCard);
 ok('radio: driving a 2nd layer releases the 1st (one warp slot)', r.radioReleasedFirst);
+ok('adding a layer does NOT squash the driving card', r.driverStaysOpenOnAdd);
+ok('a sole remaining layer stays open (not left collapsed)', r.soleLayerOpen);
 ok('runtime warp is the image-warp (declares + samples sampler_<tex>), overriding flowStyle', r.warpIsImageWarp);
 ok('editor live preview renders the melt BRIGHT, not black (luma > 20)', r.previewLuma > 20, `luma ${r.previewLuma?.toFixed(1)}`);
 ok('Flow is a click-to-explore chip grid, not a dropdown', r.flowChips >= 10, `chips ${r.flowChips}`);
 ok('double-click slider label resets it to default', r.dblclickReset);
+ok('Tier 2 (Spin/Zoom/Flow Pulse) bakes into the warp', r.tier2Baked);
+ok('all Tier-2 knobs cranked STILL render bright, not broken (luma > 20)', r.tier2Luma > 20, `luma ${r.tier2Luma?.toFixed(1)}`);
 ok('driving layer drops out of the overlay (not stacked on top)', r.overlayHiddenWhileDriving);
 ok('toggling back to Overlay restores it + parks the panel home', r.overlayRestoredWhenOff && r.panelHomedWhenOff);
 ok('imageWarp serializes into the saved preset JSON', r.savedHasImageWarp);

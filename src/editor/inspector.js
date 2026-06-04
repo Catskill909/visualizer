@@ -540,7 +540,7 @@ const BLANK = {
     // Image-as-texture (image-texture-dev.md Phase 2) — melt a loaded image layer
     // INTO the feedback loop. `texName` references one of `images[]`. When enabled it
     // OVERRIDES flowStyle's warp via buildImageWarp. Round-trips via the BLANK overlay.
-    imageWarp: { enabled: false, texName: '', flow: 'liquid', speed: 1.0, depth: 0.5, reseed: 0.20, audioSource: 'none', audioAmt: 0.50 },
+    imageWarp: { enabled: false, texName: '', flow: 'liquid', speed: 1.0, depth: 0.5, spin: 0.0, zoomPulse: 0.0, flowPulse: 0.0, reseed: 0.20, audioSource: 'none', audioAmt: 0.50 },
     motionReact: {
         source: 'bass',
         curve: 'linear',
@@ -2254,12 +2254,15 @@ export class EditorInspector {
         });
         this._bindImageWarpSlider('image-warp-speed-sl', 'speed');
         this._bindImageWarpSlider('image-warp-depth-sl', 'depth');
+        this._bindImageWarpSlider('image-warp-spin-sl', 'spin');
+        this._bindImageWarpSlider('image-warp-zoom-sl', 'zoomPulse');
+        this._bindImageWarpSlider('image-warp-flowpulse-sl', 'flowPulse');
         this._bindImageWarpSlider('image-warp-reseed-sl', 'reseed');
         this._bindImageWarpSlider('image-warp-audio-amt-sl', 'audioAmt');
         // Double-click a slider's label to reset it to default — matches every other
         // fader in the editor. The panel moves between cards/home, so the handler lives
         // on the panel itself; defaults are stamped from BLANK.imageWarp.
-        const iwDefaults = { 'image-warp-speed-sl': 1.0, 'image-warp-depth-sl': 0.5, 'image-warp-reseed-sl': 0.2, 'image-warp-audio-amt-sl': 0.5 };
+        const iwDefaults = { 'image-warp-speed-sl': 1.0, 'image-warp-depth-sl': 0.5, 'image-warp-spin-sl': 0.0, 'image-warp-zoom-sl': 0.0, 'image-warp-flowpulse-sl': 0.0, 'image-warp-reseed-sl': 0.2, 'image-warp-audio-amt-sl': 0.5 };
         for (const [id, def] of Object.entries(iwDefaults)) {
             const sl = document.getElementById(id);
             if (!sl) continue;
@@ -2361,6 +2364,9 @@ export class EditorInspector {
         if (amtRow) amtRow.style.display = (iw.audioSource && iw.audioSource !== 'none') ? '' : 'none';
         this._syncSlider('image-warp-speed-sl', iw.speed ?? 1.0, 0.1, 4, 2);
         this._syncSlider('image-warp-depth-sl', iw.depth ?? 0.5, 0, 1, 2);
+        this._syncSlider('image-warp-spin-sl', iw.spin ?? 0, 0, 1, 2);
+        this._syncSlider('image-warp-zoom-sl', iw.zoomPulse ?? 0, 0, 1, 2);
+        this._syncSlider('image-warp-flowpulse-sl', iw.flowPulse ?? 0, 0, 1, 2);
         this._syncSlider('image-warp-reseed-sl', iw.reseed ?? 0.2, 0, 1, 2);
         this._syncSlider('image-warp-audio-amt-sl', iw.audioAmt ?? 0.5, 0, 1, 2);
     }
@@ -4632,6 +4638,16 @@ export class EditorInspector {
             c.dataset.atTop = i === 0 ? '1' : '0';
             c.dataset.atBottom = i === total - 1 ? '1' : '0';
         });
+        // A sole layer stays OPEN — "a layer is open unless there's another one." Catches
+        // a last survivor left collapsed by a prior accordion (e.g. add a 2nd layer, then
+        // delete it). Only forces open at the 1-layer transition; doesn't fight manual
+        // collapse while multiple layers exist.
+        if (total === 1) {
+            const only = this.currentState.images[0];
+            if (only) only.collapsed = false;
+            cards[0].classList.remove('collapsed');
+            cards[0].querySelector('.layer-header')?.setAttribute('aria-expanded', 'true');
+        }
     }
 
     _reorderImage(fromIdx, toIdx) {
@@ -4833,9 +4849,12 @@ export class EditorInspector {
 
         // Smart accordion: collapse every existing card before we add the new one.
         // The new card goes in expanded so user focus follows what they just dropped.
-        this.currentState.images.forEach(e => { e.collapsed = true; });
+        // …but never squash the card that's DRIVING the preset — its body IS the Drive
+        // panel you're working in, so keep it open when a new layer arrives.
+        const _driveTex = this.currentState.imageWarp?.enabled ? this.currentState.imageWarp.texName : null;
+        this.currentState.images.forEach(e => { if (e.texName !== _driveTex) e.collapsed = true; });
         document.querySelectorAll('#image-layers .image-layer-card').forEach(c => {
-            c.classList.add('collapsed');
+            if (c.dataset.texName !== _driveTex) c.classList.add('collapsed');
         });
 
         // Full per-image control state — all values baked into GLSL on change
@@ -5218,9 +5237,12 @@ export class EditorInspector {
         }
 
         // Smart accordion: collapse every existing card before we add the new one.
-        this.currentState.images.forEach(e => { e.collapsed = true; });
+        // …but never squash the card that's DRIVING the preset — its body IS the Drive
+        // panel you're working in, so keep it open when a new layer arrives.
+        const _driveTex = this.currentState.imageWarp?.enabled ? this.currentState.imageWarp.texName : null;
+        this.currentState.images.forEach(e => { if (e.texName !== _driveTex) e.collapsed = true; });
         document.querySelectorAll('#image-layers .image-layer-card').forEach(c => {
-            c.classList.add('collapsed');
+            if (c.dataset.texName !== _driveTex) c.classList.add('collapsed');
         });
 
         const texName = `uservid${Date.now().toString(36)}`;
@@ -5393,9 +5415,12 @@ export class EditorInspector {
         }
 
         // Smart accordion: collapse existing cards
-        this.currentState.images.forEach(e => { e.collapsed = true; });
+        // …but never squash the card that's DRIVING the preset — its body IS the Drive
+        // panel you're working in, so keep it open when a new layer arrives.
+        const _driveTex = this.currentState.imageWarp?.enabled ? this.currentState.imageWarp.texName : null;
+        this.currentState.images.forEach(e => { if (e.texName !== _driveTex) e.collapsed = true; });
         document.querySelectorAll('#image-layers .image-layer-card').forEach(c => {
-            c.classList.add('collapsed');
+            if (c.dataset.texName !== _driveTex) c.classList.add('collapsed');
         });
 
         const texName = `usertxt${Date.now().toString(36)}`;
@@ -5573,6 +5598,8 @@ export class EditorInspector {
                 <input type="text" class="layer-name-input" maxlength="32" spellcheck="false"
                        aria-label="Layer name" />
               </div>
+              <button class="layer-action-btn layer-drive layer-drive-pill" type="button"
+                      aria-pressed="false" data-tooltip="Drive the preset: melt THIS image into the warp engine (hides its overlay)">Drive</button>
               <svg class="layer-chevron" width="10" height="10" viewBox="0 0 12 12" aria-hidden="true">
                 <path d="M2 4 L6 8 L10 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
@@ -5582,8 +5609,6 @@ export class EditorInspector {
                 ${entry.isHd ? '<span class="layer-hd-badge" data-tooltip="Uploaded at HD (2048px). Re-upload to change.">HD</span>' : ''}
               </div>
               <div class="layer-header-row2-actions">
-                <button class="layer-action-btn layer-drive" type="button"
-                        aria-pressed="false" data-tooltip="Drive the preset: melt THIS image into the warp engine (hides its overlay)">Drive</button>
                 <button class="layer-action-btn layer-solo" type="button"
                         aria-pressed="false" data-tooltip="Solo (show only this layer)">Solo</button>
                 <button class="layer-action-btn layer-mute" type="button"
@@ -8480,6 +8505,7 @@ export class EditorInspector {
         if (iw && iw.enabled && iw.texName && (state.images || []).some(e => e.texName === iw.texName)) {
             runtime.warp = buildImageWarp({
                 imgName: iw.texName, flow: iw.flow, speed: iw.speed, depth: iw.depth,
+                spin: iw.spin, zoomPulse: iw.zoomPulse, flowPulse: iw.flowPulse,
                 reseed: iw.reseed, audioSource: iw.audioSource, audioAmt: iw.audioAmt,
             });
         }

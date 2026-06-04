@@ -21,14 +21,17 @@ _Single source of truth for status. Detail in the numbered sections below._
 | **Spike / Audit** | Feasibility — pipeline exists (`setUserTexture`) + **warp shader can sample a user texture** → no engine fork (§9, §11) | ✅ **DONE 2026-06-03** |
 | **1 — Feedback-melt engine** | `buildImageWarp(opts)` generator shipped (§12) — blends `sampler_<imgName>` into the feedback loop, reusing the SAME flow math as `buildWarpShader` (shared `_flowParts`). Knobs: `flow` · `reseed` · **audio-reactive blend** (`audioSource`/`audioAmt`). **Minimal live wire-up shipped** (`window.__imgWarp.drive/clear`, dev-only). | ✅ **GENERATOR + LIVE WIRE DONE — tune look by eye next** |
 | **2 — UX** | **Per-card `Overlay \| Drive` switch** (§13, §13.5): each image layer card has a Drive button; flipping it melts THAT image into the preset (radio — one at a time), hides its overlay, and swaps the card body to the Drive panel (Flow · Speed · Depth · Presence · Audio+Amount). Overrides Flow Style; round-trips via BLANK; player parity in `refreshCustomPresets`. | ✅ **DONE 2026-06-03 — per-card editor round-trip verified 12/12** |
-| **3 — More sources** | Video / GIF / webcam frames (all already `setUserTexture`-supported) | ⬜ next |
-| **4 — Named-texture path (optional)** | "Photo-reactive" presets that sample a known user sampler + ship the **22 built-in texture assets** (`milkdrop-pack-import.md` §16.1) so the ~66 texture presets render right | ⬜ optional |
+| **2.5 — Per-card + Tier 1/2** | Per-card mode + chip-grid Flow + dbl-click reset + Speed/Depth (Tier 1) + Spin/Zoom Pulse/Flow Pulse (Tier 2, §13.6) + collapse fixes + Drive-pill in row1. | ✅ **DONE 2026-06-03 — verified 18/18** |
+| **4 — Build-out: parallel layer controls** | Flesh out the Drive panel toward the richness of regular layers — **Size/framing is #1** (melt currently fills the screen). See §14 for the weighed, phased plan. | ⬜ **NEXT (tomorrow)** |
+| **5 — Drive 🎲** | Roll a whole melt look (flow+speed+depth+spin+zoom+flow-pulse+audio target). Tier 2 gave it a rich space; boring-not-broken bar guarantees every roll renders. | ⬜ planned |
+| **3 — More sources** | Video / GIF / webcam as the driving texture (all already `setUserTexture`-supported → the melt animates). | ⬜ planned |
+| **(opt) — Named-texture path** | "Photo-reactive" presets that sample a known user sampler + ship the **22 built-in texture assets** (`milkdrop-pack-import.md` §16.1). | ⬜ optional |
 
-**▶️ PICK UP AT PHASE 1 (live wire-up):** the generator `buildImageWarp(opts)` is ✅ built
-([customPresets.js](src/customPresets.js), §12). NEXT is the minimal engine wire-up so it can be
-seen/tuned: in a real preset, set `preset.warp = buildImageWarp({ imgName, flow, reseed })` and
-upload the image via `visualizer.setUserTexture(imgName, …)` — then **iterate `reseed` + `flow` +
-the preset's own decay live in a browser** (headless proved the *mechanism* — the *look* needs eyes).
+**▶️ PICK UP TOMORROW AT PHASE 4 (§14): Size & framing first.** The melt samples `texture(sampler_<img>,
+uv_orig)` → the image is stretched to fill the screen with no size control. That's the #1 gap. §14 has the
+full weighed plan (which layer controls translate to the feedback-seed mechanism and which don't).
+**Before coding Size, settle the out-of-bounds decision** (tile / clamp / fade) — that's the one real design
+fork. Everything is uncommitted since the last commit EXCEPT what the user already pushed — **commit first.**
 
 **Key facts (so you don't re-derive):** NO engine fork — reuses `setUserTexture` (upload, exists) +
 warp-shader injection (exists, = Flow Style). Cross-platform (pure WebGL2). Machine limits a
@@ -367,9 +370,21 @@ The Source dropdown is GONE (the card you flip IS the source).
 
 **Two audio stages (reaffirmed):** the layer's own AUDIO REACTIVITY section drives overlay effects (inert
 while driving); the Drive panel's Audio/Amount drives the image's re-injection into the feedback loop on
-the beat — the only audio that matters while driving. Tier 2 (Flow Pulse / Spin / Zoom Pulse — new warp-
-shader reactivity) is the next melt-richness pass; all controls are exclusive to the Drive panel (the melt
-samples the RAW texture, so no layer-card control reaches it — by design).
+the beat. All melt controls are exclusive to the Drive panel (the melt samples the RAW texture, so no
+layer-card control reaches it — by design).
+
+### 13.6 Tier 2 melt reactivity — Spin / Zoom Pulse / Flow Pulse (2026-06-03) ✅
+Three new melt knobs in `buildImageWarp`, each ONE musical slider (per [[project_one_click_vs_pro_tools]]),
+**hardwired to `bass` (the kick)** so they react without a per-knob source sub-menu:
+- **Spin** — rotates the image-sampling UV: gentle `time` drift + a bass kick. 0 = no rotation.
+- **Zoom Pulse** — the image pumps inward on the bass hit (scales the sample coord). 0 = no pump.
+- **Flow Pulse** — multiplies the per-frame `_flow` displacement by a bass term (tunnel/ripple lunges).
+  Guarded to standard flows (kaleido has no `_flow`, it builds `_kuv` directly — Spin/Zoom still apply).
+
+**Gated = boring-not-broken.** Every knob at 0 → the generated shader is **byte-identical** to pre-Tier-2
+(Spin/Zoom collapse `_iuv` back to `uv_orig`; Flow Pulse line omitted). Model: `imageWarp` gained
+`spin`/`zoomPulse`/`flowPulse` (default 0); passed at both build sites; 3 sliders + dblclick-reset in the
+Drive panel. Verified: all three cranked STILL render bright (luma > 20) — no combo produces a dead frame.
 
 **UX polish (2026-06-03, user feedback):**
 - **Flow is a click-to-explore chip grid** (`.lseg` chips, like Palette → Field), not a dropdown —
@@ -380,10 +395,104 @@ samples the RAW texture, so no layer-card control reaches it — by design).
   its own — `e.stopPropagation()` avoids a double-fire when the panel is inside a card.)
 - Removed the cheesy "🫠 Driving the preset…" header — the violet card border + active Drive button
   already signal the mode.
+- **Collapse fix (user bug 2026-06-03):** the Drive panel IS the card body, so the smart-accordion
+  squashing the driving card (on adding a new layer) hid the controls. Two fixes: (1) the accordion now
+  **skips the driving card** (`imageWarp.texName`) — it stays open when a layer is added; (2) a **sole
+  layer is forced open** in `_updateLayerIndices` ("a layer stays open unless there's another one") —
+  catches a last survivor left collapsed by a prior accordion (add 2nd → delete 2nd).
 
 **Verified — [scripts/verify-image-warp-editor.mjs](scripts/verify-image-warp-editor.mjs): 14/14** incl.
 per-card toggle, panel-moves-into-card, **radio releases the previous driver**, overlay drop-out + restore
-+ panel re-home, live-preview luma, **Flow chip grid**, **double-click-reset**, save/reload, graceful degrade.
++ panel re-home, live-preview luma, **Flow chip grid**, **double-click-reset**, **Tier-2 bake + cranked-luma**,
+save/reload, graceful degrade. **16/16.**
 
-**Not yet done:** aesthetic tuning by eye (the *look*); Tier 2 melt reactivity (Flow Pulse / Spin / Zoom
-Pulse); Phase 3 (video/GIF/webcam as the driving source — all already `setUserTexture`-supported).
+**Not yet done:** aesthetic tuning by eye (the *look*); a Drive-panel 🎲 (roll a whole melt look — now that
+Tier 2 gives it a rich space to roll into); Phase 3 (video/GIF/webcam as the driving source — all already
+`setUserTexture`-supported).
+
+---
+
+## 14. PHASE 4 — BUILD-OUT PLAN: parallel the regular layer controls (planned 2026-06-03)
+
+User's ask: flesh the Drive panel out toward the richness of regular image layers — but it's a
+**different mechanism** (a feedback-seed warp that samples the RAW texture, NOT an overlay composite),
+so each control has to be weighed, not copy-pasted. The melt only sees `texture(sampler_<img>, <uv>)`,
+so everything we add is a transform on that sample (geometry/UV) or on the sampled colour (`_img`), or
+a modulation of the flow. Below: what translates, how, and what doesn't.
+
+### 14.1 Phase 4a — Size & Framing (THE PRIORITY — melt currently fills the screen)
+Today: `texture(sampler_<img>, uv_orig)` → uv 0..1 stretches the image to fill, no size/position/aspect.
+This is the #1 gap the user hit. Controls to add (all = transform the sample UV around a center):
+- **Size / Scale** — `_suv = (uv_orig - center) / size + center`. size<1 = image bigger (zoom in), size>1
+  = image smaller, surrounded by… → **THE design fork: out-of-bounds behavior.** Options: **tile/repeat**
+  (`fract` — trippy, kaleidoscopic), **clamp** (edge-stretch), or **fade to feedback/transparent** (image
+  floats in the melt). Likely want a mode toggle (Repeat / Once) like the layer Tile system. SETTLE THIS
+  BEFORE CODING 4a.
+- **Position (cx/cy)** — translate the sample center. Easy.
+- **Aspect / Fit** — preserve the image's aspect instead of stretching to screen (use `texsize`/`aspect`
+  uniforms, both available in the warp header). Probably a Fit toggle (Fill / Fit / Stretch).
+- **Tile** — repeat N× across the field before melting (reuse the layer tile concept; pairs with Size
+  Repeat mode).
+- **Mirror / Kaleido** — fold the sample UV (h/v/quad/kaleido); reuse the existing fold math from
+  `_buildCompShader`'s `uvFold` / the kaleido block.
+
+### 14.2 Phase 4b — Colour / Grade (re-mood the image as it melts) — mostly REUSE
+Apply the per-layer colour-grade GLSL to `_img` *before* it mixes into the feedback. High value, low risk
+(the grade math already exists in the layer card → lift it into a shared helper or inline):
+Brightness · Contrast · Gamma · Saturation · Hue · Tint (R/G/B) · Colour Temp · Sepia · Fade ·
+Shadows/Highlights · Lift/Gain. Note: the feedback loop *also* recolours over time, so a static grade on
+the injected image reads cleanly (no conflict). Ties to [[project_mood_dim_control_idea]] — a luminance↓/
+saturation↑ "mood" could live here too.
+
+### 14.3 Phase 4c — Stylize (trippy one-offs on the injected image)
+Edge/Sobel (neon line-art melting) · Posterize · Threshold · Pixelate · Invert · Solarize. Each = a small
+op on `_img`. Pick the 2–3 that feel best; don't dump all (one-knob ethos, [[project_one_click_vs_pro_tools]]).
+
+### 14.4 Phase 4d — More reactivity routing (optional, weigh against one-knob)
+Tier 2 hardwired Spin/Zoom/Flow-Pulse to bass. Could later let each pick a band (bass/mid/treb), but that's
+a sub-menu — resist unless it clearly earns it. The Drive 🎲 (Phase 5) is probably the better expressivity
+win than per-knob routing.
+
+### 14.5 What does NOT translate (skip — overlay-specific)
+- **Opacity / Blend mode** — the melt is mixed into feedback, not composited; **Presence** is the analog (done).
+- **Entrance/Exit/Idle animation** (GSAP) — the melt is a continuous loop; N/A.
+- **Vignette / Scanlines / Film grain** — overlay framing FX; low value on a feedback-seed (could apply to
+  `_img` but weak payoff). Skip for now.
+- **Orbit / Sway / Wander / Bounce / Pan** — these are overlay *motion*; the **flow IS the motion engine**
+  here, so most overlap/conflict. Maybe a slow **Drift** of the sample center later; skip the rest.
+
+### 14.6 Build order (proposed)
+4a Size & framing (settle out-of-bounds first) → 4b Colour/grade (big reuse, high value) → 4c Stylize
+(2–3 picks) → then **Phase 5 Drive 🎲** (rolls across the now-rich 4a/4b/4c space) → **Phase 3 GIF/video
+source**. Each sub-phase: add to `buildImageWarp` (gated so 0/neutral = no-op), model fields on `imageWarp`,
+sliders in the Drive panel (with dbl-click reset), pass at BOTH build sites, headless-verify (bakes + still
+renders bright). Standing rule from [[project_one_click_vs_pro_tools]]: one obvious musical knob each;
+every value must render (boring-not-broken, luma>20).
+
+---
+
+## 15. END-OF-DAY AUDIT — 2026-06-03 (clean handoff)
+
+**Shipped today (image-as-texture, 0→a real feature):**
+- **Spike/Audit** → feasible, no engine fork (§9–11).
+- **Phase 1** — `buildImageWarp` generator + audio-reactive blend + `_flowParts` refactor (buildWarpShader
+  byte-identical) + dev hook (§12).
+- **Phase 2** — per-card **Overlay|Drive** mode (panel moves into the active card), chip-grid Flow, Speed/
+  Depth (Tier 1), overlay drop-out, save/reload, graceful degrade (§13–13.5).
+- **Tier 2** — Spin / Zoom Pulse / Flow Pulse, hardwired to bass, gated (§13.6).
+- **Polish/bugs** — dbl-click slider reset; removed cringe header; **collapse fixes** (driving card not
+  squashed; sole layer stays open); **Drive moved to row1** (Delete was being clipped).
+
+**Verification:** [scripts/verify-image-warp-editor.mjs](scripts/verify-image-warp-editor.mjs) drives the
+REAL editor headless — **18/18 pass** (per-card toggle, panel-in-card, radio, no-squash, sole-open, warp
+override, live luma, chip grid, dbl-click reset, Tier-2 bake + cranked-luma, overlay drop-out/restore,
+save/reload, degrade). Plus [scripts/verify-image-warp.mjs](scripts/verify-image-warp.mjs) (player path).
+
+**Files touched:** `src/customPresets.js` (buildImageWarp, `_flowParts`), `src/editor/inspector.js`
+(model + Drive UI + per-card mode + collapse fixes), `src/visualizer.js` (player parity), `editor.html`
+(Drive panel + row1 pill), `src/editor/style.css` (drive-mode, pill), 2 verify scripts.
+
+**⚠️ COMMIT STATUS:** user committed after Phase 2 per-card. **Uncommitted since:** Tier 2, dbl-click reset,
+chip grid, collapse fixes, Drive row1 relocation. → **commit before starting Phase 4 tomorrow.**
+
+**Tomorrow:** Phase 4a (Size & framing). First decision: out-of-bounds mode (tile/clamp/fade) — see §14.1.

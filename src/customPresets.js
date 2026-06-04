@@ -712,8 +712,15 @@ export function buildWarpShader(flow) {
  *              (bass/mid/treb/vol + _att variants). When set, `reseed` becomes the
  *              baseline and the image pulses in around it. Omit/`'none'` = static.
  *   audioAmt – 0..~1 strength of the audio modulation (default 0.5 when a source is set).
+ *   spin     – 0..1 melt rotation: gentle time-drift + a bass kick. 0 = no rotation.
+ *   zoomPulse– 0..1 the image pumps inward on the bass hit. 0 = no pump.
+ *   flowPulse– 0..1 the flow displacement surges on the bass (tunnel/ripple lunges). 0 = steady.
  *   speed/depth/density – passed through to the flow math (optional).
  * @returns {string} warp shader_body, or '' for an unknown flow.
+ *
+ * Tier-2 reactivity (spin/zoomPulse/flowPulse) is hardwired to `bass` (the kick) so each is
+ * a single musical knob, no sub-menu. All are gated: every knob at 0 → byte-identical to the
+ * pre-Tier-2 shader, so the melt always RENDERS (boring-not-broken).
  */
 // Whitelisted engine audio uniforms (butterchurn warp/comp shader header) — these
 // are normalized ~1.0 at average, so `(src - 1.0)` is the beat deviation. Gated to
@@ -733,14 +740,36 @@ export function buildImageWarp(opts) {
     const reseed = (src && _AUDIO_SOURCES.has(src))
         ? `clamp(${base.toFixed(4)} + ${Number(o.audioAmt ?? 0.5).toFixed(4)} * (${src} - 1.0), 0.0, 1.0)`
         : base.toFixed(4);
+
+    const spin = Number(o.spin ?? 0), zoom = Number(o.zoomPulse ?? 0), flowPulse = Number(o.flowPulse ?? 0);
+    // Flow Pulse: surge the per-frame displacement on the bass. `_flow` only exists for the
+    // standard flows (kaleido reconstructs `_kuv` directly), so guard on it.
+    let pre = p.pre;
+    if (flowPulse > 0 && flowId !== 'kaleido') {
+        pre += `  _flow *= 1.0 + ${flowPulse.toFixed(4)} * 0.9 * (bass - 1.0);\n`;
+    }
+    // Spin + Zoom Pulse act on where we SAMPLE the user image. At 0/0 this collapses to
+    // exactly `texture(sampler_<img>, uv_orig)` (no-op) — so default melts are unchanged.
+    let imgSample;
+    if (spin > 0 || zoom > 0) {
+        imgSample =
+            `  vec2 _ic = uv_orig - 0.5;\n` +
+            `  float _spang = time * ${spin.toFixed(4)} * 1.2 + (bass - 1.0) * ${spin.toFixed(4)} * 0.6;\n` +
+            `  float _spc = cos(_spang), _sps = sin(_spang);\n` +
+            `  vec2 _iuv = vec2(_ic.x * _spc - _ic.y * _sps, _ic.x * _sps + _ic.y * _spc);\n` +
+            `  _iuv = _iuv * (1.0 - ${zoom.toFixed(4)} * 0.4 * (bass - 1.0)) + 0.5;\n` +
+            `  vec3 _img = texture(sampler_${imgName}, _iuv).rgb;\n`;
+    } else {
+        imgSample = `  vec3 _img = texture(sampler_${imgName}, uv_orig).rgb;\n`;
+    }
     // The user sampler MUST be declared in the shader HEADER (before shader_body):
     // butterchurn's getShaderParts splits on `shader_body`, scans the header with
     // /uniform sampler2D sampler_(.+?);/ (getUserSamplers), and uses that list BOTH to
     // declare the GLSL uniform AND to bind our uploaded texture each frame. Omit it and
     // sampler_<name> is an undeclared identifier → warp fails to compile → black frame.
-    return `uniform sampler2D sampler_${imgName};\nshader_body {\n${p.pre}` +
+    return `uniform sampler2D sampler_${imgName};\nshader_body {\n${pre}` +
         `  vec3 _fb = ${p.fbExpr};\n` +
-        `  vec3 _img = texture(sampler_${imgName}, uv_orig).rgb;\n` +
+        imgSample +
         `  ret = mix(_fb, _img, ${reseed});\n}`;
 }
 
