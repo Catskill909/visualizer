@@ -1057,7 +1057,7 @@ html, body {
    "Zoom Pulse", "Flow Pulse", "Luma Key", "Presence") so the 42px card column overflows
    onto the slider — widen the label column here, and give the standalone section labels
    (Flow / Position / Mirror) block spacing so they don't sit flush against the control above. */
-.image-warp-panel .layer-slider-row { gap: 8px; }
+.image-warp-panel .layer-slider-row { gap: 8px; margin-bottom: 4px; }
 .image-warp-panel .layer-slider-row .layer-ctrl-label { width: 82px; }
 .image-warp-panel > .layer-ctrl-label,
 .image-warp-panel > .layer-center-row > .layer-ctrl-label {
