@@ -248,6 +248,11 @@ const r = await page.evaluate(async () => {
         if (insp.currentState.imageWarp.blendMode !== m) blendAllBake = false;
         const warp = insp._buildRuntimePreset(insp.currentState).warp;
         if (!warp.includes(blendExpr[m])) blendAllBake = false;
+        // Clear the feedback buffer so each mode is measured from a CLEAN slate — else a
+        // darkening mode (multiply) compounds the prior modes' accumulation and the final-frame
+        // luma reading is unstable under SwiftShader. We're asserting each mode renders bright
+        // ON ITS OWN, not the running product of the whole loop.
+        insp.engine.clearFeedbackBuffer?.();
         for (let k = 0; k < 40; k++) await luma();
         blendMinLuma = Math.min(blendMinLuma, await luma());
     }
