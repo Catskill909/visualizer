@@ -620,7 +620,7 @@ export class VisualizerEngine {
           mirror: iw.mirror, kaleidoSpeed: iw.kaleidoSpeed, blendMode: iw.blendMode,
           bright: iw.bright, contrast: iw.contrast, sat: iw.sat, hue: iw.hue, invert: iw.invert,
           speed: iw.speed, depth: iw.depth,
-          spin: iw.spin, zoomPulse: iw.zoomPulse, flowPulse: iw.flowPulse, lumaKey: iw.lumaKey, disp: iw.disp,
+          spin: iw.spin, zoomPulse: iw.zoomPulse, flowPulse: iw.flowPulse, lumaKey: iw.lumaKey, mask: iw.mask, disp: iw.disp,
           reseed: iw.reseed, audioSource: iw.audioSource, audioAmt: iw.audioAmt,
           isStackedAlpha: !!iwDrive.isStackedAlpha,
         });

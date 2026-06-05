@@ -173,6 +173,19 @@ const r = await page.evaluate(async () => {
     insp.currentState.imageWarp.disp = 0;
     insp.currentState.imageWarp.flow = 'liquid';
 
+    // Mask (§16 #3) — the image's bright shape gates presence as a crisp stencil. mask=0 = no-op
+    // (no `_mask`); mask>0 bakes the stencil; outside the shape the preset's feedback shows, so the
+    // melt still renders bright (boring-not-broken — never black).
+    insp.currentState.imageWarp.mask = 0;
+    out.maskNeutralNoop = !insp._buildRuntimePreset(insp.currentState).warp.includes('_mask');
+    insp.currentState.imageWarp.mask = 0.7;
+    insp._applyToEngine();
+    const mWarp = insp._buildRuntimePreset(insp.currentState).warp;
+    out.maskBaked = mWarp.includes('float _mask = smoothstep(') && mWarp.includes('* _mask');
+    for (let k = 0; k < 50; k++) await luma();
+    out.maskLuma = await luma();
+    insp.currentState.imageWarp.mask = 0;
+
     // Phase 7 — Remix rolls the Drive melt look (incl. framing now) + the panel re-syncs.
     Object.assign(insp.currentState.imageWarp, { size: 0.7, cx: 0.45, cy: 0.5, flow: 'liquid' });
     insp._remixLock = {};
@@ -310,6 +323,9 @@ ok('Displace disp=0 = no-op (no _disp line)', r.dispNeutralNoop);
 ok('Displace bakes _disp + swaps the standard feedback coord', r.dispBaked);
 ok('Displace bakes _disp into the kaleido coord too', r.dispKaleidoBaked);
 ok('Displaced melt STILL renders bright, not black (luma > 20)', r.dispLuma > 20, `luma ${r.dispLuma?.toFixed(1)}`);
+ok('Mask mask=0 = no-op (no _mask stencil)', r.maskNeutralNoop);
+ok('Mask bakes a crisp _mask stencil that gates presence', r.maskBaked);
+ok('Masked melt STILL renders bright (preset feedback outside the shape; luma > 20)', r.maskLuma > 20, `luma ${r.maskLuma?.toFixed(1)}`);
 ok('Speed fader is log-mapped (pos 0 → ~0.02 slow, pos 1 → ~4.0 fast)', r.logSpeed);
 ok('Mirror/Kaleido bakes a fold into the warp + reveals its speed row', r.mirrorBaked && r.kaleidoRowShown);
 ok('Mirrored melt STILL renders bright, not black (luma > 20)', r.mirrorLuma > 20, `luma ${r.mirrorLuma?.toFixed(1)}`);

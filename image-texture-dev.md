@@ -13,8 +13,9 @@ Coolify 2026-06-04** — BruceLee export re-imports correctly, and freshly-impor
 to Meld render perfectly. **Displacement SHIPPED 2026-06-05 (verify 41/41)** — the image's brightness warps
 the melt's feedback sample coord (the picture's shape ripples the plasma); §16.A. **🌙 Club / Dark Mode SHIPPED
 2026-06-05 (verify 11/11)** — one-knob final-output dark-room tune for ALL presets (crush blown white, deepen
-colour); §18. **▶️ NEXT SESSION: Mask** (§16 roadmap #3) — the next melding tool. The Phase Tracker below is the
-live status. Origin: `milkdrop-pack-import.md` §16.2.
+colour); §18. **Mask SHIPPED 2026-06-05 (verify 44/44)** — the image's bright shape becomes a crisp spatial
+stencil (logo-like): image inside the silhouette, the preset's own melt outside; §16 #3. **▶️ NEXT SESSION:
+image-driven flow** (§16 roadmap #4). The Phase Tracker below is the live status. Origin: `milkdrop-pack-import.md` §16.2.
 
 > **📚 Doc map:** Tracker + §§12–17 = current/shipped (read these). **§§3–8, 10–11 are PRE-BUILD scoping
 > (2026-06-03) kept as historical record — superseded by what shipped; don't treat as TODO.**
@@ -42,17 +43,17 @@ _Single source of truth for status. Detail in the numbered sections below._
 | **2.5 — Per-card + Tier 1/2** | Per-card mode + chip-grid Flow + dbl-click reset + Speed/Depth (Tier 1) + Spin/Zoom Pulse/Flow Pulse (Tier 2, §13.6) + collapse fixes + Drive-pill in row1. | ✅ **DONE 2026-06-03 — verified 18/18** |
 | **4 — Build-out: parallel layer controls** | **SHIPPED 2026-06-04:** Size · Position pad · Luma Key · Mirror/Kaleido (§14.1a) · **4b Colour/Grade** (Brightness/Contrast/Saturation/Hue/Invert, §14.2, verified 36/36). Aspect deferred. See §14. | 🟢 **4a + 4b DONE** |
 | **4-speed — Perceptual Speed fader** | Speed mapped **logarithmically** (~0.02 → 4.0) — slow/extreme-slowdown range gets fine resolution, top still reaches fast. ONE fader, smarter mapping (§17). Applied to **Drive panel Speed AND Flow Style Speed**. Model stores real speed (engine/saved presets unchanged); only UI mapping is non-linear. | ✅ **DONE 2026-06-04 — verified 24/24** |
-| **6 — Melding tools** ⭐ | The strategic category (§16): controls for HOW an asset *integrates into* the preset's machinery. **Blend mode SHIPPED 2026-06-04 (verified 33/33)** — Mix/Add/Screen/Multiply/Difference/Overlay chip-row. **Displacement SHIPPED 2026-06-05 (verified 41/41)** — `imageWarp.disp`; image luma warps the feedback sample coord (`_disp` radial push, gated no-op at 0; swaps `_zuv + _flow` for standard flows, `_kuv` for kaleido); **Displace** slider after Luma Key; Remix rolls it (gentle on present rolls). **▶️ NEXT: Mask → image-driven flow → palette-from-image.** | 🟢 **Blend mode + Displacement DONE** |
+| **6 — Melding tools** ⭐ | The strategic category (§16): controls for HOW an asset *integrates into* the preset's machinery. **Blend mode SHIPPED 2026-06-04 (verified 33/33)** — Mix/Add/Screen/Multiply/Difference/Overlay chip-row. **Displacement SHIPPED 2026-06-05 (verified 41/41)** — `imageWarp.disp`; image luma warps the feedback sample coord (`_disp` radial push, gated no-op at 0; swaps `_zuv + _flow` for standard flows, `_kuv` for kaleido); **Displace** slider after Luma Key; Remix rolls it (gentle on present rolls). **Mask SHIPPED 2026-06-05 (verify 44/44)** — `imageWarp.mask`; image's bright shape = crisp stencil (image inside silhouette, preset melt outside); centered-threshold `_mask` whose edge sharpens with the knob; **Mask** slider after Luma Key; Remix ~20%. **▶️ NEXT: image-driven flow → palette-from-image.** | 🟢 **Blend + Displacement + Mask DONE** |
 | **3 — More sources** | Video / GIF / webcam as the driving texture. **GIF + video CONFIRMED WORKING in real use 2026-06-03** (user) — same `setUserTexture` sampler the warp reads each frame, so the melt animates for free. Remaining: webcam + per-source polish. | 🟢 **GIF/video work; webcam TODO** |
 | **(opt) — Named-texture path** | "Photo-reactive" presets that sample a known user sampler + ship the **22 built-in texture assets** (`milkdrop-pack-import.md` §16.1). | ⬜ optional |
 | **7 — Drive 🎲 (Remix)** | **GLOBAL 🎲 Remix rolls the WHOLE Meld (verified 33/33):** the Remix "Flow" axis gambles flow/speed/depth/spin/zoom/flow-pulse/mirror/luma-key/**blend-mode**/presence/audio **AND framing (size/position)** via `_rollImageWarp`; panel re-syncs (sliders + chips + pad follow), every roll renders, **Flow lock** keeps the melt. **Tuned 2026-06-04:** rolls framing too ("move also"; ⅓ full-frame, rest in-bounds); biased gently away from blown white (add/screen rolled less + lower presence); **~45% "present meld" rolls** (`_present` flag → high presence + gentler depth/speed, no obliterating kaleido, image-faithful blend → the source image stays RECOGNIZABLE; the rest keep the abstract/dissolved variety). Only which image drives is left alone. Remaining (optional): a dedicated 🎲 button IN the Meld panel. | 🟢 **Remix→Meld DONE — incl. framing, blend, present-bias** |
 
-**▶️ NEXT SESSION — pick up at MASK (§16 roadmap #3) — the next melding tool.** Displacement (§16.A, verify
-41/41) and 🌙 Club / Dark Mode (§18, verify 11/11) are both now shipped. Everything else is shipped, committed,
-pushed, and cross-platform-verified (macOS + web; export/import round-trips on the macOS install). Mask = use
-the image (or its luma) to gate WHERE the preset's OWN content vs the image shows (Luma Key is a primitive
-1-image version; a real mask channel is more — great for logos/shapes). After it: image-driven flow →
-palette-from-image → (optional) a dedicated 🎲 button in the Meld panel → Phase 3 webcam source → Aspect (§14.1a).
+**▶️ NEXT SESSION — pick up at IMAGE-DRIVEN FLOW (§16 roadmap #4) — the next melding tool.** Displacement
+(§16.A, verify 41/41), 🌙 Club / Dark Mode (§18, verify 11/11), and Mask (§16 #3, verify 44/44) are all now
+shipped. Everything else is shipped, committed, pushed, and cross-platform-verified (macOS + web; export/import
+round-trips on the macOS install). Image-driven flow = the image's gradient steers the flow *direction* (edges
+of the picture carry the melt) — deeper/experimental. After it: palette-from-image → Mask **v2** (a separate
+mask SOURCE / channel) → (optional) a dedicated 🎲 button in the Meld panel → Phase 3 webcam source → Aspect (§14.1a).
 The verify harnesses: [scripts/verify-image-warp-editor.mjs](scripts/verify-image-warp-editor.mjs) (41/41) for
 Meld; [scripts/verify-club-mode.mjs](scripts/verify-club-mode.mjs) (11/11) for the comp-grade Club op.
 Build pattern (unchanged): gated `buildImageWarp` op (neutral = byte-identical no-op) →
@@ -649,8 +650,13 @@ single opinionated knob/toggle; together they're a deep, rollable space.
    for kaleido. Reads the image at `uv_orig` (screen pixel, v1 = whole-screen emboss). **Displace** slider
    after Luma Key. Remix rolls it (40% of rolls, gentle on present rolls). v2 (gradient "edges ripple")
    deferred — see §16.A.
-3. **Mask** — use the image (or its luma) to gate WHERE the preset's OWN content vs the image shows
-   (Luma Key is a primitive 1-image version; a real mask channel is more). Great for logos/shapes.
+3. **Mask** ✅ **SHIPPED 2026-06-05 (verify 44/44)** — the image's bright SHAPE is a crisp spatial stencil:
+   inside the silhouette the image shows, OUTSIDE presence→0 so the preset's OWN melt continues (never
+   black). `imageWarp.mask` (0 = off); a centered-threshold `_mask = smoothstep(0.5∓w, 0.5±w, imgLuma)`
+   whose edge SHARPENS as mask→1 (`w` = 0.52→0.02). Distinct from Luma Key (a SOFT brightness dissolve) —
+   Mask is a hard logo-crisp cut. Reads image luma at `uv_orig` (top half for stacked-alpha video). **Mask**
+   slider after Luma Key; both build sites; Remix rolls it ~20% (never with Luma Key — both gate presence).
+   v1 self-masks; **a separate mask SOURCE (use another layer as the mask channel) is the future v2.**
 4. **Image-driven flow** — the image's gradient steers the flow *direction* (edges of the picture carry
    the melt). Deeper, more experimental.
 5. **Palette-from-image** — tint the feedback/preset by the image's dominant colours.

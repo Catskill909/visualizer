@@ -804,6 +804,11 @@
                                         <span class="lsv" id="image-warp-lumakey-sl-val">0.00</span>
                                     </div>
                                     <div class="layer-slider-row">
+                                        <span class="layer-ctrl-label" data-tooltip="Use the image's bright shape as a crisp stencil — the image shows inside its silhouette, the preset's own melt continues outside. Higher = sharper edge. Great for logos. 0 = off">Mask</span>
+                                        <input type="range" id="image-warp-mask-sl" class="slider" min="0" max="1" step="0.01" value="0">
+                                        <span class="lsv" id="image-warp-mask-sl-val">0.00</span>
+                                    </div>
+                                    <div class="layer-slider-row">
                                         <span class="layer-ctrl-label" data-tooltip="The image's brightness physically warps the melt — bright areas push out, dark pull in, so the picture's shape ripples the plasma. 0 = off">Displace</span>
                                         <input type="range" id="image-warp-disp-sl" class="slider" min="0" max="1" step="0.01" value="0">
                                         <span class="lsv" id="image-warp-disp-sl-val">0.00</span>

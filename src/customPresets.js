@@ -890,6 +890,20 @@ export function buildImageWarp(opts) {
         gate += `  float _key = mix(1.0, smoothstep(0.05, 0.45, dot(_img, vec3(0.299, 0.587, 0.114))), ${lumaKey.toFixed(4)});\n`;
         presence += ` * _key`;
     }
+    // Mask (§16 #3 — a MELDING tool): the image's bright SHAPE is a crisp spatial stencil. Inside
+    // the silhouette the image shows; OUTSIDE, presence→0 so the preset's OWN melt continues (so it
+    // can never go black — boring-not-broken). Distinct from Luma Key (a SOFT brightness dissolve):
+    // Mask is a centered threshold whose edge SHARPENS as mask→1 (logo-crisp cut). Reads the image
+    // luma at the SCREEN pixel (like Displacement); the top half for a stacked-alpha video so the
+    // alpha band can't pollute the stencil. v1 self-masks; a separate mask SOURCE is a future v2.
+    const mask = Number(o.mask ?? 0);
+    if (mask > 0) {
+        const w = (0.5 * (1.0 - mask) + 0.02).toFixed(4);  // mask 0→edge ~0.52 (soft) … 1→0.02 (hard)
+        const mCoord = isStackedAlpha ? 'vec2(uv_orig.x, uv_orig.y * 0.5)' : 'uv_orig';
+        gate += `  float _ml = dot(texture(sampler_${imgName}, ${mCoord}).rgb, vec3(0.299, 0.587, 0.114));\n`;
+        gate += `  float _mask = smoothstep(0.5 - ${w}, 0.5 + ${w}, _ml);\n`;
+        presence += ` * _mask`;
+    }
     if (isStackedAlpha) {
         // Transparent-video mask (stacked-alpha): only the opaque pixels meld in;
         // the transparent background drops to pure feedback (presence→0).
