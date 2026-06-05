@@ -709,17 +709,17 @@ function _moodHsl(h, s, l, mood) {
 function buildHarmonyPalette(rule, hue, mood) {
     if (rule === 'mono') {
         return {
-            wave:   _moodHsl(hue, 0.85, 0.60, mood),
-            glow:   _moodHsl(hue, 0.90, 0.42, mood),
-            accent: _moodHsl(hue, 0.70, 0.75, mood),
+            wave:   _moodHsl(hue, 0.85, 0.56, mood),
+            glow:   _moodHsl(hue, 0.90, 0.40, mood),
+            accent: _moodHsl(hue, 0.75, 0.60, mood),   // deepened (was 0.75 lightness — the lightest)
         };
     }
     const r = HARMONY_RULES.find(x => x.id === rule) || HARMONY_RULES[1];
     const [oW, oG, oA] = r.offsets;
     return {
-        wave:   _moodHsl(hue + oW, 0.90, 0.58, mood),
-        glow:   _moodHsl(hue + oG, 0.85, 0.50, mood),
-        accent: _moodHsl(hue + oA, 0.95, 0.60, mood),
+        wave:   _moodHsl(hue + oW, 0.90, 0.56, mood),   // foreground — kept visible
+        glow:   _moodHsl(hue + oG, 0.85, 0.46, mood),   // deepened a touch
+        accent: _moodHsl(hue + oA, 0.95, 0.52, mood),   // deepened (was 0.60; accent fed the bright bg)
     };
 }
 
@@ -1391,10 +1391,18 @@ export class EditorInspector {
 
     /** 🎲 Colors — fully random: random hue + random rule + random tone, then
      *  reflect all three in the chips/slider. Honours per-channel 🔒 locks. */
-    _rollRandomPalette() {
+    _rollRandomPalette(darkBias = false) {
         this._csHue = Math.floor(Math.random() * 360);
         this._csRule = HARMONY_RULES[Math.floor(Math.random() * HARMONY_RULES.length)].id;
-        this._csMood = MOODS[Math.floor(Math.random() * MOODS.length)].id;
+        if (darkBias) {
+            // VJ/DJ darkening (Remix only): weight the tone toward DEEP/VIVID and make the
+            // white-pushers (Pastel/Neon) rare — not banned, just much better odds for richness.
+            // (Was uniform 25% each.) Standalone 🎲 Colors stays neutral.
+            const m = Math.random();
+            this._csMood = m < 0.42 ? 'vivid' : m < 0.74 ? 'deep' : m < 0.90 ? 'neon' : 'pastel';
+        } else {
+            this._csMood = MOODS[Math.floor(Math.random() * MOODS.length)].id;
+        }
         this._applyColorStudio();
     }
 
@@ -1898,7 +1906,18 @@ export class EditorInspector {
         // values, so you can pin what you love and gamble the rest (Roll-and-lock).
         // ── Colours: harmony rule + tone + hue → wave/glow/accent + contrasting bgColorA.
         if (!L.colours) {
-            this._rollRandomPalette();
+            this._rollRandomPalette(true);   // dark-biased tone (Remix is a VJ/DJ tool — see _rollRandomPalette)
+            // VJ darkness — most rolls put the BACKGROUND field DARK / near-black so the bright primaries
+            // pop ON black (user: "where is black?"). A deep tint of the scheme hue: reads as near-black but
+            // stays alive for pure-field rolls. ~30% keep a lit background for variety. Foreground stays vivid.
+            if (Math.random() < 0.7) {
+                const _h = this._csHue ?? Math.floor(Math.random() * 360);
+                // Floor lightness at ~0.08 — reads near-black but never DEAD (a pure-field roll on a
+                // 0.05 bg could fall to pure black). Deep tint, not pure black, so the field stays alive.
+                this.currentState.bgColorA = hslToRgb(_h, rnd(0.4, 0.85), rnd(0.08, 0.18));
+                // Shift Color-B (the beat-pulse target) also deep → the field pulses dark↔deep, never flashes white.
+                this.currentState.solidColorB = hslToRgb((_h + 40) % 360, rnd(0.4, 0.85), rnd(0.08, 0.18));
+            }
             // Scene FX (Phase 14) — a final-image finish; rides the Colours/look lock.
             // Clear each roll, then rarely add ONE subtle FX (they read strong).
             const _sfx = this.currentState.baseVals;
@@ -1990,10 +2009,10 @@ export class EditorInspector {
             const _wb = this.currentState.baseVals;
             _wb.wave_mode = Math.floor(Math.random() * 8);
             _wb.wave_scale = rnd(0.5, 2.5);
-            _wb.wave_a = rnd(0.4, 0.7);
-            if (Math.random() < 0.75) {
+            _wb.wave_a = rnd(0.3, 0.5);              // dimmer (the filled-wave rolls were the bright cluster)
+            if (Math.random() < 0.55) {              // less-often FULL-fill (was 75%) → fewer broad bright washes
                 // FILLED — the broad default look: a solid disc/wedge, not a string.
-                _wb.wave_fill = rnd(0.45, 1.0);
+                _wb.wave_fill = rnd(0.4, 0.85);
                 _wb.wave_thickness = Math.random() < 0.5 ? rnd(1, 4) : 0;
             } else {
                 // THIN — a deliberate, occasional accent string.
@@ -2081,11 +2100,13 @@ export class EditorInspector {
         const sh = makeShapeDefaults();
         const b = sh.baseVals;
         b.sides = pick([3, 4, 5, 6, 8, 16, 32, 64]);   // triangle → blob/circle
-        b.rad = rnd(0.15, 0.55);
+        // Additive ("glow") shapes ADD light → stacked, they were the big blown-white chunks. Make them
+        // RARE (15%, was 50%) and, when additive, SMALL + lower opacity (a glint, not a white slab).
+        b.additive = Math.random() < 0.15 ? 1 : 0;
+        b.rad = b.additive ? rnd(0.12, 0.30) : rnd(0.15, 0.55);
+        b.a = b.additive ? rnd(0.30, 0.55) : rnd(0.45, 0.9);
         b.x = rnd(0.32, 0.68); b.y = rnd(0.32, 0.68);
         b.ang = rnd(0, 6.2832);
-        b.a = rnd(0.45, 0.9);
-        b.additive = Math.random() < 0.5 ? 1 : 0;       // glow blend
         // Foreground colour = the palette's WAVE colour → contrasts the background field.
         const cb = this.currentState.baseVals;
         b.r = cb.wave_r; b.g = cb.wave_g; b.b = cb.wave_b;

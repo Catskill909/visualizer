@@ -41,10 +41,13 @@ _Single source of truth for status. Detail in the numbered sections below._
 | **(opt) — Named-texture path** | "Photo-reactive" presets that sample a known user sampler + ship the **22 built-in texture assets** (`milkdrop-pack-import.md` §16.1). | ⬜ optional |
 | **7 — Drive 🎲 (Remix)** | **GLOBAL 🎲 Remix rolls the WHOLE Meld (verified 33/33):** the Remix "Flow" axis gambles flow/speed/depth/spin/zoom/flow-pulse/mirror/luma-key/**blend-mode**/presence/audio **AND framing (size/position)** via `_rollImageWarp`; panel re-syncs (sliders + chips + pad follow), every roll renders, **Flow lock** keeps the melt. **Tuned 2026-06-04:** rolls framing too ("move also"; ⅓ full-frame, rest in-bounds); biased gently away from blown white (add/screen rolled less + lower presence); **~45% "present meld" rolls** (`_present` flag → high presence + gentler depth/speed, no obliterating kaleido, image-faithful blend → the source image stays RECOGNIZABLE; the rest keep the abstract/dissolved variety). Only which image drives is left alone. Remaining (optional): a dedicated 🎲 button IN the Meld panel. | 🟢 **Remix→Meld DONE — incl. framing, blend, present-bias** |
 
-**▶️ NEXT SESSION — pick up at DISPLACEMENT (§16.A).** Everything else is shipped, committed, pushed, and
-cross-platform-verified (37/37 headless; macOS + web; export/import round-trips on the macOS install).
-Displacement is the next melding tool and is fully spec'd in **§16.A** — start there. After it: Mask → image-
-driven flow → (optional) a dedicated 🎲 button in the Meld panel → Phase 3 webcam source → Aspect (§14.1a).
+**▶️ NEXT SESSION — pick up at DISPLACEMENT (§16.A), THEN CLUB / DARK MODE (§18).** Everything else is
+shipped, committed, pushed, and cross-platform-verified (37/37 headless; macOS + web; export/import
+round-trips on the macOS install). Displacement is the next melding tool and is fully spec'd in **§16.A** —
+start there. **Then build the "🌙 Club / Dark Mode" final-output knob (§18)** — the easy go-to for tuning ANY
+preset for a club/dark room (kills blown white, deepens primaries; the refined version of the user's
+Invert-button hack). After those: Mask → image-driven flow → (optional) a dedicated 🎲 button in the Meld
+panel → Phase 3 webcam source → Aspect (§14.1a).
 The verify harness to extend each time: [scripts/verify-image-warp-editor.mjs](scripts/verify-image-warp-editor.mjs)
 (currently 37/37). Build pattern (unchanged): gated `buildImageWarp` op (neutral = byte-identical no-op) →
 `imageWarp` model field → Meld-panel control (dbl-click reset) → BOTH build sites → `_rollImageWarp` axis →
@@ -708,3 +711,101 @@ sits at ~¾ travel, bottom ¾ = 0.02–1.0 slow detail). Flow Style `fl-speed` c
 (Depth/Density stay linear). Both readouts show the real speed. dbl-click reset → position for 1.0×.
 Verified 24/24 (pos 0 → 0.02, pos 1 → 4.0, monotonic). Motion-Engine `me-speed` left linear (different
 control; revisit if it needs it).
+
+---
+
+## 18. CLUB / DARK MODE — one-knob final-output dark-room fine-tune (▶️ NEXT, after Displacement)
+
+**Origin (2026-06-04):** after the Remix-darkening pass landed (dark backgrounds, deeper palette, tamed
+additive shapes, deep/vivid mood bias, dimmer waves — "much much better, more dark colors, a few almost-black
+backgrounds"), the user asked for the **dedicated, easy-to-use "go-to" control** to fine-tune ANY preset for a
+**club / dark environment** — not buried faders, one clear knob in our one-knob philosophy. This is the
+[[project_mood_dim_control_idea]] we logged ("tone down room-illuminating brightness while keeping colour
+VIVID; technique = luminance↓ + saturation↑ coupled into one knob"), now greenlit and scoped.
+
+**The user's mental model:** when they hit a bright-white preset they like, they currently press **Invert** so
+"white becomes dark" — a blunt one-click hack. Club Mode is the *refined* version of that hack: surgically
+turn whites dark and deepen the colours **without** flipping every hue the way Invert does.
+
+### 18.1 What it does — the core insight: target WHITE specifically
+The enemy in a club is **blown white** (bright AND desaturated — it lights up the room). Just lowering overall
+brightness dims the nice colours too. So the knob **detects white** and crushes *that*, leaving vivid colour
+alone, then deepens what remains:
+- **White = high luminance + LOW saturation.** Detect it, pull it down hard.
+- **Already-vivid colour** (high saturation) is left mostly intact, then pushed deeper.
+- Net: blown whites collapse toward dark; reds/blues/greens get **richer, not dimmer**. "Kill the white, keep
+  the colour."
+
+One coupled knob (drag up = more club): **detect-and-crush-white + saturation/primary boost + highlight
+roll-off (so bright values physically can't reach pure white) + a gentle overall dim.**
+
+### 18.2 Where it lives in the pipeline — FINAL output, every preset
+This is a **post-process on the final composited frame**, NOT a Meld-only control — it must work on the **1,144
+bundled presets** AND custom/Meld presets, since the user wants to club-ify ANY preset they like. It slots into
+the existing final-output colour grade (the comp post-FX where `studio_brightness`/`contrast`/`sat`/`gamma`/
+`temp`/`vignette`/bloom already live — the "Color adjustments that apply to any loaded preset"). Club Mode joins
+those as ONE opinionated coupled op. ⚠️ Do **NOT** touch the load-bearing `* 2.0` MilkDrop half-brightness
+doubling in the comp shader (it's relied on by all bundled presets) — Club Mode is an *additional* op applied
+*after* the existing grade, gated so 0 = byte-identical no-op.
+
+### 18.3 Shader sketch (final-output, gated; `club` ∈ 0..1, 0 = no-op)
+```glsl
+// ret = graded final colour, club = knob 0..1
+float _lum = dot(ret, vec3(0.299, 0.587, 0.114));
+float _mx  = max(ret.r, max(ret.g, ret.b));
+float _mn  = min(ret.r, min(ret.g, ret.b));
+float _sat = (_mx - _mn) / (_mx + 1e-4);                 // 0 = grey/white, 1 = vivid
+float _white = _lum * (1.0 - _sat);                       // bright AND desaturated = the room-lighting white
+// 1) crush whites specifically (leave vivid colour):
+ret *= (1.0 - club * _white * 0.85);
+// 2) deepen / push primaries (saturation up about the luma axis):
+ret = mix(vec3(_lum), ret, 1.0 + club * 0.6);
+// 3) highlight roll-off so nothing blows back to pure white:
+ret = ret / (1.0 + club * 0.5 * max(ret - 0.5, 0.0));
+// 4) gentle overall dim (small — the white-crush does most of the work):
+ret *= (1.0 - club * 0.12);
+ret = clamp(ret, 0.0, 1.0);
+```
+Tune the four coefficients by eye in a real browser (the 0.85 / 0.6 / 0.5 / 0.12 are starting points). At
+`club = 0` emit NO lines → byte-identical to today (boring-not-broken). The exact GLSL home is wherever the
+final grade is composed (the `STUDIO_POST_FX` / comp tail near `BLANK_COMP_RAW`) — find the spot where
+`studio_sat`/`studio_brightness` already modify `ret`, and add Club after them.
+
+### 18.4 UX — the clear "go-to" (one-knob ethos)
+- **ONE slider, clearly labelled "🌙 Club" (or "Dark Room" / "Mood")**, in its own small, obvious section of
+  the **Palette / Colour tab** — NOT mixed in among the grade faders. This is the user's stated "clear part
+  that is the go-to to fine-tune for a club environment."
+- **Optional one-tap "Club" button** that snaps the slider to a good default (mirrors the user's one-click
+  Invert habit), with the slider for fine-tuning above/below it.
+- Name leaning **"Club"** (says exactly what it's for); confirm with user. Keep accent-neutral if it ever sits
+  over the live canvas ([[feedback_no_accent_color_timeline_ui]]).
+
+### 18.5 Model + parity + Remix
+- **Model:** `currentState.clubMode = 0` (a top-level state field on the preset, like `studio_*`), round-trips
+  with save/load. NOT under `imageWarp` — this is a whole-preset output control.
+- **Both build sites:** wherever the final grade is baked into the runtime `comp` (editor `_buildRuntimePreset`
+  + player `refreshCustomPresets`). Bundled presets get it via the same comp-tail injection the studio grade
+  uses.
+- **Remix-rollable:** `_rollFullStack` can nudge it (a club bias — e.g. `clubMode = Math.random()<0.5 ?
+  rnd(0.2,0.7) : 0`) under the Colours lock, respecting `_rolling` ([[project_remix_batch_perf]]). This is the
+  structural lever the Remix-darkening audit concluded was missing — it darkens the *output* directly instead
+  of only biasing the *inputs*.
+
+### 18.6 Why this is the right solution (vs. the input biases we shipped)
+The Remix-darkening pass biased the *inputs* (palette/shapes/bg/waves) — good, but residual brightness is
+**structural** (feedback accumulation over frames + the `* 2.0` comp doubling) and can't be cleanly tuned from
+the inputs alone. Club Mode acts on the **final output**, so it darkens *deterministically* regardless of how
+bright the preset's internals run — and unlike a flat brightness cut, the white-detection keeps colour vivid.
+It's both the user's "go-to club fine-tune" knob AND the clean structural darkening lever the audit pointed to.
+
+### 18.7 Build checklist (proven pattern)
+1. Find the final-grade comp tail (where `studio_sat`/`studio_brightness` modify `ret`); add the gated Club
+   block (§18.3) AFTER them, before the final clamp/output. `club === 0` → no lines (byte-identical).
+2. Model: `currentState.clubMode = 0` in `BLANK`; round-trips for free.
+3. UI: one "🌙 Club" slider in its own Palette-tab section (dbl-click reset to 0); optional one-tap default
+   button.
+4. Both build sites bake it into the runtime comp (editor + player parity).
+5. `_rollFullStack`: optional club bias under the Colours lock (respect `_rolling`).
+6. Verify headless: a deliberately blown-white preset → crank Club → assert **luminance drops while
+   saturation holds** (and a vivid-colour preset keeps its colour); `club=0` is byte-identical; round-trips.
+   Extend the editor verify harness (or a small new comp-grade verify if cleaner).
