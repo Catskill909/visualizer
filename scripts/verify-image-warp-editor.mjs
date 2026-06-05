@@ -155,6 +155,24 @@ const r = await page.evaluate(async () => {
     out.lumaKeyLuma = await luma();
     insp.currentState.imageWarp.lumaKey = 0;
 
+    // Displacement (§16.A) — the image's brightness warps the feedback sample coord. disp=0 = no-op
+    // (no `_disp` line); disp>0 bakes `_disp` + swaps the standard `_zuv + _flow` coord; the kaleido
+    // flow swaps `_kuv` instead; the melt still renders bright (boring-not-broken).
+    insp.currentState.imageWarp.flow = 'liquid';
+    insp.currentState.imageWarp.disp = 0;
+    out.dispNeutralNoop = !insp._buildRuntimePreset(insp.currentState).warp.includes('_disp');
+    insp.currentState.imageWarp.disp = 0.6;
+    insp._applyToEngine();
+    const dWarp = insp._buildRuntimePreset(insp.currentState).warp;
+    out.dispBaked = dWarp.includes('vec2 _disp = (_dl - 0.5)') && dWarp.includes('(_zuv + _flow + _disp)');
+    for (let k = 0; k < 50; k++) await luma();
+    out.dispLuma = await luma();
+    insp.currentState.imageWarp.flow = 'kaleido';
+    const dkWarp = insp._buildRuntimePreset(insp.currentState).warp;
+    out.dispKaleidoBaked = dkWarp.includes('(_kuv + _disp)');
+    insp.currentState.imageWarp.disp = 0;
+    insp.currentState.imageWarp.flow = 'liquid';
+
     // Phase 7 — Remix rolls the Drive melt look (incl. framing now) + the panel re-syncs.
     Object.assign(insp.currentState.imageWarp, { size: 0.7, cx: 0.45, cy: 0.5, flow: 'liquid' });
     insp._remixLock = {};
@@ -180,8 +198,12 @@ const r = await page.evaluate(async () => {
     insp._rollFullStack();
     out.remixFlowLock = JSON.stringify(insp.currentState.imageWarp) === _b;
     insp._remixLock = {};
-    // restore a clean known state for the round-trip checks below
+    // restore a clean known state for the round-trip checks below. clubMode (§18) is rolled by
+    // Remix (Colours lock) and BAKED into currentState.comp, so reset it AND rebuild the comp —
+    // else the last roll's club output-darkening leaks into the Blend luma test below.
+    insp.currentState.clubMode = 0;
     Object.assign(insp.currentState.imageWarp, { flow: 'tunnel', size: 1, cx: 0.5, cy: 0.5, reseed: 0.6, spin: 0, zoomPulse: 0, flowPulse: 0, lumaKey: 0, mirror: 'none' });
+    insp._buildCompShader();   // clear the baked club block from the comp
     insp._syncImageWarpSection();
 
     // §17 perceptual Speed: slider position maps LOGARITHMICALLY to real speed (slow end has range).
@@ -284,6 +306,10 @@ ok('framed (size 0.6, off-center) STILL renders bright, not black (luma > 20)', 
 ok('Position is a 2D Center pad (reset recenters cx/cy)', r.padResetWorks);
 ok('Luma Key bakes a _key gate into the warp', r.lumaKeyBaked);
 ok('Luma Key cranked STILL renders bright, not black (luma > 20)', r.lumaKeyLuma > 20, `luma ${r.lumaKeyLuma?.toFixed(1)}`);
+ok('Displace disp=0 = no-op (no _disp line)', r.dispNeutralNoop);
+ok('Displace bakes _disp + swaps the standard feedback coord', r.dispBaked);
+ok('Displace bakes _disp into the kaleido coord too', r.dispKaleidoBaked);
+ok('Displaced melt STILL renders bright, not black (luma > 20)', r.dispLuma > 20, `luma ${r.dispLuma?.toFixed(1)}`);
 ok('Speed fader is log-mapped (pos 0 → ~0.02 slow, pos 1 → ~4.0 fast)', r.logSpeed);
 ok('Mirror/Kaleido bakes a fold into the warp + reveals its speed row', r.mirrorBaked && r.kaleidoRowShown);
 ok('Mirrored melt STILL renders bright, not black (luma > 20)', r.mirrorLuma > 20, `luma ${r.mirrorLuma?.toFixed(1)}`);

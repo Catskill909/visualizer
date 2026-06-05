@@ -785,6 +785,23 @@ export function buildImageWarp(opts) {
     if (flowPulse > 0 && flowId !== 'kaleido') {
         pre += `  _flow *= 1.0 + ${flowPulse.toFixed(4)} * 0.9 * (bass - 1.0);\n`;
     }
+    // Displacement (§16.A — a MELDING tool: the image contributes SHAPE, not colour). The image's
+    // brightness physically warps WHERE the feedback is sampled — bright pixels push the sample
+    // outward, dark pull inward — so the picture embosses / ripples the melt ("the logo's shape
+    // ripples the plasma"). Reads the image at the SCREEN pixel (uv_orig), independent of the
+    // Size/Position framing (which transforms _iuv for the COLOUR sample). Gated: disp=0 → no `_disp`
+    // line + fbExpr untouched → byte-identical no-op.
+    const disp = Number(o.disp ?? 0);
+    if (disp > 0) {
+        pre += `  float _dl = dot(texture(sampler_${imgName}, uv_orig).rgb, vec3(0.299, 0.587, 0.114));\n`;
+        pre += `  vec2 _disp = (_dl - 0.5) * ${disp.toFixed(4)} * 0.08 * normalize(uv_orig - 0.5 + 1e-5);\n`;
+        // Add the offset to the feedback sample coordinate. fbExpr comes in three forms: hard/soft
+        // sample at `_zuv + _flow`; kaleido samples at `_kuv` (no `_flow`). Swap whichever applies
+        // (global — the soft expr taps the coord twice). Mirror how Flow-Pulse special-cases kaleido.
+        fbExpr = flowId === 'kaleido'
+            ? fbExpr.split('_kuv').join('(_kuv + _disp)')
+            : fbExpr.split('_zuv + _flow').join('(_zuv + _flow + _disp)');
+    }
 
     // Build the image-sample coordinate `_iuv`. At size=1, cx=cy=0.5, spin=0, zoom=0 this whole
     // block is skipped → exactly `texture(sampler, uv_orig)` + `mix(_fb,_img,reseed)` (no-op),

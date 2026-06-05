@@ -10,8 +10,11 @@ locally + macOS build + Coolify web + **Windows build (on GitHub, uploaded to re
 **a melded-remix preset exported locally imports & remixes correctly in the macOS install.**
 **Transparent-video Meld fix (stacked-alpha recombination, §12.3a) VERIFIED on the macOS build & live on
 Coolify 2026-06-04** — BruceLee export re-imports correctly, and freshly-imported transparent videos switched
-to Meld render perfectly. **▶️ NEXT SESSION: Displacement** — the next melding tool (§16.A,
-"locked & loaded"). The Phase Tracker below is the live status. Origin: `milkdrop-pack-import.md` §16.2.
+to Meld render perfectly. **Displacement SHIPPED 2026-06-05 (verify 41/41)** — the image's brightness warps
+the melt's feedback sample coord (the picture's shape ripples the plasma); §16.A. **🌙 Club / Dark Mode SHIPPED
+2026-06-05 (verify 11/11)** — one-knob final-output dark-room tune for ALL presets (crush blown white, deepen
+colour); §18. **▶️ NEXT SESSION: Mask** (§16 roadmap #3) — the next melding tool. The Phase Tracker below is the
+live status. Origin: `milkdrop-pack-import.md` §16.2.
 
 > **📚 Doc map:** Tracker + §§12–17 = current/shipped (read these). **§§3–8, 10–11 are PRE-BUILD scoping
 > (2026-06-03) kept as historical record — superseded by what shipped; don't treat as TODO.**
@@ -39,20 +42,20 @@ _Single source of truth for status. Detail in the numbered sections below._
 | **2.5 — Per-card + Tier 1/2** | Per-card mode + chip-grid Flow + dbl-click reset + Speed/Depth (Tier 1) + Spin/Zoom Pulse/Flow Pulse (Tier 2, §13.6) + collapse fixes + Drive-pill in row1. | ✅ **DONE 2026-06-03 — verified 18/18** |
 | **4 — Build-out: parallel layer controls** | **SHIPPED 2026-06-04:** Size · Position pad · Luma Key · Mirror/Kaleido (§14.1a) · **4b Colour/Grade** (Brightness/Contrast/Saturation/Hue/Invert, §14.2, verified 36/36). Aspect deferred. See §14. | 🟢 **4a + 4b DONE** |
 | **4-speed — Perceptual Speed fader** | Speed mapped **logarithmically** (~0.02 → 4.0) — slow/extreme-slowdown range gets fine resolution, top still reaches fast. ONE fader, smarter mapping (§17). Applied to **Drive panel Speed AND Flow Style Speed**. Model stores real speed (engine/saved presets unchanged); only UI mapping is non-linear. | ✅ **DONE 2026-06-04 — verified 24/24** |
-| **6 — Melding tools** ⭐ | The strategic category (§16): controls for HOW an asset *integrates into* the preset's machinery. **Blend mode SHIPPED 2026-06-04 (verified 33/33)** — Mix/Add/Screen/Multiply/Difference/Overlay chip-row; gated; all 6 render; Remix rolls it. **▶️ NEXT: Displacement — fully spec'd & locked in §16.A.** Then Mask → image-driven flow → palette-from-image. | 🟢 **Blend mode DONE — Displacement spec'd (§16.A), next session** |
+| **6 — Melding tools** ⭐ | The strategic category (§16): controls for HOW an asset *integrates into* the preset's machinery. **Blend mode SHIPPED 2026-06-04 (verified 33/33)** — Mix/Add/Screen/Multiply/Difference/Overlay chip-row. **Displacement SHIPPED 2026-06-05 (verified 41/41)** — `imageWarp.disp`; image luma warps the feedback sample coord (`_disp` radial push, gated no-op at 0; swaps `_zuv + _flow` for standard flows, `_kuv` for kaleido); **Displace** slider after Luma Key; Remix rolls it (gentle on present rolls). **▶️ NEXT: Mask → image-driven flow → palette-from-image.** | 🟢 **Blend mode + Displacement DONE** |
 | **3 — More sources** | Video / GIF / webcam as the driving texture. **GIF + video CONFIRMED WORKING in real use 2026-06-03** (user) — same `setUserTexture` sampler the warp reads each frame, so the melt animates for free. Remaining: webcam + per-source polish. | 🟢 **GIF/video work; webcam TODO** |
 | **(opt) — Named-texture path** | "Photo-reactive" presets that sample a known user sampler + ship the **22 built-in texture assets** (`milkdrop-pack-import.md` §16.1). | ⬜ optional |
 | **7 — Drive 🎲 (Remix)** | **GLOBAL 🎲 Remix rolls the WHOLE Meld (verified 33/33):** the Remix "Flow" axis gambles flow/speed/depth/spin/zoom/flow-pulse/mirror/luma-key/**blend-mode**/presence/audio **AND framing (size/position)** via `_rollImageWarp`; panel re-syncs (sliders + chips + pad follow), every roll renders, **Flow lock** keeps the melt. **Tuned 2026-06-04:** rolls framing too ("move also"; ⅓ full-frame, rest in-bounds); biased gently away from blown white (add/screen rolled less + lower presence); **~45% "present meld" rolls** (`_present` flag → high presence + gentler depth/speed, no obliterating kaleido, image-faithful blend → the source image stays RECOGNIZABLE; the rest keep the abstract/dissolved variety). Only which image drives is left alone. Remaining (optional): a dedicated 🎲 button IN the Meld panel. | 🟢 **Remix→Meld DONE — incl. framing, blend, present-bias** |
 
-**▶️ NEXT SESSION — pick up at DISPLACEMENT (§16.A), THEN CLUB / DARK MODE (§18).** Everything else is
-shipped, committed, pushed, and cross-platform-verified (37/37 headless; macOS + web; export/import
-round-trips on the macOS install). Displacement is the next melding tool and is fully spec'd in **§16.A** —
-start there. **Then build the "🌙 Club / Dark Mode" final-output knob (§18)** — the easy go-to for tuning ANY
-preset for a club/dark room (kills blown white, deepens primaries; the refined version of the user's
-Invert-button hack). After those: Mask → image-driven flow → (optional) a dedicated 🎲 button in the Meld
-panel → Phase 3 webcam source → Aspect (§14.1a).
-The verify harness to extend each time: [scripts/verify-image-warp-editor.mjs](scripts/verify-image-warp-editor.mjs)
-(currently 37/37). Build pattern (unchanged): gated `buildImageWarp` op (neutral = byte-identical no-op) →
+**▶️ NEXT SESSION — pick up at MASK (§16 roadmap #3) — the next melding tool.** Displacement (§16.A, verify
+41/41) and 🌙 Club / Dark Mode (§18, verify 11/11) are both now shipped. Everything else is shipped, committed,
+pushed, and cross-platform-verified (macOS + web; export/import round-trips on the macOS install). Mask = use
+the image (or its luma) to gate WHERE the preset's OWN content vs the image shows (Luma Key is a primitive
+1-image version; a real mask channel is more — great for logos/shapes). After it: image-driven flow →
+palette-from-image → (optional) a dedicated 🎲 button in the Meld panel → Phase 3 webcam source → Aspect (§14.1a).
+The verify harnesses: [scripts/verify-image-warp-editor.mjs](scripts/verify-image-warp-editor.mjs) (41/41) for
+Meld; [scripts/verify-club-mode.mjs](scripts/verify-club-mode.mjs) (11/11) for the comp-grade Club op.
+Build pattern (unchanged): gated `buildImageWarp` op (neutral = byte-identical no-op) →
 `imageWarp` model field → Meld-panel control (dbl-click reset) → BOTH build sites → `_rollImageWarp` axis →
 headless verify (bakes + renders + round-trips). Standing rules: [[project_one_click_vs_pro_tools]] (one
 musical knob, boring-not-broken/luma) + [[project_remix_batch_perf]] (`_rolling`).
@@ -575,8 +578,9 @@ win than per-knob routing.
 
 ### 14.6 Build order (updated 2026-06-04 — see the Phase Tracker for live status)
 **DONE:** 4a Size + Position pad + Luma Key + Mirror/Kaleido, §17 log Speed + slow-motion, 4b Colour/Grade,
-Phase 6 **Blend mode**, Phase 7 Remix→Meld (framing + blend + present-bias). **NEXT:** Phase 6 **Displacement**
-(§16.A, spec'd) → Mask → image-driven flow → 4c Stylize (Edge/Posterize/etc.) → Phase 3 webcam → Aspect (§14.1a).
+Phase 6 **Blend mode**, Phase 6 **Displacement** (§16.A), Phase 7 Remix→Meld (framing + blend + present-bias).
+**NEXT:** 🌙 Club/Dark Mode (§18) → Mask → image-driven flow → 4c Stylize (Edge/Posterize/etc.) → Phase 3
+webcam → Aspect (§14.1a).
 Each sub-phase follows the proven pattern: add to `buildImageWarp` (gated so 0/neutral = byte-identical no-op),
 model field on `imageWarp`, one control in the Meld panel (dbl-click reset), pass at BOTH build sites, roll it
 in `_rollImageWarp`, headless-verify. Standing rule [[project_one_click_vs_pro_tools]]: one obvious musical
@@ -638,9 +642,13 @@ single opinionated knob/toggle; together they're a deep, rollable space.
    bad mode → falls back to mix). Composes with presence/luma-key/framing. Remix rolls it (70% bright family
    mix/add/screen/overlay, 30% multiply/difference). Verified every mode renders bright (mix 216 · add 248 ·
    screen 248 · multiply 114 · difference 211 · overlay 187 — none dead).
-2. **Displacement** — use the image's luma/gradient to **warp the feedback** (the image becomes a
-   heightmap that bends the melt), not just contribute colour. "The logo's shape ripples the plasma."
-   `_fb` sampled at `uv + grad(_img)*amt`.
+2. **Displacement** ✅ **SHIPPED 2026-06-05 (verify 41/41)** — the image's luma **warps the feedback**
+   sample coord (the image becomes a heightmap that bends the melt), not just contributes colour. "The
+   logo's shape ripples the plasma." `imageWarp.disp` (0 = no-op); a `_disp` radial push (bright→out,
+   dark→in) added to the feedback coord — `(_zuv + _flow + _disp)` for standard flows, `(_kuv + _disp)`
+   for kaleido. Reads the image at `uv_orig` (screen pixel, v1 = whole-screen emboss). **Displace** slider
+   after Luma Key. Remix rolls it (40% of rolls, gentle on present rolls). v2 (gradient "edges ripple")
+   deferred — see §16.A.
 3. **Mask** — use the image (or its luma) to gate WHERE the preset's OWN content vs the image shows
    (Luma Key is a primitive 1-image version; a real mask channel is more). Great for logos/shapes.
 4. **Image-driven flow** — the image's gradient steers the flow *direction* (edges of the picture carry
@@ -653,7 +661,12 @@ headless verify. All axes must be **Remix-rollable** (Phase 7 Drive 🎲 + the g
 `_rolling` per [[project_remix_batch_perf]]). Applies beyond images too — video/GIF sources (Phase 3) and,
 longer-term, other layer assets melding into the preset.
 
-### 16.A — DISPLACEMENT (▶️ NEXT SESSION — locked & loaded, 2026-06-04)
+### 16.A — DISPLACEMENT (✅ SHIPPED 2026-06-05 — verify 41/41)
+
+> **Shipped as spec'd below (v1 luma push).** `imageWarp.disp`; `buildImageWarp` defines `_dl` (image luma at
+> `uv_orig`) + `_disp` (radial push), then string-swaps the feedback coord (`_zuv + _flow` → `(… + _disp)`,
+> kaleido `_kuv` → `(_kuv + _disp)`), gated so disp=0 is byte-identical. Displace slider after Luma Key, both
+> build sites, rolled in `_rollImageWarp`. **v2 (gradient "edges ripple") NOT built — left as a future option.**
 
 **What it is:** the image's brightness *physically warps the melt* — the picture becomes a heightmap that
 bends the feedback, so the **logo's shape ripples the plasma**, a face's contours push the tunnel around.
@@ -734,7 +747,20 @@ control; revisit if it needs it).
 
 ---
 
-## 18. CLUB / DARK MODE — one-knob final-output dark-room fine-tune (▶️ NEXT, after Displacement)
+## 18. CLUB / DARK MODE — one-knob final-output dark-room fine-tune ✅ SHIPPED 2026-06-05 (verify 11/11)
+
+> **✅ SHIPPED 2026-06-05 as spec'd.** `currentState.clubMode` (top-level, 0 = off → byte-identical). The
+> gated **club block** is appended to the STUDIO_POST_FX comp tail in `buildStudioPostFxGlsl` (AFTER grade +
+> Scene FX, braced so its locals can't collide with the grade's `_lum`); `gradeOpts` reads `club: st.clubMode`.
+> A **🌙 Club / Dark Room** section in the Palette tab (a "Club" slider + a one-tap **"Club it"** snap to 0.6,
+> dbl-click resets) → `_bindClubMode` writes clubMode + `_rebuildPostFx`; `_syncClubMode` in `_syncPaletteSliders`.
+> Remix rolls it (~50%, 0.2–0.7) under the **Colours** lock. Works on ANY loaded preset (bakes into the comp,
+> round-trips via save/load — same path the studio grade rides; **no `visualizer.js` change** — the §18.5
+> "both build sites" note was inaccurate: the grade bakes into `comp` in the editor only, and the player plays
+> the baked comp). Verify: [scripts/verify-club-mode.mjs](scripts/verify-club-mode.mjs) — a blown-white preset
+> + crank Club → **luma drops while saturation holds** (white crushed, colour kept), club=0 = no-op, round-trips.
+> Did NOT touch the load-bearing `* 2.0` comp doubling. Coefficients (0.85/0.6/0.5/0.12) = §18.3 starting points,
+> tune by eye if wanted. See [[project_mood_dim_control_idea]].
 
 **Origin (2026-06-04):** after the Remix-darkening pass landed (dark backgrounds, deeper palette, tamed
 additive shapes, deep/vivid mood bias, dimmer waves — "much much better, more dark colors, a few almost-black

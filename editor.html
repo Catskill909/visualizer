@@ -397,6 +397,17 @@
                             <p class="section-label">Appearance</p>
                             <div id="palette-sliders"></div>
 
+                            <!-- 🌙 Club / Dark Mode (§18): one-knob final-output dark-room tune for ANY
+                                 loaded preset — kills blown white, deepens colour. The go-to club knob. -->
+                            <p class="section-label" style="margin-top:14px">🌙 Club / Dark Room</p>
+                            <p class="section-note">Tune any preset for a dark room — crushes blown-out white, keeps colour vivid.</p>
+                            <div class="layer-slider-row">
+                                <span class="layer-ctrl-label is-resettable" data-tooltip="Drag up to dark-room any preset: blown white collapses toward dark while reds/blues/greens get richer (not dimmer). Double-click to reset">Club</span>
+                                <input type="range" id="ps-club" class="slider" min="0" max="1" step="0.01" value="0">
+                                <span class="lsv" id="ps-club-val">0.00</span>
+                            </div>
+                            <button type="button" id="ps-club-snap" class="lseg" style="margin:2px 0 4px">Club it</button>
+
                             <!-- Color Reactivity (Phase 12): make the colour adjustments
                                  (Brightness/Contrast/Gamma/Temperature) pulse to the beat over ANY
                                  loaded preset. Always visible — audio reactivity is the headline. -->
@@ -791,6 +802,11 @@
                                         <span class="layer-ctrl-label" data-tooltip="Key dark areas of the image OUT of the melt — the feedback shows through them. 0 = whole image, 1 = only bright parts seed">Luma Key</span>
                                         <input type="range" id="image-warp-lumakey-sl" class="slider" min="0" max="1" step="0.01" value="0">
                                         <span class="lsv" id="image-warp-lumakey-sl-val">0.00</span>
+                                    </div>
+                                    <div class="layer-slider-row">
+                                        <span class="layer-ctrl-label" data-tooltip="The image's brightness physically warps the melt — bright areas push out, dark pull in, so the picture's shape ripples the plasma. 0 = off">Displace</span>
+                                        <input type="range" id="image-warp-disp-sl" class="slider" min="0" max="1" step="0.01" value="0">
+                                        <span class="lsv" id="image-warp-disp-sl-val">0.00</span>
                                     </div>
                                     <span class="layer-ctrl-label" data-tooltip="How the image fuses with the melt — Mix blends, Add glows, Multiply stamps/darkens, Difference inverts, Screen lightens, Overlay punches contrast">Blend</span>
                                     <div id="image-warp-blend-grid" class="layer-react-curve" role="group"

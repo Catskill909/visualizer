@@ -446,7 +446,23 @@ function buildStudioPostFxGlsl(opts) {
     // Film grain: animated noise, ± up to ~0.25 at full.
     const grainLine = (grain < 0.001) ? '' :
         `\n    ret.rgb += ${(grain * 0.5).toFixed(4)} * (fract(sin(dot(uv * (time + 1.0), vec2(12.9898, 78.233))) * 43758.5453) - 0.5);`;
-    return `    /* STUDIO_POST_FX */\n    if (brighten != 0) ret = sqrt(ret);\n    if (darken != 0) ret = ret * ret;\n    if (solarize != 0) ret = ret * (1.0 - ret) * 4.0;\n    if (invert != 0) ret = 1.0 - ret;${sigDecl}${brLine}${conLine}${gamLine}${tmpLine}${satLine}${hueLine}${bloomLine}${postLine}${vigLine}${scanLine}${grainLine}\n`;
+    // 🌙 Club / Dark Mode (§18) — the one-knob FINAL-OUTPUT dark-room tune. The enemy in a club is
+    // BLOWN WHITE (bright AND desaturated — it lights the room). Detect that specifically and crush it,
+    // while leaving vivid colour alone and pushing it DEEPER — so whites collapse toward dark but
+    // reds/blues/greens get richer, not dimmer ("kill the white, keep the colour"). Applied LAST on the
+    // composited output (after grade + Scene FX). Braced so its locals can't collide with the grade's
+    // `_lum` (satLine). Gated: club < 0.001 → no line → byte-identical no-op. Coefficients tuned by eye.
+    const club = num(o.club, 0);
+    const clubLine = (club < 0.001) ? '' :
+        `\n    { float _cl = dot(ret.rgb, vec3(0.299, 0.587, 0.114));` +
+        `\n      float _cmx = max(ret.r, max(ret.g, ret.b)), _cmn = min(ret.r, min(ret.g, ret.b));` +
+        `\n      float _cw = _cl * (1.0 - (_cmx - _cmn) / (_cmx + 1e-4));` +              // bright + desaturated = room-white
+        `\n      ret.rgb *= 1.0 - ${club.toFixed(4)} * _cw * 0.85;` +                      // 1) crush whites specifically
+        `\n      ret.rgb = mix(vec3(_cl), ret.rgb, 1.0 + ${club.toFixed(4)} * 0.6);` +     // 2) deepen / push primaries
+        `\n      ret.rgb = ret.rgb / (1.0 + ${club.toFixed(4)} * 0.5 * max(ret.rgb - 0.5, 0.0));` + // 3) highlight roll-off
+        `\n      ret.rgb *= 1.0 - ${club.toFixed(4)} * 0.12;` +                            // 4) gentle overall dim
+        `\n      ret.rgb = clamp(ret.rgb, 0.0, 1.0); }`;
+    return `    /* STUDIO_POST_FX */\n    if (brighten != 0) ret = sqrt(ret);\n    if (darken != 0) ret = ret * ret;\n    if (solarize != 0) ret = ret * (1.0 - ret) * 4.0;\n    if (invert != 0) ret = 1.0 - ret;${sigDecl}${brLine}${conLine}${gamLine}${tmpLine}${satLine}${hueLine}${bloomLine}${postLine}${vigLine}${scanLine}${grainLine}${clubLine}\n`;
 }
 
 // Build the full grade-opts object the STUDIO_POST_FX inject reads, from a baseVals.
@@ -467,6 +483,8 @@ function gradeOpts(state) {
         // Phase 14 — Scene FX amounts (baseVals).
         posterize: b.studio_posterize ?? 0, vignette: b.studio_vignette ?? 0,
         scanlines: b.studio_scanlines ?? 0, grain: b.studio_grain ?? 0, bloom: b.studio_bloom ?? 0,
+        // §18 — Club / Dark Mode (top-level, whole-preset output control; not a baseVals fader).
+        club: st.clubMode ?? 0,
     };
 }
 
@@ -550,7 +568,7 @@ const BLANK = {
     // Image-as-texture (image-texture-dev.md Phase 2) — melt a loaded image layer
     // INTO the feedback loop. `texName` references one of `images[]`. When enabled it
     // OVERRIDES flowStyle's warp via buildImageWarp. Round-trips via the BLANK overlay.
-    imageWarp: { enabled: false, texName: '', flow: 'liquid', size: 1.0, cx: 0.5, cy: 0.5, mirror: 'none', kaleidoSpeed: 0.0, blendMode: 'mix', bright: 1.0, contrast: 1.0, sat: 1.0, hue: 0, invert: false, speed: 1.0, depth: 0.5, spin: 0.0, zoomPulse: 0.0, flowPulse: 0.0, lumaKey: 0.0, reseed: 0.20, audioSource: 'none', audioAmt: 0.50 },
+    imageWarp: { enabled: false, texName: '', flow: 'liquid', size: 1.0, cx: 0.5, cy: 0.5, mirror: 'none', kaleidoSpeed: 0.0, blendMode: 'mix', bright: 1.0, contrast: 1.0, sat: 1.0, hue: 0, invert: false, speed: 1.0, depth: 0.5, spin: 0.0, zoomPulse: 0.0, flowPulse: 0.0, lumaKey: 0.0, disp: 0.0, reseed: 0.20, audioSource: 'none', audioAmt: 0.50 },
     motionReact: {
         source: 'bass',
         curve: 'linear',
@@ -590,6 +608,10 @@ const BLANK = {
     // Phase 12 — shared Source/Curve for the audio-reactive Grade rack (the per-fader
     // amounts live in baseVals). Top-level strings, mirroring solidReactSource/Curve.
     studio_grade_react_source: 'bass', studio_grade_react_curve: 'linear',
+    // §18 — Club / Dark Mode: one-knob final-output dark-room tune (crush blown white,
+    // deepen primaries). 0 = off → byte-identical. Top-level (whole-preset output op),
+    // round-trips with save/load like studio_grade_react_source.
+    clubMode: 0,
     // Phase 8 — Color Field. Spreads the Shift A→B blend across SPACE, not just
     // time: 'flat' = the classic flat Shift (byte-identical, so old presets are
     // unchanged); linear/radial/plasma make the background a moving multi-colour
@@ -985,6 +1007,7 @@ export class EditorInspector {
         this._buildGradeReactPanel();
         this._buildSceneFxPanel();
         this._bindPaletteOpacity();
+        this._bindClubMode();
         this._buildSolidFxPanel();
         this._buildFlowStyleSection();
         this._buildImageWarpSection();
@@ -1678,6 +1701,48 @@ export class EditorInspector {
         input.addEventListener('pointerup', () => this._postSnap());
     }
 
+    // ─── 🌙 Club / Dark Mode (§18) — one-knob final-output dark-room tune ──────
+
+    /** Bind the Club slider + one-tap "Club it" snap. Writes the top-level
+     *  `currentState.clubMode` and re-injects the post-FX (it bakes into the comp
+     *  tail, same path as the grade faders), so it tunes ANY loaded preset live. */
+    _bindClubMode() {
+        const input = document.getElementById('ps-club');
+        const valEl = document.getElementById('ps-club-val');
+        if (!input) return;
+        const apply = (v) => {
+            v = Math.max(0, Math.min(1, v));
+            input.value = v;
+            if (valEl) valEl.textContent = v.toFixed(2);
+            input.style.setProperty('--pct', `${v * 100}%`);
+            this.currentState.clubMode = v;
+            this._rebuildPostFx();
+        };
+        input.addEventListener('pointerdown', () => this._preSnap());
+        input.addEventListener('input', () => apply(parseFloat(input.value)));
+        input.addEventListener('pointerup', () => this._postSnap());
+        // Double-click the label resets to 0 (off) — matches every other fader.
+        input.closest('.layer-slider-row')?.querySelector('.is-resettable')
+            ?.addEventListener('dblclick', () => { this._preSnap(); apply(0); this._postSnap(); });
+        // One-tap "Club it" — snaps to a good default (mirrors the user's one-click Invert habit).
+        document.getElementById('ps-club-snap')?.addEventListener('click', () => {
+            this._preSnap();
+            apply(this.currentState.clubMode >= 0.6 ? 0 : 0.6);  // toggle a strong default on/off
+            this._postSnap();
+        });
+    }
+
+    /** Reflect clubMode onto its slider (called from the palette sync on load/remix). */
+    _syncClubMode() {
+        const v = this.currentState.clubMode ?? 0;
+        const input = document.getElementById('ps-club');
+        const valEl = document.getElementById('ps-club-val');
+        if (!input) return;
+        input.value = v;
+        input.style.setProperty('--pct', `${v * 100}%`);
+        if (valEl) valEl.textContent = Number(v).toFixed(2);
+    }
+
     // ─── Post-FX shader rebuild (saturation / hue rotate) ────────────────────
 
     _rebuildPostFx() {
@@ -1926,6 +1991,10 @@ export class EditorInspector {
                 const fx = pick(['studio_posterize', 'studio_vignette', 'studio_scanlines', 'studio_grain']);
                 _sfx[fx] = (fx === 'studio_vignette' || fx === 'studio_posterize') ? rnd(0.2, 0.45) : rnd(0.15, 0.3);
             }
+            // 🌙 Club / Dark Mode (§18) — the structural output-darkening lever (kills blown white on the
+            // FINAL frame, where the input biases above can't fully reach). ~half the rolls dial in some
+            // club so the deck trends club-dark; the rest leave it off for brighter variety.
+            this.currentState.clubMode = Math.random() < 0.5 ? rnd(0.2, 0.7) : 0;
         }
         // ── Colour Field + Reactivity (separate locks) + a visible wave — one snapped step.
         this._preSnap();
@@ -2055,6 +2124,9 @@ export class EditorInspector {
         iw.zoomPulse = Math.random() < 0.4 ? rnd(0.2, 0.6) : 0;
         iw.flowPulse = Math.random() < 0.4 ? rnd(0.3, 0.8) : 0;
         iw.lumaKey = (!_present && Math.random() < 0.5) ? rnd(0.3, 0.8) : 0;  // keep the whole image when present
+        // Displacement (§16.A): the image's shape ripples the melt. Gentle on present rolls (high disp
+        // obliterates the source image); the abstract rolls get the full range. Mostly off so it stays special.
+        iw.disp = Math.random() < 0.4 ? (_present ? rnd(0.0, 0.3) : rnd(0.2, 0.8)) : 0;
         // Present rolls rarely kaleido (it folds the image into a pattern → unrecognizable).
         iw.mirror = Math.random() < (_present ? 0.15 : 0.35) ? pick(_present ? ['h', 'v', 'quad'] : ['h', 'v', 'quad', 'kaleido']) : 'none';
         iw.kaleidoSpeed = iw.mirror === 'kaleido' ? rnd(0.05, 0.6) : 0;
@@ -2386,6 +2458,7 @@ export class EditorInspector {
         this._bindImageWarpSlider('image-warp-zoom-sl', 'zoomPulse');
         this._bindImageWarpSlider('image-warp-flowpulse-sl', 'flowPulse');
         this._bindImageWarpSlider('image-warp-lumakey-sl', 'lumaKey');
+        this._bindImageWarpSlider('image-warp-disp-sl', 'disp');  // §16.A Displacement (melding tool)
         this._bindImageWarpSlider('image-warp-reseed-sl', 'reseed');
         this._bindImageWarpSlider('image-warp-audio-amt-sl', 'audioAmt');
         // Phase 4b — Colour/Grade on the melted image.
@@ -2404,7 +2477,7 @@ export class EditorInspector {
         // fader in the editor. The panel moves between cards/home, so the handler lives
         // on the panel itself; defaults are stamped from BLANK.imageWarp.
         // NB: speed slider is position-mapped (log); its default POSITION = _speedToPos(1.0).
-        const iwDefaults = { 'image-warp-size-sl': 1.0, 'image-warp-speed-sl': _speedToPos(1.0), 'image-warp-depth-sl': 0.5, 'image-warp-spin-sl': 0.0, 'image-warp-zoom-sl': 0.0, 'image-warp-flowpulse-sl': 0.0, 'image-warp-kaleido-speed-sl': 0.0, 'image-warp-lumakey-sl': 0.0, 'image-warp-bright-sl': 1.0, 'image-warp-contrast-sl': 1.0, 'image-warp-sat-sl': 1.0, 'image-warp-hue-sl': 0, 'image-warp-reseed-sl': 0.2, 'image-warp-audio-amt-sl': 0.5 };
+        const iwDefaults = { 'image-warp-size-sl': 1.0, 'image-warp-speed-sl': _speedToPos(1.0), 'image-warp-depth-sl': 0.5, 'image-warp-spin-sl': 0.0, 'image-warp-zoom-sl': 0.0, 'image-warp-flowpulse-sl': 0.0, 'image-warp-kaleido-speed-sl': 0.0, 'image-warp-lumakey-sl': 0.0, 'image-warp-disp-sl': 0.0, 'image-warp-bright-sl': 1.0, 'image-warp-contrast-sl': 1.0, 'image-warp-sat-sl': 1.0, 'image-warp-hue-sl': 0, 'image-warp-reseed-sl': 0.2, 'image-warp-audio-amt-sl': 0.5 };
         for (const [id, def] of Object.entries(iwDefaults)) {
             const sl = document.getElementById(id);
             if (!sl) continue;
@@ -2602,6 +2675,7 @@ export class EditorInspector {
         this._syncSlider('image-warp-zoom-sl', iw.zoomPulse ?? 0, 0, 1, 2);
         this._syncSlider('image-warp-flowpulse-sl', iw.flowPulse ?? 0, 0, 1, 2);
         this._syncSlider('image-warp-lumakey-sl', iw.lumaKey ?? 0, 0, 1, 2);
+        this._syncSlider('image-warp-disp-sl', iw.disp ?? 0, 0, 1, 2);
         this._syncSlider('image-warp-reseed-sl', iw.reseed ?? 0.2, 0, 1, 2);
         this._syncSlider('image-warp-audio-amt-sl', iw.audioAmt ?? 0.5, 0, 1, 2);
     }
@@ -8745,7 +8819,7 @@ export class EditorInspector {
                 mirror: iw.mirror, kaleidoSpeed: iw.kaleidoSpeed, blendMode: iw.blendMode,
                 bright: iw.bright, contrast: iw.contrast, sat: iw.sat, hue: iw.hue, invert: iw.invert,
                 speed: iw.speed, depth: iw.depth,
-                spin: iw.spin, zoomPulse: iw.zoomPulse, flowPulse: iw.flowPulse, lumaKey: iw.lumaKey,
+                spin: iw.spin, zoomPulse: iw.zoomPulse, flowPulse: iw.flowPulse, lumaKey: iw.lumaKey, disp: iw.disp,
                 reseed: iw.reseed, audioSource: iw.audioSource, audioAmt: iw.audioAmt,
                 isStackedAlpha: !!iwDrive.isStackedAlpha,
             });
@@ -10304,6 +10378,7 @@ export class EditorInspector {
         this._syncSlider('ps-contrast', bv.studio_contrast ?? 1.0, 0.5, 2.0, 2);
         this._syncSlider('ps-gamma', bv.studio_gamma ?? 1.0, 0.4, 2.5, 2);
         this._syncSlider('ps-temp', bv.studio_temp ?? 0, -0.3, 0.3, 2);
+        this._syncClubMode();  // §18 — Club / Dark Mode slider
     }
 
     _syncSolidFx() {
