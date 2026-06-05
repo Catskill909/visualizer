@@ -791,6 +791,19 @@ export function buildImageWarp(opts) {
     // so default melts (and the shipped spin/zoom-only path) are unchanged.
     const needCoord = framed || spin > 0 || zoom > 0 || mirror;
     const lumaKey = Number(o.lumaKey ?? 0);
+    // Stacked-alpha video meld (macOS transparent video): the texture is RGB in the
+    // TOP half, alpha-as-luma in the BOTTOM half (see _handleWebmAlphaUpload). Sample
+    // RGB from the top half (`y*0.5`) and the mask from the bottom half (`y*0.5+0.5`),
+    // then gate injection by the mask below so transparent pixels show pure feedback
+    // — same recombination the layer path does. Clamp first so spin/zoom wrap can't
+    // bleed one half into the other. Non-stacked → plain full-texture sample
+    // (byte-identical to before, so opaque image/video melds are unchanged).
+    const isStackedAlpha = !!o.isStackedAlpha;
+    const sampleImg = (coordExpr) => isStackedAlpha
+        ? `  vec2 _suv = clamp(${coordExpr}, 0.0, 1.0);\n` +
+          `  vec3 _img = texture(sampler_${imgName}, vec2(_suv.x, _suv.y * 0.5)).rgb;\n` +
+          `  float _imgA = texture(sampler_${imgName}, vec2(_suv.x, _suv.y * 0.5 + 0.5)).r;\n`
+        : `  vec3 _img = texture(sampler_${imgName}, ${coordExpr}).rgb;\n`;
     let imgSample;
     if (needCoord) {
         let lines = framed
@@ -822,10 +835,10 @@ export function buildImageWarp(opts) {
         }
         // Clamp the sample coord when framed OR mirrored (kills wrap garbage at borders / fold seams).
         const clampSample = framed || mirror;
-        lines += `  vec3 _img = texture(sampler_${imgName}, ${clampSample ? 'clamp(_iuv, 0.0, 1.0)' : '_iuv'}).rgb;\n`;
+        lines += sampleImg(clampSample ? 'clamp(_iuv, 0.0, 1.0)' : '_iuv');
         imgSample = lines;
     } else {
-        imgSample = `  vec3 _img = texture(sampler_${imgName}, uv_orig).rgb;\n`;
+        imgSample = sampleImg('uv_orig');
     }
     // Phase 4b — Colour / Grade. Re-mood the image BEFORE it blends into the feedback (darken, punch,
     // vivify, hue-shift, reverse). Each op is gated to no-op at neutral → all-neutral adds no lines
@@ -859,6 +872,11 @@ export function buildImageWarp(opts) {
         // shows through them cleanly) instead of darkening it. lumaKey blends full→keyed.
         gate += `  float _key = mix(1.0, smoothstep(0.05, 0.45, dot(_img, vec3(0.299, 0.587, 0.114))), ${lumaKey.toFixed(4)});\n`;
         presence += ` * _key`;
+    }
+    if (isStackedAlpha) {
+        // Transparent-video mask (stacked-alpha): only the opaque pixels meld in;
+        // the transparent background drops to pure feedback (presence→0).
+        presence += ` * _imgA`;
     }
     // Blend mode (§16 — the first MELDING tool). HOW the image fuses with the feedback, not just how
     // MUCH (that's presence). 'mix' (default) → `mix(_fb,_img,presence)` = byte-identical no-op. Others

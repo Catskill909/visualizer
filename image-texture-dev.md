@@ -310,6 +310,21 @@ identifier → warp won't compile → black. **Fix:** `buildImageWarp` now prepe
 `uniform sampler2D sampler_<imgName>;\n` before `shader_body`. (Same rule will apply to any future
 named-texture preset path, §16.1.)
 
+### 12.3a GOTCHA — Meld of a stacked-alpha (transparent) video (fixed 2026-06-04)
+Transparent-video meld on macOS was rendering **split in two** — the video's RGB in the top half of
+the frame and its alpha mask in the bottom half, un-recombined. Cause: a transparent WebM imported on
+macOS Tauri is transcoded to a **stacked-alpha** MP4 (RGB top, alpha-as-luma bottom — see
+`_handleWebmAlphaUpload` / `importPreset`). The **layer** sampler recombines those halves
+(`inspector.js` ~9716), but `buildImageWarp` (the Meld sampler) **never learned about it** and sampled
+the whole texture with the full-height coord. Because turning Meld on **drops the driving layer from the
+composite** (`inspector.js` ~8807), the broken warp sample was the *only* thing drawing the video.
+**Fix:** `buildImageWarp` takes an `isStackedAlpha` opt — when set it samples RGB from the top half
+(`y*0.5`), the mask from the bottom half (`y*0.5+0.5`), clamps the coord first so spin/zoom wrap can't
+bleed one half into the other, and **gates `presence` by the mask** so transparent pixels show pure
+feedback (matches the layer path's semantics). The flag is passed from both production call sites
+(`inspector.js` `_buildRuntimePreset`, `visualizer.js` `refreshCustomPresets`) by looking up the driving
+entry. Non-stacked melds are **byte-identical** to before. Opaque image/video melds unaffected.
+
 ### 12.4 Headless verification — [scripts/verify-image-warp.mjs](scripts/verify-image-warp.mjs)
 Run: `node scripts/verify-image-warp.mjs` (dev server up). Drives the real app in headless Chromium
 (SwiftShader), pushes a synthetic vivid checker image through `__imgWarp.drive()`, and reads back

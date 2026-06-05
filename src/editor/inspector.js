@@ -8737,7 +8737,9 @@ export class EditorInspector {
         // the image-warp OVERRIDES flowStyle's warp — the preset's motion now melts the
         // image through the feedback loop. Player mirrors this in refreshCustomPresets.
         const iw = state.imageWarp;
-        if (iw && iw.enabled && iw.texName && (state.images || []).some(e => e.texName === iw.texName)) {
+        const iwDrive = iw && iw.enabled && iw.texName
+            ? (state.images || []).find(e => e.texName === iw.texName) : null;
+        if (iwDrive) {
             runtime.warp = buildImageWarp({
                 imgName: iw.texName, flow: iw.flow, size: iw.size, cx: iw.cx, cy: iw.cy,
                 mirror: iw.mirror, kaleidoSpeed: iw.kaleidoSpeed, blendMode: iw.blendMode,
@@ -8745,6 +8747,7 @@ export class EditorInspector {
                 speed: iw.speed, depth: iw.depth,
                 spin: iw.spin, zoomPulse: iw.zoomPulse, flowPulse: iw.flowPulse, lumaKey: iw.lumaKey,
                 reseed: iw.reseed, audioSource: iw.audioSource, audioAmt: iw.audioAmt,
+                isStackedAlpha: !!iwDrive.isStackedAlpha,
             });
         }
         // Engine runs first (a living motion baseline), then motionReact/waveReact
