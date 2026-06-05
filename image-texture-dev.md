@@ -6,8 +6,11 @@ cross-platform-verified: feedback-melt engine (§12), per-card **Overlay\|Meld**
 Saturation/Hue/Invert, §14.2), **perceptual log Speed w/ true slow-motion** (§17), **Blend mode** (the first
 melding tool, §16), and **🎲 Remix rolls the WHOLE melt** — incl. framing, blend, colour, with a "present
 meld" bias so the source image stays recognizable (Phase 7). **Verified end-to-end:** headless 37/37, tested
-locally + macOS build + Coolify web; **a melded-remix preset exported locally imports & remixes correctly in
-the macOS install** (Windows build pending). **▶️ NEXT SESSION: Displacement** — the next melding tool (§16.A,
+locally + macOS build + Coolify web + **Windows build (on GitHub, uploaded to repo for the promo page)**;
+**a melded-remix preset exported locally imports & remixes correctly in the macOS install.**
+**Transparent-video Meld fix (stacked-alpha recombination, §12.3a) VERIFIED on the macOS build & live on
+Coolify 2026-06-04** — BruceLee export re-imports correctly, and freshly-imported transparent videos switched
+to Meld render perfectly. **▶️ NEXT SESSION: Displacement** — the next melding tool (§16.A,
 "locked & loaded"). The Phase Tracker below is the live status. Origin: `milkdrop-pack-import.md` §16.2.
 
 > **📚 Doc map:** Tracker + §§12–17 = current/shipped (read these). **§§3–8, 10–11 are PRE-BUILD scoping
@@ -310,7 +313,9 @@ identifier → warp won't compile → black. **Fix:** `buildImageWarp` now prepe
 `uniform sampler2D sampler_<imgName>;\n` before `shader_body`. (Same rule will apply to any future
 named-texture preset path, §16.1.)
 
-### 12.3a GOTCHA — Meld of a stacked-alpha (transparent) video (fixed 2026-06-04)
+### 12.3a GOTCHA — Meld of a stacked-alpha (transparent) video (fixed + VERIFIED 2026-06-04)
+✅ **Verified on the macOS build & live on Coolify** (commit `13630a5`): BruceLee export re-imports and
+melds correctly; freshly-imported transparent videos switched to Meld render perfectly.
 Transparent-video meld on macOS was rendering **split in two** — the video's RGB in the top half of
 the frame and its alpha mask in the bottom half, un-recombined. Cause: a transparent WebM imported on
 macOS Tauri is transcoded to a **stacked-alpha** MP4 (RGB top, alpha-as-luma bottom — see
