@@ -2020,7 +2020,8 @@ export class EditorInspector {
                 _wb.wave_thickness = Math.random() < 0.5 ? rnd(1, 3) : 0;
             }
         } else if (_content < 0.75) {
-            const _n = 1 + Math.floor(Math.random() * 3);
+            const _nr = Math.random();
+            const _n = _nr < 0.55 ? 1 : _nr < 0.85 ? 2 : 3;   // bias to fewer → less central pile-up (was uniform 1–3)
             for (let _i = 0; _i < _n; _i++) this._addRemixShape();
         }
         // else (~35%): pure field + flow — no thin content.
@@ -2103,9 +2104,14 @@ export class EditorInspector {
         // Additive ("glow") shapes ADD light → stacked, they were the big blown-white chunks. Make them
         // RARE (15%, was 50%) and, when additive, SMALL + lower opacity (a glint, not a white slab).
         b.additive = Math.random() < 0.15 ? 1 : 0;
-        b.rad = b.additive ? rnd(0.12, 0.30) : rnd(0.15, 0.55);
-        b.a = b.additive ? rnd(0.30, 0.55) : rnd(0.45, 0.9);
-        b.x = rnd(0.32, 0.68); b.y = rnd(0.32, 0.68);
+        // Solid shapes: MOSTLY toned down (smaller + more translucent so the feedback shows THROUGH
+        // them, not a slab on top), but ~20% land a deliberate BOLD "hero" shape up front — a big
+        // bold shape is good sometimes (user), just no longer the default. Additive glows already
+        // tamed (small/low-opacity) in the darkening pass.
+        const _hero = !b.additive && Math.random() < 0.20;
+        b.rad = b.additive ? rnd(0.12, 0.30) : (_hero ? rnd(0.42, 0.60) : rnd(0.15, 0.42));
+        b.a   = b.additive ? rnd(0.30, 0.55) : (_hero ? rnd(0.70, 0.92) : rnd(0.35, 0.72));
+        b.x = rnd(0.22, 0.78); b.y = rnd(0.22, 0.78);   // wider spread → less central overlap (was 0.32–0.68)
         b.ang = rnd(0, 6.2832);
         // Foreground colour = the palette's WAVE colour → contrasts the background field.
         const cb = this.currentState.baseVals;
