@@ -568,7 +568,7 @@ const BLANK = {
     // Image-as-texture (image-texture-dev.md Phase 2) — melt a loaded image layer
     // INTO the feedback loop. `texName` references one of `images[]`. When enabled it
     // OVERRIDES flowStyle's warp via buildImageWarp. Round-trips via the BLANK overlay.
-    imageWarp: { enabled: false, texName: '', flow: 'liquid', size: 1.0, cx: 0.5, cy: 0.5, mirror: 'none', kaleidoSpeed: 0.0, blendMode: 'mix', bright: 1.0, contrast: 1.0, sat: 1.0, hue: 0, invert: false, speed: 1.0, depth: 0.5, spin: 0.0, zoomPulse: 0.0, flowPulse: 0.0, lumaKey: 0.0, mask: 0.0, disp: 0.0, reseed: 0.20, audioSource: 'none', audioAmt: 0.50 },
+    imageWarp: { enabled: false, texName: '', flow: 'liquid', size: 1.0, cx: 0.5, cy: 0.5, mirror: 'none', kaleidoSpeed: 0.0, blendMode: 'mix', bright: 1.0, contrast: 1.0, sat: 1.0, hue: 0, invert: false, speed: 1.0, depth: 0.5, spin: 0.0, zoomPulse: 0.0, flowPulse: 0.0, lumaKey: 0.0, mask: 0.0, disp: 0.0, flowMap: 0.0, reseed: 0.20, audioSource: 'none', audioAmt: 0.50 },
     motionReact: {
         source: 'bass',
         curve: 'linear',
@@ -2130,6 +2130,9 @@ export class EditorInspector {
         // Mask (§16 #3): the image's bright shape becomes a crisp stencil (logo-like). Special-occasion
         // (~20%); never paired with Luma Key (both gate presence — together they'd over-thin the image).
         iw.mask = (iw.lumaKey === 0 && Math.random() < 0.2) ? rnd(0.4, 0.9) : 0;
+        // Image-driven flow (§16 #4): the picture's edges steer the melt's motion. Special-occasion
+        // (~30%); gentler on present rolls (a strong flow map smears the source) so it stays recognizable.
+        iw.flowMap = Math.random() < 0.3 ? (_present ? rnd(0.15, 0.45) : rnd(0.3, 0.9)) : 0;
         // Present rolls rarely kaleido (it folds the image into a pattern → unrecognizable).
         iw.mirror = Math.random() < (_present ? 0.15 : 0.35) ? pick(_present ? ['h', 'v', 'quad'] : ['h', 'v', 'quad', 'kaleido']) : 'none';
         iw.kaleidoSpeed = iw.mirror === 'kaleido' ? rnd(0.05, 0.6) : 0;
@@ -2463,6 +2466,7 @@ export class EditorInspector {
         this._bindImageWarpSlider('image-warp-lumakey-sl', 'lumaKey');
         this._bindImageWarpSlider('image-warp-mask-sl', 'mask');  // §16 #3 Mask (melding tool)
         this._bindImageWarpSlider('image-warp-disp-sl', 'disp');  // §16.A Displacement (melding tool)
+        this._bindImageWarpSlider('image-warp-flowmap-sl', 'flowMap');  // §16 #4 Image-driven flow (melding tool)
         this._bindImageWarpSlider('image-warp-reseed-sl', 'reseed');
         this._bindImageWarpSlider('image-warp-audio-amt-sl', 'audioAmt');
         // Phase 4b — Colour/Grade on the melted image.
@@ -2481,7 +2485,7 @@ export class EditorInspector {
         // fader in the editor. The panel moves between cards/home, so the handler lives
         // on the panel itself; defaults are stamped from BLANK.imageWarp.
         // NB: speed slider is position-mapped (log); its default POSITION = _speedToPos(1.0).
-        const iwDefaults = { 'image-warp-size-sl': 1.0, 'image-warp-speed-sl': _speedToPos(1.0), 'image-warp-depth-sl': 0.5, 'image-warp-spin-sl': 0.0, 'image-warp-zoom-sl': 0.0, 'image-warp-flowpulse-sl': 0.0, 'image-warp-kaleido-speed-sl': 0.0, 'image-warp-lumakey-sl': 0.0, 'image-warp-mask-sl': 0.0, 'image-warp-disp-sl': 0.0, 'image-warp-bright-sl': 1.0, 'image-warp-contrast-sl': 1.0, 'image-warp-sat-sl': 1.0, 'image-warp-hue-sl': 0, 'image-warp-reseed-sl': 0.2, 'image-warp-audio-amt-sl': 0.5 };
+        const iwDefaults = { 'image-warp-size-sl': 1.0, 'image-warp-speed-sl': _speedToPos(1.0), 'image-warp-depth-sl': 0.5, 'image-warp-spin-sl': 0.0, 'image-warp-zoom-sl': 0.0, 'image-warp-flowpulse-sl': 0.0, 'image-warp-kaleido-speed-sl': 0.0, 'image-warp-lumakey-sl': 0.0, 'image-warp-mask-sl': 0.0, 'image-warp-disp-sl': 0.0, 'image-warp-flowmap-sl': 0.0, 'image-warp-bright-sl': 1.0, 'image-warp-contrast-sl': 1.0, 'image-warp-sat-sl': 1.0, 'image-warp-hue-sl': 0, 'image-warp-reseed-sl': 0.2, 'image-warp-audio-amt-sl': 0.5 };
         for (const [id, def] of Object.entries(iwDefaults)) {
             const sl = document.getElementById(id);
             if (!sl) continue;
@@ -2681,6 +2685,7 @@ export class EditorInspector {
         this._syncSlider('image-warp-lumakey-sl', iw.lumaKey ?? 0, 0, 1, 2);
         this._syncSlider('image-warp-mask-sl', iw.mask ?? 0, 0, 1, 2);
         this._syncSlider('image-warp-disp-sl', iw.disp ?? 0, 0, 1, 2);
+        this._syncSlider('image-warp-flowmap-sl', iw.flowMap ?? 0, 0, 1, 2);
         this._syncSlider('image-warp-reseed-sl', iw.reseed ?? 0.2, 0, 1, 2);
         this._syncSlider('image-warp-audio-amt-sl', iw.audioAmt ?? 0.5, 0, 1, 2);
     }
@@ -8824,7 +8829,7 @@ export class EditorInspector {
                 mirror: iw.mirror, kaleidoSpeed: iw.kaleidoSpeed, blendMode: iw.blendMode,
                 bright: iw.bright, contrast: iw.contrast, sat: iw.sat, hue: iw.hue, invert: iw.invert,
                 speed: iw.speed, depth: iw.depth,
-                spin: iw.spin, zoomPulse: iw.zoomPulse, flowPulse: iw.flowPulse, lumaKey: iw.lumaKey, mask: iw.mask, disp: iw.disp,
+                spin: iw.spin, zoomPulse: iw.zoomPulse, flowPulse: iw.flowPulse, lumaKey: iw.lumaKey, mask: iw.mask, disp: iw.disp, flowMap: iw.flowMap,
                 reseed: iw.reseed, audioSource: iw.audioSource, audioAmt: iw.audioAmt,
                 isStackedAlpha: !!iwDrive.isStackedAlpha,
             });

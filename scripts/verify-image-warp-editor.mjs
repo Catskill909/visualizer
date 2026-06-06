@@ -186,6 +186,23 @@ const r = await page.evaluate(async () => {
     out.maskLuma = await luma();
     insp.currentState.imageWarp.mask = 0;
 
+    // Image-driven flow (§16 #4) — the image's luma gradient steers `_flow` so the melt streams along
+    // the picture's contours. flowMap=0 = no-op (no gradient lines); flowMap>0 bakes the central-diff
+    // gradient + a tangent push into `_flow`; kaleido (no `_flow`) is a no-op; melt still renders bright.
+    insp.currentState.imageWarp.flow = 'liquid';
+    insp.currentState.imageWarp.flowMap = 0;
+    out.flowMapNeutralNoop = !insp._buildRuntimePreset(insp.currentState).warp.includes('_fmgx');
+    insp.currentState.imageWarp.flowMap = 0.6;
+    insp._applyToEngine();
+    const fmWarp = insp._buildRuntimePreset(insp.currentState).warp;
+    out.flowMapBaked = fmWarp.includes('float _fmgx =') && fmWarp.includes('_flow += vec2(-_fmgy, _fmgx)');
+    for (let k = 0; k < 50; k++) await luma();
+    out.flowMapLuma = await luma();
+    insp.currentState.imageWarp.flow = 'kaleido';
+    out.flowMapKaleidoNoop = !insp._buildRuntimePreset(insp.currentState).warp.includes('_fmgx');
+    insp.currentState.imageWarp.flowMap = 0;
+    insp.currentState.imageWarp.flow = 'liquid';
+
     // Phase 7 — Remix rolls the Drive melt look (incl. framing now) + the panel re-syncs.
     Object.assign(insp.currentState.imageWarp, { size: 0.7, cx: 0.45, cy: 0.5, flow: 'liquid' });
     insp._remixLock = {};
@@ -331,6 +348,10 @@ ok('Displaced melt STILL renders bright, not black (luma > 20)', r.dispLuma > 20
 ok('Mask mask=0 = no-op (no _mask stencil)', r.maskNeutralNoop);
 ok('Mask bakes a crisp _mask stencil that gates presence', r.maskBaked);
 ok('Masked melt STILL renders bright (preset feedback outside the shape; luma > 20)', r.maskLuma > 20, `luma ${r.maskLuma?.toFixed(1)}`);
+ok('Flow Map flowMap=0 = no-op (no gradient lines)', r.flowMapNeutralNoop);
+ok('Flow Map bakes the luma gradient + a tangent push into _flow', r.flowMapBaked);
+ok('Flow Map is a no-op on kaleido (no _flow to steer)', r.flowMapKaleidoNoop);
+ok('Flow-mapped melt STILL renders bright, not black (luma > 20)', r.flowMapLuma > 20, `luma ${r.flowMapLuma?.toFixed(1)}`);
 ok('Speed fader is log-mapped (pos 0 → ~0.02 slow, pos 1 → ~4.0 fast)', r.logSpeed);
 ok('Mirror/Kaleido bakes a fold into the warp + reveals its speed row', r.mirrorBaked && r.kaleidoRowShown);
 ok('Mirrored melt STILL renders bright, not black (luma > 20)', r.mirrorLuma > 20, `luma ${r.mirrorLuma?.toFixed(1)}`);

@@ -813,6 +813,11 @@
                                         <input type="range" id="image-warp-disp-sl" class="slider" min="0" max="1" step="0.01" value="0">
                                         <span class="lsv" id="image-warp-disp-sl-val">0.00</span>
                                     </div>
+                                    <div class="layer-slider-row">
+                                        <span class="layer-ctrl-label" data-tooltip="The image's edges steer the melt's motion — the flow streams ALONG the picture's contours, so its lines carry the melt. 0 = off">Flow Map</span>
+                                        <input type="range" id="image-warp-flowmap-sl" class="slider" min="0" max="1" step="0.01" value="0">
+                                        <span class="lsv" id="image-warp-flowmap-sl-val">0.00</span>
+                                    </div>
                                     <span class="layer-ctrl-label" data-tooltip="How the image fuses with the melt — Mix blends, Add glows, Multiply stamps/darkens, Difference inverts, Screen lightens, Overlay punches contrast">Blend</span>
                                     <div id="image-warp-blend-grid" class="layer-react-curve" role="group"
                                         aria-label="Blend mode" style="margin:6px 0 10px">

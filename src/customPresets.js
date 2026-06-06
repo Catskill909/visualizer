@@ -785,6 +785,23 @@ export function buildImageWarp(opts) {
     if (flowPulse > 0 && flowId !== 'kaleido') {
         pre += `  _flow *= 1.0 + ${flowPulse.toFixed(4)} * 0.9 * (bass - 1.0);\n`;
     }
+    // Image-driven flow (§16 #4 — a MELDING tool: the image steers MOTION, not colour). The image's
+    // luma GRADIENT biases the per-frame flow so the melt streams ALONG the picture's contours
+    // ("edges of the picture carry the melt"). Distinct from Displacement (a static radial push on
+    // WHERE we sample): this adds a directional velocity to `_flow` (the motion field) itself, TANGENT
+    // to the image's edges — flat areas (zero gradient) get no push, so the motion traces the lines of
+    // the image. 2 central-difference luma taps → gradient `(_fmgx,_fmgy)`; the perpendicular is the
+    // flow direction. Reads the image at uv_orig (top half for stacked-alpha video so the alpha band
+    // can't fake a seam). Gated: flowMap=0 → no lines → byte-identical no-op. Kaleido has no `_flow`
+    // → no-op there (like speed / flowPulse).
+    const flowMap = Number(o.flowMap ?? 0);
+    if (flowMap > 0 && flowId !== 'kaleido') {
+        const yc = (e) => o.isStackedAlpha ? `(${e}) * 0.5` : e;
+        const lum = (cx, cy) => `dot(texture(sampler_${imgName}, vec2(${cx}, ${cy})).rgb, vec3(0.299, 0.587, 0.114))`;
+        pre += `  float _fmgx = ${lum('uv_orig.x + 0.004', yc('uv_orig.y'))} - ${lum('uv_orig.x - 0.004', yc('uv_orig.y'))};\n`;
+        pre += `  float _fmgy = ${lum('uv_orig.x', yc('uv_orig.y + 0.004'))} - ${lum('uv_orig.x', yc('uv_orig.y - 0.004'))};\n`;
+        pre += `  _flow += vec2(-_fmgy, _fmgx) * ${flowMap.toFixed(4)} * 0.35;\n`;  // tangent to the image edge
+    }
     // Displacement (§16.A — a MELDING tool: the image contributes SHAPE, not colour). The image's
     // brightness physically warps WHERE the feedback is sampled — bright pixels push the sample
     // outward, dark pull inward — so the picture embosses / ripples the melt ("the logo's shape
