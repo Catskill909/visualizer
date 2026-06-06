@@ -941,6 +941,21 @@ export function buildImageWarp(opts) {
     }
     const mix = gate + `  ret = mix(_fb, ${_blended}, ${presence});\n`;
 
+    // Palette-from-image (§19 — a MELDING tool: the melt wears the image's OWN colours). The image's
+    // dominant dark/light colours (extracted CPU-side into `palette = {lo,hi}`, 0..1) become a duotone
+    // ramp; the feedback's luma maps through it so the whole preset takes on the image's colour mood.
+    // Recolours `_fb` (so the blend modes see the tinted feedback too). All-literal → injection-safe.
+    // Gated: tint=0 or no palette → no lines → byte-identical no-op.
+    const tint = Number(o.tint ?? 0);
+    const pal = o.palette;
+    let tintBlock = '';
+    if (tint > 0 && pal && Array.isArray(pal.lo) && Array.isArray(pal.hi)) {
+        const v3 = (a) => `vec3(${Number(a[0] || 0).toFixed(4)}, ${Number(a[1] || 0).toFixed(4)}, ${Number(a[2] || 0).toFixed(4)})`;
+        tintBlock =
+            `  float _tl = dot(_fb, vec3(0.299, 0.587, 0.114));\n` +
+            `  _fb = mix(_fb, mix(${v3(pal.lo)}, ${v3(pal.hi)}, _tl), ${tint.toFixed(4)});\n`;
+    }
+
     // The user sampler MUST be declared in the shader HEADER (before shader_body):
     // butterchurn's getShaderParts splits on `shader_body`, scans the header with
     // /uniform sampler2D sampler_(.+?);/ (getUserSamplers), and uses that list BOTH to
@@ -948,6 +963,7 @@ export function buildImageWarp(opts) {
     // sampler_<name> is an undeclared identifier → warp fails to compile → black frame.
     return `uniform sampler2D sampler_${imgName};\nshader_body {\n${pre}` +
         `  vec3 _fb = ${fbExpr};\n` +
+        tintBlock +
         imgSample +
         grade +
         mix + `}`;

@@ -203,6 +203,23 @@ const r = await page.evaluate(async () => {
     insp.currentState.imageWarp.flowMap = 0;
     insp.currentState.imageWarp.flow = 'liquid';
 
+    // Palette-from-image (§19) — the image's dominant colours tint the feedback (a duotone). Extraction
+    // returns a {lo,hi} palette; tint=0 = no-op (no `_tl` duotone line); tint>0 bakes the ramp + the melt
+    // still renders bright.
+    const pal = await insp._extractImagePalette(texName);
+    out.paletteExtracted = !!(pal && Array.isArray(pal.lo) && pal.lo.length === 3 && Array.isArray(pal.hi) && pal.hi.length === 3);
+    insp.currentState.imageWarp.imgPalette = pal || { lo: [0.1, 0.0, 0.2], hi: [1.0, 0.85, 0.2] };
+    insp.currentState.imageWarp.tint = 0;
+    out.tintNeutralNoop = !insp._buildRuntimePreset(insp.currentState).warp.includes('float _tl = dot(_fb');
+    insp.currentState.imageWarp.tint = 0.8;
+    insp._applyToEngine();
+    const tWarp = insp._buildRuntimePreset(insp.currentState).warp;
+    out.tintBaked = tWarp.includes('float _tl = dot(_fb') && tWarp.includes('_fb = mix(_fb, mix(vec3(');
+    for (let k = 0; k < 50; k++) await luma();
+    out.tintLuma = await luma();
+    insp.currentState.imageWarp.tint = 0;
+    insp.currentState.imageWarp.imgPalette = null;
+
     // Phase 7 — Remix rolls the Drive melt look (incl. framing now) + the panel re-syncs.
     Object.assign(insp.currentState.imageWarp, { size: 0.7, cx: 0.45, cy: 0.5, flow: 'liquid' });
     insp._remixLock = {};
@@ -352,6 +369,10 @@ ok('Flow Map flowMap=0 = no-op (no gradient lines)', r.flowMapNeutralNoop);
 ok('Flow Map bakes the luma gradient + a tangent push into _flow', r.flowMapBaked);
 ok('Flow Map is a no-op on kaleido (no _flow to steer)', r.flowMapKaleidoNoop);
 ok('Flow-mapped melt STILL renders bright, not black (luma > 20)', r.flowMapLuma > 20, `luma ${r.flowMapLuma?.toFixed(1)}`);
+ok('Palette-from-image extracts a {lo,hi} dominant-colour palette', r.paletteExtracted);
+ok('Tint tint=0 = no-op (no duotone line)', r.tintNeutralNoop);
+ok('Tint bakes the image-palette duotone ramp into the feedback', r.tintBaked);
+ok('Tinted melt STILL renders bright, not black (luma > 20)', r.tintLuma > 20, `luma ${r.tintLuma?.toFixed(1)}`);
 ok('Speed fader is log-mapped (pos 0 → ~0.02 slow, pos 1 → ~4.0 fast)', r.logSpeed);
 ok('Mirror/Kaleido bakes a fold into the warp + reveals its speed row', r.mirrorBaked && r.kaleidoRowShown);
 ok('Mirrored melt STILL renders bright, not black (luma > 20)', r.mirrorLuma > 20, `luma ${r.mirrorLuma?.toFixed(1)}`);

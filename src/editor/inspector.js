@@ -568,7 +568,7 @@ const BLANK = {
     // Image-as-texture (image-texture-dev.md Phase 2) — melt a loaded image layer
     // INTO the feedback loop. `texName` references one of `images[]`. When enabled it
     // OVERRIDES flowStyle's warp via buildImageWarp. Round-trips via the BLANK overlay.
-    imageWarp: { enabled: false, texName: '', flow: 'liquid', size: 1.0, cx: 0.5, cy: 0.5, mirror: 'none', kaleidoSpeed: 0.0, blendMode: 'mix', bright: 1.0, contrast: 1.0, sat: 1.0, hue: 0, invert: false, speed: 1.0, depth: 0.5, spin: 0.0, zoomPulse: 0.0, flowPulse: 0.0, lumaKey: 0.0, mask: 0.0, disp: 0.0, flowMap: 0.0, reseed: 0.20, audioSource: 'none', audioAmt: 0.50 },
+    imageWarp: { enabled: false, texName: '', flow: 'liquid', size: 1.0, cx: 0.5, cy: 0.5, mirror: 'none', kaleidoSpeed: 0.0, blendMode: 'mix', bright: 1.0, contrast: 1.0, sat: 1.0, hue: 0, invert: false, speed: 1.0, depth: 0.5, spin: 0.0, zoomPulse: 0.0, flowPulse: 0.0, lumaKey: 0.0, mask: 0.0, disp: 0.0, flowMap: 0.0, tint: 0.0, imgPalette: null, reseed: 0.20, audioSource: 'none', audioAmt: 0.50 },
     motionReact: {
         source: 'bass',
         curve: 'linear',
@@ -2073,13 +2073,21 @@ export class EditorInspector {
         this.currentState.shapes = [];
         this.currentState.baseVals.wave_a = 0;
         this.currentState.baseVals.wave_fill = 0;
+        // When a MELD is driving, the melt IS the content — so mostly run CLEAN and let it shine instead
+        // of stamping a wave/shape slab over it (user: shapes kept covering the gorgeous melt). Melt → wave
+        // ~10% (thin accent only, no filled disc), shapes ~12% (ONE gentle small/translucent accent, never
+        // a hero), else ~78% pure melt. NO meld → the from-scratch distribution is UNCHANGED (wave ~30% /
+        // shapes ~45% / pure ~25%; shapes are the show there).
+        const _meld = !!(this.currentState.imageWarp && this.currentState.imageWarp.enabled && this.currentState.imageWarp.texName);
+        const _waveMax = _meld ? 0.10 : 0.30;
+        const _shapeMax = _meld ? 0.22 : 0.75;
         const _content = Math.random();
-        if (_content < 0.30) {
+        if (_content < _waveMax) {
             const _wb = this.currentState.baseVals;
             _wb.wave_mode = Math.floor(Math.random() * 8);
             _wb.wave_scale = rnd(0.5, 2.5);
             _wb.wave_a = rnd(0.3, 0.5);              // dimmer (the filled-wave rolls were the bright cluster)
-            if (Math.random() < 0.55) {              // less-often FULL-fill (was 75%) → fewer broad bright washes
+            if (!_meld && Math.random() < 0.55) {    // over a melt: thin accent only (a filled disc/wedge would cover it)
                 // FILLED — the broad default look: a solid disc/wedge, not a string.
                 _wb.wave_fill = rnd(0.4, 0.85);
                 _wb.wave_thickness = Math.random() < 0.5 ? rnd(1, 4) : 0;
@@ -2088,12 +2096,12 @@ export class EditorInspector {
                 _wb.wave_fill = 0;
                 _wb.wave_thickness = Math.random() < 0.5 ? rnd(1, 3) : 0;
             }
-        } else if (_content < 0.75) {
+        } else if (_content < _shapeMax) {
             const _nr = Math.random();
-            const _n = _nr < 0.55 ? 1 : _nr < 0.85 ? 2 : 3;   // bias to fewer → less central pile-up (was uniform 1–3)
-            for (let _i = 0; _i < _n; _i++) this._addRemixShape();
+            const _n = _meld ? 1 : (_nr < 0.55 ? 1 : _nr < 0.85 ? 2 : 3);   // over a melt: at most ONE accent; else fewer-biased 1–3
+            for (let _i = 0; _i < _n; _i++) this._addRemixShape(_meld);      // _meld → gentle (small/translucent/no hero)
         }
-        // else (~35%): pure field + flow — no thin content.
+        // else: pure field + flow — no thin content (or, with a meld, the clean melt carries it).
         this._postSnap();
         // End the batch and do the ONE real rebuild+apply+sync for the whole roll.
         this._rolling = false;
@@ -2122,17 +2130,32 @@ export class EditorInspector {
         iw.depth = _present ? rnd(0.2, 0.5) : rnd(0.35, 0.9);            // softer warp → image not obliterated
         iw.spin = Math.random() < 0.4 ? rnd(0.1, 0.6) : 0;
         iw.zoomPulse = Math.random() < 0.4 ? rnd(0.2, 0.6) : 0;
-        iw.flowPulse = Math.random() < 0.4 ? rnd(0.3, 0.8) : 0;
+        // ── Shared DISTORTION budget — Flow Pulse / Displacement / Flow Map each FRACTURE the melt.
+        // Rolled independently they used to STACK (2–3 at once → the image shattered / animated out on
+        // ~30% of rolls). Each one's odds + range are UNCHANGED, but now AT MOST ONE wins per roll: the
+        // three rollers are shuffled (so no single effect is favoured) and we stop at the first hit, so they
+        // never pile up. (User: the breakup is fantastic — keep it as the occasional surprise, not every roll.)
+        iw.flowPulse = 0; iw.disp = 0; iw.flowMap = 0;
+        const _distRollers = [
+            () => { if (Math.random() < 0.4) iw.flowPulse = rnd(0.3, 0.8); return iw.flowPulse > 0; },                  // §13.6 Flow Pulse
+            () => { if (Math.random() < 0.4) iw.disp = _present ? rnd(0.0, 0.3) : rnd(0.2, 0.8); return iw.disp > 0; }, // §16.A Displacement (gentle on present)
+            () => { if (Math.random() < 0.3) iw.flowMap = _present ? rnd(0.15, 0.45) : rnd(0.3, 0.9); return iw.flowMap > 0; }, // §16 #4 Flow Map
+        ];
+        for (let i = _distRollers.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [_distRollers[i], _distRollers[j]] = [_distRollers[j], _distRollers[i]]; }
+        for (const _roll of _distRollers) { if (_roll()) break; }
         iw.lumaKey = (!_present && Math.random() < 0.5) ? rnd(0.3, 0.8) : 0;  // keep the whole image when present
-        // Displacement (§16.A): the image's shape ripples the melt. Gentle on present rolls (high disp
-        // obliterates the source image); the abstract rolls get the full range. Mostly off so it stays special.
-        iw.disp = Math.random() < 0.4 ? (_present ? rnd(0.0, 0.3) : rnd(0.2, 0.8)) : 0;
         // Mask (§16 #3): the image's bright shape becomes a crisp stencil (logo-like). Special-occasion
         // (~20%); never paired with Luma Key (both gate presence — together they'd over-thin the image).
         iw.mask = (iw.lumaKey === 0 && Math.random() < 0.2) ? rnd(0.4, 0.9) : 0;
-        // Image-driven flow (§16 #4): the picture's edges steer the melt's motion. Special-occasion
-        // (~30%); gentler on present rolls (a strong flow map smears the source) so it stays recognizable.
-        iw.flowMap = Math.random() < 0.3 ? (_present ? rnd(0.15, 0.45) : rnd(0.3, 0.9)) : 0;
+        // Palette-from-image (§19): tint the melt by the image's own colours. ~35%; stronger when present
+        // (the image's colour mood reads on the recognizable source). Needs a palette — extract if missing.
+        iw.tint = Math.random() < 0.35 ? (_present ? rnd(0.35, 0.75) : rnd(0.25, 0.6)) : 0;
+        if (iw.tint > 0 && !iw.imgPalette && iw.texName) {
+            this._extractImagePalette(iw.texName).then((pal) => {
+                const cw = this.currentState.imageWarp;
+                if (pal && cw && cw.texName === iw.texName) { cw.imgPalette = pal; this._applyToEngine(); }
+            });
+        }
         // Present rolls rarely kaleido (it folds the image into a pattern → unrecognizable).
         iw.mirror = Math.random() < (_present ? 0.15 : 0.35) ? pick(_present ? ['h', 'v', 'quad'] : ['h', 'v', 'quad', 'kaleido']) : 'none';
         iw.kaleidoSpeed = iw.mirror === 'kaleido' ? rnd(0.05, 0.6) : 0;
@@ -2171,7 +2194,7 @@ export class EditorInspector {
      *  polygon that pulses to the beat. Coloured from the palette's WAVE colour so it
      *  contrasts the background field (which blends accent→Shift-colour). This is the
      *  "shapes & blobs" content type that gives Remix variety beyond the wave. */
-    _addRemixShape() {
+    _addRemixShape(gentle = false) {
         const shapes = this.currentState.shapes || (this.currentState.shapes = []);
         if (shapes.filter(s => this._isEditorShape(s)).length >= MAX_SHAPES) return;
         const rnd = (lo, hi) => lo + Math.random() * (hi - lo);
@@ -2185,10 +2208,11 @@ export class EditorInspector {
         // Solid shapes: MOSTLY toned down (smaller + more translucent so the feedback shows THROUGH
         // them, not a slab on top), but ~20% land a deliberate BOLD "hero" shape up front — a big
         // bold shape is good sometimes (user), just no longer the default. Additive glows already
-        // tamed (small/low-opacity) in the darkening pass.
-        const _hero = !b.additive && Math.random() < 0.20;
-        b.rad = b.additive ? rnd(0.12, 0.30) : (_hero ? rnd(0.42, 0.60) : rnd(0.15, 0.42));
-        b.a   = b.additive ? rnd(0.30, 0.55) : (_hero ? rnd(0.70, 0.92) : rnd(0.35, 0.72));
+        // tamed (small/low-opacity). `gentle` (a shape placed OVER a melt) forces a small, translucent
+        // accent — never a hero — so the melt always shows through.
+        const _hero = !gentle && !b.additive && Math.random() < 0.20;
+        b.rad = b.additive ? rnd(0.12, 0.30) : (_hero ? rnd(0.42, 0.60) : gentle ? rnd(0.12, 0.30) : rnd(0.15, 0.42));
+        b.a   = b.additive ? rnd(0.30, 0.55) : (_hero ? rnd(0.70, 0.92) : gentle ? rnd(0.25, 0.50) : rnd(0.35, 0.72));
         b.x = rnd(0.22, 0.78); b.y = rnd(0.22, 0.78);   // wider spread → less central overlap (was 0.32–0.68)
         b.ang = rnd(0, 6.2832);
         // Foreground colour = the palette's WAVE colour → contrasts the background field.
@@ -2467,6 +2491,18 @@ export class EditorInspector {
         this._bindImageWarpSlider('image-warp-mask-sl', 'mask');  // §16 #3 Mask (melding tool)
         this._bindImageWarpSlider('image-warp-disp-sl', 'disp');  // §16.A Displacement (melding tool)
         this._bindImageWarpSlider('image-warp-flowmap-sl', 'flowMap');  // §16 #4 Image-driven flow (melding tool)
+        this._bindImageWarpSlider('image-warp-tint-sl', 'tint');  // §19 Palette-from-image (melding tool)
+        // Lazy palette extraction: if Tint goes up but the source colours weren't captured yet (race,
+        // or a pre-feature preset), extract them now and re-apply so the tint takes effect.
+        document.getElementById('image-warp-tint-sl')?.addEventListener('input', () => {
+            const iw = this.currentState.imageWarp;
+            if (iw && iw.enabled && iw.tint > 0 && !iw.imgPalette && iw.texName) {
+                this._extractImagePalette(iw.texName).then((pal) => {
+                    const cw = this.currentState.imageWarp;
+                    if (pal && cw && cw.texName === iw.texName) { cw.imgPalette = pal; this._applyToEngine(); }
+                });
+            }
+        });
         this._bindImageWarpSlider('image-warp-reseed-sl', 'reseed');
         this._bindImageWarpSlider('image-warp-audio-amt-sl', 'audioAmt');
         // Phase 4b — Colour/Grade on the melted image.
@@ -2485,7 +2521,7 @@ export class EditorInspector {
         // fader in the editor. The panel moves between cards/home, so the handler lives
         // on the panel itself; defaults are stamped from BLANK.imageWarp.
         // NB: speed slider is position-mapped (log); its default POSITION = _speedToPos(1.0).
-        const iwDefaults = { 'image-warp-size-sl': 1.0, 'image-warp-speed-sl': _speedToPos(1.0), 'image-warp-depth-sl': 0.5, 'image-warp-spin-sl': 0.0, 'image-warp-zoom-sl': 0.0, 'image-warp-flowpulse-sl': 0.0, 'image-warp-kaleido-speed-sl': 0.0, 'image-warp-lumakey-sl': 0.0, 'image-warp-mask-sl': 0.0, 'image-warp-disp-sl': 0.0, 'image-warp-flowmap-sl': 0.0, 'image-warp-bright-sl': 1.0, 'image-warp-contrast-sl': 1.0, 'image-warp-sat-sl': 1.0, 'image-warp-hue-sl': 0, 'image-warp-reseed-sl': 0.2, 'image-warp-audio-amt-sl': 0.5 };
+        const iwDefaults = { 'image-warp-size-sl': 1.0, 'image-warp-speed-sl': _speedToPos(1.0), 'image-warp-depth-sl': 0.5, 'image-warp-spin-sl': 0.0, 'image-warp-zoom-sl': 0.0, 'image-warp-flowpulse-sl': 0.0, 'image-warp-kaleido-speed-sl': 0.0, 'image-warp-lumakey-sl': 0.0, 'image-warp-mask-sl': 0.0, 'image-warp-disp-sl': 0.0, 'image-warp-flowmap-sl': 0.0, 'image-warp-tint-sl': 0.0, 'image-warp-bright-sl': 1.0, 'image-warp-contrast-sl': 1.0, 'image-warp-sat-sl': 1.0, 'image-warp-hue-sl': 0, 'image-warp-reseed-sl': 0.2, 'image-warp-audio-amt-sl': 0.5 };
         for (const [id, def] of Object.entries(iwDefaults)) {
             const sl = document.getElementById(id);
             if (!sl) continue;
@@ -2611,6 +2647,15 @@ export class EditorInspector {
             if (this.currentState.baseVals.decay < FLOW_FILL_DECAY) {
                 this.currentState.baseVals.decay = FLOW_FILL_DECAY;
             }
+            // Palette-from-image (§19): extract the image's dominant colours now so the Tint knob is
+            // ready when the user reaches for it. Async; applies (+ rebuilds if tint is already up).
+            this._extractImagePalette(entry.texName).then((pal) => {
+                const cw = this.currentState.imageWarp;
+                if (pal && cw && cw.texName === entry.texName) {
+                    cw.imgPalette = pal;
+                    if (cw.tint > 0) this._applyToEngine();
+                }
+            });
         } else {
             iw.enabled = false;
         }
@@ -2620,6 +2665,63 @@ export class EditorInspector {
         this._syncImageWarpSection();
         this._syncTrailSlider?.();
         this._syncSlider('ps-decay', this.currentState.baseVals.decay, 0.85, 0.999, 3);
+    }
+
+    /**
+     * Palette-from-image (§19) — extract the source's dominant DARK + LIGHT colours into
+     * `{ lo:[r,g,b], hi:[r,g,b] }` (0..1) for the duotone Tint. Downscales the source to a tiny
+     * canvas and averages the darkest/lightest luma quartiles. Source priority: the engine's live
+     * video upload canvas → a video element → the image/gif/text dataURL. Returns null on failure
+     * (tainted canvas, video object-URL that can't load as an Image, < 4 opaque pixels) → Tint then
+     * gracefully no-ops. Async (an Image may need to decode). Caches nothing here — the caller stores
+     * the result on `imageWarp.imgPalette` (which serialises into the saved preset, so loaded presets
+     * tint with no source re-decode).
+     */
+    async _extractImagePalette(texName) {
+        const texObj = this._imageTextures[texName];
+        if (!texObj) return null;
+        let drawable = null;
+        try {
+            const vid = this.engine?._videoAnimations?.get?.(texName);
+            if (vid?.uploadCanvas) drawable = vid.uploadCanvas;
+            else if (texObj.videoElement && texObj.videoElement.readyState >= 2) drawable = texObj.videoElement;
+        } catch { /* engine internals optional */ }
+        if (!drawable) {
+            const src = texObj.isText
+                ? this.engine?._renderTextTexture?.(texObj.textLayer)?.dataURL
+                : texObj.data;
+            if (!src || typeof src !== 'string' || src.startsWith('blob:')) return null; // blob: = video, not Image-loadable
+            drawable = await new Promise((res) => {
+                const im = new Image();
+                im.onload = () => res(im);
+                im.onerror = () => res(null);
+                im.src = src;
+            });
+            if (!drawable) return null;
+        }
+        const N = 32;
+        const cv = document.createElement('canvas');
+        cv.width = N; cv.height = N;
+        const ctx = cv.getContext('2d', { willReadFrequently: true });
+        let px;
+        try { ctx.drawImage(drawable, 0, 0, N, N); px = ctx.getImageData(0, 0, N, N).data; }
+        catch { return null; } // drawImage or tainted-canvas read failed
+        const pts = [];
+        for (let i = 0; i < px.length; i += 4) {
+            if (px[i + 3] / 255 < 0.15) continue; // skip near-transparent pixels
+            const r = px[i] / 255, g = px[i + 1] / 255, b = px[i + 2] / 255;
+            pts.push([r, g, b, 0.299 * r + 0.587 * g + 0.114 * b]);
+        }
+        if (pts.length < 4) return null;
+        pts.sort((a, b) => a[3] - b[3]);
+        const avg = (arr) => {
+            let r = 0, g = 0, b = 0;
+            for (const p of arr) { r += p[0]; g += p[1]; b += p[2]; }
+            const n = arr.length || 1;
+            return [r / n, g / n, b / n];
+        };
+        const k = Math.max(1, Math.floor(pts.length * 0.25));
+        return { lo: avg(pts.slice(0, k)), hi: avg(pts.slice(pts.length - k)) };
     }
 
     /** Park the Drive panel back in its hidden home (so it survives card deletes/reorders
@@ -2686,6 +2788,7 @@ export class EditorInspector {
         this._syncSlider('image-warp-mask-sl', iw.mask ?? 0, 0, 1, 2);
         this._syncSlider('image-warp-disp-sl', iw.disp ?? 0, 0, 1, 2);
         this._syncSlider('image-warp-flowmap-sl', iw.flowMap ?? 0, 0, 1, 2);
+        this._syncSlider('image-warp-tint-sl', iw.tint ?? 0, 0, 1, 2);
         this._syncSlider('image-warp-reseed-sl', iw.reseed ?? 0.2, 0, 1, 2);
         this._syncSlider('image-warp-audio-amt-sl', iw.audioAmt ?? 0.5, 0, 1, 2);
     }
@@ -8830,6 +8933,7 @@ export class EditorInspector {
                 bright: iw.bright, contrast: iw.contrast, sat: iw.sat, hue: iw.hue, invert: iw.invert,
                 speed: iw.speed, depth: iw.depth,
                 spin: iw.spin, zoomPulse: iw.zoomPulse, flowPulse: iw.flowPulse, lumaKey: iw.lumaKey, mask: iw.mask, disp: iw.disp, flowMap: iw.flowMap,
+                tint: iw.tint, palette: iw.imgPalette,
                 reseed: iw.reseed, audioSource: iw.audioSource, audioAmt: iw.audioAmt,
                 isStackedAlpha: !!iwDrive.isStackedAlpha,
             });

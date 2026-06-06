@@ -1,24 +1,39 @@
 # Meld (Image-as-Texture) — feeding images INTO MilkDrop presets
 
-Status: **🟢 SHIPPED & STABLE (updated 2026-06-04).** The **Meld** feature is feature-complete for v1 and
-cross-platform-verified: feedback-melt engine (§12), per-card **Overlay\|Meld** UX (§13), Tier 1/2 reactivity
-(§13.6), **Size · Position pad · Luma Key · Mirror/Kaleido** (§14a) + **Colour/Grade** (Brightness/Contrast/
-Saturation/Hue/Invert, §14.2), **perceptual log Speed w/ true slow-motion** (§17), **Blend mode** (the first
-melding tool, §16), and **🎲 Remix rolls the WHOLE melt** — incl. framing, blend, colour, with a "present
-meld" bias so the source image stays recognizable (Phase 7). **Verified end-to-end:** headless 37/37, tested
-locally + macOS build + Coolify web + **Windows build (on GitHub, uploaded to repo for the promo page)**;
-**a melded-remix preset exported locally imports & remixes correctly in the macOS install.**
-**Transparent-video Meld fix (stacked-alpha recombination, §12.3a) VERIFIED on the macOS build & live on
-Coolify 2026-06-04** — BruceLee export re-imports correctly, and freshly-imported transparent videos switched
-to Meld render perfectly. **Displacement SHIPPED 2026-06-05 (verify 41/41)** — the image's brightness warps
-the melt's feedback sample coord (the picture's shape ripples the plasma); §16.A. **🌙 Club / Dark Mode SHIPPED
-2026-06-05 (verify 11/11)** — one-knob final-output dark-room tune for ALL presets (crush blown white, deepen
-colour); §18. **Mask SHIPPED 2026-06-05 (verify 44/44)** — the image's bright shape becomes a crisp spatial
-stencil (logo-like): image inside the silhouette, the preset's own melt outside; §16 #3. **▶️ NEXT SESSION:
-image-driven flow** (§16 roadmap #4). The Phase Tracker below is the live status. Origin: `milkdrop-pack-import.md` §16.2.
+Status: **🟢 SHIPPED & STABLE — feature-complete v1, cross-platform-verified** (macOS + Coolify web + Windows;
+export/import round-trips on the macOS install). The **Meld** feature feeds a user image/video/GIF INTO a
+preset's feedback loop so the preset *processes* it instead of overlaying it. **Full shipped status lives in the
+Phase Tracker below (single source of truth).** Origin: `milkdrop-pack-import.md` §16.2.
 
-> **📚 Doc map:** Tracker + §§12–17 = current/shipped (read these). **§§3–8, 10–11 are PRE-BUILD scoping
-> (2026-06-03) kept as historical record — superseded by what shipped; don't treat as TODO.**
+## ▶️ NEXT UP — Palette-from-image follow-ons (§16 #5 · detail in §19)
+
+Tint the melt by the image's **own dominant colours** — the preset takes on the image's colour mood, still
+pulsing to the audio (a sunset photo washes it orange/purple; a logo's brand colours bleed into the plasma).
+Phase steps:
+- **A — Tint v1 (core)** ⭐ ✅ **SHIPPED 2026-06-06 (verify 52/52)** — CPU lo/hi dominant-colour extraction
+  (`_extractImagePalette`) + a one-knob duotone **Tint** remapping the feedback's brightness through the
+  image's dark→light palette. Gated no-op at 0; model `tint`+`imgPalette`; Tint slider after Flow Map; both
+  build sites; `_rollImageWarp` axis (~35%); headless verify. `imgPalette` serialises into the saved preset.
+- **B — 3-stop ramp** — add a saturated `mid` accent (lo/mid/hi) for a richer, more faithful recolour. ← next
+- **C — Audio-reactive tint** — pulse the tint amount on the beat (on-brand: audio is the differentiator).
+- **D — Live palette** — re-extract per-N-frames so the tint *tracks* video/GIF footage (v1 snapshots at enable).
+- **E — Tint target/mode (opt)** — feedback (default) vs final output; hue-only vs full-colour.
+
+## 🗺️ Roadmap at a glance
+
+**✅ Shipped melding tools:** base presence/reseed · Luma Key · Size/Position framing · Mirror/Kaleido ·
+Colour/Grade · log Speed (slow-mo) · **Blend mode** · **Displacement** · **Mask** · **Flow Map** ·
+**Palette-from-image (Tint)** · 🎲 Remix rolls the whole melt (incl. framing + present-bias) · 🌙 Club/Dark
+Mode (final-output knob, §18). **That's the full v1 melding-tool set.**
+
+**📋 Backlog (all optional/future):** Palette-from-image **B–E** (3-stop ramp · audio-reactive tint · live
+palette · tint-target mode — §19) · Mask v2 (separate mask source) · Flow Map v2 (along-gradient) ·
+Displacement v2 (gradient ripple) · dedicated 🎲 in the Meld panel · webcam source (Phase 3) · Aspect mode
+(§14.1a) · 4c Stylize (Edge/Posterize) · Colour/Grade extras (Gamma/Temp/Sepia/Fade/Shadows/Highlights/Lift/
+Gain/Tint) · named-texture path + 22 built-in textures · Tile out-of-bounds toggle.
+
+> **📚 Doc map:** Tracker + §§12–19 = current/shipped (read these). **§§3–8, 10–11 + §15 are PRE-BUILD scoping
+> / historical snapshots (2026-06-03) — superseded by what shipped; don't treat as TODO.**
 >
 > **🏷️ NAME (2026-06-04): the user-facing feature is "MELD"** (renamed from "Drive" — more intuitive: the
 > image *melds INTO* the preset). The per-card button says **Meld**. **Internal CODE names are unchanged**
@@ -46,18 +61,15 @@ _Single source of truth for status. Detail in the numbered sections below._
 | **6 — Melding tools** ⭐ | The strategic category (§16): controls for HOW an asset *integrates into* the preset's machinery. **Blend mode SHIPPED 2026-06-04 (verified 33/33)** — Mix/Add/Screen/Multiply/Difference/Overlay chip-row. **Displacement SHIPPED 2026-06-05 (verified 41/41)** — `imageWarp.disp`; image luma warps the feedback sample coord (`_disp` radial push, gated no-op at 0; swaps `_zuv + _flow` for standard flows, `_kuv` for kaleido); **Displace** slider after Luma Key; Remix rolls it (gentle on present rolls). **Mask SHIPPED 2026-06-05 (verify 44/44)** — `imageWarp.mask`; image's bright shape = crisp stencil (image inside silhouette, preset melt outside); centered-threshold `_mask` whose edge sharpens with the knob; **Mask** slider after Luma Key; Remix ~20%. **Image-driven flow SHIPPED 2026-06-06 (verify 48/48)** — `imageWarp.flowMap`; the image's luma gradient steers the per-frame `_flow` so the melt streams ALONG the picture's contours (tangent push, gated no-op at 0; no-op on kaleido); **Flow Map** slider after Displace; Remix rolls it ~30%. **▶️ NEXT: palette-from-image.** | 🟢 **Blend + Displacement + Mask + Flow Map DONE** |
 | **3 — More sources** | Video / GIF / webcam as the driving texture. **GIF + video CONFIRMED WORKING in real use 2026-06-03** (user) — same `setUserTexture` sampler the warp reads each frame, so the melt animates for free. Remaining: webcam + per-source polish. | 🟢 **GIF/video work; webcam TODO** |
 | **(opt) — Named-texture path** | "Photo-reactive" presets that sample a known user sampler + ship the **22 built-in texture assets** (`milkdrop-pack-import.md` §16.1). | ⬜ optional |
-| **7 — Drive 🎲 (Remix)** | **GLOBAL 🎲 Remix rolls the WHOLE Meld (verified 33/33):** the Remix "Flow" axis gambles flow/speed/depth/spin/zoom/flow-pulse/mirror/luma-key/**blend-mode**/presence/audio **AND framing (size/position)** via `_rollImageWarp`; panel re-syncs (sliders + chips + pad follow), every roll renders, **Flow lock** keeps the melt. **Tuned 2026-06-04:** rolls framing too ("move also"; ⅓ full-frame, rest in-bounds); biased gently away from blown white (add/screen rolled less + lower presence); **~45% "present meld" rolls** (`_present` flag → high presence + gentler depth/speed, no obliterating kaleido, image-faithful blend → the source image stays RECOGNIZABLE; the rest keep the abstract/dissolved variety). Only which image drives is left alone. Remaining (optional): a dedicated 🎲 button IN the Meld panel. | 🟢 **Remix→Meld DONE — incl. framing, blend, present-bias** |
+| **7 — Drive 🎲 (Remix)** | **GLOBAL 🎲 Remix rolls the WHOLE Meld (verified 33/33):** the Remix "Flow" axis gambles flow/speed/depth/spin/zoom/flow-pulse/mirror/luma-key/**blend-mode**/presence/audio **AND framing (size/position)** via `_rollImageWarp`; panel re-syncs (sliders + chips + pad follow), every roll renders, **Flow lock** keeps the melt. **Tuned 2026-06-04:** rolls framing too ("move also"; ⅓ full-frame, rest in-bounds); biased gently away from blown white (add/screen rolled less + lower presence); **~45% "present meld" rolls** (`_present` flag → high presence + gentler depth/speed, no obliterating kaleido, image-faithful blend → the source image stays RECOGNIZABLE; the rest keep the abstract/dissolved variety). Only which image drives is left alone. **Anti-shred tuning 2026-06-06:** the three FRACTURE axes (Flow Pulse / Displacement / Flow Map) used to roll as independent dice → 2–3 stacked on ~30% of rolls → the image shattered/animated out. Now a **shared distortion budget**: each keeps its exact odds + range, but the three rollers are shuffled and **at most ONE wins per roll** (stop at first hit) → 2+ stacking 30%→0%, "any distortion fires" unchanged at ~75%. The breakup stays as the occasional surprise, never the pile-up. **Melt-aware content 2026-06-06:** Remix's content-type roll (`_rollFullStack`) ignored whether a Meld was driving → it stamped a wave/shape slab over the melt ~45% of the time (a big opaque "hero" shape covering the gorgeous melt). Now when `imageWarp.enabled`, the melt IS the content: shapes 45%→**12%** (and those go through `_addRemixShape(gentle)` = small/translucent/no-hero, at most ONE), filled-wave skipped, **pure-melt 25%→78%**. No-meld (from-scratch) distribution UNCHANGED. Remaining (optional): a dedicated 🎲 button IN the Meld panel. | 🟢 **Remix→Meld DONE — incl. framing, blend, present-bias, anti-shred budget, melt-aware content** |
 
-**▶️ NEXT SESSION — pick up at PALETTE-FROM-IMAGE (§16 roadmap #5) — the next melding tool.** Displacement
-(§16.A, verify 41/41), 🌙 Club / Dark Mode (§18, verify 11/11), Mask (§16 #3, verify 44/44), and **Image-driven
-flow (§16 #4, verify 48/48 — `imageWarp.flowMap`, the image's gradient steers `_flow` tangent to its contours)**
-are all now shipped. Everything else is shipped, committed, pushed, and cross-platform-verified (macOS + web;
-export/import round-trips on the macOS install). After palette-from-image: Mask **v2** (a separate mask SOURCE /
-channel) → (optional) a dedicated 🎲 button in the Meld panel → Phase 3 webcam source → Aspect (§14.1a).
+**▶️ What's next is the NEXT UP block at the top of this doc (Palette-from-image, §19).**
+
 The verify harnesses: [scripts/verify-image-warp-editor.mjs](scripts/verify-image-warp-editor.mjs) (48/48) for
 Meld; [scripts/verify-club-mode.mjs](scripts/verify-club-mode.mjs) (11/11) for the comp-grade Club op.
-Build pattern (unchanged): gated `buildImageWarp` op (neutral = byte-identical no-op) →
-`imageWarp` model field → Meld-panel control (dbl-click reset) → BOTH build sites → `_rollImageWarp` axis →
+**Build pattern (the proven recipe — every melding tool follows it):** gated `buildImageWarp` op (neutral =
+byte-identical no-op) → `imageWarp` model field → Meld-panel control (dbl-click reset) → BOTH build sites
+(`_buildRuntimePreset` editor + `refreshCustomPresets` player/visualizer.js) → `_rollImageWarp` axis →
 headless verify (bakes + renders + round-trips). Standing rules: [[project_one_click_vs_pro_tools]] (one
 musical knob, boring-not-broken/luma) + [[project_remix_batch_perf]] (`_rolling`).
 
@@ -667,7 +679,11 @@ single opinionated knob/toggle; together they're a deep, rollable space.
    Gated → byte-identical no-op at 0; **no-op on kaleido** (no `_flow`, like speed/flowPulse). **Flow Map**
    slider after Displace; Remix rolls it ~30% (gentler on present rolls). v2 (along-gradient "climb to bright"
    variant) left as a future option — tangent shipped because it reads most distinct from Displacement.
-5. **Palette-from-image** — tint the feedback/preset by the image's dominant colours.
+5. **Palette-from-image** ✅ **v1 SHIPPED 2026-06-06 (verify 52/52; full phase plan in §19)** — tint the
+   feedback/preset by the image's dominant colours so the melt takes on the image's colour mood. v1 = a
+   one-knob duotone **Tint** (`imageWarp.tint`) that maps the feedback's luma through the image's extracted
+   dark→light palette (`imageWarp.imgPalette`, via `_extractImagePalette`). Phases B–E (3-stop ramp /
+   audio-reactive / live palette / tint-target) remain optional follow-ons.
 
 **Build rules (same as always):** each = a gated addition to `buildImageWarp` (neutral = no-op,
 boring-not-broken/luma>20), model field on `imageWarp`, one control in the Drive panel, both build sites,
@@ -869,3 +885,69 @@ It's both the user's "go-to club fine-tune" knob AND the clean structural darken
 6. Verify headless: a deliberately blown-white preset → crank Club → assert **luminance drops while
    saturation holds** (and a vivid-colour preset keeps its colour); `club=0` is byte-identical; round-trips.
    Extend the editor verify harness (or a small new comp-grade verify if cleaner).
+
+---
+
+## 19. PALETTE-FROM-IMAGE — tint the melt by the image's own colours (§16 #5)
+
+**The pitch:** the melt takes on the *image's colour mood*. We pull the image's dominant **dark** and **light**
+colours, then remap the feedback's brightness through that two-colour ramp — a **duotone** toward the image's
+palette — mixed in by one **Tint** knob. A sunset photo washes the whole preset orange→purple; a brand logo
+bleeds its colours into the plasma; and because the feedback is still audio-driven, the tinted melt keeps
+pulsing to the music. The 5th melding tool — the one that makes the preset *wear the image's colours*.
+
+**Why it's distinct from the shipped tools:** Colour/Grade (§14.2) re-moods the *image* before it blends in;
+Palette-from-image re-moods the *feedback/preset* using colours *derived from* the image. Blend mode decides
+HOW image+feedback fuse; this decides what COLOUR the feedback becomes. One opinionated musical knob, gated,
+Remix-rollable — same ethos as every other melding tool ([[project_one_click_vs_pro_tools]]).
+
+### 19.1 Mechanism
+
+**CPU — colour extraction (no new decode plumbing).** `this._imageTextures[texName]` already holds the source
+(`{ data: <dataURL>, width, height }`); the thumbnail code (`_addImageLayer`, inspector.js ~8594) already shows
+the draw-to-canvas pattern. New `_extractImagePalette(texName)`:
+1. Draw the source into a small offscreen canvas (~32×32) — letterbox-free, we only want colour.
+2. `getImageData` → sort/bucket pixels by luma.
+3. Average the **dark percentile** → `lo` `[r,g,b]`, the **light percentile** → `hi` `[r,g,b]` (normalised 0..1).
+4. Cache on `imageWarp.imgPalette = { lo, hi }`. Recompute on meld-enable and on image swap (not per frame).
+
+(Video/GIF: v1 snapshots the *current frame* at enable time — see Phase D for live tracking.)
+
+**Shader — gated duotone in `buildImageWarp`.** Right after `_fb` is computed (before imgSample/grade/mix),
+when `tint > 0`, bake `lo`/`hi` as GLSL literals:
+```glsl
+float _tl = dot(_fb, vec3(0.299, 0.587, 0.114));     // feedback luma
+vec3 _pal = mix(vec3(<lo>), vec3(<hi>), _tl);        // image's dark→light palette ramp
+_fb = mix(_fb, _pal, <tint>);                        // recolour the feedback toward it
+```
+`tint === 0` (or no palette) → no lines → **byte-identical no-op**. Recolouring `_fb` (not `ret`) means the
+tint also feeds the blend modes, so the whole melt wears the colours. Composes with everything; audio
+reactivity untouched (the feedback is still audio-driven, we only recolour it).
+
+### 19.2 Phase steps
+
+| Phase | What | State |
+|---|---|---|
+| **A — Tint v1 (core)** ⭐ | `_extractImagePalette` (lo/hi) + the gated duotone + **Tint** slider after Flow Map + model `tint`/`imgPalette` + both build sites + `_rollImageWarp` axis (~35%) + verify. | ✅ **SHIPPED 2026-06-06 (verify 52/52)** |
+| **B — 3-stop ramp** | add a saturated `mid` (the image's most-saturated dominant) → `lo/mid/hi` split ramp for a richer, more faithful recolour. | ⬜ follow-on |
+| **C — Audio-reactive tint** | pulse the tint amount on the beat (reuse the `audioSource`/`audioAmt` pattern or a micro-knob) — the differentiator. | ⬜ follow-on |
+| **D — Live palette** | re-extract every N frames for video/GIF so the tint *tracks* the footage instead of v1's enable-time snapshot. | ⬜ future |
+| **E — Tint target/mode (opt)** | choose feedback (default) vs final output; or hue-only vs full-colour duotone. | ⬜ optional |
+
+### 19.3 Phase A build checklist (the proven recipe)
+1. `_extractImagePalette(texName)` → `{ lo:[r,g,b], hi:[r,g,b] }` (0..1); call on meld-enable (`_toggleCardDrive`)
+   + image swap; store on `imageWarp.imgPalette`.
+2. `buildImageWarp`: add `tint` + `palette` params + the gated duotone block (guarded `tint>0 && palette`).
+3. Model: `imageWarp.tint = 0.0`, `imageWarp.imgPalette = null` in `BLANK`.
+4. UI: a **Tint** slider in the Meld panel after Flow Map (dbl-click reset, `_bindImageWarpSlider`, `iwDefaults`,
+   `_syncSlider`).
+5. Both build sites (`_buildRuntimePreset` + `refreshCustomPresets`) pass `tint: iw.tint, palette: iw.imgPalette`.
+6. `_rollImageWarp`: roll `tint` (special-occasion; gentler on present rolls so the source colour still reads).
+7. `scripts/verify-image-warp-editor.mjs`: assert tint=0 no-op (no `_tl` duotone line), tint>0 bakes the ramp,
+   the tinted melt still renders bright, and `_extractImagePalette` returns a `{lo,hi}` palette. ✅ **Done —
+   suite now 52/52** (4 assertions added).
+
+**Gotcha to watch:** `imgPalette` must round-trip in the saved preset (it's part of `imageWarp`, so it serialises
+for free) — but on **import/load** the cached pixels may not be available before first paint; re-extract lazily
+if `imgPalette` is missing but `tint>0`. (Or persist the extracted lo/hi in the saved JSON, which we already do
+by storing it on `imageWarp` — preferred, so loaded presets tint correctly with no source re-decode.)
