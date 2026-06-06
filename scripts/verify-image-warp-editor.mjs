@@ -71,7 +71,8 @@ const r = await page.evaluate(async () => {
     const runtime = insp._buildRuntimePreset(insp.currentState);
     out.warpIsImageWarp = !!runtime.warp
         && runtime.warp.includes(`uniform sampler2D sampler_${texName};`)
-        && runtime.warp.includes(`texture(sampler_${texName}, uv_orig)`);
+        && runtime.warp.includes(`vec2 _sc = uv_orig;`)            // native-alpha path samples via _sc
+        && runtime.warp.includes(`texture(sampler_${texName}, _sc)`);
 
     // Radio: driving a SECOND layer must release the first (one warp slot).
     await insp._addImageLayer(await mkFile());  // entry was driving when this ran
@@ -219,6 +220,20 @@ const r = await page.evaluate(async () => {
     out.tintLuma = await luma();
     insp.currentState.imageWarp.tint = 0;
     insp.currentState.imageWarp.imgPalette = null;
+
+    // Edge Feather (transparent-video cutout edge clean-up) — only acts on stacked-alpha sources, so
+    // briefly fake isStackedAlpha on the driving entry to exercise it. feather=0 = no-op (no `_fr` line);
+    // feather>0 bakes the alpha blur + the smoothstep edge-sharpen.
+    const _fEntry = insp.currentState.images.find(e => e.texName === texName);
+    const _fOrig = _fEntry.isStackedAlpha;
+    _fEntry.isStackedAlpha = true;
+    insp.currentState.imageWarp.edgeFeather = 0;
+    out.featherNeutralNoop = !insp._buildRuntimePreset(insp.currentState).warp.includes('float _fr =');
+    insp.currentState.imageWarp.edgeFeather = 0.6;
+    const fWarp = insp._buildRuntimePreset(insp.currentState).warp;
+    out.featherBaked = fWarp.includes('float _fr =') && fWarp.includes('* 0.36');  // soft-only 9-tap matte blur
+    insp.currentState.imageWarp.edgeFeather = 0;
+    _fEntry.isStackedAlpha = _fOrig;
 
     // Phase 7 — Remix rolls the Drive melt look (incl. framing now) + the panel re-syncs.
     Object.assign(insp.currentState.imageWarp, { size: 0.7, cx: 0.45, cy: 0.5, flow: 'liquid' });
@@ -373,6 +388,8 @@ ok('Palette-from-image extracts a {lo,hi} dominant-colour palette', r.paletteExt
 ok('Tint tint=0 = no-op (no duotone line)', r.tintNeutralNoop);
 ok('Tint bakes the image-palette duotone ramp into the feedback', r.tintBaked);
 ok('Tinted melt STILL renders bright, not black (luma > 20)', r.tintLuma > 20, `luma ${r.tintLuma?.toFixed(1)}`);
+ok('Edge Feather feather=0 = no-op (no _fr alpha-blur line)', r.featherNeutralNoop);
+ok('Edge Feather bakes the alpha blur + smoothstep edge-sharpen (stacked-alpha)', r.featherBaked);
 ok('Speed fader is log-mapped (pos 0 → ~0.02 slow, pos 1 → ~4.0 fast)', r.logSpeed);
 ok('Mirror/Kaleido bakes a fold into the warp + reveals its speed row', r.mirrorBaked && r.kaleidoRowShown);
 ok('Mirrored melt STILL renders bright, not black (luma > 20)', r.mirrorLuma > 20, `luma ${r.mirrorLuma?.toFixed(1)}`);

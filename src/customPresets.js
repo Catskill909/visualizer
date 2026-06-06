@@ -832,12 +832,41 @@ export function buildImageWarp(opts) {
     // — same recombination the layer path does. Clamp first so spin/zoom wrap can't
     // bleed one half into the other. Non-stacked → plain full-texture sample
     // (byte-identical to before, so opaque image/video melds are unchanged).
+    //
+    // Image colour + ALPHA. Two source layouts, BOTH now gate by the matte (`_imgA`):
+    //   • stacked-alpha (macOS transparent video): RGB = top half (`y*0.5`), alpha-as-luma = bottom half
+    //     (`y*0.5+0.5`); clamp first so spin/zoom wrap can't cross the half-seam.
+    //   • native-alpha (web transparent video / transparent PNG/GIF/text) AND opaque: alpha = the texture's
+    //     `.a` channel. Opaque content reads `.a = 1` → the alpha gate is a no-op (opaque melds unchanged).
+    // ⚠️ ROOT-CAUSE FIX 2026-06-06: the native path USED to be `_img = texture(...).rgb` with NO `_imgA` and
+    // NO presence gate — so on the web (where transparent videos are native VP9-alpha, not stacked) the meld
+    // ignored the matte entirely and ALL edge handling was skipped. That's why Edge Feather "did nothing"
+    // and the whole edge-noise saga's fixes (all gated behind isStackedAlpha) never ran. See
+    // video-cutout-edge-noise-dev.md.
+    //
+    // EDGE FEATHER (`edgeFeather`, 0 = off): SOFT-ONLY 9-tap box blur of the matte alpha (cross + diagonals,
+    // radius `_fr` ∝ feather). A soft matte edge stops the hard edge from beating against the warped
+    // feedback (the speckle). Blurs ALPHA only (blurring RGB spreads white). feather=0 → single tap → no-op.
     const isStackedAlpha = !!o.isStackedAlpha;
+    const feather = Number(o.edgeFeather ?? 0);
+    const _fr = (feather * 0.05).toFixed(5);
+    // Alpha-tap builders (same dx/dy convention: '0.0' | '_fr' | '-_fr'). Stacked reads the bottom-half
+    // luma (clamped into the alpha band); native reads the texture's `.a`.
+    const _aTapS = (dx, dy) => `texture(sampler_${imgName}, vec2(clamp(_suv.x + ${dx}, 0.0, 1.0), clamp((_suv.y + ${dy}) * 0.5 + 0.5, 0.5, 1.0))).r`;
+    const _aTapN = (dx, dy) => `texture(sampler_${imgName}, _sc + vec2(${dx}, ${dy})).a`;
+    const _blur9 = (tap) =>
+        `${tap('0.0', '0.0')} * 0.36\n` +
+        `    + (${tap('_fr', '0.0')} + ${tap('-_fr', '0.0')} + ${tap('0.0', '_fr')} + ${tap('0.0', '-_fr')}) * 0.11\n` +
+        `    + (${tap('_fr', '_fr')} + ${tap('-_fr', '_fr')} + ${tap('_fr', '-_fr')} + ${tap('-_fr', '-_fr')}) * 0.05`;
     const sampleImg = (coordExpr) => isStackedAlpha
         ? `  vec2 _suv = clamp(${coordExpr}, 0.0, 1.0);\n` +
+          (feather > 0 ? `  float _fr = ${_fr};\n` : '') +
           `  vec3 _img = texture(sampler_${imgName}, vec2(_suv.x, _suv.y * 0.5)).rgb;\n` +
-          `  float _imgA = texture(sampler_${imgName}, vec2(_suv.x, _suv.y * 0.5 + 0.5)).r;\n`
-        : `  vec3 _img = texture(sampler_${imgName}, ${coordExpr}).rgb;\n`;
+          `  float _imgA = ${feather > 0 ? _blur9(_aTapS) : _aTapS('0.0', '0.0')};\n`
+        : `  vec2 _sc = ${coordExpr};\n` +
+          (feather > 0 ? `  float _fr = ${_fr};\n` : '') +
+          `  vec3 _img = texture(sampler_${imgName}, _sc).rgb;\n` +
+          `  float _imgA = ${feather > 0 ? _blur9(_aTapN) : `texture(sampler_${imgName}, _sc).a`};\n`;
     let imgSample;
     if (needCoord) {
         let lines = framed
@@ -921,11 +950,11 @@ export function buildImageWarp(opts) {
         gate += `  float _mask = smoothstep(0.5 - ${w}, 0.5 + ${w}, _ml);\n`;
         presence += ` * _mask`;
     }
-    if (isStackedAlpha) {
-        // Transparent-video mask (stacked-alpha): only the opaque pixels meld in;
-        // the transparent background drops to pure feedback (presence→0).
-        presence += ` * _imgA`;
-    }
+    // Gate the meld by the matte alpha — for BOTH stacked AND native-alpha now (`_imgA` is defined in both
+    // branches of sampleImg). Transparent pixels → presence 0 → pure feedback (the preset's own melt shows
+    // through). Opaque content has `_imgA = 1` → no-op, so opaque image/video melds are unchanged. This is
+    // the line that was previously stacked-only, which is why web (native-alpha) cutouts ignored their matte.
+    presence += ` * _imgA`;
     // Blend mode (§16 — the first MELDING tool). HOW the image fuses with the feedback, not just how
     // MUCH (that's presence). 'mix' (default) → `mix(_fb,_img,presence)` = byte-identical no-op. Others
     // compute a blended colour, still scaled by presence so the dial still works. The switch only emits
