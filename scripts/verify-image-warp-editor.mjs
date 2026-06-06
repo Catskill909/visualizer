@@ -53,6 +53,14 @@ const r = await page.evaluate(async () => {
     const entry = insp.currentState.images[0];
     const texName = entry?.texName;
 
+    // Bundled-preset guard: Meld is BLOCKED (modal shown, drive NOT enabled) on a raw bundled MilkDrop base.
+    insp._bundledBase = true;
+    insp._toggleCardDrive(entry);
+    out.meldBlockedOnBundled = insp.currentState.imageWarp.enabled === false
+        && document.getElementById('meld-bundled-modal')?.hidden === false;
+    document.getElementById('meld-bundled-ok')?.click();   // close + cleanup
+    insp._bundledBase = false;                              // back to a custom base for the rest of the suite
+
     // Per-card Overlay|Drive switch: toggle Drive on THIS layer via the real handler.
     insp._toggleCardDrive(entry);
     insp.currentState.imageWarp.flow = 'tunnel';
@@ -338,12 +346,16 @@ const r = await page.evaluate(async () => {
     const saved = JSON.parse(JSON.stringify(insp.currentState));
     out.savedHasImageWarp = !!(saved.imageWarp && saved.imageWarp.enabled && saved.imageWarp.texName === texName && saved.imageWarp.flow === 'tunnel');
 
+    // Bug guard: a meld was active (panel relocated INTO a card) when loadPresetData → _clearForLoad ran.
+    // _clearForLoad must home the panel BEFORE wiping #image-layers, or the single #image-warp-controls
+    // node gets destroyed and every later Meld has no panel (retract dead / no settings).
     await insp.loadPresetData(saved);
+    out.panelSurvivesClear = !!document.getElementById('image-warp-controls');
     const iw2 = insp.currentState.imageWarp;
     out.reloadedEnabled = !!(iw2 && iw2.enabled && iw2.flow === 'tunnel' && Math.abs(iw2.reseed - 0.6) < 1e-6);
     const texName2 = insp.currentState.images[0]?.texName;
     const runtime2 = insp._buildRuntimePreset(insp.currentState);
-    out.reloadWarpOk = !!runtime2.warp && runtime2.warp.includes(`texture(sampler_${texName2}, uv_orig)`);
+    out.reloadWarpOk = !!runtime2.warp && runtime2.warp.includes(`texture(sampler_${texName2}, _sc)`);  // native path samples via _sc
 
     // Graceful degrade: delete the only layer → image-warp must auto-disable so the
     // build can't reference a missing sampler.
@@ -406,6 +418,8 @@ ok('Remix now rolls framing too (size/position move, stay in bounds)', r.remixFr
 ok('Flow lock keeps the melt (Remix does not roll it)', r.remixFlowLock);
 ok('driving layer drops out of the overlay (not stacked on top)', r.overlayHiddenWhileDriving);
 ok('toggling back to Overlay restores it + parks the panel home', r.overlayRestoredWhenOff && r.panelHomedWhenOff);
+ok('Drive panel survives a reset/load while melding (not destroyed by the #image-layers wipe)', r.panelSurvivesClear);
+ok('Meld on a bundled MilkDrop preset is blocked with a modal (not silently broken)', r.meldBlockedOnBundled);
 ok('imageWarp serializes into the saved preset JSON', r.savedHasImageWarp);
 ok('save → reload restores imageWarp (enabled/flow/reseed) + rebuilds the melt', r.reloadedEnabled && r.reloadWarpOk);
 ok('deleting the source layer auto-disables drive (no dangling sampler)', r.degradedDisabled && r.degradedWarpClean);

@@ -1068,6 +1068,22 @@
             </div>
         </div>
 
+        <!-- Meld-on-bundled-preset info modal -->
+        <div id="meld-bundled-modal" class="save-modal" hidden role="dialog" aria-modal="true"
+            aria-labelledby="meld-bundled-title">
+            <div class="save-modal-card">
+                <h2 id="meld-bundled-title" class="save-modal-title">Meld needs a custom preset</h2>
+                <p class="layer-delete-msg">Meld feeds your image into the preset's own motion — and that only
+                    works on a <strong>custom</strong> preset, not the built-in MilkDrop presets (their motion
+                    is baked in). Start one with <strong>New</strong> or <strong>🎲 Remix</strong>, then Meld your
+                    image in. <em>(Melding into the 1,144 MilkDrop presets is on the roadmap.)</em></p>
+                <div class="save-modal-actions">
+                    <button id="meld-bundled-remix" class="primary-btn" type="button">🎲 Remix into a custom preset</button>
+                    <button id="meld-bundled-ok" class="reset-btn" type="button">Got it</button>
+                </div>
+            </div>
+        </div>
+
         <!-- GIF Optimizer modal -->
         <div id="gif-optimizer-modal" class="save-modal gif-optimizer-modal" hidden role="dialog" aria-modal="true"
             aria-labelledby="gif-optimizer-title">

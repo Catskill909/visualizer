@@ -5,6 +5,12 @@ export/import round-trips on the macOS install). The **Meld** feature feeds a us
 preset's feedback loop so the preset *processes* it instead of overlaying it. **Full shipped status lives in the
 Phase Tracker below (single source of truth).** Origin: `milkdrop-pack-import.md` §16.2.
 
+> **✅ Transparent-video cutouts now clean & fully shippable (2026-06-06).** The long-standing white edge
+> speckle on melded transparent videos is FIXED — the web/native-alpha meld path was ignoring the matte
+> entirely (alpha handling was macOS-stacked-only); now both paths gate by the matte + apply a soft-feather
+> **Edge Feather** matte blur (default 0.5). Small/low-res cutouts especially are now usable. macOS build
+> tested ✅; Windows build pushed live (test pending). Full post-mortem: [`video-cutout-edge-noise-dev.md`](video-cutout-edge-noise-dev.md).
+
 ## ▶️ NEXT UP — Palette-from-image follow-ons (§16 #5 · detail in §19)
 
 Tint the melt by the image's **own dominant colours** — the preset takes on the image's colour mood, still
@@ -23,8 +29,9 @@ Phase steps:
 
 **✅ Shipped melding tools:** base presence/reseed · Luma Key · Size/Position framing · Mirror/Kaleido ·
 Colour/Grade · log Speed (slow-mo) · **Blend mode** · **Displacement** · **Mask** · **Flow Map** ·
-**Palette-from-image (Tint)** · 🎲 Remix rolls the whole melt (incl. framing + present-bias) · 🌙 Club/Dark
-Mode (final-output knob, §18). **That's the full v1 melding-tool set.**
+**Palette-from-image (Tint)** · **Edge Feather** (transparent-video cutout edge clean-up) · 🎲 Remix rolls the
+whole melt (incl. framing + present-bias) · 🌙 Club/Dark Mode (final-output knob, §18). **That's the full v1
+melding-tool set, and transparent-video cutouts are now clean across platforms.**
 
 **📋 Backlog (all optional/future):** Palette-from-image **B–E** (3-stop ramp · audio-reactive tint · live
 palette · tint-target mode — §19) · Mask v2 (separate mask source) · Flow Map v2 (along-gradient) ·

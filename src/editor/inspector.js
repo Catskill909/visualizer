@@ -992,6 +992,7 @@ export class EditorInspector {
         this._paletteLock = loadPaletteLocks();
         this._remixLock = loadRemixLocks();
         this._rolling = false;   // batch flag: true only during _rollFullStack (defers engine reloads)
+        this._bundledBase = false;   // true when a raw bundled MilkDrop preset is the active base (Meld can't override its warp → blocked w/ a modal). Cleared the moment the editor takes over the warp (Flow style / Remix) or on any reset/load.
         this._myMix = loadMyMix();
         this._palettePreviewBackup = null;
 
@@ -2382,6 +2383,9 @@ export class EditorInspector {
      *  content for the warp to act on (solid variations ship wave_a:0). */
     _applyFlowStyle(id) {
         this._preSnap();
+        // The editor now owns the warp (a Flow style replaces it) → no longer a raw bundled preset, so
+        // Meld is allowed again. Also covers 🎲 Remix, which calls this.
+        this._bundledBase = false;
         this.currentState.flowStyle.id = id;
         if (id !== 'none') {
             // Feedback needs *some* content to warp. A shape counts — only seed a
@@ -2641,6 +2645,9 @@ export class EditorInspector {
     _toggleCardDrive(entry) {
         const iw = this.currentState.imageWarp || (this.currentState.imageWarp = deepClone(BLANK.imageWarp));
         const turningOn = !(iw.enabled && iw.texName === entry.texName);
+        // Meld can't override a raw bundled MilkDrop preset's warp — explain + offer the path instead of
+        // silently doing nothing. (Allow turning OFF in case a stale state ever leaves one enabled.)
+        if (turningOn && this._bundledBase) { this._showMeldBundledModal(); return; }
         this._preSnap();
         if (turningOn) {
             iw.texName = entry.texName;
@@ -2731,6 +2738,32 @@ export class EditorInspector {
         const panel = document.getElementById('image-warp-controls');
         const home = document.getElementById('image-warp-home');
         if (panel && home && panel.parentElement !== home) home.appendChild(panel);
+    }
+
+    /** Friendly block when the user clicks Meld on a raw bundled MilkDrop preset (Meld can't override
+     *  its baked-in warp). Offers a one-click 🎲 Remix that converts it to a custom preset they CAN meld. */
+    _showMeldBundledModal() {
+        const modal = document.getElementById('meld-bundled-modal');
+        const okBtn = document.getElementById('meld-bundled-ok');
+        const remixBtn = document.getElementById('meld-bundled-remix');
+        if (!modal || !okBtn) { showToast?.('Meld needs a custom preset — hit New or 🎲 Remix first', true); return; }
+        modal.hidden = false;
+        okBtn.focus();
+        const cleanup = () => {
+            modal.hidden = true;
+            okBtn.removeEventListener('click', onOk);
+            remixBtn?.removeEventListener('click', onRemix);
+            modal.removeEventListener('click', onBackdrop);
+            window.removeEventListener('keydown', onKey);
+        };
+        const onOk = () => cleanup();
+        const onRemix = () => { cleanup(); this._rollFullStack(); };  // converts to a from-scratch custom preset (clears _bundledBase)
+        const onBackdrop = (e) => { if (e.target === modal) cleanup(); };
+        const onKey = (e) => { if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); cleanup(); } };
+        okBtn.addEventListener('click', onOk);
+        remixBtn?.addEventListener('click', onRemix);
+        modal.addEventListener('click', onBackdrop);
+        window.addEventListener('keydown', onKey);
     }
 
     /** Reflect imageWarp state into the cards: place the Drive panel inside the driving
@@ -4074,6 +4107,14 @@ export class EditorInspector {
      *  and loadPresetData so all three start from the same baseline. Callers then
      *  overlay their own data on top. */
     _clearForLoad() {
+        // Park the shared Drive/Meld panel back in its safe home FIRST. When a meld is active the
+        // single `#image-warp-controls` node lives INSIDE a layer card (inside `#image-layers`); the
+        // `innerHTML=''` wipe below would otherwise DESTROY it, so every later Meld would find no panel
+        // (drive-mode hides the card body, panel gone → "can't access Meld settings / retract dead").
+        // `#image-warp-home` is a separate sibling div the wipe doesn't touch. (Same guard the delete
+        // flow uses.) See video-cutout-edge-noise-dev.md sibling bug notes / Meld panel relocation.
+        this._homeDrivePanel();
+        this._bundledBase = false;   // reset/load starts from a clean (non-bundled) base; loadBundledPreset re-sets it
         // animation-dev.md A3 — stop any idle tweens on the old layers before
         // they're discarded. Otherwise GSAP keeps the detached entries alive.
         for (const entry of (this.currentState?.images || [])) {
@@ -10681,6 +10722,10 @@ export class EditorInspector {
 
         // Track remix origin so a save references the parent
         this.currentState.parentPresetName = name;
+        // This is a RAW bundled MilkDrop preset — its warp/comp/eqs ARE its look. Meld would override
+        // the warp (clobbering it), so block Meld with a modal until the user takes over the warp via a
+        // Flow style or 🎲 Remix (which clears this flag in _applyFlowStyle). See milkdrop-control-dev.md.
+        this._bundledBase = true;
 
         this._applyToEngine();
         this._syncAllControls();
