@@ -400,10 +400,10 @@ async function _loadRandomBundled() {
     if (!inspector) return;
     _rpBuild();
     if (!_rpNames || _rpNames.length === 0) return;
-    if (isDirty) {
-        const proceed = await confirmDirty();
-        if (!proceed) return;
-    }
+    // NO unsaved-changes confirm on Random — it's a browse button; the whole point is instant, uninterrupted
+    // discovery (click → new preset → click → new preset). The dirty-confirm stays on New / the picker / save
+    // flows, so deliberate "leave my work" paths are still guarded. (If you've edited and want to keep it,
+    // Save first.) Each load is marked clean below.
     // Exclude the current preset from the pool so back-to-back clicks always reroll.
     const current = inspector.currentState?.parentPresetName || null;
     const pool = current ? _rpNames.filter(n => n !== current) : _rpNames;
@@ -413,7 +413,11 @@ async function _loadRandomBundled() {
         const nameInput = document.getElementById('preset-name-input');
         if (nameInput) nameInput.value = name;
         activePresetId = null;
-        markDirty();
+        // A freshly-loaded preset is CLEAN — there's nothing unsaved yet, so browsing with Random stays
+        // instant (no "replace your preset?" modal on every click). Editing a control marks it dirty again
+        // via `inspector.onchange` (so real unsaved edits are still protected on the next Random). markClean
+        // runs AFTER the load, overriding any dirty the load itself may have set.
+        markClean();
         setMode('edit');
         showToast(`Random: ${name}`);
     } catch (err) {

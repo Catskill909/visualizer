@@ -1963,6 +1963,16 @@ export class EditorInspector {
         // single reload, so it's exception-safe (only the final apply can throw).
         this._rolling = true;
 
+        // A from-scratch Remix is a NEW preset — it is NOT the Random'd MilkDrop preset that was loaded.
+        // Clear the inherited parent link + wipe its title from the name field, so the stuck MilkDrop name
+        // doesn't ride along into the header or a save (bug: Random title stuck after Remix). Only fires when
+        // there WAS a parent (i.e. a Random'd/bundled base), so re-rolling a named custom preset keeps its name.
+        if (this.currentState.parentPresetName) {
+            this.currentState.parentPresetName = null;
+            const nameEl = document.getElementById('preset-name-input');
+            if (nameEl) nameEl.value = 'Untitled preset';
+        }
+
         // Ensure the Shift colour engine (solid mode) is on so the Colour Field +
         // beat-pulse run. Only flips when currently in feedback mode, so repeated
         // rolls don't reset a locked palette/field.
