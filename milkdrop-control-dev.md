@@ -3,8 +3,8 @@
 **Status:** PLANNING. Next step = Phase 1. Captured 2026-06-06.
 
 ## Goal (one line)
-Make the **Remix** button able to vary a loaded **MilkDrop preset** — so the 1,144 built-in presets become
-endlessly explorable, instead of frozen.
+Let you **lock the current MilkDrop preset** so the **Random** button varies (remixes) THAT preset instead of
+loading a new one — so the 1,144 built-in presets become endlessly explorable, instead of frozen.
 
 ## The two buttons today
 - **Random** — loads a built-in **MilkDrop preset** (one of the 1,144 shipped with the app).
@@ -26,27 +26,46 @@ should be **tweakable / remixable / meldable**, not frozen.
 
 ## The plan — 4 phases, built ONE AT A TIME (each gets its own discussion first)
 
-### Phase 1 — "Remix this preset" (look only). ← START HERE
-A two-state Remix MODE — Remix's default behavior is NEVER changed; the new behavior is opt-in and reversible:
-- **"From scratch" (default)** — Remix = exactly today (builds a brand-new from-scratch preset). Untouched.
-- **"This preset"** — Remix keeps the loaded MilkDrop preset and re-rolls only its **LOOK**: colour scheme,
-  colour reactivity, Scene FX, Club. Same motion; new colours/finish each press; pulsing to the music.
+### Phase 1 — LOCK a MilkDrop preset, then Random remixes IT (look only). ← START HERE
+The mechanism lives on the **Random** button, driven by a **lock on the current MilkDrop preset** — NOT on the
+Remix button, and NOT inside the Remix Locks menu.
 
-**The exit (critical — no hijack):** the mode toggle IS the way out. "This preset" is only available while a
-MilkDrop preset is loaded (`_bundledBase`); pressing **New** or loading a custom preset auto-reverts to
-"From scratch". Default is "From scratch", so Remix's original behavior always works unless you opt in.
+- **Default (unlocked):** Random = today — each press loads a brand-new MilkDrop preset. Untouched.
+- **Locked:** lock the loaded MilkDrop preset → the Random button stops loading new presets and instead
+  **remixes (varies) the locked one** — re-rolls only its **LOOK**: colour scheme, colour reactivity, Scene
+  FX, Club. Same preset, same motion; new colours/finish each press; pulsing to the music.
 
-- **Why first:** ZERO new sliders — "This preset" mode just re-rolls tools that already work on any preset.
-- **Build:** add the mode toggle near Remix (enabled only when `_bundledBase`). In `_rollFullStack`, when mode
-  = "This preset", roll ONLY the final-output axes; do NOT touch the preset's warp/comp (preset keeps its
-  identity). Otherwise `_rollFullStack` runs unchanged.
-  - Reuse the existing Remix-locks strip (pin what you like, re-roll the rest).
-  - Respect `_rolling` (one engine reload per press — [[project_remix_batch_perf]]).
-- **Approach — treat it as a SPIKE:** live with it for a day. That experience tells us which Phase 2 motion
-  knobs are actually worth adding — build the controls Remix makes you *wish* you had, rather than guessing
-  the slider set up front. (This is "A serves B" — see Design principles.)
-- **Decision to settle:** does "This preset" stay a live tweak, or convert the preset to a custom preset on
-  first press? (Lean: live tweak; offer "Save as custom" after — mirrors the current Random → edit → Save flow.)
+**The exit:** the lock IS the on/off. Locked = Random varies this preset; unlock = Random browses fresh
+presets again (also resets via New / loading a custom preset).
+
+- **Why first:** ZERO new sliders — locked-Random just re-rolls tools that already work on any preset.
+- **Where the lock lives:** with the **Random button** (a lock state on / next to it) so it's obvious. The
+  **Remix Locks menu stays untouched** — it's for from-scratch app parts; a MilkDrop-preset lock there is
+  awkward. (Remix and its locks don't change at all in this phase.)
+- **Build:** add a "lock current preset" state. When locked AND a MilkDrop preset is active (`_bundledBase`),
+  the Random handler rolls ONLY the final-output "look" axes on the current preset; do NOT touch warp/comp,
+  do NOT load a new preset. Unlocked → `_loadRandomBundled` runs exactly as today. Respect `_rolling`.
+- **Audit (2026-06-07) — exactly what to roll, and the mechanism:**
+  - **ROLL (final-output, re-moods ANY preset via `STUDIO_POST_FX`):** (1) Colour adjustments —
+    Brightness / Contrast / Gamma / Temperature / Saturation / Hue Rotate / Colour Roll. (2) Colour-grade
+    reactivity (which adjustment pulses, band, curve). (3) Scene FX (one of Bloom/Posterize/Vignette/
+    Scanlines/Grain). (4) Club / Dark Mode.
+  - **DO NOT TOUCH (would clobber the preset):** `_applyVariation` (swaps in solid/shift engine),
+    `_applyFlowStyle` (replaces the warp), the content roll (wave/shapes slab), the Motion engine (that's
+    Phase 2 motion), and palette/Colour-Field/Shift (from-scratch solid-mode only → no-op or conflict here).
+  - **Mechanism (clean, no warp touch):** `loadBundledPreset` already keeps the bundled comp in `this._baseComp`
+    and does `currentState.comp = injectStudioPostFx(_baseComp, gradeOpts(state))`. So the roll = mutate the
+    look axes into `currentState`, then re-run `injectStudioPostFx(this._baseComp, gradeOpts(currentState))` +
+    apply. Re-moods the preset; never touches its warp or base comp.
+  - **The ONE new bit of roll logic:** the current `_rollFullStack` does NOT roll the *static* colour
+    adjustments (only their reactivity + Scene FX + Club). Phase 1 must ADD rolling those static grade values
+    (brightness/contrast/gamma/temp/sat/hue/colour-roll) — that's the main re-mood variety. Everything else
+    (Scene FX, Club, grade reactivity) is lift-and-reuse from `_rollFullStack`'s colour/reactivity blocks.
+- **From here:** more Random-button actions can build on the locked-preset state.
+- **Approach — treat it as a SPIKE:** live with it for a day. That tells us which Phase 2 motion knobs are
+  worth adding ("A serves B" — see Design principles).
+- **DECIDED: variations stay LIVE** — keep doom-scrolling; no auto-convert. The **Save** button (same footer
+  row) is the save path if the user wants to keep one.
 
 ### Phase 2 — A few curated motion knobs
 Add **2–3 dramatic** one-knob controls that *modulate the preset's own motion* (don't replace it). Candidates:
@@ -57,9 +76,9 @@ Add **2–3 dramatic** one-knob controls that *modulate the preset's own motion*
 Each is gated so neutral = the preset untouched (safe on all 1,144), AND each is a new axis Remix can roll.
 Open work: audit which `baseVals` / eq patterns are safe to scale per the MilkDrop spec; verify across packs.
 
-### Phase 3 — "Remix this preset", full
-Remix now varies **look (Phase 1) AND motion (Phase 2)**. Endless variety in both, still keeping the preset's
-identity.
+### Phase 3 — locked-Random varies the preset, full
+With a MilkDrop preset locked, Random now varies **look (Phase 1) AND motion (Phase 2)**. Endless variety in
+both, still keeping the preset's identity.
 
 ### Phase 4 — Meld your image into a preset (bigger, later)
 Inject a user image/video into the preset's **own** warp/motion so the preset processes your asset while
@@ -90,18 +109,17 @@ Via the `STUDIO_POST_FX` comp-tail inject — these are exactly the axes **Phase
 ## The gaps (what does NOT reach a bundled preset today)
 - **Motion / warp / feedback** is not editor-controllable — the preset's `warp` shader, `frame_eqs`/
   `pixel_eqs`, and zoom/rot/decay/warp `baseVals` are raw and untouched. (Phase 2 modulates these.)
-- **Remix is from-scratch only** — pressing Remix builds a new preset; it does not vary a loaded bundled
-  preset. (Phase 1 fixes this.)
+- **No way to vary a loaded MilkDrop preset** — Random only loads a new one; Remix only builds from-scratch.
+  (Phase 1 fixes this: lock the preset, and Random remixes IT.)
 - **Meld can't meld INTO a bundled preset** — it would override the warp and clobber the look. Now blocked
   with a friendly modal (shipped 2026-06-06; offers Remix to convert to a custom preset). (Phase 4 is the real
   fix — inject the texture into the preset's own warp.)
 
 ## Maybe: a 5th tab
-A dedicated "Tune / Remix this preset" tab — the home for the *loaded-preset* world, distinct from the
-from-scratch CREATION tabs (Palette / Layers / Motion / Wave). It would hold the Remix mode toggle + the lock
-strip + the few Phase-2 knobs, making it the unified discovery surface (Random picks a base, Remix varies it).
-Justified because it's a distinct *workflow*, not just a place to park sliders. Decide when we build Phase 1.
-Naming TBD ("Tune" / "Remix" / "Mix").
+A dedicated "Tune this preset" tab could be the home for the *loaded-preset* world, distinct from the
+from-scratch CREATION tabs (Palette / Layers / Motion / Wave) — holding the preset lock + the few Phase-2
+knobs. But the lock itself lives on the Random button regardless; a tab is only worth it if there are enough
+loaded-preset controls to justify a distinct workflow. Decide when we build Phase 2+. Naming TBD.
 
 ## Open questions (settle when scoping each phase)
 - Phase 1: live tweak vs convert-to-custom on first Remix?

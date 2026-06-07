@@ -4079,37 +4079,44 @@ export class EditorInspector {
     // ─── Reset ─────────────────────────────────────────────────────────────────
 
     _bindReset() {
-        document.getElementById('btn-reset')?.addEventListener('click', () => {
-            this._preSnap();
-            this._clearForLoad();
+        // Footer button (re-purposed from "Reset" to "UNDO" — handy during live use): step back one
+        // history state, same as the top Undo / ⌘Z. The old clear-to-default logic moved to
+        // _resetToBlank() below, still used by the New button.
+        document.getElementById('btn-reset')?.addEventListener('click', () => this._undo());
+    }
 
-            const v0 = BASE_VARIATIONS[DEFAULT_VARIATION_INDEX];
-            this._solidColor = v0.solid || null;
-            this.currentState.baseVals = { ...deepClone(BLANK.baseVals), ...v0.bv };
-            if (v0.solid) {
-                this.currentState.baseVals.wave_r = v0.solid[0];
-                this.currentState.baseVals.wave_g = v0.solid[1];
-                this.currentState.baseVals.wave_b = v0.solid[2];
-            }
-            this.currentState.solidPulse = v0.solidPulse ?? 0;
-            this.currentState.solidBreath = v0.solidBreath ?? 0;
-            this.currentState.solidShift = v0.solidShift ?? 0;
-            this.currentState.solidColorB = (v0.solidColorB || [0, 0, 0]).slice();
-            this.currentState.solidReactSource = v0.solidReactSource ?? 'bass';
-            this.currentState.solidReactCurve = v0.solidReactCurve ?? 'linear';
+    /** Clear the editor to the known-clean default (Shift) base. Used by the New button (main.js), which is
+     *  "blank canvas + fresh identity". (This was the footer Reset handler before it became Undo.) */
+    _resetToBlank() {
+        this._preSnap();
+        this._clearForLoad();
 
-            this._postSnap();
-            this._buildCompShader();
-            this._applyToEngine();
-            this._syncAllControls();
-            this._updateLayersBar();
-            this._updateSolidFxVisibility(v0);
-            // Re-baseline A/B "A" to the reset (Shift) state, so A isn't a stale wave.
-            this.originalState = deepClone(this.currentState);
-            // Re-highlight the default variation (Shift)
-            document.querySelectorAll('.base-var-btn').forEach((el, idx) => {
-                el.classList.toggle('active', idx === DEFAULT_VARIATION_INDEX);
-            });
+        const v0 = BASE_VARIATIONS[DEFAULT_VARIATION_INDEX];
+        this._solidColor = v0.solid || null;
+        this.currentState.baseVals = { ...deepClone(BLANK.baseVals), ...v0.bv };
+        if (v0.solid) {
+            this.currentState.baseVals.wave_r = v0.solid[0];
+            this.currentState.baseVals.wave_g = v0.solid[1];
+            this.currentState.baseVals.wave_b = v0.solid[2];
+        }
+        this.currentState.solidPulse = v0.solidPulse ?? 0;
+        this.currentState.solidBreath = v0.solidBreath ?? 0;
+        this.currentState.solidShift = v0.solidShift ?? 0;
+        this.currentState.solidColorB = (v0.solidColorB || [0, 0, 0]).slice();
+        this.currentState.solidReactSource = v0.solidReactSource ?? 'bass';
+        this.currentState.solidReactCurve = v0.solidReactCurve ?? 'linear';
+
+        this._postSnap();
+        this._buildCompShader();
+        this._applyToEngine();
+        this._syncAllControls();
+        this._updateLayersBar();
+        this._updateSolidFxVisibility(v0);
+        // Re-baseline A/B "A" to the reset (Shift) state, so A isn't a stale wave.
+        this.originalState = deepClone(this.currentState);
+        // Re-highlight the default variation (Shift)
+        document.querySelectorAll('.base-var-btn').forEach((el, idx) => {
+            el.classList.toggle('active', idx === DEFAULT_VARIATION_INDEX);
         });
     }
 
@@ -5075,7 +5082,8 @@ export class EditorInspector {
         // If this layer was driving the preset, disable Drive and park the panel back
         // home FIRST — otherwise card.remove() below would take the panel with it.
         const _iw = this.currentState.imageWarp;
-        if (_iw && _iw.texName === texName) { _iw.enabled = false; this._homeDrivePanel(); }
+        const _wasDriving = !!(_iw && _iw.texName === texName);
+        if (_wasDriving) { _iw.enabled = false; this._homeDrivePanel(); }
         // Clean up video blob URL if present
         const texObj = this._imageTextures[texName];
         if (texObj?._videoUrl) {
@@ -5086,6 +5094,11 @@ export class EditorInspector {
         this.engine.removeVideoAnimation(texName);
         this._buildCompShader();
         this._applyToEngine();
+        // The melt lives IN the feedback buffer (sampler_main), kept alive by the high decay Meld sets.
+        // Disabling Drive + removing the texture isn't enough — the last melted frames keep recirculating
+        // and stay "stuck" on screen. Clear the feedback so the deleted melt actually vanishes. (Only when
+        // it was the DRIVING layer; overlay layers aren't in the feedback, so skip the flash for those.)
+        if (_wasDriving) this.engine.clearFeedbackBuffer?.();
         // A4-2: slide-up + fade the card before pulling it from the DOM. The
         // canvas-side layer already disappeared (above); this just makes the
         // card list compact gracefully instead of a hard pop. ~220ms.

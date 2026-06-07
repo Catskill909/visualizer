@@ -181,7 +181,7 @@ function handleLibraryNew() {
     setMode('edit');
     // Small delay so the mode transition completes before the reset
     setTimeout(() => {
-        document.getElementById('btn-reset')?.click();
+        inspector?._resetToBlank();   // clear-to-default (the footer button is now Undo, not Reset)
         activePresetId = null;
         markClean();
         document.getElementById('preset-name-input').value = 'Untitled preset';
