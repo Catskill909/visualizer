@@ -29,6 +29,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # ⚠️ LOAD-BEARING: tauri.conf.json has `beforeBuildCommand: ""` (disabled), so the
+      # "Build Windows app" step below does NOT build the frontend — it bundles the dist/
+      # this step produces. Do NOT remove this step, or the installer ships a stale/missing
+      # frontend. (beforeBuildCommand was disabled 2026-06-08 to stop a redundant 2nd vite
+      # run that intermittently wedged the macOS build.)
       - name: Build Vite web app
         run: npm run build
 

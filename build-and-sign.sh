@@ -165,13 +165,17 @@ rm -rf \
 # run_step detaches stdin (kills the npm-prompt hang) AND enforces a 120s budget
 # (the real vite build finishes in well under a second), so this step can never
 # freeze silently again — whatever the cause, it dies loud and fast.
+# ⚠️ LOAD-BEARING: this Step-1 vite build is now the ONLY one. tauri.conf.json has
+# `beforeBuildCommand: ""` (disabled) so Step 2 does NOT re-run vite — it just bundles
+# the dist/ this step produced. Do NOT remove or skip Step 1, or Step 2 ships a stale/
+# missing frontend. (Previously Tauri re-ran vite a 2nd time inside Step 2, under the
+# loose 600s budget — that redundant run is what wedged for ~2min on 2026-06-08.)
 echo -e "${YELLOW}Step 1: Building web app with Vite...${NC}"
 run_step 120 "Step 1 (Vite web build)" npm run build
 
-# Step 2: Build the macOS app with Tauri. Tauri re-runs `npm run build` as its
-# beforeBuildCommand, so the same Vite/npm hang can strike here too — it runs
-# under the watchdog as well. The 600s budget is generous enough for a cold
-# Rust compile while still catching a true hang.
+# Step 2: Bundle the macOS app with Tauri. With beforeBuildCommand disabled, Tauri no
+# longer re-runs vite here — it packages the already-built dist/ from Step 1. The 600s
+# budget covers a cold Rust compile while still catching a true hang via the watchdog.
 echo -e "${YELLOW}Step 2: Building macOS app with Tauri...${NC}"
 run_step 600 "Step 2 (Tauri macOS build)" npm run tauri-build
 
