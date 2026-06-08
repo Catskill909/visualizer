@@ -993,6 +993,7 @@ export class EditorInspector {
         this._remixLock = loadRemixLocks();
         this._rolling = false;   // batch flag: true only during _rollFullStack (defers engine reloads)
         this._bundledBase = false;   // true when a raw bundled MilkDrop preset is the active base (Meld can't override its warp → blocked w/ a modal). Cleared the moment the editor takes over the warp (Flow style / Remix) or on any reset/load.
+        this._lockedPreset = false;  // Phase 1 (milkdrop-control-dev.md): when true AND _bundledBase, the Random button VARIES the current preset's look (rollLockedPresetLook) instead of loading a new one. Reset in _clearForLoad (New / load / reset / fresh Random-load all clear the lock).
         this._myMix = loadMyMix();
         this._palettePreviewBackup = null;
 
@@ -2123,6 +2124,78 @@ export class EditorInspector {
         showToast?.(anyLocked ? '🎲 Remixed — locks kept' : '🎲 Remixed');
     }
 
+    /** Phase 1 (milkdrop-control-dev.md): is the current preset locked for look-variation?
+     *  Only meaningful on a RAW bundled MilkDrop base — locking a from-scratch preset is a no-op
+     *  (Remix already varies those). The Random handler calls this to decide whether to load a new
+     *  preset (false) or vary the current one's look (true). */
+    isPresetLocked() {
+        return !!(this._lockedPreset && this._bundledBase);
+    }
+
+    /** Phase 1: re-roll ONLY the final-output "look" of the currently-loaded (bundled) preset —
+     *  the Random button's locked behaviour. Stays entirely in comp-tail safe lane #1 (the
+     *  STUDIO_POST_FX inject): static colour grade + grade reactivity + Scene FX + Club. Touches
+     *  NO warp/comp body, eqs, q-registers, shapes, field, flow, or motion engine — so it's safe on
+     *  all 1,144 and can never black-screen, and it keeps `_bundledBase` set (no _applyVariation/
+     *  _applyFlowStyle/_applyMotionEngine calls that would leave the bundled world). Same preset,
+     *  same motion; new colours/finish each press, pulsing to the music.
+     *
+     *  Mechanism mirrors loadBundledPreset's re-mood: mutate the look axes into currentState, then
+     *  re-inject the post-FX onto `this._baseComp`. CRITICAL: do NOT call _buildCompShader on a
+     *  layer-free bundled preset — it early-returns BLANK_COMP and would WIPE the bundled comp; use
+     *  the direct injectStudioPostFx(_baseComp, …) path (what loadBundledPreset does). With layers
+     *  present, `_baseComp` already holds the layer-composited comp and _buildCompShader is the
+     *  correct path (it composites the overlays + applies the _hasImages grade variant). */
+    rollLockedPresetLook() {
+        const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+        const rnd = (lo, hi) => +(lo + Math.random() * (hi - lo)).toFixed(2);
+        const bv = this.currentState.baseVals;
+
+        // ── Static colour grade — the MAIN re-mood variety (the one axis _rollFullStack never
+        //    rolls). Ranges match the Palette-tab sliders (ps-* defs). Biased toward tasteful,
+        //    not blown-out: brightness/contrast/gamma stay near 1, temperature is a gentle sway.
+        bv.studio_brightness = rnd(0.85, 1.35);
+        bv.studio_contrast   = rnd(0.9, 1.4);
+        bv.studio_gamma      = rnd(0.8, 1.4);
+        bv.studio_temp       = Math.random() < 0.6 ? rnd(-0.18, 0.18) : 0;
+        // Saturation/hue: most rolls leave a natural look; sometimes push a recolour.
+        bv.studio_saturation = Math.random() < 0.5 ? rnd(0.7, 1.5) : 1.0;
+        bv.studio_hue_rotate = Math.random() < 0.4 ? Math.floor(Math.random() * 360) : 0;
+        bv.studio_hue_roll   = Math.random() < 0.25 ? rnd(0.2, 0.8) : 0;
+
+        // ── Grade reactivity — pulse ONE main fader to a band/curve (lift from _rollFullStack's
+        //    reactivity block). Note: 'flux' is unavailable on a raw bundled base (q31 unpopulated
+        //    by design), so the source pool excludes it here.
+        this.currentState.studio_grade_react_source = pick(['bass', 'mid', 'treb', 'vol']);
+        this.currentState.studio_grade_react_curve  = pick(['linear', 'squared', 'cubed', 'threshold']);
+        bv.studio_brightness_react = 0; bv.studio_contrast_react = 0;
+        bv.studio_gamma_react = 0; bv.studio_temp_react = 0;
+        if (Math.random() < 0.5) bv.studio_brightness_react = rnd(0.25, 0.5);
+        else bv.studio_contrast_react = rnd(0.25, 0.5);
+        if (Math.random() < 0.4) bv.studio_temp_react = rnd(0.05, 0.12);
+
+        // ── Scene FX — clear, then rarely add ONE subtle finish (lift from _rollFullStack).
+        bv.studio_posterize = 0; bv.studio_vignette = 0; bv.studio_scanlines = 0; bv.studio_grain = 0;
+        if (Math.random() < 0.25) {
+            const fx = pick(['studio_posterize', 'studio_vignette', 'studio_scanlines', 'studio_grain']);
+            bv[fx] = (fx === 'studio_vignette' || fx === 'studio_posterize') ? rnd(0.2, 0.45) : rnd(0.15, 0.3);
+        }
+
+        // ── Club / Dark Mode — ~half the rolls dial in some club-dark finish.
+        this.currentState.clubMode = Math.random() < 0.5 ? rnd(0.2, 0.7) : 0;
+
+        // ── Re-mood: re-inject the post-FX. _baseComp stays the preset's own comp (or the
+        //    layer-composited comp when overlays are present) — the warp/comp BODY is untouched.
+        if ((this.currentState.images || []).length) {
+            this._buildCompShader();   // layers present → safe (won't early-return BLANK); composites overlays + _hasImages grade
+        } else {
+            this.currentState.comp = injectStudioPostFx(this._baseComp, gradeOpts(this.currentState));
+        }
+        this._applyToEngine();
+        this._syncAllControls();
+        showToast?.('🎲 New look');
+    }
+
     /** Remix the Drive melt LOOK (image-texture-dev.md Phase 7). Mutates currentState.imageWarp
      *  only — no engine reload (respects the _rolling batch; the final _applyToEngine +
      *  _syncAllControls in _rollFullStack do the one rebuild + slider re-sync). Rolls the full melt
@@ -2260,6 +2333,33 @@ export class EditorInspector {
                 sync();
             });
         });
+
+        // Phase 1 — preset lock (drives the Random button, not Remix). Not persisted: it's
+        // per-loaded-preset state, cleared on any load/reset. Only meaningful on a bundled base.
+        const lockBtn = document.getElementById('btn-preset-lock');
+        if (lockBtn) {
+            lockBtn.addEventListener('click', () => {
+                if (!this._bundledBase) return;   // disabled when no MilkDrop preset is loaded
+                this._lockedPreset = !this._lockedPreset;
+                this._syncPresetLock();
+            });
+        }
+    }
+
+    /** Reflect the preset-lock toggle state: disabled unless a MilkDrop preset is loaded
+     *  (`_bundledBase`), pressed when locked. Called wherever `_bundledBase`/`_lockedPreset`
+     *  change (load, reset, flow/remix takeover). */
+    _syncPresetLock() {
+        const btn = document.getElementById('btn-preset-lock');
+        if (!btn) return;
+        const canLock = !!this._bundledBase;
+        btn.disabled = !canLock;
+        if (!canLock) this._lockedPreset = false;
+        const locked = this.isPresetLocked();
+        btn.setAttribute('aria-pressed', String(locked));
+        btn.title = !canLock
+            ? 'Load a MilkDrop preset with Random first, then lock it'
+            : (locked ? 'Locked — Random varies THIS preset’s look' : 'Lock this preset so Random varies its look');
     }
 
     // ─── Motion Engine (living, time-driven motion) ─────────────────────────────
@@ -4132,6 +4232,7 @@ export class EditorInspector {
         // flow uses.) See video-cutout-edge-noise-dev.md sibling bug notes / Meld panel relocation.
         this._homeDrivePanel();
         this._bundledBase = false;   // reset/load starts from a clean (non-bundled) base; loadBundledPreset re-sets it
+        this._lockedPreset = false;  // any reset/load clears the preset lock (New / custom load / reset / a fresh Random-load of a NEW preset)
         // animation-dev.md A3 — stop any idle tweens on the old layers before
         // they're discarded. Otherwise GSAP keeps the detached entries alive.
         for (const entry of (this.currentState?.images || [])) {
@@ -10562,6 +10663,7 @@ export class EditorInspector {
         this._syncBgField();
         this._syncGradeReact();
         this._syncSceneFx();
+        this._syncPresetLock();   // Phase 1 — enable/press the preset-lock toggle per _bundledBase/_lockedPreset
         this._syncToggle('toggle-invert', 'invert');
         this._syncToggle('toggle-darken', 'darken');
         this._syncToggle('toggle-brighten-fx', 'brighten');

@@ -891,9 +891,20 @@
                         </div>
                     </div>
 
-                    <!-- Remix locks: pin a group and the 🎲 Remix re-rolls only the rest. -->
+                    <!-- Locks panel — two distinct sections, two different buttons:
+                         · RANDOM section = the preset lock (Phase 1, milkdrop-control-dev.md): lock the
+                           loaded MilkDrop preset so the Random button RE-MOODS its look instead of loading
+                           a new one. Drives the Random button.
+                         · REMIX section = the keep-chips: pin a group so the 🎲 Remix re-rolls only the
+                           rest. Drives the Remix button (from-scratch). -->
                     <details class="remix-locks" id="remix-locks">
-                        <summary class="remix-locks-summary">🎲 Remix locks — pin what to keep</summary>
+                        <summary class="remix-locks-summary">🔒 Locks</summary>
+                        <div class="locks-section-label">Random · this MilkDrop preset</div>
+                        <button class="preset-lock" id="btn-preset-lock" type="button" aria-pressed="false" disabled
+                            data-tooltip="Load a MilkDrop preset with Random first, then lock it">
+                            Lock preset — Random re-moods its look</button>
+                        <div class="remix-locks-divider"></div>
+                        <div class="locks-section-label">Remix · pin what to keep</div>
                         <div class="remix-locks-row" role="group" aria-label="Remix locks">
                             <button class="remix-lock" data-lock="colours" type="button">Colours</button>
                             <button class="remix-lock" data-lock="field" type="button">Field</button>

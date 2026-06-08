@@ -41,9 +41,25 @@ should be **tweakable / remixable / meldable**, not frozen.
 
 ## The plan — 4 phases, built ONE AT A TIME (each gets its own discussion first)
 
-### Phase 1 — LOCK a MilkDrop preset, then Random remixes IT (look only). ← START HERE
-The mechanism lives on the **Random** button, driven by a **lock on the current MilkDrop preset** — NOT on the
-Remix button, and NOT inside the Remix Locks menu.
+### Phase 1 — LOCK a MilkDrop preset, then Random remixes IT (look only). ✅ BUILT 2026-06-08 (web-verified; not yet pushed)
+**Built:** `_lockedPreset` flag + `isPresetLocked()` + `rollLockedPresetLook()` (inspector.js), Random branch in
+`_loadRandomBundled` (editor/main.js), and the lock toggle in the locks panel. Locked → Random re-moods the
+preset's look (static grade + grade reactivity + Scene FX + Club) via the comp-tail inject; warp/eqs/shapes/motion
+baseVals stay frozen and `_bundledBase` stays set (headless-verified, 15/15). **UI realized as a two-section locks
+panel** (summary "🔒 Locks"): a *Random · this MilkDrop preset* section (the lock toggle) above a divider, then the
+*Remix · pin what to keep* section (the five keep-chips, unchanged). Footer stays the clean 5-button row.
+The mechanism drives the **Random** button (locked = Random varies the current preset's look instead of loading a
+new one). The lock **toggle lives inside the retractable `#remix-locks` `<details>` panel** — as its OWN labeled
+row, visually separated from the "pin what to keep" chips — NOT as a control in the footer button row.
+
+**Lock placement — DECIDED 2026-06-08 (supersedes the earlier "on the Random button" framing below).** The footer is
+a clean, balanced 5-button row (New / Random / Remix / Save / Reset); adding a 6th control or a corner badge there
+unbalances it (user's call). The retractable locks panel is the natural home for an advanced toggle. BUT the panel's
+five chips (`data-lock=colours/field/motion/flow/reactivity`) control the **Remix** button (pin a group → Remix
+re-rolls the rest, via `_remixLock`), whereas the preset lock controls the **Random** button (vary this preset).
+Different buttons, different axis — so the preset-lock toggle goes at the TOP of the panel as its own row with a
+divider, clearly NOT a sixth Remix-keep chip. It's `disabled`/greyed when `!_bundledBase` (a from-scratch preset has
+nothing to lock). The five Remix-keep chips and the `_remixLock` logic stay untouched.
 
 - **Default (unlocked):** Random = today — each press loads a brand-new MilkDrop preset. Untouched.
 - **Locked:** lock the loaded MilkDrop preset → the Random button stops loading new presets and instead
@@ -54,9 +70,10 @@ Remix button, and NOT inside the Remix Locks menu.
 presets again (also resets via New / loading a custom preset).
 
 - **Why first:** ZERO new sliders — locked-Random just re-rolls tools that already work on any preset.
-- **Where the lock lives:** with the **Random button** (a lock state on / next to it) so it's obvious. The
-  **Remix Locks menu stays untouched** — it's for from-scratch app parts; a MilkDrop-preset lock there is
-  awkward. (Remix and its locks don't change at all in this phase.)
+- **Where the lock lives:** a toggle row at the TOP of the retractable `#remix-locks` panel (see "Lock placement —
+  DECIDED 2026-06-08" above), separated by a divider from the five Remix-keep chips so it doesn't read as a sixth
+  one. The footer 5-button row stays clean/balanced. The **Remix-keep chips and `_remixLock` logic don't change** —
+  the new toggle drives the Random button only.
 - **Build:** add a "lock current preset" state. When locked AND a MilkDrop preset is active (`_bundledBase`),
   the Random handler rolls ONLY the final-output "look" axes on the current preset; do NOT touch warp/comp,
   do NOT load a new preset. Unlocked → `_loadRandomBundled` runs exactly as today. Respect `_rolling`.

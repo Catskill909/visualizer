@@ -381,6 +381,33 @@ html, body {
 }
 .remix-locks[open] > .remix-locks-summary::before { transform: rotate(90deg); }
 .remix-locks-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+/* Phase 1 — preset lock: a full-width toggle row at the top of the locks panel,
+   driving the Random button (vary this preset). Neutral styling (no accent), pressed
+   state = filled like the keep-chips' .locked. Disabled until a MilkDrop preset loads. */
+.preset-lock {
+  display: block; width: 100%; text-align: left;
+  font-size: 11px; padding: 6px 10px; border-radius: 8px; margin-bottom: 8px;
+  border: 1px solid var(--border, rgba(255,255,255,0.14));
+  background: transparent; color: var(--text-3); cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease, opacity 0.12s ease;
+}
+.preset-lock::before { content: "🔓 "; }
+.preset-lock:hover:not(:disabled) { color: var(--text-2, var(--text-1)); border-color: var(--text-3); }
+.preset-lock[aria-pressed="true"] {
+  background: var(--text-1, #e8e8ea); color: #15151a;
+  border-color: var(--text-1, #e8e8ea); font-weight: 600;
+}
+.preset-lock[aria-pressed="true"]::before { content: "🔒 "; }
+.preset-lock:disabled { opacity: 0.4; cursor: not-allowed; }
+.remix-locks-divider {
+  height: 1px; background: var(--border, rgba(255,255,255,0.1));
+  margin: 0 0 8px;
+}
+/* Small section headers so the two halves (Random vs Remix) read as separate. */
+.locks-section-label {
+  font-size: 9px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text-3); opacity: 0.75; margin: 0 0 5px;
+}
 .remix-lock {
   font-size: 11px; padding: 4px 9px; border-radius: 999px;
   border: 1px solid var(--border, rgba(255,255,255,0.14));

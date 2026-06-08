@@ -398,6 +398,14 @@ function _rpClose() {
 // and excluded the currently-loaded preset so consecutive clicks reroll.
 async function _loadRandomBundled() {
     if (!inspector) return;
+    // Phase 1 (milkdrop-control-dev.md): if the current bundled preset is LOCKED, Random varies
+    // ITS look (colour/reactivity/Scene-FX/Club) instead of loading a new preset. A look-roll is a
+    // real edit (keep it via Save), so this path does NOT markClean like the browse path below.
+    if (inspector.isPresetLocked()) {
+        inspector.rollLockedPresetLook();
+        setMode('edit');
+        return;
+    }
     _rpBuild();
     if (!_rpNames || _rpNames.length === 0) return;
     // NO unsaved-changes confirm on Random — it's a browse button; the whole point is instant, uninterrupted
