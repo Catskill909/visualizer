@@ -612,6 +612,12 @@ const BLANK = {
     // deepen primaries). 0 = off → byte-identical. Top-level (whole-preset output op),
     // round-trips with save/load like studio_grade_react_source.
     clubMode: 0,
+    // Phase 2 (milkdrop-control-dev.md) — Speed / Motion amount. Multiplicatively scales the
+    // loaded preset's OWN motion baseVals (zoom deviation-from-1, rot×, warp×) in _buildRuntimePreset
+    // — a no-op at 1 (preset untouched). Top-level (round-trips via ...currentState save/load);
+    // reset to 1 on every load via deepClone(BLANK) in _clearForLoad. The Speed slider (Motion tab,
+    // shown only on a bundled base) writes this. Audit: lands on ~96% of the 1,144.
+    motionSpeed: 1,
     // Phase 8 — Color Field. Spreads the Shift A→B blend across SPACE, not just
     // time: 'flat' = the classic flat Shift (byte-identical, so old presets are
     // unchanged); linear/radial/plasma make the background a moving multi-colour
@@ -1010,6 +1016,7 @@ export class EditorInspector {
         this._buildSceneFxPanel();
         this._bindPaletteOpacity();
         this._bindClubMode();
+        this._buildPresetSpeed();
         this._buildSolidFxPanel();
         this._buildFlowStyleSection();
         this._buildImageWarpSection();
@@ -1734,6 +1741,37 @@ export class EditorInspector {
         });
     }
 
+    // ─── Phase 2 — Speed / Motion amount (Motion tab; bundled-preset only) ────────
+
+    /** Build + bind the Speed slider — scales the loaded preset's own motion
+     *  (zoom/rot/warp baseVals via `motionSpeed`, applied in _buildRuntimePreset).
+     *  Lives in the Motion tab, shown only when a bundled preset is loaded (gated by
+     *  _syncPresetSpeed). Default 1 = preset untouched; double-click the label resets
+     *  to 1 (makeSlider wires that to the config `value`). */
+    _buildPresetSpeed() {
+        const slot = document.getElementById('preset-speed-slot');
+        if (!slot) return;
+        const input = makeSlider(slot, { id: 'preset-speed', label: 'Speed', min: 0, max: 2, step: 0.05, value: 1, decimals: 2 });
+        const valEl = document.getElementById('preset-speed-val');
+        input.addEventListener('pointerdown', () => this._preSnap());
+        input.addEventListener('input', () => {
+            const v = parseFloat(input.value);
+            if (valEl) valEl.textContent = v.toFixed(2);
+            input.style.setProperty('--pct', `${(v / 2) * 100}%`);
+            this.currentState.motionSpeed = v;
+            this._applyToEngine(true);   // re-derives scaled baseVals via _buildRuntimePreset; skip texture re-bind
+        });
+        input.addEventListener('pointerup', () => this._postSnap());
+    }
+
+    /** Reflect motionSpeed onto the Speed slider + show it only on a bundled base
+     *  (a from-scratch preset has the Motion Engine; nothing to scale here). */
+    _syncPresetSpeed() {
+        const section = document.getElementById('preset-speed-section');
+        if (section) section.hidden = !this._bundledBase;
+        this._syncSlider('preset-speed', this.currentState.motionSpeed ?? 1, 0, 2, 2);
+    }
+
     /** Reflect clubMode onto its slider (called from the palette sync on load/remix). */
     _syncClubMode() {
         const v = this.currentState.clubMode ?? 0;
@@ -2184,6 +2222,14 @@ export class EditorInspector {
         // ── Club / Dark Mode — ~half the rolls dial in some club-dark finish.
         this.currentState.clubMode = Math.random() < 0.5 ? rnd(0.2, 0.7) : 0;
 
+        // ── Phase 3 — Speed / Motion amount. Roll the preset's OWN motion rate too, so one locked
+        //    Random press reinvents BOTH look AND motion. Mostly a tasteful band centred near 1
+        //    (~75%); ~25% bolder for the occasional dreamy slow-mo or frantic press. Never 0 (no dead
+        //    freeze) and capped at ~1.9 (no nausea-fast). Scaled into the runtime by _buildRuntimePreset;
+        //    a graceful no-op on the ~4% hand-coded presets that compute their motion absolutely.
+        const _sp = Math.random() < 0.75 ? rnd(0.6, 1.6) : rnd(0.35, 1.9);
+        this.currentState.motionSpeed = +(Math.round(_sp / 0.05) * 0.05).toFixed(2);  // snap to the Speed slider's 0.05 step so the thumb matches exactly
+
         // ── Re-mood: re-inject the post-FX. _baseComp stays the preset's own comp (or the
         //    layer-composited comp when overlays are present) — the warp/comp BODY is untouched.
         if ((this.currentState.images || []).length) {
@@ -2191,9 +2237,9 @@ export class EditorInspector {
         } else {
             this.currentState.comp = injectStudioPostFx(this._baseComp, gradeOpts(this.currentState));
         }
-        this._applyToEngine();
-        this._syncAllControls();
-        showToast?.('🎲 New look');
+        this._applyToEngine();         // re-derives the speed-scaled baseVals via _buildRuntimePreset
+        this._syncAllControls();       // re-syncs the Speed slider to the rolled value (_syncPresetSpeed)
+        showToast?.('🎲 Remixed');
     }
 
     /** Remix the Drive melt LOOK (image-texture-dev.md Phase 7). Mutates currentState.imageWarp
@@ -9067,6 +9113,19 @@ export class EditorInspector {
 
     _buildRuntimePreset(state) {
         const runtime = deepClone(state);
+        // Phase 2 — Speed / Motion amount. Scale the preset's OWN motion baseVals by `motionSpeed`
+        // (safe lane #2 — per-frame scalars, no shader recompile). Applied to the runtime CLONE only,
+        // so currentState.baseVals stays the preset's true (unscaled) values → non-destructive +
+        // reversible (f=1 is byte-identical). zoom is scaled by its deviation from neutral 1 (so f=0
+        // freezes, f=2 doubles the rate); rot/warp neutral 0 → ×f. On the ~4% of presets that compute
+        // zoom/rot/warp absolutely in frame_eqs this is a graceful no-op (see the mechanism audit).
+        const _spd = state.motionSpeed ?? 1;
+        if (_spd !== 1 && runtime.baseVals) {
+            const _bv = runtime.baseVals;
+            _bv.zoom = 1 + ((_bv.zoom ?? 1) - 1) * _spd;
+            _bv.rot  = (_bv.rot  ?? 0) * _spd;
+            _bv.warp = (_bv.warp ?? 0) * _spd;
+        }
         // Phase 3 — generate each shape's frame_eqs from its motion params (Spin/
         // Pulse/Orbit). Generated at runtime, never stored (saved frame_eqs_str
         // stays ''). Player mirrors this in refreshCustomPresets for parity.
@@ -10664,6 +10723,7 @@ export class EditorInspector {
         this._syncGradeReact();
         this._syncSceneFx();
         this._syncPresetLock();   // Phase 1 — enable/press the preset-lock toggle per _bundledBase/_lockedPreset
+        this._syncPresetSpeed();  // Phase 2 — show/sync the Speed slider per _bundledBase
         this._syncToggle('toggle-invert', 'invert');
         this._syncToggle('toggle-darken', 'darken');
         this._syncToggle('toggle-brighten-fx', 'brighten');

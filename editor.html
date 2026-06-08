@@ -474,6 +474,18 @@
                     <!-- ─── MOTION TAB ─── -->
                     <div id="tab-motion" class="tab-panel" role="tabpanel" hidden>
                         <div class="tab-scroll">
+                            <!-- Phase 2 (milkdrop-control-dev.md) — Speed: scales a LOADED bundled
+                                 preset's OWN motion (zoom/rot/warp). Shown only when a MilkDrop preset
+                                 is active (gated by _syncPresetSpeed → _bundledBase). Slider built by
+                                 _buildPresetSpeed into #preset-speed-slot. -->
+                            <div id="preset-speed-section" hidden>
+                                <div class="section-label-row">
+                                    <p class="section-label">This preset</p>
+                                </div>
+                                <p class="section-note">Speed up or slow down the loaded preset's own motion.</p>
+                                <div id="preset-speed-slot"></div>
+                            </div>
+
                             <!-- ① THE LOOK — pick a living Motion and/or a Flow field; they stack -->
                             <div class="section-label-row">
                                 <p class="section-label">Motion</p>

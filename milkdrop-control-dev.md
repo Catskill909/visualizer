@@ -99,18 +99,51 @@ presets again (also resets via New / loading a custom preset).
 - **DECIDED: variations stay LIVE** — keep doom-scrolling; no auto-convert. The **Save** button (same footer
   row) is the save path if the user wants to keep one.
 
-### Phase 2 — A few curated motion knobs
+### Phase 2 — A few curated motion knobs · ✅ Speed BUILT 2026-06-08 (web-verified, 8/8)
+**Built:** the **Speed** knob (Motion tab, shown only when `_bundledBase`). Top-level `currentState.motionSpeed`
+(default 1, in `BLANK` → auto-resets via `_clearForLoad`, auto-persists via `saveCurrent`'s `...currentState`).
+The scale is applied in `_buildRuntimePreset` on the `deepClone(state)` runtime ONLY (non-destructive):
+`zoom = 1+(zoom-1)*f`, `rot = rot*f`, `warp = warp*f` — f=1 byte-identical, f=0 freezes, f=2 doubles. Slider built
+by `_buildPresetSpeed` (range 0–2, dbl-click resets to 1); `_syncPresetSpeed` shows/syncs it (in `_syncAllControls`).
+Headless-verified: gating, identity at 1, doubles at 2, freezes at 0, `currentState.baseVals` unmutated. **Phase 3
+hook ready:** because the scale lives in `_buildRuntimePreset`, adding Speed to the locked-Random roll is a one-liner
+(`currentState.motionSpeed = rnd(...)` in `rollLockedPresetLook`). Trail/Warp-amount knobs: not built (spike Speed first).
+
 Add **2–3 dramatic** one-knob controls that *modulate the preset's own motion* (don't replace it). Candidates:
-- **Speed / Motion amount** — scale the preset's `frame_eqs` time-evolution + `zoom`/`rot`/`warp` `baseVals`
-  by a global factor.
+- **Speed / Motion amount** — scale the preset's `zoom`/`rot`/`warp` `baseVals` (motion AMOUNT, reads as speed).
 - **Trail / Feedback** — nudge `decay`.
 - **Warp amount** — scale the preset's `warp` / `warpscale`.
 Each is gated so neutral = the preset untouched (safe on all 1,144), AND each is a new axis Remix can roll.
-Open work: audit which `baseVals` / eq patterns are safe to scale per the MilkDrop spec; verify across packs.
+**Build Speed FIRST and alone** (dramatic-or-cut + A-serves-B); add Trail/Warp only if Speed reveals the need.
+Placement: fold into the **Motion** tab, gated to show only when `_bundledBase` (no 5th tab — see DECIDED note).
 
-### Phase 3 — locked-Random varies the preset, full
-With a MilkDrop preset locked, Random now varies **look (Phase 1) AND motion (Phase 2)**. Endless variety in
-both, still keeping the preset's identity.
+**Mechanism audit — DONE 2026-06-08 (resolves the open question). Scale `baseVals` (Mechanism A) is the lever.**
+Static analysis over all 1,144 (bundled eqs ship pre-compiled to JS, vars `a.zoom`/`a.rot`/…; butterchurn reseeds
+these per-frame vars from `baseVals` each frame, so a `baseVals` multiply propagates UNLESS `frame_eqs` reassigns
+the var *absolutely* — RHS without the var itself):
+- **zoom:** 81.1% none (baseVals used) + 1.4% relative = **82.5% scalable**, 17.5% absolute-overridden (dead).
+- **rot:** 89.1% scalable, 10.8% dead. **warp:** 87% scalable, 13% dead. **warpscale:** **100% scalable** (never reassigned).
+- **Fully dead (ALL of zoom+rot+warp absolute):** only **3.8% (43 presets)** — the hand-coded `flexi`/`martin`
+  family that computes its own motion. Speed is a graceful no-op there (boring-not-broken; acceptable).
+- **Ruled out:** **Mechanism B (engine time-scale via `render({elapsedTime})`)** — engine does `this.time += 1/fps`
+  and `elapsedTime` only feeds the FPS smoother, so it speeds *time-oscillations* not the per-frame feedback motion;
+  weak/laggy. **Mechanism C (render engine N× per displayed frame)** — universal (catches the 43) but N× GPU + needs
+  frame-skip for slow-mo; keep as a possible future "Turbo," not the default knob.
+- **Speed math:** scale each var's deviation from its neutral (zoom: `1+(zoom-1)*f`; rot/warp/dx/dy: `v*f`), so f=1
+  is untouched, f→0 freezes, f→2 doubles the energy. Per-frame scalar = ≈free (no recompile), safe lane #2.
+- Re-run the audit method (`a.<var>=` absolute-vs-relative classification) for any other `baseVals` knob (Trail=decay,
+  Warp amount=warp/warpscale) before shipping it.
+
+### Phase 3 — locked-Random varies the preset, full · ✅ BUILT 2026-06-08 (web-verified)
+With a MilkDrop preset locked, Random now varies **look (Phase 1) AND motion (Phase 2)** in one press — endless
+variety in both, still keeping the preset's identity. **Built:** `rollLockedPresetLook` now also rolls
+`currentState.motionSpeed` — ~75% in a tasteful band `rnd(0.6,1.6)`, ~25% bolder `rnd(0.35,1.9)`, snapped to the
+slider's 0.05 step; never 0 (no dead freeze), capped ~1.9 (no nausea). The existing `_buildRuntimePreset` scale +
+`_syncPresetSpeed` re-sync mean the engine and the Speed slider both follow the roll automatically. Toast now reads
+"🎲 Remixed" (look + motion). Headless-verified: varies, stays in band, slider matches, baseVals non-destructive,
+`_bundledBase` stays set. **NOTE (perceptual):** even before this, the look roll alone *felt* like it changed motion
+— rolling grade-reactivity (which fader pulses, to which band/curve) + Club + contrast/gamma re-moods the beat-pulse
+and visible energy. Phase 3 adds the *true* motion-rate change (real slow-mo / fast zoom-rot) on top.
 
 ### Phase 4 — Meld your image into a preset (bigger, later)
 Inject a user image/video into the preset's **own** warp/motion so the preset processes your asset while
@@ -165,16 +198,21 @@ Via the `STUDIO_POST_FX` comp-tail inject — these are exactly the axes **Phase
   with a friendly modal (shipped 2026-06-06; offers Remix to convert to a custom preset). (Phase 4 is the real
   fix — inject the texture into the preset's own warp.)
 
-## Maybe: a 5th tab
-A dedicated "Tune this preset" tab could be the home for the *loaded-preset* world, distinct from the
-from-scratch CREATION tabs (Palette / Layers / Motion / Wave) — holding the preset lock + the few Phase-2
-knobs. But the lock itself lives on the Random button regardless; a tab is only worth it if there are enough
-loaded-preset controls to justify a distinct workflow. Decide when we build Phase 2+. Naming TBD.
+## DECIDED (2026-06-08): NO 5th tab — expose loaded-preset controls in the EXISTING tabs
+The "Tune this preset" 5th-tab idea is **dropped.** Decision: keep the current tabbed interface (Palette / Motion /
+Wave / Layers) as-is, and when a loaded-preset control needs a home, **expose it in the relevant existing tab**
+(e.g. the Phase-2 motion knob folds into the **Motion** tab, gated to show only when `_bundledBase`). The 5th tab
+was only ever floated as a place to surface settings that aren't exposed yet — but the better answer is to surface
+those in the tabs we already have, not add a workflow. Revisit only if a future phase genuinely accumulates a
+distinct loaded-preset workflow that the existing tabs can't hold (not anticipated).
 
 ## Open questions (settle when scoping each phase)
 - Phase 1: live tweak vs convert-to-custom on first Remix?
-- Phase 2: which `baseVals` / eq patterns are safe to scale globally without breaking presets?
-- UX: where do the controls live — a 5th tab, or folded into existing tabs?
+- ~~Phase 2: which `baseVals` / eq patterns are safe to scale globally without breaking presets?~~ **RESOLVED
+  2026-06-08 by the mechanism audit (see Phase 2): scale `baseVals` zoom/rot/warp/warpscale — works on ~96% of the
+  1,144 (only 43 hand-coded presets are immune). time-scale and render-multiply ruled out as the primary lever.**
+- ~~UX: where do the controls live — a 5th tab, or folded into existing tabs?~~ **RESOLVED 2026-06-08: folded into
+  the existing tabs (no 5th tab).** See "DECIDED: NO 5th tab" above.
 - How to reliably detect "bundled base" beyond the `_bundledBase` flag if state paths grow.
 
 ## Bringing bundled MilkDrop presets faithfully into the editor (the "renders in player, BLACK in editor" class)
