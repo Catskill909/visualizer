@@ -6,6 +6,17 @@ three reconstruction bugs fixed (dropped shapes / wrong baseVals defaults / q-re
 library-wide (`npm run audit:editor-presets`). See the **🗝️ KEYSTONE MAP** below for what's safe to touch when
 dice-rolling / studio-controlling a bundled preset — that's the groundwork Phase 1 builds on.
 
+**OVERLAY LAYERS now first-class on bundled presets (2026-06-08).** Two layer bugs fixed (see "Bugs fixed") that
+together make image/video/GIF/text **overlays** a fully proven third surface on the 1,144 (alongside the comp-tail
+and baseVals lanes): (1) layers now sit STILL by default on a bundled preset instead of jittering to its motion
+(the q-register read-back — the *mirror* of the 06-07 clobber), and Blend modes work cleanly on bundled presets as
+a result; (2) layers **persist across the Random button** the way they already did across Remix. Strategic upshot
+for the phases: **Random + layers is now a discovery combo** — you can drop in a logo/clip and doom-scroll the 1,144
+underneath it (reinforces Phase 1's "Random is the discovery instrument"), and the static-default + per-layer audio
+sliders give the one-knob "make it react" control without touching the preset. This is also groundwork for **Phase 4
+(Meld into a preset)**: overlays-over-a-preset are now solid, so the remaining Phase-4 work is the genuinely hard
+part (injecting the asset INTO the preset's own warp), not the compositing around it.
+
 ## Goal (one line)
 Let you **lock the current MilkDrop preset** so the **Random** button varies (remixes) THAT preset instead of
 loading a new one — so the 1,144 built-in presets become endlessly explorable, instead of frozen.
@@ -125,7 +136,8 @@ Via the `STUDIO_POST_FX` comp-tail inject — these are exactly the axes **Phase
 - Colour Reactivity (pulse those to Bass / Mid / Treble / Volume / Flux)
 - Scene FX (Bloom / Posterize / Vignette / Scan lines / Film grain)
 - Club / Dark Mode (final-output dark-room tune)
-- Overlay layers (image / video / GIF / text composite over any preset)
+- Overlay layers (image / video / GIF / text composite over any preset) — **static by default + Blend modes + per-layer
+  audio reactivity, and they persist across the Random button** (2026-06-08). A proven third surface on the 1,144.
 
 ## The gaps (what does NOT reach a bundled preset today)
 - **Motion / warp / feedback** is not editor-controllable — the preset's `warp` shader, `frame_eqs`/
@@ -203,6 +215,15 @@ them — `q1`–`q25` for image/text **layer animation** (`buildAnimFrameEqs`), 
 `frame_eqs` in `_buildRuntimePreset`. On a raw bundled preset those writes **overwrite the preset's shader
 inputs → black** (this was the ~50-preset cluster). Fixed by gating that injection on `_bundledBase`.
 
+**The collision is BIDIRECTIONAL — and the gate must be applied on BOTH sides (2026-06-08 lesson).** The 06-07 fix
+handled the WRITE side (editor writes q → clobbers the preset). But the editor also READS those same registers: the
+per-layer comp GLSL in `_buildImageBlock` animates each overlay by reading `q1`–`q25` (`opacity*q1`, `size*q2`,
+`cx+q3`, `cy+q4`, `blur+q5`), expecting the neutral values `buildAnimFrameEqs` would have written. With the write
+gated off on a bundled base, those reads picked up the PRESET's live q-values instead → layers jittered to the
+preset's motion. **Fix:** gate the READ too — emit neutral literals (`1.0`/`0.0`) for those q-slots when
+`_bundledBase`. **General rule:** any editor feature that touches a `q` register must be `_bundledBase`-gated on
+*both* the write and the read; gating only one leaves the other half reading/writing the preset's namespace.
+
 **Implication for Phase 1 (locked-Random remix) and Phase 2 (motion knobs) — do NOT inject q-register logic into
 a bundled preset's `frame_eqs`.** Any "vary the preset" feature must stay in lanes proven safe on a raw bundled
 base:
@@ -232,7 +253,7 @@ the look, how `loadBundledPreset` reconstructs it, and whether a control/roll ma
 | **`shapes[0..3]`** | up to 4 custom shapes (own `baseVals` + eqs) | Sometimes (the WHOLE look for some) | kept (`deepClone`); `_buildRuntimePreset` packs **editor shapes first, then bundled** into the 4 engine slots | ⚠️ Leave bundled shapes alone; the editor adds its OWN (never starves them). |
 | **`waves[0..3]`** | custom waveforms (own `baseVals` + point eqs) | Sometimes | kept (`deepClone`) | ⚠️ Leave alone. |
 | **`init/frame/pixel_eqs`** | the preset's physics + **the code that loads `q1`–`q32`** for its shaders | **Yes** — drives motion AND feeds the shaders | preserved; editor normally APPENDS motion-engine/react/wave/flux/anim lines — **now GATED OFF when `_bundledBase`** | 🚫 **NEVER append to a bundled preset's eqs.** That's the q-clobber. |
-| **`q1`–`q32`** | shared per-frame scratch registers the preset uses to pass values into its warp/comp/shape shaders | indirectly (shader inputs) | editor writes `q1`–`q25` (layer anim) + `q31` (flux) — **gated on `!_bundledBase`** | 🚫 **OFF-LIMITS on a bundled base.** This is the namespace collision; the editor must not write any `q` the preset reads. |
+| **`q1`–`q32`** | shared per-frame scratch registers the preset uses to pass values into its warp/comp/shape shaders | indirectly (shader inputs) | editor WRITES `q1`–`q25` (layer anim) + `q31` (flux) in `frame_eqs` AND READS `q1`–`q25` in the layer comp GLSL (`_buildImageBlock`) — **both gated on `!_bundledBase`** | 🚫 **OFF-LIMITS on a bundled base — write AND read.** The namespace collision is bidirectional: don't write any `q` the preset reads, and don't read any `q` the preset writes (emit neutral literals instead). |
 
 ### The TWO safe lanes (everything a bundled-preset control or dice-roll may use)
 1. **Output stage — the comp TAIL (`STUDIO_POST_FX`).** Re-moods ANY of the 1,144 without touching their shader:
@@ -252,14 +273,43 @@ bundled world" (Remix-to-custom / Flow style / Meld) and must clear `_bundledBas
   populating it clobbers presets that use q31). Studio grade/solid/image reactivity "flux" → silently reads 0
   on a bundled base. Use bass/mid/treb/vol there. (Full flux returns once the preset is converted to custom.)
 - **`_bundledBase` is the master switch.** Set in `loadBundledPreset`; cleared when the editor takes over the
-  warp (Flow/Remix) or on reset/load. It gates: Meld-block modal, AND now the eq/q injection. **Locked-Random
-  (Phase 1) MUST keep it set** — clearing it re-enables the q-injection and re-breaks the preset.
+  warp (Flow/Remix) or on reset/load. It gates: Meld-block modal, the eq/q injection (WRITE), AND the layer comp
+  q-reads (`_buildImageBlock` → neutral literals). **Locked-Random (Phase 1) MUST keep it set** — clearing it
+  re-enables the q-injection and re-breaks the preset.
+- **Any new `q`-touching layer/anim feature must be `_bundledBase`-gated on BOTH write and read** (2026-06-08). The
+  collision is bidirectional (see "⚠️ The q-register namespace collision"): gating only the write leaves the comp
+  reading the preset's `q` values → erratic layers; gating only the read leaves `frame_eqs` clobbering the preset →
+  black. New per-layer GLSL that reads a `q` slot must fall back to its neutral literal when `_bundledBase`.
+- **Overlay-layer re-hydration is shared, not duplicated.** `_rehydrateImageLayers(savedImages)` is the single
+  per-entry re-mount path (fetch blob from IndexedDB → build texObj → `_mountLayerCard`), used by BOTH `loadPresetData`
+  (library load) and `restoreImageLayers` (Random-button persistence). Layer-load changes go there once.
 - **Saved baseVals are authoritative; old saves aren't auto-migrated.** A bundled-derived preset saved BEFORE
   these fixes baked the wrong `mv_a`/etc into its JSON — it stays broken until re-saved. New loads are correct.
 - **Verifying changes:** `npm run audit:editor-presets` is the regression net. Re-run after ANY change to the
   bundled-load path. Mind the two audit caveats (animation-timing false positives; "both-dark" is inconclusive).
 
 ## Bugs fixed
+- **Image/video/text LAYERS jittered to the preset's motion on bundled presets — q-register read-back (fixed 2026-06-08).**
+  The mirror image of the q-clobber above. Each layer's comp GLSL (`_buildImageBlock`) animates itself by READING
+  per-layer registers `q1`–`q25` (opacity`*q1`, size`*q2`, cx`+q3`, cy`+q4`, blur`+q5`). Those are meant to hold the
+  editor's neutral anim values from `buildAnimFrameEqs`, but that injection is gated OFF on a bundled base (the
+  2026-06-07 fix). So on a bundled preset `q1`–`q25` held the PRESET's own per-frame register values, which pulse with
+  the music — every layer's opacity/size/position rode the preset's motion ("layers acting erratic… picks up slider
+  motions instead of just sitting there"). **Fix:** in `_buildImageBlock`, when `_bundledBase` is true, bake the
+  neutral identity literals (`1.0` mult / `0.0` add) in place of the `q1`–`q25` tokens, so a layer sits STILL by default
+  — byte-identical to a from-scratch layer with no animation. From-scratch presets (`_bundledBase` false) keep the
+  q-refs so the GSAP animation pipe is unaffected. Per-layer audio sliders (`audioPulse`/`opacityPulse`/`bounceAmp`…)
+  read the `_r` envelope directly, NOT through q, so controllable reactivity is the intended "make it react" choice and
+  is untouched. Verified headlessly: bundled comp has no `q1`–`q5` in the layer block, from-scratch comp keeps them.
+- **Layers vanished when pressing Random (but persisted on Remix) — `_clearForLoad` wipe (fixed 2026-06-08).**
+  `Random` (`_loadRandomBundled`) → `loadBundledPreset` → `_clearForLoad` resets `currentState` to BLANK + empties
+  `#image-layers` + drops `_imageTextures`, so every overlay layer was destroyed on each Random press; the Remix button
+  (`_rollFullStack`) re-rolls in place and kept them. **Fix:** the Random handler snapshots `currentState.images` BEFORE
+  the load (each entry carries its `imageId`/`videoId` → persisted blob in IndexedDB), then `await
+  inspector.restoreImageLayers(snapshot)` re-mounts them over the new preset. Re-hydration reuses the SAME trusted path
+  as a library load: extracted `loadPresetData`'s per-entry re-mount loop into `_rehydrateImageLayers(savedImages)`
+  (shared by both); `restoreImageLayers` calls it then rebuilds comp + applies once. Scoped to the Random button — the
+  Remix-picker dirty-confirm flow is untouched.
 - **~50 bundled presets rendered BLACK in the editor — q-register injection clobber (fixed 2026-06-07).**
   Custom MilkDrop presets (`martin -`, `shifter -`, `ORB -`, `Geiss`, `Dark One`, `stahlregen`…) pass values
   into their own warp/comp/shape shaders via the `q1`–`q32` registers. `_buildRuntimePreset` appended the

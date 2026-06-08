@@ -9349,11 +9349,21 @@ export class EditorInspector {
         // GLSL below. Default neutral values in the JS eq pipe (1.0 / 0.0) make
         // the un-animated case byte-equivalent to the pre-animation shader.
         const _qBase = layerIdx * 5 + 1;       // 1, 6, 11, 16, 21
-        const _qOp   = `q${_qBase + 0}`;
-        const _qSc   = `q${_qBase + 1}`;
-        const _qDx   = `q${_qBase + 2}`;
-        const _qDy   = `q${_qBase + 3}`;
-        const _qBlur = `q${_qBase + 4}`;
+        // On a RAW bundled MilkDrop preset the editor's animation pipe is gated OFF
+        // (buildAnimFrameEqs is skipped — see _buildRuntimePreset, _bundledBase gate),
+        // so q1–q25 are NOT the editor's neutral anim slots: they hold the preset's OWN
+        // per-frame register values, which pulse with the music. Reading them here made
+        // every layer's opacity/size/position jitter to the preset's motion ("layers
+        // acting erratic"). Bake the neutral identity literals (1.0 mult / 0.0 add)
+        // instead so a layer sits STILL by default on bundled presets — byte-identical
+        // to a from-scratch layer with no animation. Per-layer audio sliders (audioPulse
+        // etc.) read the `_r` envelope directly, so controllable reactivity is unaffected.
+        const _animOn = !this._bundledBase;
+        const _qOp   = _animOn ? `q${_qBase + 0}` : '1.0';
+        const _qSc   = _animOn ? `q${_qBase + 1}` : '1.0';
+        const _qDx   = _animOn ? `q${_qBase + 2}` : '0.0';
+        const _qDy   = _animOn ? `q${_qBase + 3}` : '0.0';
+        const _qBlur = _animOn ? `q${_qBase + 4}` : '0.0';
         // Phase B (video-tiling-dev.md): stacked-alpha video tiling. A stacked-alpha
         // clip is a 2×-tall texture (RGB top, alpha-as-luma bottom); every tiled sample
         // must recombine the halves. `stackedTiled` also disables the texture-resample
@@ -10791,45 +10801,16 @@ export class EditorInspector {
         this.originalState = deepClone(this.currentState);
     }
 
-    // ─── Public: load a saved preset into the editor ──────────────────────────
-
     /**
-     * Load a full custom preset object (from customPresets.js) into the editor.
-     * Restores baseVals, shapes, waves, and image layers (fetching blobs from IndexedDB).
-     * @param {object} presetData - preset object as returned by loadAllCustomPresets()
+     * Re-mount a list of image/video/text layer entries onto the current preset,
+     * re-fetching the persisted blobs from IndexedDB. Shared by loadPresetData
+     * (library load) and restoreImageLayers (Random-button layer persistence) so
+     * both go through one trusted re-hydration path. Pushes each rebuilt entry into
+     * currentState.images and mounts its card; the CALLER rebuilds the comp + applies
+     * to the engine afterwards (so it runs once, after every layer is mounted).
      */
-    async loadPresetData(presetData) {
-        this._clearForLoad();
-
-        // Strip library-only metadata
-        const { id: _id, name: _name, schemaVersion: _sv, createdAt: _ca, updatedAt: _ua,
-            thumbnailDataUrl: _th, ...stateFields } = presetData;
-
-        // Overlay onto BLANK so fields missing from older saves fall back to defaults
-        // (avoids `undefined` propagating into _syncSlider → NaN value labels).
-        // baseVals is merged at the inner level — top-level spread alone replaces it
-        // wholesale, which would drop BLANK defaults for any field not in the saved file.
-        this.currentState = {
-            ...deepClone(BLANK),
-            ...deepClone(stateFields),
-            baseVals: { ...deepClone(BLANK.baseVals), ...deepClone(stateFields.baseVals || {}) },
-            images: [],
-        };
-
-        // ⚠️ PERSISTENCE BOUNDARY ⚠️
-        // Mirror of `saveCurrent` — every render-affecting instance variable
-        // saved there must be restored here. See the long comment above
-        // `saveCurrent` for the full audit list and the bug history.
-        this._imagesOnly = !!this.currentState.imagesOnly;
-        // Restore _solidColor (instance var, not in currentState). Without this,
-        // presets saved while in a solid-color variation reload with a black
-        // background because _buildCompShader falls back to sampler_main when
-        // the underlying preset has no visible Butterchurn output (e.g. wave_a=0).
-        this._solidColor = Array.isArray(stateFields.solidColor) ? stateFields.solidColor.slice() : null;
-
-        // Restore image layers (async — fetch blobs from IndexedDB)
-        const savedImages = stateFields.images || [];
-        for (const savedEntry of savedImages) {
+    async _rehydrateImageLayers(savedImages) {
+        for (const savedEntry of (savedImages || [])) {
             try {
                 // Text layers have no imageId — restore directly from saved properties
                 if (savedEntry.type === 'text') {
@@ -10912,6 +10893,63 @@ export class EditorInspector {
                 console.warn('[Studio] Could not restore image layer:', savedEntry.imageId, err.message);
             }
         }
+    }
+
+    /**
+     * Re-mount layers that were on screen before a Random-button preset load, so
+     * image/video/text overlays persist across Random the same way they do across
+     * the Remix button. The new bundled preset has already been loaded (clearing the
+     * old layers); we re-hydrate the snapshot over it and rebuild the comp once.
+     */
+    async restoreImageLayers(savedImages) {
+        if (!savedImages || !savedImages.length) return;
+        if (!this.currentState.images) this.currentState.images = [];
+        await this._rehydrateImageLayers(savedImages);
+        this._buildCompShader();
+        this._applyToEngine();
+        this._updateLayersBar();
+        this._updateLayerIndices();
+    }
+
+    // ─── Public: load a saved preset into the editor ──────────────────────────
+
+    /**
+     * Load a full custom preset object (from customPresets.js) into the editor.
+     * Restores baseVals, shapes, waves, and image layers (fetching blobs from IndexedDB).
+     * @param {object} presetData - preset object as returned by loadAllCustomPresets()
+     */
+    async loadPresetData(presetData) {
+        this._clearForLoad();
+
+        // Strip library-only metadata
+        const { id: _id, name: _name, schemaVersion: _sv, createdAt: _ca, updatedAt: _ua,
+            thumbnailDataUrl: _th, ...stateFields } = presetData;
+
+        // Overlay onto BLANK so fields missing from older saves fall back to defaults
+        // (avoids `undefined` propagating into _syncSlider → NaN value labels).
+        // baseVals is merged at the inner level — top-level spread alone replaces it
+        // wholesale, which would drop BLANK defaults for any field not in the saved file.
+        this.currentState = {
+            ...deepClone(BLANK),
+            ...deepClone(stateFields),
+            baseVals: { ...deepClone(BLANK.baseVals), ...deepClone(stateFields.baseVals || {}) },
+            images: [],
+        };
+
+        // ⚠️ PERSISTENCE BOUNDARY ⚠️
+        // Mirror of `saveCurrent` — every render-affecting instance variable
+        // saved there must be restored here. See the long comment above
+        // `saveCurrent` for the full audit list and the bug history.
+        this._imagesOnly = !!this.currentState.imagesOnly;
+        // Restore _solidColor (instance var, not in currentState). Without this,
+        // presets saved while in a solid-color variation reload with a black
+        // background because _buildCompShader falls back to sampler_main when
+        // the underlying preset has no visible Butterchurn output (e.g. wave_a=0).
+        this._solidColor = Array.isArray(stateFields.solidColor) ? stateFields.solidColor.slice() : null;
+
+        // Restore image layers (async — re-mount each entry, fetching blobs from IndexedDB).
+        const savedImages = stateFields.images || [];
+        await this._rehydrateImageLayers(savedImages);
 
         // Build comp AFTER images are loaded so the GLSL includes their layer code.
         this._buildCompShader();

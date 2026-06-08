@@ -408,6 +408,11 @@ async function _loadRandomBundled() {
     const current = inspector.currentState?.parentPresetName || null;
     const pool = current ? _rpNames.filter(n => n !== current) : _rpNames;
     const name = pool[Math.floor(Math.random() * pool.length)];
+    // Persist any layers across the load — image/video/text overlays should survive a
+    // Random press the same way they do a Remix (loadBundledPreset wipes them via
+    // _clearForLoad). Snapshot the entries BEFORE the load (each holds its imageId/
+    // videoId so restoreImageLayers can re-fetch the persisted blob), then re-mount.
+    const keptLayers = (inspector.currentState?.images || []).map(e => ({ ...e }));
     try {
         inspector.loadBundledPreset(name);
         const nameInput = document.getElementById('preset-name-input');
@@ -420,6 +425,12 @@ async function _loadRandomBundled() {
         markClean();
         setMode('edit');
         showToast(`Random: ${name}`);
+        // Re-mount the layers that were on screen before this Random press (async —
+        // re-fetches blobs from IndexedDB). A layer-free Random stays clean for instant
+        // browsing; when layers carry over, the restore's _applyToEngine fires onchange →
+        // the preset reads dirty, which is correct (unsaved overlay on a new base) and
+        // harmless since Random has no dirty-confirm gate.
+        if (keptLayers.length) await inspector.restoreImageLayers(keptLayers);
     } catch (err) {
         showToast('Load failed: ' + err.message, true);
         console.warn('[Studio] Random load failed:', err.message);
