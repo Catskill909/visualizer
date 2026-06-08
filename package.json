@@ -11,7 +11,8 @@
     "start": "sirv dist --host --port 8080 --single",
     "tauri-dev": "tauri dev",
     "tauri-build": "tauri build",
-    "verify:packs": "node scripts/verify-packs.mjs"
+    "verify:packs": "node scripts/verify-packs.mjs",
+    "audit:editor-presets": "node scripts/audit-editor-presets.mjs"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^1.5.0",

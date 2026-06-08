@@ -1,6 +1,10 @@
 # MilkDrop Control & Remix Convergence (dev plan)
 
 **Status:** PLANNING. Next step = Phase 1. Captured 2026-06-06.
+**Foundation DONE (2026-06-07):** the editor now renders the full 1,144-preset bundled library faithfully —
+three reconstruction bugs fixed (dropped shapes / wrong baseVals defaults / q-register clobber), audited
+library-wide (`npm run audit:editor-presets`). See the **🗝️ KEYSTONE MAP** below for what's safe to touch when
+dice-rolling / studio-controlling a bundled preset — that's the groundwork Phase 1 builds on.
 
 ## Goal (one line)
 Let you **lock the current MilkDrop preset** so the **Random** button varies (remixes) THAT preset instead of
@@ -97,6 +101,23 @@ Scope after Phases 1–3 land. Detail: `image-texture-dev.md` §16.2.
 4. **A serves B.** The curated motion knobs (Phase 2) exist so Remix (Phases 1/3) has meaningful things to roll
    on a loaded preset — not as a control panel for its own sake. That's why Phase 1 ships first and we let it
    *reveal* which knobs Phase 2 needs.
+5. **Push control & dice-roll to the MAX — within two HARD ceilings: don't break the app, don't tax the machine.**
+   The ambition is to tune/bend/randomize the 1,144 as far as possible. Two non-negotiable limits define "as far
+   as possible":
+   - **Don't break the app (FIDELITY).** Stay inside the two safe lanes (see 🗝️ KEYSTONE MAP): the output-stage
+     comp tail + `baseVals` scaling. Out-of-lane = black screens / clobbered presets (every bug we just fixed).
+     A control that genuinely needs to leave the lanes must first convert the preset to custom (clears
+     `_bundledBase`) — i.e. it leaves the bundled world rather than corrupting it in place.
+   - **Don't tax the machine (PERFORMANCE).** Respect the cost hierarchy and pick the cheapest lever that
+     achieves the effect:
+     - **`baseVals` / shader uniforms ≈ free** (per-frame scalars, NO recompile) → use for anything LIVE or
+       continuous (sliders, smooth motion knobs, per-frame audio reactivity).
+     - **comp-tail re-inject (`STUDIO_POST_FX`) = a shader recompile** → fine on a DISCRETE action (slider
+       commit, dice press); NEVER per-frame.
+     - **warp replace / full engine reload = expensive** → discrete only.
+     - A dice roll must collapse to **ONE** engine reload via the `_rolling` batch flag
+       ([[project_remix_batch_perf]]); every new roll axis respects it. Boring rolls (lemons) are fine — jank,
+       recompile storms, and meltdowns are not.
 
 ## Already works on any loaded preset (incl. all 1,144) — don't rebuild
 Via the `STUDIO_POST_FX` comp-tail inject — these are exactly the axes **Phase 1** re-rolls:
@@ -126,6 +147,160 @@ loaded-preset controls to justify a distinct workflow. Decide when we build Phas
 - Phase 2: which `baseVals` / eq patterns are safe to scale globally without breaking presets?
 - UX: where do the controls live — a 5th tab, or folded into existing tabs?
 - How to reliably detect "bundled base" beyond the `_bundledBase` flag if state paths grow.
+
+## Bringing bundled MilkDrop presets faithfully into the editor (the "renders in player, BLACK in editor" class)
+
+**The root divide (read this first).** The **player** renders a bundled preset by handing butterchurn the *raw
+preset object* (`visualizer.loadPreset(name)` → `visualizer.loadPreset(JSON.parse(JSON.stringify(preset)))`).
+The **editor** does NOT — `loadBundledPreset` *reconstructs* the preset field-by-field into `currentState`
+(baseVals / shapes / waves / warp / comp / eqs), then rebuilds a runtime preset in `_buildRuntimePreset` and
+calls `loadPresetObject`. That reconstruction is the convergence seam — **anything it drops, defaults
+differently, reorders, or appends silently changes the look**, and the failure mode is usually a BLACK editor
+canvas while the player is fine. **Three** confirmed instances (all fixed 2026-06-07), same root cause:
+
+1. **Dropped shapes** — `currentState.shapes = []` discarded the preset's own shapes; fatal for presets whose
+   look IS their shapes.
+2. **Wrong baseVals defaults** — sparse presets (most fields omitted) inherited the editor's *from-scratch*
+   `BLANK` defaults instead of *butterchurn's* preset defaults; fatal for any field where BLANK ≠ butterchurn.
+3. **q-register clobber (~50 presets, the big one)** — the editor APPENDED its anim/flux writes to the preset's
+   `frame_eqs`, overwriting the `q1`–`q32` registers the preset feeds its own shaders through.
+
+(1) drops, (2) defaults differently, (3) appends — all three flavours of the same seam. Full details in
+"Bugs fixed" below; the forward-looking synthesis is in the keystone map.
+
+**META-RULE for future bundled-preset work:** when a bundled preset looks wrong/black in the editor but fine in
+the player, the bug is almost always in the editor's reconstruction diverging from "what butterchurn would do
+with the raw object." Diagnose by diffing the reconstructed runtime preset against the raw object
+(`engine.presets[name]`), not by reading shaders. **Headless caveat:** many presets are audio-driven AND
+feedback-based (decay), so a no-audio harness shows them black in BOTH paths and `loadPresetObject` leaks the
+prior preset's feedback buffer between samples — both confound pixel sampling. Inject **pulsed** oscillators
+(transients, for `bass_att`) into `engine.visualizerGainNode` and sample via `engine.captureNextFrame()` for a
+reliable read. (See the two fixes below for the exact diagnostic path used.)
+
+## Library-wide audit (2026-06-07) — the editor now faithfully renders the bundled library
+Ran a **differential render audit** over all **1,144** bundled presets: render each BOTH ways (editor
+`loadBundledPreset` reconstruction vs player raw-object) under identical pulsed-audio, flag editor-black-but-
+player-fine. Reusable tool: **`scripts/audit-editor-presets.mjs`** (`npm run audit:editor-presets`; needs the
+dev server). It renders the editor path first and only does the costly player-confirm render when the editor
+looks dark, writing `scripts/audit-editor-presets-results.json`.
+
+- **Before the q-fix:** 59 flagged editor-black (≈5%), dominated by `martin -`/`shifter -`/`ORB -`/`Geiss`/
+  `Dark One`/`stahlregen` families. **After:** all 59 render (58 confirmed ≥3%; the last, `martin - basal
+  ganglion`, renders at ~29% under longer sampling — its flag was an animation-timing dark frame).
+- **Audit caveats (so the numbers aren't over-read):** (1) **Animation-timing false positives** — a single
+  snapshot can catch a sine-animated preset at a dark instant (e.g. `phat_Phenethylamine`, `glassball`, `Geiss`
+  flagged but actually fine). Sample a few frames and take the max. (2) The **"both-dark" bucket (~63)** is
+  *inconclusive*, not "fine" — the synthetic pulsed audio may be too weak to light a preset in either path;
+  real music or higher gain would re-classify some. The high-confidence signal is **editor≈0% while player is
+  consistently 50–100%**.
+
+## ⚠️ The q-register namespace collision — load-bearing for Phase 1–3 randomizing
+The deepest lesson from the audit, and it directly shapes how we randomize/remix bundled presets:
+
+**MilkDrop's per-frame registers `q1`–`q32` are a SHARED namespace.** A custom MilkDrop preset stores values in
+them (in its `frame_eqs`/`pixel_eqs`) to pass into its OWN warp/comp/shape shaders. The editor *also* writes
+them — `q1`–`q25` for image/text **layer animation** (`buildAnimFrameEqs`), `q31` for **flux** — by appending to
+`frame_eqs` in `_buildRuntimePreset`. On a raw bundled preset those writes **overwrite the preset's shader
+inputs → black** (this was the ~50-preset cluster). Fixed by gating that injection on `_bundledBase`.
+
+**Implication for Phase 1 (locked-Random remix) and Phase 2 (motion knobs) — do NOT inject q-register logic into
+a bundled preset's `frame_eqs`.** Any "vary the preset" feature must stay in lanes proven safe on a raw bundled
+base:
+- **Output stage (`STUDIO_POST_FX` comp tail)** — colour/reactivity/Scene-FX/Club. Already safe on all 1,144;
+  this is the Phase-1 re-roll surface. It reads `bass`/`mid`/`treb`/`vol` (and `q31` only if the user picks
+  "flux" — note flux is unavailable on a raw bundled base now, by design).
+- **Scaling the preset's OWN `baseVals`** (zoom/rot/decay/warp/warpscale) — the Phase-2 motion-knob lane.
+  Multiplicative nudges to values the preset already owns, NOT new q-driven equations.
+- **NEVER** append q-register assignments or new `frame_eqs` physics to a bundled preset — that's the clobber.
+- **Keep `_bundledBase` semantics through locked-Random.** Phase 1's "Random varies THIS preset" must NOT clear
+  `_bundledBase` (clearing it re-enables the q-injection and re-breaks the preset). The lock stays a raw bundled
+  base; only the output-stage look axes roll.
+
+This is the same "only the final-output tools reach a bundled preset" boundary from "The two worlds" above —
+now with a concrete mechanism (the q-namespace) explaining *why* crossing it breaks presets.
+
+## 🗝️ KEYSTONE MAP — preset anatomy, who renders each part, and what's safe to touch
+This is the load-bearing reference for BOTH goals (dice-roll MilkDrop + studio controls on MilkDrop presets).
+A butterchurn/MilkDrop preset (`engine.presets[name]`) has these parts. For each: what it is, whether it draws
+the look, how `loadBundledPreset` reconstructs it, and whether a control/roll may touch it on a RAW bundled base.
+
+| Part | What it is | Draws the look? | Editor reconstruction | SAFE to modulate on a raw bundled preset? |
+|------|-----------|------|----------------------|-------------------------------------------|
+| **`baseVals`** (~70) | per-frame scalars: `zoom`/`rot`/`warp`/`warpscale`/`decay`/`cx`/`cy`/`echo_*`/`wave_*`/`mv_*`/`ib_*`/`ob_*`/`gammaadj`… | **Yes** — base motion, feedback, wave/motion-vector/border draw | `{ ...BLANK, ...butterchurn baseValsDefaults, ...preset }` (faithful to player) | ✅ **YES — the Phase-2 motion lane.** Multiplicative nudges to values the preset already owns (`zoom`/`rot`/`decay`/`warp`/`warpscale`). Gate so neutral = untouched. |
+| **`warp` shader** | per-pixel motion-field shader (HLSL→GLSL) | Yes (when non-empty) | preserved verbatim (`currentState.warp = bundled.warp`); only replaced when the editor TAKES OVER (Flow style / image-warp / Remix) | ⚠️ Not directly. Phase 4 = inject the user image INTO it. Replacing it = leaving the bundled world. |
+| **`comp` shader** | per-pixel final-composite shader (HLSL→GLSL) | Yes (when non-empty) | preserved as `this._baseComp`; the editor APPENDS its `STUDIO_POST_FX` block at the **tail** via `injectStudioPostFx(_baseComp, gradeOpts)` | ✅ **The TAIL is the safe lane.** Colour/grade/Scene-FX/Club/glow/accent append here and re-mood ANY preset. The shader BODY stays untouched. |
+| **`shapes[0..3]`** | up to 4 custom shapes (own `baseVals` + eqs) | Sometimes (the WHOLE look for some) | kept (`deepClone`); `_buildRuntimePreset` packs **editor shapes first, then bundled** into the 4 engine slots | ⚠️ Leave bundled shapes alone; the editor adds its OWN (never starves them). |
+| **`waves[0..3]`** | custom waveforms (own `baseVals` + point eqs) | Sometimes | kept (`deepClone`) | ⚠️ Leave alone. |
+| **`init/frame/pixel_eqs`** | the preset's physics + **the code that loads `q1`–`q32`** for its shaders | **Yes** — drives motion AND feeds the shaders | preserved; editor normally APPENDS motion-engine/react/wave/flux/anim lines — **now GATED OFF when `_bundledBase`** | 🚫 **NEVER append to a bundled preset's eqs.** That's the q-clobber. |
+| **`q1`–`q32`** | shared per-frame scratch registers the preset uses to pass values into its warp/comp/shape shaders | indirectly (shader inputs) | editor writes `q1`–`q25` (layer anim) + `q31` (flux) — **gated on `!_bundledBase`** | 🚫 **OFF-LIMITS on a bundled base.** This is the namespace collision; the editor must not write any `q` the preset reads. |
+
+### The TWO safe lanes (everything a bundled-preset control or dice-roll may use)
+1. **Output stage — the comp TAIL (`STUDIO_POST_FX`).** Re-moods ANY of the 1,144 without touching their shader:
+   Brightness/Contrast/Gamma/Temperature/Saturation/Hue-Rotate/Colour-Roll + their audio reactivity + Scene FX
+   (Bloom/Posterize/Vignette/Scanlines/Grain) + Club/Dark-Mode + Glow/Accent. **This is the Phase-1 dice-roll
+   surface and the studio "look" controls — same lane.**
+2. **`baseVals` scaling — motion/feedback.** Multiplicative nudges to `zoom`/`rot`/`decay`/`warp`/`warpscale`
+   the preset already owns. **This is the Phase-2 motion-knob lane** (also a dice-roll axis). Audit per-pattern
+   safety across packs before shipping (some presets drive these in `frame_eqs`, which wins over `baseVals`).
+
+**Anything outside these two lanes (warp/comp body, shapes/waves, eqs, q-registers) is OFF-LIMITS on a raw
+bundled preset** — touching it is what produced every black-screen bug. Crossing the line is "leaving the
+bundled world" (Remix-to-custom / Flow style / Meld) and must clear `_bundledBase` first.
+
+### Gotchas that bite both goals
+- **`flux` reactivity source is unavailable on a raw bundled preset** (q31 is no longer populated, by design —
+  populating it clobbers presets that use q31). Studio grade/solid/image reactivity "flux" → silently reads 0
+  on a bundled base. Use bass/mid/treb/vol there. (Full flux returns once the preset is converted to custom.)
+- **`_bundledBase` is the master switch.** Set in `loadBundledPreset`; cleared when the editor takes over the
+  warp (Flow/Remix) or on reset/load. It gates: Meld-block modal, AND now the eq/q injection. **Locked-Random
+  (Phase 1) MUST keep it set** — clearing it re-enables the q-injection and re-breaks the preset.
+- **Saved baseVals are authoritative; old saves aren't auto-migrated.** A bundled-derived preset saved BEFORE
+  these fixes baked the wrong `mv_a`/etc into its JSON — it stays broken until re-saved. New loads are correct.
+- **Verifying changes:** `npm run audit:editor-presets` is the regression net. Re-run after ANY change to the
+  bundled-load path. Mind the two audit caveats (animation-timing false positives; "both-dark" is inconclusive).
+
+## Bugs fixed
+- **~50 bundled presets rendered BLACK in the editor — q-register injection clobber (fixed 2026-06-07).**
+  Custom MilkDrop presets (`martin -`, `shifter -`, `ORB -`, `Geiss`, `Dark One`, `stahlregen`…) pass values
+  into their own warp/comp/shape shaders via the `q1`–`q32` registers. `_buildRuntimePreset` appended the
+  editor's layer-anim lines (`q1`–`q25`, `buildAnimFrameEqs`) and flux line (`q31`) to EVERY preset's
+  `frame_eqs`, overwriting those shader inputs → black. The player never does this for bundled presets (they
+  load raw, never through `refreshCustomPresets`'s injection, which is gated on `CUSTOM_PREFIX`). **Fix:** gate
+  both injections on `!this._bundledBase` in `_buildRuntimePreset` — a raw bundled preset's `frame_eqs` pass
+  through verbatim (player parity); injection resumes once the user takes over the warp (Flow/Remix clears
+  `_bundledBase`, editor owns the shaders → its own anim/flux features apply). Bisected by reverting one
+  reconstruction transform at a time with the feedback buffer cleared: reverting q-injection restored every
+  truly-broken preset (tunnel race 0→87%, lattice 0→98%, Kalidescope 0→95%, Dark One 0→72%); comp/baseVals/
+  shapes reverts did nothing. Verified: 58/59 flagged presets now render (59th renders at 29%). No regression
+  risk — passing bundled presets already render in the player *without* the injection; custom/from-scratch
+  presets (`_bundledBase` false) are unaffected.
+- **Sparse bundled presets rendered BLACK in the editor — wrong baseVals defaults (fixed 2026-06-07).**
+  `Rovastar - Space _Twisted Dimension Mix_` (and other *sparse* presets) omit most `baseVals` fields,
+  including `mv_a` (motion-vector alpha). Its visible "space" content is the **motion-vector point grid**
+  warped through the feedback loop. The player works because butterchurn fills omitted fields from its own
+  table — `preset.baseVals = Object.assign({}, this.baseValsDefaults, preset.baseVals)` (vendor butterchurn.js
+  ~line 6740), where `mv_a` defaults to **1**. The editor built `baseVals = { ...BLANK.baseVals,
+  ...bundled.baseVals }`, and `BLANK` is the from-scratch creation base that intentionally sets `mv_a: 0`
+  (no motion vectors) — so `mv_a` was explicitly `0`, the grid was invisible, nothing seeded the feedback →
+  **BLACK**. (BLANK also diverges on `wave_mode` 3-vs-0, `wave_brighten` 0-vs-1, `b1ed` 0.5-vs-0.25 — latent
+  same-class breakage for other sparse presets.) **Fix:** interpose butterchurn's OWN defaults between BLANK
+  and the preset in `loadBundledPreset`: `{ ...BLANK.baseVals, ...engine.visualizer.baseValsDefaults,
+  ...bundled.baseVals }`. Keeps the editor-only fields (`studio_*`, `darken_center`…), makes every MilkDrop
+  field faithful to the player, and the preset's own values still win. Read from the same pinned vendor at
+  runtime → zero drift. **Did NOT** change `BLANK` (changing `mv_a` there would give every new from-scratch
+  preset motion vectors). Verified with pulsed-audio harness: Rovastar 0% → 100% non-black, `mv_a` now 1;
+  phat_Phenethylamine unaffected (its own `mv_a:0`/`wave_mode:6` win). No player/save-path change needed —
+  saved baseVals stay authoritative.
+- **Shape-driven bundled presets rendered BLACK in the editor (fixed 2026-06-07).** `loadBundledPreset`
+  did `this.currentState.shapes = []`, dropping the bundled preset's own shapes. For presets whose entire
+  look IS their shapes — empty warp + empty comp + near-zero `wave_a` (e.g. `phat_Phenethylamine`) — that
+  left nothing to draw → black, even though the player rendered it fine (player loads the raw object via
+  `visualizer.loadPreset`, keeping all shapes). Fix: keep the bundled shapes (`deepClone(bundled.shapes||[])`);
+  they have no `.motion`/`.react`, so `_isEditorShape()` is false → still no cards, still don't count against
+  the add-limit. `_buildRuntimePreset` now orders **editor shapes first, then bundled shapes** into the engine's
+  4 slots so user-added shapes are never starved (the original reason shapes were dropped). Mirrored in the
+  player's `refreshCustomPresets` (visualizer.js) for save parity. Verified headlessly: dropping shapes = 0%
+  non-black, keeping = renders + editor shape survives into slots.
 
 ## Notes
 - "MilkDrop preset is loaded" detection already exists: `this._bundledBase` (inspector.js) — set on Random,

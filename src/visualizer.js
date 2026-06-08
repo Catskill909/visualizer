@@ -636,6 +636,14 @@ export class VisualizerEngine {
             if (eqs) sh.frame_eqs_str = eqs;
           }
         }
+        // Mirror _buildRuntimePreset's slot ordering: editor shapes (motion/react)
+        // claim the engine's shape slots FIRST, then raw bundled shapes fill the rest,
+        // so a saved remix of a shape-driven bundled preset plays identically here.
+        const isEditorShape = (s) => !!(s && s.motion && s.react);
+        preset.shapes = [
+          ...preset.shapes.filter(isEditorShape),
+          ...preset.shapes.filter(s => !isEditorShape(s)),
+        ];
       }
       this.presets[key] = preset;
     }

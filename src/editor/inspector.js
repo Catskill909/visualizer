@@ -8969,7 +8969,15 @@ export class EditorInspector {
         // Phase 3 — generate each shape's frame_eqs from its motion params (Spin/
         // Pulse/Orbit). Generated at runtime, never stored (saved frame_eqs_str
         // stays ''). Player mirrors this in refreshCustomPresets for parity.
-        const shapes = (runtime.shapes || []).slice(0, MAX_SHAPES);
+        // Editor shapes claim engine slots FIRST, then bundled raw shapes fill the
+        // remainder — so user-added shapes are never starved by a bundled preset's own
+        // shapes (the engine renders only MAX_SHAPES slots). Player mirrors this ordering
+        // in refreshCustomPresets for save parity.
+        const allShapes = runtime.shapes || [];
+        const shapes = [
+            ...allShapes.filter(s => this._isEditorShape(s)),
+            ...allShapes.filter(s => !this._isEditorShape(s)),
+        ].slice(0, MAX_SHAPES);
         for (const sh of shapes) {
             if (sh && sh.baseVals && (sh.motion || sh.react)) {
                 sh.frame_eqs_str = buildShapeMotionEqs(sh.baseVals, sh.motion, sh.react) || sh.frame_eqs_str || '';
@@ -9011,12 +9019,23 @@ export class EditorInspector {
         const injectedMotion = buildMotionReactFrameEqs(state.motionReact);
         const injectedWave = buildWaveReactFrameEqs(state.waveReact);
         const baseFrame = runtime.frame_eqs_str || '';
-        const fluxLine = 'a.q31=(typeof __dcFlux!=="undefined"?__dcFlux:0);';
+        // q-register injection — CRITICAL: skip for a RAW bundled MilkDrop preset.
+        // Custom MilkDrop presets feed their OWN warp/comp/shape shaders through the
+        // q1–q32 registers; the flux line (q31) and the per-layer anim lines (q1–q25)
+        // would overwrite the preset's shader inputs → BLACK. ~50 bundled presets
+        // (martin/shifter/ORB/Geiss/Dark One…) broke this way. The player never injects
+        // these for bundled presets (they load raw, never through refreshCustomPresets),
+        // so gating on `_bundledBase` ACHIEVES editor↔player parity. Once the user takes
+        // over the warp (Flow style / Remix → `_bundledBase` cleared, editor owns the
+        // shaders), injection resumes for the editor's own animation/flux features.
+        // Tradeoff: a raw bundled preset can't use "flux" as a grade-reactivity source
+        // (q31 unpopulated) — acceptable, since populating it is what breaks the preset.
+        const fluxLine = this._bundledBase ? '' : 'a.q31=(typeof __dcFlux!=="undefined"?__dcFlux:0);';
         // animation-dev.md P0-C: pull `window.__dcAnim[i]` into per-layer q-slots
         // each frame. Now built by the SHARED helper so the editor and the
         // player/timeline (visualizer.refreshCustomPresets) inject byte-identical
         // lines — single source of truth, see customPresets.buildAnimFrameEqs().
-        const animLines = buildAnimFrameEqs();
+        const animLines = this._bundledBase ? '' : buildAnimFrameEqs();
         runtime.frame_eqs_str = [baseFrame, injectedEngine, injectedMotion, injectedWave, fluxLine, animLines].filter(Boolean).join('\n').trim();
         return runtime;
     }
@@ -10717,17 +10736,30 @@ export class EditorInspector {
 
         this._clearForLoad();
 
-        // Overlay bundled MilkDrop data on top of the BLANK base
-        if (bundled.baseVals) {
-            this.currentState.baseVals = { ...deepClone(BLANK.baseVals), ...bundled.baseVals };
-        }
-        // Editor shapes are independent of a preset's own shapes. A bundled preset's
-        // custom shapes are raw (uneditable here) AND the engine renders only 4 shape
-        // slots — so keeping them here let them occupy all 4 slots and starve the
-        // shapes YOU add (they got sliced off in _buildRuntimePreset and never drew,
-        // while the count read "Shape 6"). Drop them: `shapes` is now editor-only.
-        // (The bundled preset still keeps its warp/comp/waves — the bulk of its look.)
-        this.currentState.shapes = [];
+        // Overlay bundled MilkDrop data on top of the BLANK base.
+        // CRITICAL: fields the preset OMITS must fall back to butterchurn's OWN preset
+        // defaults (what the player gets — butterchurn does Object.assign({}, baseValsDefaults,
+        // preset.baseVals) on load), NOT the editor's from-scratch BLANK defaults. BLANK is a
+        // clean-slate creation base and intentionally differs (e.g. mv_a:0 = no motion vectors,
+        // wave_mode:3). A sparse bundled preset whose look IS the motion-vector grid (e.g.
+        // "Rovastar - Space _Twisted Dimension Mix_") rendered BLACK because BLANK forced mv_a:0,
+        // hiding the grid that seeds its feedback. Interposing butterchurn's defaults keeps the
+        // editor-only fields (studio_*, darken_center…) while making MilkDrop fields faithful to
+        // the player. Read from the same pinned vendor at runtime → zero drift.
+        const mdDefaults = this.engine.visualizer?.baseValsDefaults || {};
+        this.currentState.baseVals = {
+            ...deepClone(BLANK.baseVals),
+            ...deepClone(mdDefaults),
+            ...deepClone(bundled.baseVals || {}),
+        };
+        // Keep the bundled preset's own shapes — for some presets (empty warp + empty
+        // comp + near-zero wave, e.g. phat_Phenethylamine) the shapes ARE the entire
+        // look, so dropping them rendered the preset black in the editor. They're raw
+        // (no .motion/.react) so _isEditorShape() returns false → they never get a card
+        // and never count against the add-limit (editor UI is unchanged). _buildRuntimePreset
+        // orders editor shapes FIRST into the engine's 4 slots, so user-added shapes are
+        // never starved by these bundled ones.
+        this.currentState.shapes = deepClone(bundled.shapes || []);
         this.currentState.waves = deepClone(bundled.waves || []);
         this.currentState.warp = bundled.warp || '';
 
