@@ -1,6 +1,8 @@
 # Visualizer Output System — Dev & Research Doc
 
-**Status**: Phase 1 Research 🔬  
+> ⚠️ **ARCHIVE / REFERENCE ONLY — this doc does NOT track current status.** The single source of truth for output / multi-monitor / projector work is **[`output-dev.md`](output-dev.md)**. Kept for the early platform-API research + the Syphon/Spout/NDI reference tables. Do not start a new output doc; update output-dev.md.
+
+**Status**: Superseded — see [`output-dev.md`](output-dev.md) (this was Phase 1 Research 🔬, now historical)  
 **Scope**: Multi-monitor, projector, and VJ device output for timeline zones and main app player  
 **Created**: 2026-05-06  
 **Related**: `timeline-editor.md` Phase 5 (timeline-specific implementation)

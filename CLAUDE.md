@@ -43,3 +43,16 @@ These have burned us before and require a written execution trace before any cod
 - Do not add a third option (e.g. "Keep Both") when the user asked for yes/no
 - When a fix fails twice: stop patching, return to the original requirement, start clean
 - Prefer deleting competing code over patching around it
+
+---
+
+## Dev docs: ONE truth doc per topic — never fragment
+
+The user hates doc sprawl and stale/contradictory docs. For any feature area, there is **one** source-of-truth dev doc; the rest are archive/reference.
+
+- **NEVER start a new dev doc when one already exists for that topic.** Update the existing truth doc instead.
+- Before editing or creating any `*-dev.md`, find the topic's truth doc and confirm you're editing *that* one.
+- If a doc is reference/archive, it must say so in a banner at the very top, pointing to the truth doc.
+- Keep status in ONE place (the truth doc's top status block) — don't duplicate status across docs.
+
+**Output / multi-monitor / projector → the single source of truth is [`output-dev.md`](output-dev.md).** `app-output-dev.md`, `native-output-dev.md`, and `visualizer-output-dev.md` are **archive/reference only** (their tops say so). Do not create a new output doc.

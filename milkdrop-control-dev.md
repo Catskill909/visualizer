@@ -1,19 +1,43 @@
 # MilkDrop Control & Remix Convergence (dev plan)
 
-**Status (2026-06-08): CORE ARC COMPLETE — Phases 1–3 shipped, Phase 4 dropped. Layer↔Preset #1 (Preset Reveal) shipped.**
+**Status (2026-06-08): CORE ARC COMPLETE + LAYER↔PRESET INTERACTION SHIPPED (#1 Reveal, #2 Layer Remix, #3 blend modes).**
 Lock a bundled MilkDrop preset and the **Random** button stops loading new presets — it **reinvents the locked one's
 look + motion** in one press, so the 1,144 are now endlessly explorable instead of frozen. Foundation (06-07): the
-editor renders the full 1,144-preset library faithfully. Overlay layers (06-08): first-class on bundled presets
-(static by default, persist across Random, blend modes work). First layer↔preset interaction shipped (06-08):
-**Preset Reveal** (#1 below). The active thread continues — deepening how **layers interact with** a bundled preset
-(the safe output-stage lane), NOT melding into it.
+editor renders the full 1,144-preset library faithfully. Overlay layers (06-08): first-class on bundled presets. Then
+the whole **layer↔preset interaction** lane shipped 06-08 (#1–#3 below): the layer now *fuses* with the preset's live
+light (11 blend modes + Preset Reveal), and **Random reinvents the layers too** (blend / colour / size / tiling / FX),
+in BOTH locked and unlocked modes. The active thread continues — output-stage layer↔preset interaction, NOT melding in.
 
 The original goal (achieved): *Random and Remix should feel like one discovery instrument, and a loaded MilkDrop
 preset should be tweakable / remixable, not frozen.*
 
+### ⚡ Handoff summary — what shipped in the 2026-06-08 layer↔preset session
+All in `src/editor/inspector.js` (+ one wire in `src/editor/main.js`); pushed to git. **Web-tested (Vite dev,
+localhost:5173 — [[feedback_test_on_web_dev_server]]); no DMG.** Verdict: user "much better… the colour blending really
+stands out." See #1–#3 below for full mechanism. The crown jewel is the **blend×preset fusion**; everything else is
+seasoning that must serve it (see the regression post-mortem in #2).
+1. **Preset Reveal** — preset luma gates where the layer shows (`presetMask`/`presetMaskInvert`).
+2. **6 new blend modes** — Lighten/Darken/Difference/Color-Dodge/Color-Burn/Hard-Light (11 total).
+3. **Layer Remix** — `_rollLayerLook` / `rollLayerLooks` / `_remountLayerCards`; Random rolls every layer's whole look in
+   both Random modes; final weighting favours INTERACTING blends + lower opacity + Reveal so the preset always reads
+   through (the post-mortem). **Next:** fast-follows below, or #4 Preset-driven tint.
+
+### 🎛️ Random vs Remix — how each button handles LAYERS (source of truth — don't conflate them)
+**Two buttons, TWO INTENTIONALLY-DIFFERENT layer paradigms. Both already work. Do NOT cross them.**
+- **RANDOM button → rolls the OVERLAY LAYERS.** On a bundled preset (locked `rollLockedPresetLook` OR unlocked
+  `_loadRandomBundled`), Random reinvents each overlay layer's *compositing* look via **`_rollLayerLook`** — blend mode /
+  Preset-Reveal / opacity+audio-pulse / colour / size / single↔density-tile↔grid / per-cell variance. This is the
+  2026-06-08 work. **Random uses layers.**
+- **REMIX button (`_rollFullStack`) → uses MELD.** Its layer interaction is the **Meld/Drive melt**: when a Drive image
+  is active it rolls the whole melt via **`_rollImageWarp`** (flow/depth/spin/mirror/luma-key/blend/tint — image fused
+  INTO the warp). Remix also rolls palette/field/reactivity/motion/flow/wave/shape content. **Remix mixes layers via
+  Meld**, not via `_rollLayerLook`.
+- **Meld (fuse image INTO the warp) ≠ Overlay (composite image OVER via blend modes)** — different mechanisms, different
+  buttons, by design. `_rollLayerLook` lives in the Random paths ONLY; `_rollImageWarp` lives in Remix.
+
 ---
 
-## ▶️ NEXT — Layer ↔ Preset interaction (brainstorm + dev queue) · NEEDS DISCUSSION
+## ▶️ Layer ↔ Preset interaction — dev queue (#1–#3 SHIPPED 2026-06-08; #4 + fast-follows OPEN)
 
 **The insight (user, 2026-06-08):** our layer **Blend modes already make the layer interact with the preset** — they
 aren't flat overlays. In `_buildImageBlock` the comp shader takes `col` (the preset's live pixels) and `_src` (the
@@ -32,13 +56,15 @@ direction is: **deepen layer↔preset interaction here**, all output-stage, all 
    mix(1.0, smoothstep(0.15, 0.85, _pM), amount)`, just before `blendLine`. Pure output-stage — no q-registers, no
    `_bundledBase` gate, works on bundled AND custom; gated so 0 = byte-identical flat overlay. New per-entry fields
    `presetMask` / `presetMaskInvert` (round-trip through `currentState.images`; own dedicated handler + on the
-   slider-sweep `:not()` exclusion list). **Rolled by `rollLockedPresetLook`** (~45% of present layers get a 0.35–0.85
-   reveal, ~30% of those flipped to Dark) — a new dice axis. **Caveat:** in a multi-layer stack `col` includes lower
+   slider-sweep `:not()` exclusion list). **Rolled inside `_rollLayerLook`** (#2) — current odds ~60% → 0.35–0.85, ~30%
+   Dark (the initial 45% was raised by the regression fix). **Caveat:** in a multi-layer stack `col` includes lower
    layers, so layer N is masked by "preset + layers below," not the bare preset (fine for the headline single-overlay
    case). **To test live:** load a bundled preset, drop an image/logo layer, push Reveal up — the preset's bright
    regions should carve the logo; try the Dark flip and a high-contrast tunnel preset for the most dramatic wipe.
-2. **LAYER REMIX ⭐⭐ — ✅ SHIPPED 2026-06-08 (framing-untouched v1).** Random now reinvents the overlay LAYERS' look on
-   every locked-Random press, not just the preset. New `_rollLayerLook(img, pick, rnd)` (mutates each layer entry,
+2. **LAYER REMIX ⭐⭐ — ✅ SHIPPED 2026-06-08 (full: look + size + tiling + the regression fix).** Random now reinvents the
+   overlay LAYERS' whole look on every Random press (locked AND unlocked), not just the preset. *(The per-axis weights
+   evolved across the session — the **CURRENT roll weighting** bullet near the end of this item is the source of truth;
+   the dated sub-bullets below narrate how it got there.)* New `_rollLayerLook(img, pick, rnd)` (mutates each layer entry,
    modeled on `_rollImageWarp`), called per layer from `rollLockedPresetLook`; after the single trailing
    `_buildCompShader`+`_applyToEngine`+`_syncAllControls`, **`_remountLayerCards()`** rebuilds the cards (clear
    `#image-layers` + loop `_mountLayerCard(entry, _imageTextures[entry.texName])` — DOM-only, idempotent, doesn't
@@ -85,43 +111,17 @@ direction is: **deepen layer↔preset interaction here**, all output-stage, all 
      beat, motion, geometry, mirror) dialled back to seasoning (~half their old odds) so blend×preset×colour LEADS.
      META-LESSON: when you give a layer the power to cover the frame, the "let the preset show through" path (interacting
      blend / lower opacity / Reveal) must be the DEFAULT, or the headline interaction gets plastered over.
-   - **Fast-follows:** (a) reuse `_rollLayerLook` in `_rollFullStack` (custom-preset Remix); (b) optional per-layer
-     "keep" lock so a placed logo can opt out of the roll (the deliberate replacement for the old accidental
-     fixed-layer-while-browsing behaviour, now gone since unlocked Random rolls layers).
-   --- *original plan (kept for reference):* ---
-   Random should reinvent the
-   OVERLAY LAYERS the same way Meld's 🎲 reinvents a melt — not just re-mood the preset. *(User: "Random changing up the
-   blending, mirroring, and all the effects the layers have = unlimited remix capabilities.")* **Zero new GLSL** — every
-   layer effect is already an output-stage param the comp shader reads each frame; this is purely a taste-biased ROLL
-   function that sets values on each `currentState.images` entry, then rebuilds. **Subsumes #2** (audio-reactive blend
-   becomes one rolled axis — `opacityPulse` to a rolled band/curve = the blend breathing with the music). Modeled
-   directly on `_rollImageWarp` (the Meld whole-melt roll).
-   - **New method `_rollLayerLook(img, pick, rnd)`** called per layer from `rollLockedPresetLook` (replaces the
-     presetMask-only roll added with #1). Two load-bearing patterns lifted from `_rollImageWarp`:
-     - **Recognizable bias (`_present`, ~50%):** half the rolls keep the logo clearly readable (high opacity, no tile,
-       gentle FX); the other half go wild. This is what stops Random from nuking a logo to mush every press.
-     - **Shared FX budget:** shuffle [chromatic, edge, posterize, pixelate, scanlines, grain, wave, solarize, invert],
-       take AT MOST 1–2 (milder when present). Never stack into garbage — the exact bug Meld's distortion budget solved.
-   - **Per-axis treatment:**
-     | Axis | Treatment |
-     |---|---|
-     | **Blend mode** ⭐ | weighted pick; present favours normal/overlay (image reads), wild adds screen/additive/multiply |
-     | **Mirror** ⭐ | ~25% present / ~45% wild → h/v/quad/kaleido (+kaleidoSpeed when kaleido) |
-     | **Reveal** (presetMask) | the #1 roll — ~45% → 0.35–0.85, ~30% Dark flip |
-     | **Opacity + audio pulse** (#2) | opacity 0.4–1.0 (never invisible); ~50% add `opacityPulse` to a rolled band+curve → blend breathes with the music |
-     | **Colour** | ~40% recolour (tintRGB / imageHue / hueSpin); mild brightness/contrast/saturation always |
-     | **FX budget** | the shuffled 1–2 above |
-     | **Beat-reactive (B1′)** | ~30% add one of tilt/hop/huePulse/blurPulse/squash at modest amp |
-     | **Motion** | occasional gentle spin/sway/wander/orbit; gentler when present |
-     | **Leave alone** | which image (`texName`/`imageId`), name, solo/mute, HD — identity & housekeeping |
-   - **DECIDED — framing:** **look = aggressive, framing = GENTLE, tile = rare surprise.** Keep size/position roughly
-     where the user placed it; **tile only on rare wild rolls (~10%, non-text)** — tiling a logo turns it into wallpaper
-     (great *sometimes*, destructive as a default). (User confirmed: "your instinct is right on with tile vs image.")
-   - **Mechanics:** hooks `rollLockedPresetLook` only (the locked-Random instrument where layers ride); its single
-     trailing `_buildCompShader()` + `_applyToEngine()` already batches the rebuild → no per-layer reload. After rolling,
-     **re-mount the layer cards** (clear `#image-layers`, loop `_mountLayerCard(entry, _imageTextures[entry.texName])`)
-     so the cards' sliders/dropdowns show the rolled values. One file, one new method + a re-mount helper. **Fast-follow:**
-     custom-preset Remix (`_rollFullStack`) can reuse the same `_rollLayerLook`.
+   - **OPEN fast-follows (next session):** (a) optional **per-layer "keep" lock** so a placed logo can opt out of the
+     Random roll — the deliberate replacement for the old accidental "browse presets with a fixed layer" (now gone, since
+     unlocked Random rolls layers in the uniform model). Pure addition; no mechanics change.
+     - *(NOT a fast-follow — intentionally NOT done: porting `_rollLayerLook` into the Remix button. Random rolls overlay
+       layers; Remix uses Meld. Two paradigms by design — see "Random vs Remix" at the top. Don't cross them.)*
+   - **CURRENT roll weighting (post-regression-fix — the source of truth; the old "favour normal/overlay, framing
+     gentle" plan was REVERSED, see post-mortem above):** blend `normal` 7% / `overlay` 11% / rest INTERACTING
+     (`_softInteract` present, `_wildInteract` wild); opacity 0.6–0.95 present / 0.45–0.9 wild (`normal` forced 0.35–0.6);
+     Reveal ~60%; mirror 18/32%; colour always-mild + ~40% recolour + ~30% tint; FX/beat/motion/geometry all dialled to
+     seasoning (~10–40%); GUARD re-blends any big single image; tiling three-way + size + per-cell variance per the suite
+     above. **`_present` (~50%)** still gates calm-vs-wild. Identity (`texName`/`imageId`, name, solo/mute, HD) untouched.
 3. **More blend modes — ✅ SHIPPED 2026-06-08.** Added Lighten(max) / Darken(min) / Difference / Color-Dodge /
    Color-Burn / Hard-Light to the layer-blend dropdown (now 11 modes) — six standard Photoshop formulas as new `case`s
    in the `switch(img.blendMode)` GLSL of `_buildImageBlock`, each `col = mix(col, BLEND(col,_src), _op)` exactly like
@@ -142,11 +142,11 @@ direction is: **deepen layer↔preset interaction here**, all output-stage, all 
 **Each candidate must clear the bar:** one obvious knob (no sub-menus, [[project_one_click_vs_pro_tools]]), dramatic
 on a BROAD sample, stays output-stage (never the feedback loop / warp body), and is a new axis Remix can roll.
 
-**Next step:** #1 Reveal, #3 blend modes, **#2 LAYER REMIX all shipped 2026-06-08** — lock a bundled preset with a
-layer, hit Random, and every press reinvents preset look + motion AND the layer's blend/mirror/reveal/colour/FX/
-audio-pulse. **Live with it, then pick a fast-follow:** (a) tile-surprise in the roll, (b) `_rollLayerLook` into
-`_rollFullStack` (custom Remix), (c) per-layer "keep" lock, or (d) #4 Preset-driven tint. Recommend living with Layer
-Remix first — the doom-scroll feel will say which lever it wants next.
+**Next step (next session):** #1 Reveal, #3 blend modes, **#2 LAYER REMIX all shipped & web-verified 2026-06-08**
+(incl. size/tile-mode/full-fader expansion + the blend-fusion regression fix). **Pick a fast-follow:** (a) per-layer
+**"keep" lock**; (b) **#4 Preset-driven tint** (last unstarted queue item); or (c) tune the roll lean from living with it.
+(Random rolls overlay layers; Remix uses Meld — two paradigms by design, NOT to be merged; see "Random vs Remix" up top.)
+No blocking work; the queue is in a clean, handoff-ready state.
 
 ---
 

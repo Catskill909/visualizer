@@ -18,7 +18,7 @@ Legend: ✅ done · ⬅ **next** · 📋 planned. Shipping product = the **deskt
 
 **NATIVE — in progress** (the shipping path)
 - ✅ **N0** — NDI proof: composed program live in OBS + NDI Video Monitor
-- ⬅ **Phase B — desktop local display (projector/monitor)  ◀ WE ARE HERE**
+- ⬅ **Phase B — desktop local display (projector/monitor)  ◀ WE ARE HERE**  · 🔌 **first real projector (Vankyo X3) field-tested 2026-06-09 — see the "Projector field setup" section below: wireless RULED OUT (lag + AirPlay instability); ✅ root cause found — the projector's hub was wired to the **MacBook Air**, not the Mac mini (where the app/dev/terminal run); Universal Control hid that. RULE: **one machine hosts app + operator monitor + projector** (wired EXTENDED, its WiFi OFF — wired+wireless conflict = blackouts). Canvas-only output already works via A1 once the rig is one-machine + wired. See "Projector field setup" → RESOLUTION.**
   - ✅ **B1** — fullscreen the app on a chosen monitor · **Approach A** (one projector, whole show, ~zero latency) · **verified in tauri-dev 2026-05-23** (app went fullscreen on the chosen display)
   - 📋 **B2** — separate operator + output · **Approach B** spike (Syphon vs pixel-readback) · *needs the 2nd display — projector arriving ~end of week (2026-05); will test monitor + projector as 2 outputs*
   - 📋 **B3** — placement polish: wake-lock on output, clean teardown, multi-output
@@ -28,6 +28,82 @@ Legend: ✅ done · ⬅ **next** · 📋 planned. Shipping product = the **deskt
 - 📋 **Enhancements** — audio-over-NDI A/V-lock, A4 venue presets, transparent-bg → NDI alpha
 
 **Locked rules:** event sync rides the **local-display path, not NDI**; ⚠ don't ship NDI until **N2**; never re-render at the destination (§13).
+
+---
+
+## 🔌 Projector field setup — Vankyo X3 (HARD-WON, 2026-06-09)
+
+A real on-device test that cost ~2 hours of pain. **Read this before connecting any projector** — it saves the entire ordeal.
+
+> **✅ END RESULT: WORKING (web build, MacBook Air, 2026-06-09 night).** The app's Outputs modal detected **both** Built-in Retina + **S2-TEK TV (1920×1080)** as separate displays once the projector was set to **Extended** in System Settings → Displays. Winning recipe: projector wired to the MacBook Air (its own keyboard → no Universal Control needed) → in System Settings → Displays set **S2-TEK TV to Extended** (NOT mirror; setting the built-in's mode was the path that failed — set the *projector* to Extended) → app on the MacBook Air → Outputs → route **Full → S2-TEK TV** (or Open Composed Program) → fullscreen → projector shows pure canvas, controls stay on the built-in. The BetterDisplay EDID fix below is only needed if the macOS "mirror/extend" TV-prompt keeps nagging; the rig works without it once Extended is set.
+
+**The device:** Vankyo X3 (shows up as **"S2-TEK TV"**) — native 1080p, 300 ANSI lumens, dual-band WiFi (AirPlay/Miracast receiver), HDMI / USB / AV inputs. Test rig: Mac mini M2 (`Mac14,3`) driving an LG FHD operator monitor; controlled from a MacBook Air over **Universal Control**.
+
+### What actually happened (accurate hardware + symptom log — corrected after I got it wrong twice)
+**Hardware (confirmed 2026-06-09):**
+- **LG FHD** operator monitor → Mac mini's **native HDMI port** · Main display · 1920×1080 @ 100 Hz.
+- **Vankyo X3 projector** → **HDMI cable → a USB‑C HUB → Mac mini USB‑C port.** (It is a *hub*, NOT a bare "adapter" — earlier notes here calling it an adapter were wrong.)
+- **The projector HAS appeared in System Settings → Displays in a prior session** — so a wired path to it is *capable* of working. Today it did not.
+
+**Symptom today (every single check):** `system_profiler SPDisplaysDataType` showed **only the LG**. The projector never registered as a wired display. Instead it connected over **WiFi AirPlay** — it showed in the macOS *Screen Mirroring* menu as "Connected," and the projector itself displayed the macOS **"Choose to Mirror or Extend Display from the menu"** AirPlay placeholder. Diagnostic rule: a *wired* HDMI display appears in Displays/`system_profiler` and **never** in the Screen Mirroring menu; an *AirPlay* connection is the reverse. Today = AirPlay, not the hub.
+
+**The blackout:** when "Extend" was chosen (over that wireless session), the **LG went black** — because the projector had been set as macOS **"Main display,"** so the whole desktop jumped to the projector and left the LG empty.
+
+**UNRESOLVED — the real open question:** *why the wired HDMI‑via‑hub signal wasn't reaching (or wasn't preferred) today, when it has worked before.* Two live hypotheses, **neither confirmed — do not state as fact:**
+- (a) the **USB‑C hub's video passthrough dropped** (loose/flaky USB‑C, needs reseating, or only works in a specific port);
+- (b) the **projector prioritised its own built‑in WiFi input** over its HDMI input and auto-connected over AirPlay before the wired signal could take.
+
+### Wireless (AirPlay) = RULED OUT for this app
+Two hard reasons, both confirmed live:
+- **Latency** — AirPlay buffers ~100–300 ms; it visibly lags the beat and **wrecks audio-reactivity sync** (the thing we care most about).
+- **Instability** — "Extend Display" over AirPlay **blanked the Mac mini's main monitor**; the Screen Mirroring session then **wedged into a phantom "Connected" state** the UI could not dismiss (cleared only by physically unplugging / powering off the projector). Budget-projector AirPlay receiver + macOS = unreliable. **Do not revisit wireless for this projector.**
+
+### Terminal diagnosis truths (for the next time something "won't disconnect")
+- **`system_profiler SPDisplaysDataType` is the authority.** It lists only *real, attached* displays. All day it showed **one** display (LG FHD); the projector never appeared because it was never a stable wired display. An AirPlay "connection" that does **not** show here = no actual mirror, just a UI ghost.
+- A live AirPlay mirror is held by **`replicatord` + `AirPlayUIAgent`** (plus `sharingd` / `mediaremoted`). `killall`-ing them drops a *real* mirror, but will **not** clear a phantom Control Center menu entry while the projector keeps advertising itself on Bonjour. The phantom only dies when the **projector** stops broadcasting (turn it off / switch its input).
+- ⚠️ **NEVER turn off WiFi on a machine you drive via Universal Control.** Universal Control rides on WiFi — killing WiFi on the Mac mini **severs the keyboard/mouse link and locks you out of the machine.** This burned ~30 min. Stick to read-only checks; let the human drive any network/AirPlay/system-settings change.
+
+### ✅ RESOLUTION (end of 2026-06-09) — the projector was on the WRONG MACHINE
+The whole day's failure had one cause: **the projector's hub was wired to the MacBook Air, while the app, the dev server, the repo, and the Claude/terminal session were all on the Mac mini.** Universal Control made the two machines *feel* like one (one cursor/keyboard), so it wasn't obvious the projector wasn't physically on the Mac mini. Proof: the Mac mini's `system_profiler` + Thunderbolt check showed **"No device connected"** on both USB-C ports — nothing was plugged into the mini — while plugging the projector into the **MacBook Air** made it appear instantly as a real wired display (`Paul's MacBook Air → S2-TEK TV`, MacBook resolution auto-changed). Universal Control's unified Displays view listing screens from *both* machines added to the confusion.
+
+A **second** conflict then appeared: on the MacBook Air the projector was connected **both** by cable (HDMI hub) **and** over WiFi AirPlay at once → choosing "Extend" blacked all screens and mirroring kept re-popping. This is the exact wired+wireless conflict Vankyo's manual warns against.
+
+**THE RULE (decided by the user, the right call):** **one machine hosts the app + the operator monitor + the projector.** Don't split them across machines. Projector = a **wired EXTENDED** display on that one machine, with its **WiFi/AirPlay OFF** so wired and wireless never fight. Universal Control is fine *only* as a remote keyboard/trackpad — never as a way to span the display rig across machines.
+
+**Two valid rigs (pick the host = the machine that runs the app):**
+- **Mac mini host (recommended — repo + dev server + LG already there):** LG FHD = operator (native HDMI); projector = 2nd display via a **video-capable USB‑C→HDMI adapter plugged DIRECTLY into the mini's USB‑C** (not the hub that turned out to be on the Air). Mac mini M2 drives 2 displays (HDMI + 1 USB‑C).
+- **MacBook Air host (fewest cables — projector already works there):** built-in = operator; projector = the Air's single external display (Apple-Silicon Air supports exactly one external).
+
+Once the rig is one-machine + wired-extended + wireless-off, canvas-only output is the already-shipped A1 flow (open the canvas-only output window → drag onto the projector → fullscreen).
+
+### ✅✅ THE WORKING FIX (confirmed 2026-06-09 night) — "Stop Mirroring" = set built-in to Main display
+After the projector was wired to the MacBook Air, the built-in screen kept defaulting to **"Use as: Mirror for S2-TEK TV"** (System Settings → Displays → select the built-in). Two symptoms came from that one setting: (1) the built-in shrank to the projector's 1080p ("everything smaller"); (2) choosing "Extend" blacked the operator screen (desktop jumped to the projector, which was set as Main).
+**The fix that worked:** in Displays, select the **Built-in Display** → **"Use as"** dropdown → change **"Mirror for S2-TEK TV" → "Main display"** (this is the "Stop Mirroring" action). That single change **un-mirrors** (built-in returns to native resolution) **and** makes the built-in the Main display (desktop stays put) **and** turns the projector into a clean separate **extended** screen. No blackout, no shrinking.
+**Then:** run the app on the MacBook Air → open the canvas-only output window (player `O` → Open output window, or timeline Open Composed Program) → drag it onto the S2-TEK TV extended screen → fullscreen (⛶). Projector = pure canvas; built-in = controls. Keep projector input on **HDMI**; stay out of the Screen Mirroring menu.
+
+### 🎯 THE DEFINITIVE ROOT CAUSE — macOS Sequoia mis-IDs the projector as a "TV" (known bug)
+Why the **"Choose to Mirror or Extend Display from the menu"** prompt kept appearing *every single time* the projector connected, no matter what — it's a **known macOS Sequoia (15.x) bug**, not a user error and not the projector's WiFi. There's a GitHub thread with that exact title and a MacRumors thread "macOS 15.2 Screen Mirroring is always active." It hits **Apple-Silicon Macs with a display connected through a USB-C dock/hub** — exactly this rig. Two factors gang up: (1) the projector rides a **USB-C hub** (the Sequoia trigger), and (2) it names itself **"S2-TEK TV."** macOS treats *TVs* differently from *monitors* — for a TV it pops the mirror/extend prompt on every connect/wake instead of just extending. OS-level misidentification → no built-in setting fully suppresses it.
+**Fixes:**
+- **Level 1 (try first):** System Settings → Displays → select **S2-TEK TV** → change the **"When connected to TV"** dropdown (away from "Ask What to Show"). Helps but per the thread may not fully stop it.
+- **Level 2 (the sure fix):** install **[BetterDisplay](https://github.com/waydabber/BetterDisplay)** (free, open-source) → **override the projector's EDID to mark it as a DisplayPort (DP) monitor, not a TV.** Maintainer: *"change the display's EDID to explicitly mark it as a DP device, macOS seems to honor that."* Then macOS treats it as a normal monitor → the mirror prompt stops, it just extends.
+- Sources: [BetterDisplay discussion #4654](https://github.com/waydabber/BetterDisplay/discussions/4654) · [MacRumors — Sequoia screen mirroring always active](https://forums.macrumors.com/threads/macos-15-2-screen-mirroring-is-always-active.2445366/) · [Apple — Use your TV as a display](https://support.apple.com/guide/mac-help/use-your-tv-as-a-display-mchlp1206/mac).
+
+### Earlier next-test note (superseded by the resolution above)
+Goal: force the projector onto the **wired** path and see whether it registers — to settle hypothesis (a) vs (b) above.
+1. On the **projector** (its own remote/menu): **turn the PROJECTOR's WiFi OFF** — this is the *projector's* WiFi, **NOT the Mac mini's** (never touch the Mac's WiFi → it locks the user out via Universal Control, see [[feedback_mac_mini_no_disruptive_terminal]]). With its WiFi off the projector physically *cannot* fall back to AirPlay. Set input **Source → HDMI**.
+2. **Reseat the USB‑C hub** firmly in the Mac mini (and/or try the other USB‑C port).
+3. Run `system_profiler SPDisplaysDataType` (read-only):
+   - **Projector now appears as a 2nd display** → the hub path is alive; the cause was the projector preempting with WiFi (hypothesis b). Then: set **LG as Main display**, choose **Extend**, drag the canvas-only output window onto the projector, fullscreen → done.
+   - **Still only the LG** → the **USB‑C hub's video passthrough is the failure** (hypothesis a): it isn't carrying the projector's HDMI to the Mac. Next: try a different hub / a video‑capable USB‑C→HDMI adapter, or temporarily move the projector to the **native HDMI port** to prove the projector + cable themselves are fine.
+
+### Canvas-only output is ALREADY shipped (A1) — no new code for the first win
+Once the projector is a real **wired** display:
+1. Player → press **`O`** → **↻ Detect** → pick the projector.
+2. **Open output window** — this window is *already* **canvas-only, no controls** (a dumb `<video>`).
+3. Drag it onto the projector, fullscreen it (⛶).
+4. Operator controls stay on the LG; the projector shows pure canvas.
+
+That is the entire "app outputs only the canvas, not the overlay controls" goal — it works the moment the projector is a stable wired display instead of a WiFi ghost. The *native* (Tauri) clean-output equivalent is Phase B2 (still the real build gap); web A1 covers the test rig today.
 
 ---
 
@@ -485,4 +561,4 @@ These ARE the native pixel pipe (the shipping product is desktop — decision #3
 
 ---
 
-*Last updated: 2026-05-23 — Web A1–A3 + composed program + **N0 NDI proof** all committed (composed program live in OBS + NDI Monitor via the Rust-relay ndi-send sidecar). Pixel mirror, not re-render (§13). **Single source of truth for status & steps = the 📋 Phase Board at the top** (next = Phase B → B1, fullscreen-on-monitor). [`native-output-dev.md`](native-output-dev.md) is native reference detail only.*
+*Last updated: 2026-06-09 — added the **🔌 Projector field setup (Vankyo X3)** section (wireless ruled out; wired-via-USB‑C-adapter is the path; canvas-only = shipped A1). Prior: 2026-05-23 — Web A1–A3 + composed program + **N0 NDI proof** all committed (composed program live in OBS + NDI Monitor via the Rust-relay ndi-send sidecar). Pixel mirror, not re-render (§13). **Single source of truth for status & steps = the 📋 Phase Board at the top** (next = Phase B → B1, fullscreen-on-monitor). [`native-output-dev.md`](native-output-dev.md) is native reference detail only.*

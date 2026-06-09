@@ -1,5 +1,7 @@
 # DiscoCast Visualizer — Output / Projection Brainstorm
 
+> ⚠️ **ARCHIVE / REFERENCE ONLY — this doc does NOT track current status.** The single source of truth for output / multi-monitor / projector work is **[`output-dev.md`](output-dev.md)**. This doc is kept for history: the **shipped single-canvas output settings** (resolution/aspect lock, wake-lock, virtual camera — Phase 1 below) and the early brainstorm. Its multi-monitor sections are **superseded** by output-dev.md. Do not start a new output doc; update output-dev.md.
+
 > Audit, ideation, and implementation reference.
 > Stack: Butterchurn / WebGL 2 canvas · Vite / Vanilla JS · Tauri v1.5 (macOS app) · served via Nginx/Coolify
 
@@ -454,4 +456,4 @@ Features that need **build-target detection** (`window.__TAURI__` is defined in 
 
 ---
 
-*Last updated: brainstorm phase — no implementation started.*
+*Status: Phase 1 (single-canvas output settings — resolution/aspect lock, wake-lock, virtual camera) SHIPPED. Multi-monitor / projector work moved to and superseded by [`output-dev.md`](output-dev.md) — the single source of truth. This doc is archive/reference.*
