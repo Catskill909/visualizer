@@ -2230,6 +2230,11 @@ export class EditorInspector {
         const _sp = Math.random() < 0.75 ? rnd(0.6, 1.6) : rnd(0.35, 1.9);
         this.currentState.motionSpeed = +(Math.round(_sp / 0.05) * 0.05).toFixed(2);  // snap to the Speed slider's 0.05 step so the thumb matches exactly
 
+        // ── LAYER REMIX (▶️ NEXT #2) — reinvent every overlay layer's LOOK (blend / mirror /
+        //    reveal / opacity+audio-pulse / colour / FX / beat-react / motion), taste-biased.
+        //    Framing left untouched. One press now reinvents preset look + motion AND the layers.
+        (this.currentState.images || []).forEach(img => this._rollLayerLook(img, pick, rnd));
+
         // ── Re-mood: re-inject the post-FX. _baseComp stays the preset's own comp (or the
         //    layer-composited comp when overlays are present) — the warp/comp BODY is untouched.
         if ((this.currentState.images || []).length) {
@@ -2239,6 +2244,7 @@ export class EditorInspector {
         }
         this._applyToEngine();         // re-derives the speed-scaled baseVals via _buildRuntimePreset
         this._syncAllControls();       // re-syncs the Speed slider to the rolled value (_syncPresetSpeed)
+        if ((this.currentState.images || []).length) this._remountLayerCards();  // Layer Remix: cards reflect the rolled values
         showToast?.('🎲 Remixed');
     }
 
@@ -2318,6 +2324,237 @@ export class EditorInspector {
         // flies off. Size/Position sliders + pad re-sync via _syncAllControls.
         if (Math.random() < 0.35) { iw.size = 1.0; iw.cx = 0.5; iw.cy = 0.5; }
         else { iw.size = rnd(0.45, 1.25); iw.cx = rnd(0.32, 0.68); iw.cy = rnd(0.32, 0.68); }
+    }
+
+    /** LAYER REMIX (milkdrop-control-dev.md ▶️ NEXT #2). Remix ONE overlay layer's LOOK in
+     *  place — blend / mirror / reveal / opacity+audio-pulse / colour / FX / beat-react /
+     *  motion — taste-biased exactly like _rollImageWarp's whole-melt roll. A ~50% "present"
+     *  roll keeps the image clearly readable; the rest go wild. **Framing is left UNTOUCHED**
+     *  (size/scale/position/tile stay as the user set them — DECIDED "gentle framing"; the rare
+     *  tile-surprise is a documented fast-follow). Identity (which image, name, solo/mute) is
+     *  never touched. No engine reload here — rollLockedPresetLook does the single rebuild. */
+    _rollLayerLook(img, pick, rnd) {
+        const present = Math.random() < 0.5;   // recognizable bias (logo reads clearly)
+        const isText = img.type === 'text';
+        const isVideo = img.type === 'video';
+        const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+        // ── Blend mode — THE STAR. `normal`/`overlay` are PLAIN alpha-over (no fusion with the
+        //    preset's light) → an opaque sprite "sitting on top," the regression that buried the
+        //    magic. So heavily favour the INTERACTING modes that fuse with the preset's light;
+        //    `normal` is rare, `overlay` uncommon. Present leans to the readable light-mixers;
+        //    wild opens the wilder dodge/difference/burn looks.
+        const _softInteract = ['screen', 'additive', 'lighten', 'multiply'];
+        const _wildInteract = ['screen', 'additive', 'colordodge', 'difference', 'lighten', 'darken', 'multiply', 'hardlight', 'colorburn'];
+        const _b = Math.random();
+        img.blendMode = _b < 0.07 ? 'normal'
+            : _b < 0.18 ? 'overlay'
+            : present ? pick(_softInteract)
+            : pick(_wildInteract);
+
+        // ── Mirror — seasoning now (blend leads). ~18% present / ~32% wild.
+        if (Math.random() < (present ? 0.18 : 0.32)) {
+            img.mirror = pick(present ? ['h', 'v', 'quad'] : ['h', 'v', 'quad', 'kaleido']);
+            img.mirrorScope = img.tile ? 'tile' : 'field';
+            img.kaleidoSpeed = img.mirror === 'kaleido' ? rnd(0.05, 0.6) : 0;
+        } else { img.mirror = 'none'; img.kaleidoSpeed = 0; }
+
+        // ── Preset Reveal (#1) — the literal "preset shows THROUGH the layer" knob, so lean in:
+        //    ~60% → 0.35–0.85, ~30% Dark flip.
+        if (Math.random() < 0.6) { img.presetMask = rnd(0.35, 0.85); img.presetMaskInvert = Math.random() < 0.3; }
+        else { img.presetMask = 0; img.presetMaskInvert = false; }
+
+        // ── Opacity + audio-reactive blend (#2 folded in). Kept LOWER than before so the preset
+        //    keeps showing THROUGH (high opacity + plain blend = the opaque-sprite regression).
+        //    `normal` (the one fully-opaque mode) is forced low so even it lets the preset breathe.
+        //    ~50%: the blend BREATHES to a band — opacityPulse pulses _op (= the blend amount) to
+        //    bass/mid/treb/vol. (flux excluded — q31 unpopulated on a raw bundled base.)
+        img.opacity = img.blendMode === 'normal' ? rnd(0.35, 0.6)
+            : present ? rnd(0.6, 0.95) : rnd(0.45, 0.9);
+        if (Math.random() < 0.5) {
+            img.opacityPulse = rnd(0.15, 0.5);
+            img.audioPulse = Math.random() < 0.5 ? rnd(0.1, 0.35) : 0;
+            img.reactSource = pick(['bass', 'mid', 'treb', 'vol']);
+            img.reactCurve = pick(['linear', 'squared', 'cubed', 'threshold']);
+            img.pulseInvert = Math.random() < 0.2;
+        } else { img.opacityPulse = 0; img.audioPulse = 0; img.pulseInvert = false; }
+
+        // ── Colour — mild grade always; ~40% a recolour (hue rotate / spin), ~30% a tint push.
+        img.brightness = rnd(0.85, 1.25);
+        img.contrast = rnd(0.9, 1.3);
+        img.imageSaturation = rnd(0.7, 1.5);
+        img.gamma = 1.0;
+        if (Math.random() < 0.4) {
+            img.imageHue = Math.round(rnd(0, 360));
+            img.hueSpinSpeed = Math.random() < 0.3 ? rnd(0.1, 0.5) : 0;
+        } else { img.imageHue = 0; img.hueSpinSpeed = 0; }
+        if (Math.random() < 0.3) { img.tintR = rnd(0.5, 1.2); img.tintG = rnd(0.5, 1.2); img.tintB = rnd(0.5, 1.2); }
+        else { img.tintR = 1.0; img.tintG = 1.0; img.tintB = 1.0; }
+
+        // ── FX budget — shuffle, take AT MOST 1 (present) / 2 (wild). Never stack to mush
+        //    (the exact bug Meld's distortion budget solved). Clear all first.
+        img.chromaticAberration = 0; img.edgeSobel = false; img.posterize = 0; img.pixelate = 0;
+        img.scanLines = 0; img.filmGrain = 0; img.invertMix = 0; img.solarizeMix = 0; img.waveAmp = 0;
+        const fxRollers = [
+            () => { img.chromaticAberration = rnd(0.2, 0.6); img.chromaticSpeed = rnd(0.5, 1.5); },
+            () => { img.edgeSobel = true; },
+            () => { img.posterize = Math.round(rnd(3, 8)); },
+            () => { img.pixelate = rnd(0.2, 0.6); },
+            () => { img.scanLines = rnd(0.2, 0.5); },
+            () => { img.filmGrain = rnd(0.15, 0.4); },
+            () => { img.invertMix = rnd(0.5, 1.0); },
+            () => { img.solarizeMix = rnd(0.4, 0.9); },
+            () => { img.waveAmp = rnd(0.15, 0.5); img.waveFreq = rnd(2, 10); },
+        ];
+        for (let i = fxRollers.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [fxRollers[i], fxRollers[j]] = [fxRollers[j], fxRollers[i]]; }
+        // Seasoning: fewer image-FX so they don't distract from the blend×preset fusion.
+        const fxCount = present ? (Math.random() < 0.2 ? 1 : 0) : (Math.random() < 0.4 ? 1 : 0);
+        for (let k = 0; k < fxCount; k++) fxRollers[k]();
+
+        // ── Beat-reactive (B1') — seasoning. ~22% add ONE (tilt / hop / hue-pulse / blur-pulse / squash).
+        img.tiltAmp = 0; img.hopAmp = 0; img.huePulse = 0; img.blurPulse = 0; img.squashAmp = 0;
+        if (Math.random() < 0.22) {
+            const br = pick(['tilt', 'hop', 'hue', 'blur', 'squash']);
+            if (br === 'tilt') { img.tiltAmp = rnd(0.1, 0.4); img.tiltDir = Math.random() < 0.5 ? 1 : -1; }
+            else if (br === 'hop') { img.hopAmp = rnd(0.1, 0.4); img.hopDir = Math.random() < 0.5 ? 1 : -1; }
+            else if (br === 'hue') img.huePulse = rnd(0.2, 0.6);
+            else if (br === 'blur') img.blurPulse = rnd(0.2, 0.5);
+            else { img.squashAmp = rnd(0.1, 0.4); img.squashAxis = Math.random() < 0.5 ? 'wide' : 'tall'; }
+        }
+
+        // ── Spin + sway (own small axes; gentler when present).
+        img.spinSpeed = Math.random() < (present ? 0.2 : 0.4) ? rnd(-0.4, 0.4) : 0;
+        if (Math.random() < 0.25) { img.swayAmt = rnd(0.05, 0.2); img.swaySpeed = rnd(0.3, 1.0); }
+        else { img.swayAmt = 0; }
+
+        // ── TILING MODE + SIZE + per-cell variety (user: randomize single/grid/tile + push the
+        //    many faders). Text sizes via its own fontSize → skip framing for text (look rolls
+        //    still apply). Video never tiles → image-only tiling. All taste-BUDGETED so a roll is
+        //    bold but never a noisy mush (≤1 present / ≤2 wild per budget).
+        if (!isText) {
+            // (1) Asset scale — tileScaleX/Y, the universal size lever (0.25–4.0).
+            const _scale = present ? rnd(0.7, 1.6) : rnd(0.45, 2.4);
+            if (Math.random() < 0.25) {          // independent stretch (squash / elongate)
+                img.tileScaleX = clamp(+(_scale * rnd(0.7, 1.3)).toFixed(2), 0.25, 4.0);
+                img.tileScaleY = clamp(+(_scale * rnd(0.7, 1.3)).toFixed(2), 0.25, 4.0);
+            } else {                             // uniform (keeps the asset's aspect)
+                img.tileScaleX = clamp(_scale, 0.25, 4.0);
+                img.tileScaleY = clamp(_scale, 0.25, 4.0);
+            }
+
+            // Video: 'scale' is its coverage lever (0.1–2.0) — roll it so video also resizes.
+            if (isVideo) img.scale = +rnd(0.35, 1.6).toFixed(2);
+
+            // (2) Tiling MODE — single / density-tile / grid (images only). The headline axis.
+            if (img.type === 'image') {
+                const _m = Math.random();
+                // present favours single/simple-density; wild opens grid more often.
+                img.tile     = _m < (present ? 0.55 : 0.30) ? false : true;
+                img.tileMode = _m < (present ? 0.85 : 0.65) ? 'density' : 'grid';
+                if (!img.tile) {
+                    // SINGLE — `size` IS the on-screen scale (small → screen-FILLING). This was the
+                    // missing lever: single images sat pinned at the small 0.25 default and could
+                    // never fill the frame. Combined with tileScaleX/Y this now spans tiny → overflow.
+                    img.size = +rnd(0.45, 1.0).toFixed(2);
+                } else if (img.tileMode === 'density') {
+                    img.size = +rnd(0.12, 0.7).toFixed(2);                                   // tile count
+                    img.spacing = Math.random() < 0.35 ? +rnd(0.05, 0.5).toFixed(2) : 0;     // gaps between tiles
+                } else if (img.tileMode === 'grid') {
+                    img.tileCols = Math.round(rnd(present ? 2 : 1, present ? 5 : 8));
+                    img.tileRows = Math.round(rnd(present ? 2 : 1, present ? 5 : 8));
+                    img.tileFit = pick(['fill', 'fit']);
+                    img.tileGridScale = Math.random() < 0.3 ? +rnd(0.5, 0.95).toFixed(2) : 1.0;
+                    img.tileSubdivide = Math.random() < 0.2 ? Math.round(rnd(2, 3)) : 1;     // recursion
+                    img.tileOuterGap = img.tileSubdivide > 1 && Math.random() < 0.5 ? +rnd(0.05, 0.3).toFixed(2) : 0;
+                }
+            }
+
+            // (3) Per-cell variance suite — ONLY when tiled. Budget ≤1 present / ≤2 wild.
+            if (img.tile && img.type === 'image') {
+                img.tileOffsetAxis = 'none'; img.tileOffsetAmount = 0; img.tileRotateVariance = 0;
+                img.tilePopcornAmount = 0; img.tileSizeVariance = 0; img.tileJitterX = 0;
+                img.tileJitterY = 0; img.tileOpacityVariance = 0; img.tileDepthVariance = 0;
+                const vRollers = [
+                    () => { img.tileOffsetAxis = pick(['row', 'col']); img.tileOffsetAmount = +rnd(0.3, 0.6).toFixed(2); },
+                    () => { img.tileRotateVariance = +rnd(0.2, 0.8).toFixed(2); img.tileRotateSnap = Math.random() < 0.4; },
+                    () => { img.tilePopcornAmount = +rnd(0.3, 0.8).toFixed(2); },
+                    () => { img.tileSizeVariance = +rnd(0.2, 0.6).toFixed(2); },
+                    () => { img.tileJitterX = +rnd(0.1, 0.5).toFixed(2); },
+                    () => { img.tileJitterY = +rnd(0.1, 0.5).toFixed(2); },
+                    () => { img.tileOpacityVariance = +rnd(0.2, 0.6).toFixed(2); },
+                    () => { img.tileDepthVariance = +rnd(0.2, 0.7).toFixed(2); },
+                ];
+                for (let i = vRollers.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [vRollers[i], vRollers[j]] = [vRollers[j], vRollers[i]]; }
+                const vCount = present ? (Math.random() < 0.5 ? 1 : 0) : (Math.random() < 0.6 ? 2 : 1);
+                for (let k = 0; k < vCount; k++) vRollers[k]();
+                img.groupSpin = Math.random() < 0.25;   // occasionally spin the whole grid, not each cell
+            }
+
+            // (4) Position — ~30% reframe, kept centred (never flies off, like Remix).
+            if (Math.random() < 0.3) { img.cx = rnd(0.35, 0.65); img.cy = rnd(0.35, 0.65); }
+        }
+
+        // ── GUARD (the fix for the buried-magic regression): a LARGE SINGLE image must never sit
+        //    opaque over the preset. If it's big and on a plain/opaque blend, force an interacting
+        //    blend + a Reveal so the preset reads THROUGH it instead of being covered.
+        if (img.type === 'image' && !img.tile && img.size > 0.65 &&
+            (img.blendMode === 'normal' || img.blendMode === 'overlay')) {
+            img.blendMode = pick(['screen', 'additive', 'colordodge', 'lighten', 'difference']);
+            img.opacity = Math.min(img.opacity, 0.85);
+            if (img.presetMask < 0.3) img.presetMask = rnd(0.4, 0.75);
+        }
+
+        // ── MOTION budget — pick a couple of the many motion faders (cleared first for a clean
+        //    slate). Tunnel is density-tile-only (a finite grid can't tunnel). Gentler when present.
+        img.orbitRadius = 0; img.bounceAmp = 0; img.tunnelSpeed = 0; img.wanderAmt = 0;
+        img.panMode = 'off'; img.panSpeedX = 0; img.panSpeedY = 0;
+        const mRollers = [
+            () => { img.orbitRadius = +rnd(0.05, 0.3).toFixed(2); img.orbitMode = pick(['circle', 'lissajous']); },
+            () => { img.bounceAmp = +rnd(0.05, 0.3).toFixed(2); },
+            () => { if (img.tile && !isVideo && img.tileMode === 'density') img.tunnelSpeed = +rnd(-0.4, 0.4).toFixed(2); },
+            () => { img.wanderAmt = +rnd(0.05, 0.25).toFixed(2); img.wanderSpeed = +rnd(0.3, 1.0).toFixed(2); },
+            () => { img.panMode = 'drift'; img.panSpeedX = +rnd(-0.15, 0.15).toFixed(2); img.panSpeedY = +rnd(-0.1, 0.1).toFixed(2); },
+        ];
+        for (let i = mRollers.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [mRollers[i], mRollers[j]] = [mRollers[j], mRollers[i]]; }
+        // Seasoning: at most ONE motion fader, and often none.
+        const mCount = present ? (Math.random() < 0.25 ? 1 : 0) : (Math.random() < 0.4 ? 1 : 0);
+        for (let k = 0; k < mCount; k++) mRollers[k]();
+
+        // ── GEOMETRY / strobe budget — rare skew / perspective / shake / strobe (≤1).
+        img.skewX = 0; img.skewY = 0; img.perspX = 0; img.perspY = 0; img.shakeAmp = 0; img.strobeAmp = 0;
+        if (Math.random() < (present ? 0.1 : 0.2)) {
+            const g = pick(['skew', 'persp', 'shake', 'strobe']);
+            if (g === 'skew') { img.skewX = +rnd(-0.4, 0.4).toFixed(2); img.skewY = +rnd(-0.3, 0.3).toFixed(2); }
+            else if (g === 'persp') { img.perspX = +rnd(-0.4, 0.4).toFixed(2); img.perspY = +rnd(-0.4, 0.4).toFixed(2); }
+            else if (g === 'shake') img.shakeAmp = +rnd(0.1, 0.4).toFixed(2);
+            else { img.strobeAmp = +rnd(0.3, 0.7).toFixed(2); img.strobeThr = +rnd(0.3, 0.6).toFixed(2); }
+        }
+    }
+
+    /** Public: roll a LIST of layer entries' looks in one pass (sets up pick/rnd, loops
+     *  _rollLayerLook). Used by both Random paths — rollLockedPresetLook (locked: re-mood THIS
+     *  preset) and _loadRandomBundled's snapshot (unlocked: load a NEW preset) — so Random
+     *  ALWAYS reinvents the layers; the lock only decides whether the preset is held or replaced. */
+    rollLayerLooks(layers) {
+        const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+        const rnd = (lo, hi) => +(lo + Math.random() * (hi - lo)).toFixed(2);
+        (layers || []).forEach(img => this._rollLayerLook(img, pick, rnd));
+    }
+
+    /** Rebuild every overlay layer card from the (already-mutated) currentState.images, so the
+     *  cards' sliders/dropdowns reflect a fresh roll. DOM-only + idempotent: _mountLayerCard
+     *  re-sets _imageTextures[texName] to the SAME texObj; engine gif/video animations register
+     *  elsewhere (keyed by texName), so this never double-registers. Mirrors the _clearForLoad
+     *  clear-and-remount pattern. The <video>/GIF elements live in texObj, not the card DOM,
+     *  so clearing the cards doesn't interrupt playback. */
+    _remountLayerCards() {
+        const layersEl = document.getElementById('image-layers');
+        if (!layersEl) return;
+        layersEl.innerHTML = '';
+        for (const entry of (this.currentState.images || [])) {
+            const texObj = this._imageTextures[entry.texName];
+            if (texObj) this._mountLayerCard(entry, texObj);
+        }
     }
 
     /** Add one randomised, audio-reactive editor shape for a Remix roll — a blob or
@@ -5581,6 +5818,8 @@ export class EditorInspector {
             edgeSobel: false,      // Edge / Sobel mode: replaces image with neon line art
             lumaKeyLo: 0.00,       // luma key low threshold (0–1): pixels darker than this become transparent
             lumaKeyHi: 0.00,       // luma key high threshold (0–1): pixels brighter than this become transparent
+            presetMask: 0.00,      // Preset Reveal (0–1): preset's luma gates where the layer shows
+            presetMaskInvert: false, // reveal where the preset is DARK instead of bright
             waveAmp: 0.00,         // wave distort amplitude (0–1): sinusoidal UV warp strength
             waveFreq: 4.0,         // wave distort frequency (1–20): number of sine cycles across image
             invertMix: 0.00,       // color inversion mix (0–1): 0=normal, 1=fully inverted
@@ -5970,6 +6209,8 @@ export class EditorInspector {
             edgeSobel: false,
             lumaKeyLo: 0.00,       // luma key low threshold (0–1): pixels darker than this become transparent
             lumaKeyHi: 0.00,       // luma key high threshold (0–1): pixels brighter than this become transparent
+            presetMask: 0.00,      // Preset Reveal (0–1): preset's luma gates where the layer shows
+            presetMaskInvert: false, // reveal where the preset is DARK instead of bright
             waveAmp: 0.00,         // wave distort amplitude (0–1): sinusoidal UV warp strength
             waveFreq: 4.0,         // wave distort frequency (1–20): number of sine cycles across image
             invertMix: 0.00,       // color inversion mix (0–1): 0=normal, 1=fully inverted
@@ -6147,6 +6388,8 @@ export class EditorInspector {
             edgeSobel: false,
             lumaKeyLo: 0.00,
             lumaKeyHi: 0.00,
+            presetMask: 0.00,
+            presetMaskInvert: false,
             waveAmp: 0.00,
             waveFreq: 4.0,
             invertMix: 0.00,
@@ -6449,10 +6692,27 @@ export class EditorInspector {
                 <option value="overlay"${(entry.blendMode || 'overlay') === 'overlay' ? ' selected' : ''}>Overlay</option>
                 <option value="additive"${(entry.blendMode || 'overlay') === 'additive' ? ' selected' : ''}>Additive</option>
                 <option value="multiply"${(entry.blendMode || 'overlay') === 'multiply' ? ' selected' : ''}>Multiply</option>
+                <option value="lighten"${(entry.blendMode || 'overlay') === 'lighten' ? ' selected' : ''}>Lighten</option>
+                <option value="darken"${(entry.blendMode || 'overlay') === 'darken' ? ' selected' : ''}>Darken</option>
+                <option value="difference"${(entry.blendMode || 'overlay') === 'difference' ? ' selected' : ''}>Difference</option>
+                <option value="colordodge"${(entry.blendMode || 'overlay') === 'colordodge' ? ' selected' : ''}>Color Dodge</option>
+                <option value="colorburn"${(entry.blendMode || 'overlay') === 'colorburn' ? ' selected' : ''}>Color Burn</option>
+                <option value="hardlight"${(entry.blendMode || 'overlay') === 'hardlight' ? ' selected' : ''}>Hard Light</option>
               </select>
               <span class="layer-ctrl-label" style="margin-left:8px">Tile</span>
               <label class="toggle-switch toggle-switch--sm">
                 <input type="checkbox" class="layer-tile" ${entry.tile ? 'checked' : ''} />
+                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+              </label>
+            </div>
+            <div class="layer-slider-row">
+              <span class="layer-ctrl-label" data-tooltip="Preset Reveal — the preset's own brightness gates where this layer shows, so its moving swirls wipe & reveal the layer (no warp touched)">Reveal</span>
+              <input type="range" class="slider layer-presetmask-sl" min="0" max="1" step="0.01"
+                value="${(entry.presetMask || 0).toFixed(2)}" style="--pct:${pct(entry.presetMask || 0, 0, 1)}">
+              <span class="lsv layer-presetmask-val">${(entry.presetMask || 0).toFixed(2)}</span>
+              <span class="layer-ctrl-label" style="margin-left:8px" data-tooltip="Flip: reveal where the preset is DARK instead of bright">Dark</span>
+              <label class="toggle-switch toggle-switch--sm">
+                <input type="checkbox" class="layer-presetmask-invert" ${entry.presetMaskInvert ? 'checked' : ''} />
                 <span class="toggle-track"><span class="toggle-thumb"></span></span>
               </label>
             </div>
@@ -7673,6 +7933,8 @@ export class EditorInspector {
             // Tilt/Hop/Squash sliders live in .layer-row-inline (not swept), but the
             // class is listed here too for defence-in-depth if the row class ever changes.
             'layer-tilt-sl','layer-hop-sl','layer-huepulse-sl','layer-blurpulse-sl','layer-squash-sl',
+            // Preset Reveal — own dedicated handler below
+            'layer-presetmask-sl',
         ].map(c => `:not(.${c})`).join('');
         card.querySelectorAll(`.layer-slider-row input[type=range]${sliderExclude}`).forEach((sl, i) => {
             const valEl = sl.nextElementSibling;
@@ -8355,6 +8617,22 @@ export class EditorInspector {
             entry.lumaKeyHi = v;
             lumaHiVal.textContent = v.toFixed(2);
             lumaHiSl.style.setProperty('--pct', `${(v * 100).toFixed(1)}%`);
+            refresh();
+        });
+
+        // Preset Reveal slider + invert toggle (milkdrop-control-dev.md ▶️ NEXT #1)
+        const pMaskSl = card.querySelector('.layer-presetmask-sl');
+        const pMaskVal = card.querySelector('.layer-presetmask-val');
+        if (pMaskSl) pMaskSl.addEventListener('input', () => {
+            const v = parseFloat(pMaskSl.value);
+            entry.presetMask = v;
+            pMaskVal.textContent = v.toFixed(2);
+            pMaskSl.style.setProperty('--pct', `${(v * 100).toFixed(1)}%`);
+            refresh();
+        });
+        const pMaskInvCb = card.querySelector('.layer-presetmask-invert');
+        if (pMaskInvCb) pMaskInvCb.addEventListener('change', () => {
+            entry.presetMaskInvert = pMaskInvCb.checked;
             refresh();
         });
 
@@ -9604,6 +9882,15 @@ export class EditorInspector {
         const lumaKeyLo = (img.lumaKeyLo || 0).toFixed(4);
         const lumaKeyHi = (img.lumaKeyHi || 0).toFixed(4);
         const hasLumaKey = parseFloat(lumaKeyLo) > 0.001 || parseFloat(lumaKeyHi) > 0.001;
+        // Preset Reveal (milkdrop-control-dev.md ▶️ NEXT #1): the LIVE preset's own
+        // brightness gates where this layer shows, so the preset's moving swirls/tunnel
+        // wipe & reveal the layer — it rides the preset's motion *visually* without ever
+        // touching its warp. Pure output-stage (reads `col`, the preset+lower-layers
+        // accumulator, before this layer composites). Works on bundled AND custom, no
+        // q-registers, no _bundledBase gate. Invert flips to reveal-where-dark.
+        const presetMask = (img.presetMask || 0).toFixed(4);
+        const hasPresetMask = parseFloat(presetMask) > 0.001;
+        const pMaskInvert = !!img.presetMaskInvert;
         const waveAmp = (img.waveAmp || 0).toFixed(4);
         const waveFreq = (img.waveFreq || 4.0).toFixed(4);
         const hasWave = parseFloat(waveAmp) > 0.001;
@@ -9743,7 +10030,15 @@ export class EditorInspector {
             case 'additive': blendLine = `col += _src * _op;`; break;
             case 'multiply': blendLine = `col = mix(col, col * _src, _op);`; break;
             case 'overlay':  blendLine = `col = mix(col, _src, _op);`; break;
-            default: blendLine = `col = mix(col, 1.0 - (1.0 - col) * (1.0 - _src), _op);`;
+            // Standard Photoshop blend formulas on col (preset+lower accumulator) × _src
+            // (this layer), weighted by _op exactly like the modes above. All output-stage.
+            case 'difference': blendLine = `col = mix(col, abs(col - _src), _op);`; break;
+            case 'colordodge': blendLine = `col = mix(col, min(vec3(1.0), col / max(1.0 - _src, 0.001)), _op);`; break;
+            case 'colorburn':  blendLine = `col = mix(col, 1.0 - min(vec3(1.0), (1.0 - col) / max(_src, 0.001)), _op);`; break;
+            case 'hardlight':  blendLine = `col = mix(col, mix(2.0 * col * _src, 1.0 - 2.0 * (1.0 - col) * (1.0 - _src), step(0.5, _src)), _op);`; break;
+            case 'lighten':    blendLine = `col = mix(col, max(col, _src), _op);`; break;
+            case 'darken':     blendLine = `col = mix(col, min(col, _src), _op);`; break;
+            default: blendLine = `col = mix(col, 1.0 - (1.0 - col) * (1.0 - _src), _op);`;  // screen
         }
 
         let angLines = '';
@@ -10662,6 +10957,13 @@ export class EditorInspector {
             (img.alphaMode === 'preserve'
                 ? `    float _alphaMask = step(0.1, _t.w);\n    float _op = _alphaMask * _gapMask * clamp((${op} * ${_qOp}) + _r * ${opa}, 0.0, 1.0);\n`
                 : `    float _op = _t.w * _gapMask * clamp((${op} * ${_qOp}) + _r * ${opa}, 0.0, 1.0);\n`) +
+            // Preset Reveal: gate _op by the live preset's luma (smoothstep for punch —
+            // raw luma alone is too mushy). col here is the preset+lower-layers, pre-blend.
+            (hasPresetMask
+                ? `    { float _pL = dot(col, vec3(0.299, 0.587, 0.114));\n` +
+                  `      float _pM = ${pMaskInvert ? '1.0 - _pL' : '_pL'};\n` +
+                  `      _op *= mix(1.0, smoothstep(0.15, 0.85, _pM), ${presetMask});\n    }\n`
+                : '') +
             `    ${blendLine}\n` +
             // Transparent-bg (§H): accumulate this layer's alpha into col_a using
             // the SAME coverage the RGB blend used (_t.w*_op for normal; _op for the
@@ -10861,7 +11163,7 @@ export class EditorInspector {
             tileScaleX: 1.00, tileScaleY: 1.00,
             aspectMode: 'lock',   // 'lock' = keep true shape on any canvas (default); 'fluid' = legacy canvas-adaptive
 
-            angle: 0.00, skewX: 0.00, skewY: 0.00, shakeAmp: 0.00, posterize: 0, depthOffset: 0.00, edgeSobel: false, lumaKeyLo: 0.00, lumaKeyHi: 0.00, waveAmp: 0.00, waveFreq: 4.0, invertMix: 0.00, solarizeMix: 0.00, thresholdCutoff: 0.00, pixelate: 0.00, scanLines: 0.00, filmGrain: 0.00, perspX: 0.00, perspY: 0.00,
+            angle: 0.00, skewX: 0.00, skewY: 0.00, shakeAmp: 0.00, posterize: 0, depthOffset: 0.00, edgeSobel: false, lumaKeyLo: 0.00, lumaKeyHi: 0.00, presetMask: 0.00, presetMaskInvert: false, waveAmp: 0.00, waveFreq: 4.0, invertMix: 0.00, solarizeMix: 0.00, thresholdCutoff: 0.00, pixelate: 0.00, scanLines: 0.00, filmGrain: 0.00, perspX: 0.00, perspY: 0.00,
             vignette: 0, vignetteCX: 0.5, vignetteCY: 0.5, vignetteW: 0.5, vignetteH: 0.5, vignetteCorner: 0.3, vignetteStrength: 0.5, vignetteFeather: 0.3, vignetteColor: '#000000',
             audioPulse: 0.00, pulseInvert: false,
             blendMode: 'overlay', tile: true, groupSpin: false,

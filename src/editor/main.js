@@ -438,7 +438,13 @@ async function _loadRandomBundled() {
         // browsing; when layers carry over, the restore's _applyToEngine fires onchange →
         // the preset reads dirty, which is correct (unsaved overlay on a new base) and
         // harmless since Random has no dirty-confirm gate.
-        if (keptLayers.length) await inspector.restoreImageLayers(keptLayers);
+        // LAYER REMIX (milkdrop-control-dev.md #2): Random ALWAYS reinvents the layers — roll
+        // the snapshot BEFORE restore so the new preset arrives with a freshly-remixed layer
+        // (restore deep-clones + mounts the rolled entries, reflecting them in its one rebuild).
+        if (keptLayers.length) {
+            inspector.rollLayerLooks(keptLayers);
+            await inspector.restoreImageLayers(keptLayers);
+        }
     } catch (err) {
         showToast('Load failed: ' + err.message, true);
         console.warn('[Studio] Random load failed:', err.message);
