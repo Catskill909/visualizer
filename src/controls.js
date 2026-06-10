@@ -2,6 +2,7 @@
  * ControlPanel — UI bindings, auto-hide, keyboard shortcuts, preset drawer
  */
 import { downloadFile, showAudioLoadingModal, hideAudioLoadingModal } from './fileUtils.js';
+import { isSupportedAudioFile, showUnsupportedAudioModal } from './audioFormat.js';
 import {
   getCustomPreset,
   deleteCustomPreset,
@@ -814,8 +815,14 @@ export class ControlPanel {
   }
 
   async handleFileSelection(file) {
+    // Unsupported format → show the modal and stay on the start screen.
+    if (!isSupportedAudioFile(file)) {
+      showUnsupportedAudioModal(file);
+      return;
+    }
     try {
       const audioEl = await this.engine.connectAudioFile(file);
+      if (!audioEl) return; // safety net: guard already handled messaging
       this.els.startScreen.classList.add('hidden');
       this.els.controlBar.classList.remove('hidden');
       this.els.deviceSelect.classList.add('hidden');

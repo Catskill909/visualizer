@@ -8,6 +8,7 @@ import { TimelineEditor }   from './timelineEditor.js';
 import { initAuthGate }     from '../auth-gate.js';
 import { pickAndConnect } from '../devicePicker.js';
 import { hydratePresets } from '../customPresets.js';
+import { isSupportedAudioFile, showUnsupportedAudioModal } from '../audioFormat.js';
 
 initAuthGate();
 
@@ -353,6 +354,7 @@ btnFile.addEventListener('click', async () => {
     if (window.__TAURI__) {
         const file = await pickAudioFile();
         if (!file) return;
+        if (!isSupportedAudioFile(file)) { showUnsupportedAudioModal(file); return; }
         boot(async eng => {
             const audio = await eng.connectAudioFile(file);
             audio.play();
@@ -366,6 +368,7 @@ btnFile.addEventListener('click', async () => {
 fileInput.addEventListener('change', () => {
     const file = fileInput.files?.[0];
     if (!file) return;
+    if (!isSupportedAudioFile(file)) { showUnsupportedAudioModal(file); return; }
     boot(async eng => {
         const audio = await eng.connectAudioFile(file);
         audio.play();
@@ -397,6 +400,7 @@ mpLoad.addEventListener('click', async () => {
         if (!file || !engine) return;
         try {
             const audio = await engine.connectAudioFile(file);
+            if (!audio) return; // unsupported format — modal already shown
             audio.play();
             mountMiniPlayer(audio, file.name);
         } catch (err) {
@@ -412,6 +416,7 @@ mpFileInput.addEventListener('change', async () => {
     if (!file || !engine) return;
     try {
         const audio = await engine.connectAudioFile(file);
+        if (!audio) return; // unsupported format — modal already shown
         audio.play();
         mountMiniPlayer(audio, file.name);
     } catch (err) {

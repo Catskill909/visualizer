@@ -3041,3 +3041,63 @@ html, body {
     background-size: 26px 26px;
     background-position: 0 0, 0 13px, 13px -13px, -13px 0;
 }
+
+/* ─── Unsupported audio format modal (audioFormat.js) ───────────────────────── */
+.audio-format-modal {
+  position: fixed; inset: 0; z-index: 100000;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+.audio-format-modal.hidden { display: none; }
+.audio-format-modal .afm-card {
+  width: min(380px, calc(100vw - 48px));
+  background: #16161a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 30px 28px 24px;
+  text-align: center;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  animation: afmPop 0.18s ease-out;
+}
+@keyframes afmPop {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.audio-format-modal .afm-icon {
+  width: 46px; height: 46px; margin: 0 auto 16px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; color: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.audio-format-modal .afm-title {
+  font-size: 17px; font-weight: 600; letter-spacing: 0.01em;
+  color: #fff; margin-bottom: 10px;
+}
+.audio-format-modal .afm-msg {
+  font-size: 13.5px; line-height: 1.5;
+  color: rgba(255, 255, 255, 0.62);
+  margin-bottom: 18px;
+}
+.audio-format-modal .afm-formats {
+  font-size: 13px; font-weight: 600; letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 12px 10px;
+  margin-bottom: 22px;
+}
+.audio-format-modal .afm-btn {
+  min-width: 130px;
+  padding: 11px 22px;
+  font-size: 14px; font-weight: 600;
+  color: #111; background: #fff;
+  border: none; border-radius: 10px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+.audio-format-modal .afm-btn:hover { opacity: 0.85; }

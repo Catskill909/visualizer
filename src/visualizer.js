@@ -12,6 +12,7 @@ import butterchurnPresetsExtra2 from 'butterchurn-presets/lib/butterchurnPresets
 import butterchurnPresetsMD1 from 'butterchurn-presets/lib/butterchurnPresetsMD1.min.js';
 import { loadAllCustomPresets, CUSTOM_PREFIX, registryKey, getImage, buildMotionReactFrameEqs, buildWaveReactFrameEqs, buildAnimFrameEqs, buildMotionEngineFrameEqs, buildShapeMotionEqs, buildWarpShader, buildImageWarp } from './customPresets.js';
 import { loadAllCommunity, COMMUNITY_PREFIX } from './presetStore.js';
+import { isSupportedAudioFile, showUnsupportedAudioModal } from './audioFormat.js';
 import { parseGIF, decompressFrames } from 'gifuct-js';
 // animation-dev.md — drive entrance/exit/idle in the player & timeline (not just
 // the editor). animation.js is the same GSAP driver the editor uses; gsap here is
@@ -275,6 +276,13 @@ export class VisualizerEngine {
   }
 
   async connectAudioFile(file) {
+    // Guard: reject formats we can't decode everywhere BEFORE tearing down any
+    // current playback. Returns null so callers skip navigation/play(). The
+    // modal is the user-facing message; the existing track keeps playing.
+    if (!isSupportedAudioFile(file)) {
+      showUnsupportedAudioModal(file);
+      return null;
+    }
     try {
       if (this.audioContext.state === 'suspended') await this.audioContext.resume();
       this.disconnectSource();
