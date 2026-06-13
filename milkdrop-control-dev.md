@@ -1,6 +1,6 @@
 # MilkDrop Control & Remix Convergence (dev plan)
 
-**Status (2026-06-13): CORE ARC COMPLETE + LAYER↔PRESET INTERACTION SHIPPED (#1 Reveal, #2 Layer Remix, #3 blend modes) + REMIX↔LAYER CONVERGENCE SHIPPED (Layers lock — Remix now rolls overlay layers too).**
+**Status (2026-06-13): CORE ARC COMPLETE + LAYER↔PRESET INTERACTION SHIPPED (#1 Reveal, #2 Layer Remix, #3 blend modes) + REMIX↔LAYER CONVERGENCE SHIPPED & VERIFIED WORKING (Layers lock — Remix now rolls overlay layers too).**
 Lock a bundled MilkDrop preset and the **Random** button stops loading new presets — it **reinvents the locked one's
 look + motion** in one press, so the 1,144 are now endlessly explorable instead of frozen. Foundation (06-07): the
 editor renders the full 1,144-preset library faithfully. Overlay layers (06-08): first-class on bundled presets. Then
@@ -23,7 +23,7 @@ seasoning that must serve it (see the regression post-mortem in #2).
    through (the post-mortem). **Next:** fast-follows below, or #4 Preset-driven tint.
 
 ### 🎛️ Random vs Remix — how each button handles LAYERS (source of truth)
-**UPDATE 2026-06-13: the two paradigms now CONVERGE on overlay layers — Remix rolls them too, gated by a Layers lock.**
+**UPDATE 2026-06-13 (✅ SHIPPED & VERIFIED WORKING): the two paradigms now CONVERGE on overlay layers — Remix rolls them too, gated by a Layers lock.**
 The earlier "two intentionally-different paradigms, do NOT cross them" rule was reversed at the user's request: Remix
 left a placed image/video/gif untouched, which felt broken next to Random. Both buttons now reinvent overlay layers.
 - **RANDOM button → rolls the OVERLAY LAYERS.** On a bundled preset (locked `rollLockedPresetLook` OR unlocked
