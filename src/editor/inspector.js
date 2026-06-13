@@ -911,7 +911,7 @@ function savePaletteLocks(locks) {
 // Remix (🎲 full-stack roll) per-group locks — pin a group and Remix re-rolls only
 // the rest. Session preference (localStorage), not saved per-preset.
 const REMIX_LOCKS_KEY = 'dc.remix.locks';
-const REMIX_LOCK_GROUPS = ['colours', 'field', 'motion', 'flow', 'reactivity'];
+const REMIX_LOCK_GROUPS = ['colours', 'field', 'motion', 'flow', 'reactivity', 'layers'];
 function loadRemixLocks() {
     const blank = { colours: false, field: false, motion: false, flow: false, reactivity: false };
     try {
@@ -2153,11 +2153,24 @@ export class EditorInspector {
         }
         // else: pure field + flow — no thin content (or, with a meld, the clean melt carries it).
         this._postSnap();
+        // ── LAYER REMIX (Layers lock) — reinvent each OVERLAY layer's look (blend / Preset-Reveal /
+        //    opacity+audio-pulse / colour / tiling / motion) the SAME way Random does, so Remix no
+        //    longer leaves a placed image/video/gif untouched. Gated by the Layers lock (pin to keep
+        //    a layer as-is). The layer actively DRIVING a Meld is skipped — its look is already rolled
+        //    by _rollImageWarp above, so re-rolling its overlay framing here would fight the melt.
+        //    Pure mutation (no reload) inside the batch; the single apply below rebuilds once. Cards
+        //    are remounted AFTER the apply (mirrors rollLockedPresetLook's order).
+        if (!L.layers && (this.currentState.images || []).length) {
+            const _iw = this.currentState.imageWarp;
+            const _driver = (_iw && _iw.enabled) ? _iw.texName : null;
+            this.rollLayerLooks(this.currentState.images.filter(e => e.texName !== _driver));
+        }
         // End the batch and do the ONE real rebuild+apply+sync for the whole roll.
         this._rolling = false;
         this._buildCompShader();
         this._applyToEngine();
         this._syncAllControls();
+        if (!L.layers && (this.currentState.images || []).length) this._remountLayerCards();
         const anyLocked = REMIX_LOCK_GROUPS.some(k => L[k]);
         showToast?.(anyLocked ? '🎲 Remixed — locks kept' : '🎲 Remixed');
     }

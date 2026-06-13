@@ -1,6 +1,6 @@
 # MilkDrop Control & Remix Convergence (dev plan)
 
-**Status (2026-06-08): CORE ARC COMPLETE + LAYER↔PRESET INTERACTION SHIPPED (#1 Reveal, #2 Layer Remix, #3 blend modes).**
+**Status (2026-06-13): CORE ARC COMPLETE + LAYER↔PRESET INTERACTION SHIPPED (#1 Reveal, #2 Layer Remix, #3 blend modes) + REMIX↔LAYER CONVERGENCE SHIPPED (Layers lock — Remix now rolls overlay layers too).**
 Lock a bundled MilkDrop preset and the **Random** button stops loading new presets — it **reinvents the locked one's
 look + motion** in one press, so the 1,144 are now endlessly explorable instead of frozen. Foundation (06-07): the
 editor renders the full 1,144-preset library faithfully. Overlay layers (06-08): first-class on bundled presets. Then
@@ -22,18 +22,23 @@ seasoning that must serve it (see the regression post-mortem in #2).
    both Random modes; final weighting favours INTERACTING blends + lower opacity + Reveal so the preset always reads
    through (the post-mortem). **Next:** fast-follows below, or #4 Preset-driven tint.
 
-### 🎛️ Random vs Remix — how each button handles LAYERS (source of truth — don't conflate them)
-**Two buttons, TWO INTENTIONALLY-DIFFERENT layer paradigms. Both already work. Do NOT cross them.**
+### 🎛️ Random vs Remix — how each button handles LAYERS (source of truth)
+**UPDATE 2026-06-13: the two paradigms now CONVERGE on overlay layers — Remix rolls them too, gated by a Layers lock.**
+The earlier "two intentionally-different paradigms, do NOT cross them" rule was reversed at the user's request: Remix
+left a placed image/video/gif untouched, which felt broken next to Random. Both buttons now reinvent overlay layers.
 - **RANDOM button → rolls the OVERLAY LAYERS.** On a bundled preset (locked `rollLockedPresetLook` OR unlocked
   `_loadRandomBundled`), Random reinvents each overlay layer's *compositing* look via **`_rollLayerLook`** — blend mode /
   Preset-Reveal / opacity+audio-pulse / colour / size / single↔density-tile↔grid / per-cell variance. This is the
-  2026-06-08 work. **Random uses layers.**
-- **REMIX button (`_rollFullStack`) → uses MELD.** Its layer interaction is the **Meld/Drive melt**: when a Drive image
-  is active it rolls the whole melt via **`_rollImageWarp`** (flow/depth/spin/mirror/luma-key/blend/tint — image fused
-  INTO the warp). Remix also rolls palette/field/reactivity/motion/flow/wave/shape content. **Remix mixes layers via
-  Meld**, not via `_rollLayerLook`.
-- **Meld (fuse image INTO the warp) ≠ Overlay (composite image OVER via blend modes)** — different mechanisms, different
-  buttons, by design. `_rollLayerLook` lives in the Random paths ONLY; `_rollImageWarp` lives in Remix.
+  2026-06-08 work. **Random always uses layers.**
+- **REMIX button (`_rollFullStack`) → rolls OVERLAY LAYERS *and* uses MELD.**
+  - *Overlay layers (2026-06-13):* unless the **Layers** lock is set, Remix calls **`rollLayerLooks`** + `_remountLayerCards`
+    on every overlay layer (same `_rollLayerLook` path Random uses). Default = rolls; lock the chip to pin a placed layer.
+  - *Meld:* when a Drive image is active it also rolls the whole melt via **`_rollImageWarp`** (flow/depth/spin/mirror/
+    luma-key/blend/tint — image fused INTO the warp). The layer **driving** the Meld is **excluded** from `rollLayerLooks`
+    so its overlay framing doesn't fight the melt (it's rolled by `_rollImageWarp` only).
+  - Remix also rolls palette/field/reactivity/motion/flow/wave/shape content as before.
+- **Meld (fuse image INTO the warp) ≠ Overlay (composite image OVER via blend modes)** — still different mechanisms.
+  `_rollLayerLook` now runs in BOTH Random and Remix; `_rollImageWarp` (the melt) is still Remix-only.
 
 ---
 
@@ -113,9 +118,11 @@ direction is: **deepen layer↔preset interaction here**, all output-stage, all 
      blend / lower opacity / Reveal) must be the DEFAULT, or the headline interaction gets plastered over.
    - **OPEN fast-follows (next session):** (a) optional **per-layer "keep" lock** so a placed logo can opt out of the
      Random roll — the deliberate replacement for the old accidental "browse presets with a fixed layer" (now gone, since
-     unlocked Random rolls layers in the uniform model). Pure addition; no mechanics change.
-     - *(NOT a fast-follow — intentionally NOT done: porting `_rollLayerLook` into the Remix button. Random rolls overlay
-       layers; Remix uses Meld. Two paradigms by design — see "Random vs Remix" at the top. Don't cross them.)*
+     unlocked Random rolls layers in the uniform model). Pure addition; no mechanics change. *(The Remix-side equivalent —
+     the **Layers** lock chip — shipped 2026-06-13; see below.)*
+     - *(✅ DONE 2026-06-13 — REVERSED the old "don't cross them" rule: `_rollLayerLook` now ALSO runs in the Remix button,
+       gated by a **Layers** lock chip. Remix used to leave overlay layers untouched, which felt broken next to Random.
+       See "Random vs Remix" at the top + the Layers-lock entry below. Random and Remix now BOTH roll overlay layers.)*
    - **CURRENT roll weighting (post-regression-fix — the source of truth; the old "favour normal/overlay, framing
      gentle" plan was REVERSED, see post-mortem above):** blend `normal` 7% / `overlay` 11% / rest INTERACTING
      (`_softInteract` present, `_wildInteract` wild); opacity 0.6–0.95 present / 0.45–0.9 wild (`normal` forced 0.35–0.6);
@@ -143,9 +150,11 @@ direction is: **deepen layer↔preset interaction here**, all output-stage, all 
 on a BROAD sample, stays output-stage (never the feedback loop / warp body), and is a new axis Remix can roll.
 
 **Next step (next session):** #1 Reveal, #3 blend modes, **#2 LAYER REMIX all shipped & web-verified 2026-06-08**
-(incl. size/tile-mode/full-fader expansion + the blend-fusion regression fix). **Pick a fast-follow:** (a) per-layer
-**"keep" lock**; (b) **#4 Preset-driven tint** (last unstarted queue item); or (c) tune the roll lean from living with it.
-(Random rolls overlay layers; Remix uses Meld — two paradigms by design, NOT to be merged; see "Random vs Remix" up top.)
+(incl. size/tile-mode/full-fader expansion + the blend-fusion regression fix). **Remix↔layer convergence: the Layers
+lock chip shipped 2026-06-13** — Remix now rolls overlay layers via `rollLayerLooks` unless the chip is locked (the
+Meld-driving layer is excluded so the melt isn't double-rolled). **Pick a fast-follow:** (a) per-layer **"keep" lock**;
+(b) **#4 Preset-driven tint** (last unstarted queue item); or (c) tune the roll lean from living with it.
+(Random AND Remix now both roll overlay layers; `_rollImageWarp`/Meld stays Remix-only — see "Random vs Remix" up top.)
 No blocking work; the queue is in a clean, handoff-ready state.
 
 ---
