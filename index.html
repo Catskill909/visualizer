@@ -117,8 +117,6 @@
         <input type="file" id="file-input" accept="audio/*" hidden />
       </div>
 
-      <p class="start-hint">Requires WebGL 2 • Works best in Chrome or Firefox</p>
-
       <button id="btn-welcome-help" class="welcome-help-btn" type="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
           stroke-linejoin="round" width="14" height="14">
@@ -757,8 +755,8 @@
               <div class="welcome-feature-title">Live Audio</div>
               <p>Uses your microphone, line-in, or any connected USB device (DJ controllers, audio interfaces). When you
                 pick Live Audio, a device selector appears so you can choose the exact input.</p>
-              <p class="welcome-hint">Requires <strong>localhost</strong> or <strong>HTTPS</strong> and microphone
-                permission in your browser.</p>
+              <p class="welcome-hint">Requires microphone permission &mdash; grant it in your system sound/privacy
+                settings if prompted.</p>
             </div>
 
             <div class="welcome-feature">
@@ -906,7 +904,7 @@
             <div class="welcome-feature" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 14px 16px;">
               <div class="welcome-feature-title">Default settings (out of the box)</div>
               <ul class="welcome-list" style="margin-top: 6px;">
-                <li><strong>Resolution</strong> &mdash; Match window. Canvas always fills whatever size the browser window or app is.</li>
+                <li><strong>Resolution</strong> &mdash; Match window. Canvas always fills whatever size the app window is.</li>
                 <li><strong>Aspect Ratio</strong> &mdash; Free. No constraint; proportions follow the window.</li>
                 <li><strong>Fill Mode</strong> &mdash; Letterbox. If a resolution is locked, black bars appear rather than stretching or cropping.</li>
                 <li><strong>Virtual Camera</strong> &mdash; Off. No stream is started until you turn it on.</li>
@@ -916,7 +914,7 @@
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Render Resolution</div>
-              <p>Pin the canvas to a fixed pixel size regardless of the browser window. Choose from the dropdown or enter
+              <p>Pin the canvas to a fixed pixel size regardless of the app window. Choose from the dropdown or enter
                 a custom width &times; height and click <strong>Apply</strong>.</p>
               <ul class="welcome-list">
                 <li><strong>Match window</strong> (default) &mdash; canvas always fills the window at its natural size.
@@ -963,13 +961,11 @@
             <div class="welcome-feature">
               <div class="welcome-feature-title">Virtual Camera</div>
               <p>Toggle the <strong>Virtual Camera</strong> switch to stream the visualizer canvas as a live video
-                source. Once active, open OBS, Zoom, Teams, or any video software and select the browser window or tab
+                source. Once active, open OBS, Zoom, Teams, or any video software and select the app window
                 as a camera input &mdash; the visualizer appears as a live feed.</p>
               <ul class="welcome-list">
                 <li><strong>Status hint</strong> &mdash; turns <em>LIVE &mdash; select this window in OBS / Zoom</em>
                   while active; the monitor button dot turns green.</li>
-                <li><strong>OBS Browser Source</strong> &mdash; an alternative: point OBS at the app URL as a Browser
-                  Source. No toggle needed &mdash; OBS captures the page directly at any resolution.</li>
                 <li><strong>macOS app note</strong> &mdash; the stream is available in the WKWebView, but routing it to
                   a system-level virtual camera requires the OBS Virtual Camera driver to be installed separately.</li>
               </ul>
@@ -1022,7 +1018,7 @@
               <ul class="welcome-list">
                 <li><strong>Undo / Redo</strong> — 50-deep stack. <kbd>⌘Z</kbd> / <kbd>⌘⇧Z</kbd>.</li>
                 <li><strong>A/B compare</strong> — hold the button to preview the saved state; release to restore.</li>
-                <li><strong>Save</strong> — writes to your browser (localStorage + IndexedDB for images). Saved presets
+                <li><strong>Save</strong> — saved locally on your computer. Saved presets
                   appear in the <em>My Presets</em> tab of the main app.</li>
                 <li><strong>Reset a slider</strong> — double-click its label to snap it back to the default
                   value instantly. Works on every slider in every layer card.</li>
@@ -1031,7 +1027,7 @@
                   to restore the panel.</li>
                 <li><strong>First-use tips</strong> — a tips modal appears when you open the editor. Dismiss it
                   freely or click "Never show again" to stop it appearing. Reset with
-                  <code>localStorage.removeItem('discocast_onboarding_never')</code> in the browser console.</li>
+                  <code>localStorage.removeItem('discocast_onboarding_never')</code> in the developer console.</li>
                 <li><strong>Dev HUD</strong> — press <kbd>`</kbd> (backtick) to overlay frame time, estimated VRAM,
                   active layer count, and last shader rebuild time.</li>
               </ul>
@@ -1752,28 +1748,21 @@
             <h4>Tips &amp; Troubleshooting</h4>
 
             <div class="welcome-feature">
-              <div class="welcome-feature-title">Browser support</div>
-              <p>DiscoCast Visualizer needs <strong>WebGL 2</strong> and the <strong>Web Audio API</strong>. Works best
-                in <strong>Chrome</strong> or <strong>Firefox</strong>. Safari works but some presets may render
-                differently.</p>
-            </div>
-
-            <div class="welcome-feature">
               <div class="welcome-feature-title">Microphone access</div>
-              <p>Browsers only allow mic access on <strong>localhost</strong> or <strong>HTTPS</strong>. If the mic
-                button fails, check the address bar for a blocked-permission icon and re-allow.</p>
+              <p>If the mic button fails, make sure DiscoCast Visualizer has microphone permission in your system
+                sound/privacy settings, then try again.</p>
             </div>
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Your data stays local</div>
-              <p>Favorites, hidden presets, and saved custom presets are all stored in your browser's localStorage (and
-                IndexedDB for images). Nothing is uploaded — clearing site data resets everything.</p>
+              <p>Favorites, hidden presets, and saved custom presets are all stored locally on your computer. Nothing is
+                uploaded.</p>
             </div>
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Performance</div>
-              <p>For the smoothest visuals on older machines, use <kbd>F</kbd> for fullscreen, close other tabs running
-                video or WebGL, and prefer <em>file</em> input over <em>live</em> (less processing overhead).</p>
+              <p>For the smoothest visuals on older machines, use <kbd>F</kbd> for fullscreen, close other apps running
+                video or 3D graphics, and prefer <em>file</em> input over <em>live</em> (less processing overhead).</p>
             </div>
 
             <div class="welcome-feature">
