@@ -293,7 +293,7 @@ body.force-hide-ui, body.controls-hidden {
   border-style: dashed;
 }
 .source-btn--studio:hover { opacity: 1; border-style: solid; }
-.source-icon { font-size: 1.6rem; flex-shrink: 0; width: 40px; text-align: center; }
+.source-icon { font-size: 1.6rem; flex-shrink: 0; width: 40px; text-align: center; display: flex; align-items: center; justify-content: center; }
 .source-label { font-size: 1rem; font-weight: 600; display: block; }
 .source-desc { font-size: 0.78rem; color: var(--text-secondary); display: block; margin-top: 2px; }
 .start-hint { font-size: 0.72rem; color: var(--text-muted); margin-top: 8px; }
