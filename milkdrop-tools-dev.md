@@ -5,7 +5,7 @@ Last updated: 2026-06-02
 > **The mission:** raise the Preset Studio's *from-scratch* creation ceiling to rival the 1,144 bundled
 > presets — **without** a wall of code/knobs. *Simple to use, great for the creative user* is the hard
 > constraint. **Phases 1–16 shipped (creator tools beta-ready; the thin-line "string" look is solved and
-> waves can now fill into broad shapes).** Colour Field now has **18 styles** (Phases 8/13/17/19); Phase 18
+> waves can now fill into broad shapes).** Colour Field now has **22 styles** + a global **Warp** knob (Phases 8/13/17/19/20); Phase 18
 > (Remix Energy dial) was built then reverted (user disliked the static slider). NEXT = backlog (§2). The
 > headline edge is **audio reactivity**
 > ([[project_audio_reactivity_differentiator]]).
@@ -37,6 +37,7 @@ Last updated: 2026-06-02
 | 17 | **More Colour Field styles** — Diamond · Checker · Clouds | ✅ **SHIPPED & approved** ("love the new chips!!") |
 | 18 | ~~Remix strength dial~~ — built then **❌ REVERTED** (user: "doesn't add much + hate it static atop crucial controls") | ❌ removed 2026-06-02 |
 | 19 | **9 more Colour Field styles** (Stripes·Weave·Vortex·Rays·Ripples·Moiré·Marble·Mandala·Hex) + Field→header layout + Remix rolls all 17 | ✅ **SHIPPED & tested** (user: "great stuff!") |
+| 20 | **Colour Field: global Warp knob** (domain-warps `_fuv` → organic ripple on *every* pattern, cost-free at 0) + **4 new styles** (Chevron·Dots·Grid·Caustics) + Remix rolls warp & new styles | ✅ **SHIPPED** 2026-06-16 |
 | — | ~~Templates~~ ❌ dropped · ~~Expert eqn/shader drawer~~ ❌ removed · ~~Modulator/LFO bank~~ ⏸ deferred | — |
 
 **Current state:** A from-scratch preset has all three MilkDrop layers — a living **colour-field background**,
@@ -215,10 +216,17 @@ slider. Don't rebuild it as a top-level slider.
 
 ### 🎨 Colour Field styles (user loves these — "more anytime!")
 Each is ONE `fieldExpr` (0..1 over `_fuv`+time) → free chip + auto Spin/Sharpness/3-colour/beat-react.
-A reliable, cheap, high-delight vein. **✅ SHIPPED (18 total, Phases 8/13/17/19):** Flat · Linear · Stripes ·
+A reliable, cheap, high-delight vein. **✅ SHIPPED (22 total, Phases 8/13/17/19/20):** Flat · Linear · Stripes ·
 Weave · Radial · Diamond · Moiré · Conic · Spiral · Rays · Vortex · Mandala · Plasma · Clouds · Marble ·
-Ripples · Checker · Hex. All 17 non-flat rolled by 🎲 Remix; "Field" is now a full-width **header** above the
-wrapped chip grid (`#bgfield-style` flex-wrap CSS) — the inline label was too cramped at this chip count.
+Ripples · Checker · Hex · **Chevron · Dots · Grid · Caustics** (Phase 20). All 21 non-flat rolled by 🎲 Remix;
+"Field" is a full-width **header** above the wrapped chip grid (`#bgfield-style` flex-wrap CSS).
+
+**Global Warp knob (Phase 20, ✅ SHIPPED).** A single **Warp** slider (`bgField.warp`, 0–1) domain-warps `_fuv`
+with two crossed sine layers *before* the field expression, so **every** pattern gains an organic ripple from
+one knob (this is the generalised, one-control answer to "could Checker have displacement?"). Animated on the
+field's own speed; **0 injects no GLSL** (byte-identical, cost-guarded exactly like Spin/Beat). 🎲 Remix rolls it
+~40% of the time (`rnd(0.3, 0.8)`). Note: **Caustics shipped inline after all** — the pow-sharpened crossed-sine
+one-liner is good enough without the deferred shader-prelude fbm version.
 
 **Still inline-ready if we want even more (no helper):** stacked-frequency bands · spiral-arms count ·
 log-polar grid · diagonal weave · target/bullseye. **Needs a shader PRELUDE (deferred — can't declare a

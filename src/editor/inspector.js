@@ -623,7 +623,7 @@ const BLANK = {
     // unchanged); linear/radial/plasma make the background a moving multi-colour
     // field that still pulses with the audio. scale = pattern frequency, speed =
     // how fast it drifts. Lives outside baseVals; round-trips via ...currentState.
-    bgField: { style: 'flat', scale: 1.0, speed: 0.3, spin: 0, sharp: 0, tri: false, react: 0 },  // Phase 13: spin (rotate over time), sharp (0=gradient,1=hard bands), tri (3-colour A→B→C), react (field breathes to the beat)
+    bgField: { style: 'flat', scale: 1.0, speed: 0.3, spin: 0, sharp: 0, tri: false, react: 0, warp: 0 },  // Phase 13: spin (rotate over time), sharp (0=gradient,1=hard bands), tri (3-colour A→B→C), react (field breathes to the beat). Phase 20: warp (domain-warp _fuv → organic ripple on ALL patterns)
     // Phase 8.2 — Background colour A, distinct from the foreground wave colour
     // (wave_r/g/b). null = fall back to the wave colour (so old presets that never
     // had this are byte-identical). Set by the palette/roll to a contrasting
@@ -1298,6 +1298,7 @@ export class EditorInspector {
                 { id: 'bgf-spin', label: 'Spin', min: -1.0, max: 1.0, step: 0.02, key: 'spin' },
                 { id: 'bgf-sharp', label: 'Sharpness', min: 0.0, max: 1.0, step: 0.02, key: 'sharp' },
                 { id: 'bgf-react', label: 'Beat', min: 0.0, max: 1.0, step: 0.02, key: 'react' },
+                { id: 'bgf-warp', label: 'Warp', min: 0.0, max: 1.0, step: 0.02, key: 'warp' },
             ].forEach(cfg => {
                 const bgf = this.currentState.bgField || (this.currentState.bgField = deepClone(BLANK.bgField));
                 const input = makeSlider(fieldSliders, { ...cfg, value: bgf[cfg.key] });
@@ -1332,12 +1333,13 @@ export class EditorInspector {
         if (bgf.spin == null) bgf.spin = 0;     // backfill pre-v2 presets
         if (bgf.sharp == null) bgf.sharp = 0;
         if (bgf.react == null) bgf.react = 0;
+        if (bgf.warp == null) bgf.warp = 0;     // backfill pre-Phase-20 presets
         document.querySelectorAll('#bgfield-style .lseg').forEach(b => {
             b.classList.toggle('active', b.dataset.field === (bgf.style || 'flat'));
         });
         const triToggle = document.getElementById('bgfield-tri');
         if (triToggle) triToggle.checked = !!bgf.tri;
-        [['bgf-scale', 'scale', 0.2, 3.0], ['bgf-speed', 'speed', 0.0, 2.0], ['bgf-spin', 'spin', -1.0, 1.0], ['bgf-sharp', 'sharp', 0.0, 1.0], ['bgf-react', 'react', 0.0, 1.0]].forEach(([id, key, min, max]) => {
+        [['bgf-scale', 'scale', 0.2, 3.0], ['bgf-speed', 'speed', 0.0, 2.0], ['bgf-spin', 'spin', -1.0, 1.0], ['bgf-sharp', 'sharp', 0.0, 1.0], ['bgf-react', 'react', 0.0, 1.0], ['bgf-warp', 'warp', 0.0, 1.0]].forEach(([id, key, min, max]) => {
             const input = document.getElementById(id);
             if (!input) return;
             const v = bgf[key];
@@ -2052,11 +2054,12 @@ export class EditorInspector {
             // Mutate (don't replace) so bgField.react — rolled in the Reactivity block —
             // survives a Field-unlocked + Reactivity-locked roll.
             const _f = this.currentState.bgField || (this.currentState.bgField = deepClone(BLANK.bgField));
-            _f.style = pick(['linear', 'stripes', 'weave', 'radial', 'diamond', 'moire', 'conic', 'spiral', 'rays', 'vortex', 'mandala', 'plasma', 'clouds', 'marble', 'ripples', 'checker', 'hex']);
+            _f.style = pick(['linear', 'stripes', 'weave', 'radial', 'diamond', 'moire', 'conic', 'spiral', 'rays', 'vortex', 'mandala', 'plasma', 'clouds', 'marble', 'ripples', 'checker', 'hex', 'chevron', 'dots', 'grid', 'caustics']);
             _f.scale = rnd(0.5, 2.5);
             _f.speed = rnd(0.15, 0.95);
             _f.spin = Math.random() < 0.5 ? 0 : rnd(-0.6, 0.6);     // sometimes a slow spin
             _f.sharp = Math.random() < 0.35 ? rnd(0.3, 0.9) : 0;    // sometimes hard bands
+            _f.warp = Math.random() < 0.4 ? rnd(0.3, 0.8) : 0;      // sometimes an organic ripple
             _f.tri = Math.random() < 0.5;                           // ~half 3-colour
         }
         if (!L.reactivity) {
@@ -9641,6 +9644,7 @@ export class EditorInspector {
             const fsp = Number(bgf.speed ?? 0.3).toFixed(4);
             const fspin = Number(bgf.spin ?? 0);
             const fsharp = Number(bgf.sharp ?? 0);
+            const fwarp = Number(bgf.warp ?? 0);
             const _isFlatField = !bgf.style || bgf.style === 'flat';
             // Build the `_field` GLSL (a 0..1 spatial pattern). 'flat' → 0.0 (byte-
             // identical Shift). Phase 13: Spin rotates the field coord over time;
@@ -9658,6 +9662,14 @@ export class EditorInspector {
                 const freact = Number(bgf.react ?? 0);
                 const reactDecl = (freact > 0.001)
                     ? `  _fuv = (_fuv - 0.5) * (1.0 - _sr * ${freact.toFixed(4)} * 0.6) + 0.5;\n`
+                    : '';
+                // Warp (Phase 20): domain-warp _fuv with two crossed sine layers BEFORE
+                // the field expression, so EVERY pattern (Checker tiles, Stripes, Hex…)
+                // gains an organic ripple from one knob. Animated on the field's own
+                // speed so the wobble moves with the pattern. 0 = no injection (cost-free,
+                // byte-identical), same guard pattern as Spin/Beat.
+                const warpDecl = (fwarp > 0.001)
+                    ? `  _fuv += vec2(sin(_fuv.y * 18.8496 + time * ${fsp}), sin(_fuv.x * 18.8496 - time * ${fsp} * 0.8)) * ${(fwarp * 0.06).toFixed(4)};\n`
                     : '';
                 let fieldExpr;
                 switch (bgf.style) {
@@ -9690,9 +9702,17 @@ export class EditorInspector {
                     case 'mandala': fieldExpr = `0.5 + 0.5 * sin(abs(mod(atan(_fuv.y - 0.5, _fuv.x - 0.5) * 6.0, 6.28318) - 3.14159) * ${fsc} * 2.0 + length(_fuv - 0.5) * 8.0 - time * ${fsp})`; break;
                     // Phase 19 — Hex: three 60°-offset plane waves → honeycomb lattice.
                     case 'hex': fieldExpr = `0.5 + 0.166 * (sin(_fuv.x * ${fsc} * 16.0 + time * ${fsp}) + sin((_fuv.x * 0.5 + _fuv.y * 0.866) * ${fsc} * 16.0 - time * ${fsp} * 0.5) + sin((_fuv.x * 0.5 - _fuv.y * 0.866) * ${fsc} * 16.0 + time * ${fsp} * 0.5))`; break;
+                    // Phase 20 — Chevron: V-shaped zigzag bands (x bands phase-shifted by a triangle wave of y).
+                    case 'chevron': fieldExpr = `0.5 + 0.5 * sin(_fuv.x * ${fsc} * 10.0 + abs(fract(_fuv.y * ${fsc} * 3.0) - 0.5) * 12.0 + time * ${fsp})`; break;
+                    // Phase 20 — Dots: drifting polka grid (colour-A dots over colour-B field).
+                    case 'dots': fieldExpr = `1.0 - smoothstep(0.25, 0.45, length(fract((_fuv + vec2(time * ${fsp} * 0.05, 0.0)) * ${fsc} * 8.0) - 0.5))`; break;
+                    // Phase 20 — Grid: thin lattice lines (vs Checker's filled tiles).
+                    case 'grid': fieldExpr = `1.0 - smoothstep(0.0, 0.08, min(abs(fract(_fuv.x * ${fsc} * 8.0 + time * ${fsp} * 0.1) - 0.5), abs(fract(_fuv.y * ${fsc} * 8.0) - 0.5)))`; break;
+                    // Phase 20 — Caustics: water-light shimmer (crossed warped sines, pow-sharpened into bright veins).
+                    case 'caustics': fieldExpr = `pow(clamp(0.5 + 0.5 * sin(_fuv.x * ${fsc} * 9.0 + sin(_fuv.y * ${fsc} * 7.0 + time * ${fsp}) * 2.0 + time * ${fsp}) * sin(_fuv.y * ${fsc} * 9.0 + cos(_fuv.x * ${fsc} * 6.0 - time * ${fsp} * 0.7) * 2.0), 0.0, 1.0), 2.0)`; break;
                     default: fieldExpr = '0.0';
                 }
-                fieldGlsl = coordDecl + reactDecl + `  float _field = ${fieldExpr};\n`;
+                fieldGlsl = coordDecl + reactDecl + warpDecl + `  float _field = ${fieldExpr};\n`;
                 if (fsharp > 0.001) {
                     const bands = Math.max(2, Math.round(2 + fsharp * 6));  // 2..8 hard bands
                     fieldGlsl += `  _field = floor(_field * ${bands}.0 + 0.5) / ${bands}.0;\n`;
