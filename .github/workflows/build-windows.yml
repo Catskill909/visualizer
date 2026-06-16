@@ -6,6 +6,11 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
+    # actions/upload-artifact@v5 still ships a Node 20 runtime; this forces it (and any
+    # other lingering Node 20 action) onto Node 24, clearing the deprecation warning.
+    # GitHub's documented opt-in — see the deprecation notice. Remove once all actions are Node 24.
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - uses: actions/checkout@v5
