@@ -4,10 +4,14 @@
 > and the self-hosted download + page-view counting that the split enables.
 
 ## Status
-- **State:** ✅ **SHIPPED (code) 2026-06-17.** Promo page is fully split into its own
-  repo + standalone Node server with view + per-OS download counting. Local smoke-test
-  passed. **Remaining = Coolify deploy** (stand up the new app at `discocast.supersoul.top`,
-  add the `/data` volume, set `STATS_KEY`).
+- **State:** ✅ **DONE + DEPLOYED + SUCCESSFUL 2026-06-17.** Promo page fully split into its
+  own repo + standalone Node server with view + per-OS download counting, and **live at
+  `discocast.supersoul.top`** via Coolify (Dockerfile build, `/data` volume, `STATS_KEY` env).
+  Post-deploy fix: `logo.png`/`logo2.png` (served from the main app's `public/` before the split)
+  were 404'ing → copied into `discocast/promo/`; favicon + both logos are the complete set of
+  absolute-root assets, all present now.
+- **Promo is no longer built into the web, macOS, or Windows builds.** The macOS build script
+  (`build-and-sign.sh`) now delivers the installer into the discocast repo. Done and verified.
 - **Scope:** WEB ONLY — the front-facing promo/download page. No telemetry ever goes inside
   the shipped product (`.dmg` / `.exe` / Tauri app).
 - **Goal (met):** (1) De-risked — promo has its own container, separate from the app deploy.
