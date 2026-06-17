@@ -22,7 +22,8 @@ export default defineConfig({
         editor: resolve(__dirname, 'editor.html'),
         timeline: resolve(__dirname, 'timeline.html'),
         output: resolve(__dirname, 'output.html'),
-        promo: resolve(__dirname, 'promo/index.html'),
+        // promo page split into its own repo/container (discocast.supersoul.top).
+        // Not built here anymore — keeps it out of the web, macOS, and Windows bundles.
       },
       output: {
         manualChunks(id) {

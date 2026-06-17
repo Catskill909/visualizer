@@ -45,8 +45,8 @@ src-tauri/target/
 # (kept out of git/Coolify per 2026-06-03 decision). Regenerated at build time, bundled locally.
 public/packs/*.zip
 
-# Allow the stable download in promo/ (served to users via Coolify)
-!promo/DiscoCast-Visualizer.dmg
+# (The promo page + installers moved to the standalone discocast repo —
+#  discocast.supersoul.top. No promo/ folder here anymore.)
 
 # Keep Tauri config, ignore only build output
 # (src-tauri/tauri.conf.json, Cargo.toml, etc. should be committed)

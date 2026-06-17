@@ -24,8 +24,8 @@ RUN rm -rf /usr/share/nginx/html/*
 
 # Copy build assets from stage 1
 COPY --from=build /app/dist /usr/share/nginx/html
-# DMG is not processed by Vite — copy it directly into the served promo dir
-COPY --from=build /app/promo/DiscoCast-Visualizer.dmg /usr/share/nginx/html/promo/DiscoCast-Visualizer.dmg
+# (Promo page + .dmg moved to the standalone discocast repo / container —
+#  discocast.supersoul.top. This container serves only the visualizer app now.)
 
 # Copy custom nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf

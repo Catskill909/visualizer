@@ -41,6 +41,23 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
+# ── Promo / download page lives in its OWN repo now (discocast.supersoul.top) ──
+# This script still PRODUCES the macOS installer, but delivers it (plus
+# version.json and the version span patch) into the standalone discocast repo,
+# assumed to be a sibling folder of this one. Override the location with:
+#   PROMO_REPO=/path/to/discocast ./build-and-sign.sh
+# Guard runs here, before the slow build, so a missing repo fails fast.
+PROMO_REPO="${PROMO_REPO:-$(dirname "$0")/../discocast}"
+PROMO_DIR="${PROMO_REPO}/promo"
+if [ ! -d "$PROMO_DIR" ]; then
+    echo -e "${RED}Error: discocast promo repo not found at:${NC} ${PROMO_DIR}"
+    echo "Clone it as a sibling of this repo:"
+    echo "  git clone https://github.com/Catskill909/discocast.git ../discocast"
+    echo "Or point at it explicitly:  PROMO_REPO=/path/to/discocast ./build-and-sign.sh"
+    exit 1
+fi
+echo -e "${GREEN}Installer will be delivered to: ${PROMO_DIR}${NC}"
+
 # ── Hang-proofing: the permanent fix for the recurring Step 1 build wedge ──────
 # We stopped playing whack-a-mole with individual triggers. Two layers:
 #   1. kill_stale — sweep EVERY process/port left by a prior build or dev session
@@ -245,7 +262,7 @@ cp "$(pwd)/installer/dmg-background@2x.png" "$DMG_STAGING/.background/background
 
 # Create a writable temp DMG first, then convert to compressed
 TEMP_DMG="/tmp/${APP_NAME}-temp.dmg"
-FINAL_DMG="promo/${DISPLAY_NAME}-${VERSION}.dmg"
+FINAL_DMG="${PROMO_DIR}/${DISPLAY_NAME}-${VERSION}.dmg"
 
 hdiutil create \
     -volname "${DISPLAY_NAME}" \
@@ -309,28 +326,32 @@ spctl --assess --type open --context context:primary-signature -v "$FINAL_DMG" 2
 
 xattr -c "$FINAL_DMG" 2>/dev/null || true
 
-# Keep a stable-named copy for the download button in promo/index.html
-STABLE_DMG="promo/DiscoCast-Visualizer.dmg"
+# Keep a stable-named copy for the download button in the promo page
+STABLE_DMG="${PROMO_DIR}/DiscoCast-Visualizer.dmg"
 cp "$FINAL_DMG" "$STABLE_DMG"
 echo -e "${GREEN}Stable copy: ${STABLE_DMG}${NC}"
 
 # Step 9: Write version.json — promo page fetches this when served over HTTP
-echo -e "${YELLOW}Step 9: Writing promo/version.json (${APP_VERSION})...${NC}"
-printf '{"version": "%s"}\n' "${APP_VERSION}" > promo/version.json
-echo -e "${GREEN}promo/version.json → ${APP_VERSION}${NC}"
+echo -e "${YELLOW}Step 9: Writing version.json (${APP_VERSION})...${NC}"
+printf '{"version": "%s"}\n' "${APP_VERSION}" > "${PROMO_DIR}/version.json"
+echo -e "${GREEN}${PROMO_DIR}/version.json → ${APP_VERSION}${NC}"
 
-# Step 9b: Patch the inline span fallback in promo/index.html so the version
+# Step 9b: Patch the inline span fallback in the promo index.html so the version
 # shows correctly even when the file is opened locally (file:// blocks fetch).
-echo -e "${YELLOW}Step 9b: Patching version span in promo/index.html...${NC}"
-sed -i '' "s|<span id=\"app-version\">[^<]*</span>|<span id=\"app-version\">${APP_VERSION}</span>|" promo/index.html
-echo -e "${GREEN}promo/index.html span → ${APP_VERSION}${NC}"
+echo -e "${YELLOW}Step 9b: Patching version span in promo index.html...${NC}"
+sed -i '' "s|<span id=\"app-version\">[^<]*</span>|<span id=\"app-version\">${APP_VERSION}</span>|" "${PROMO_DIR}/index.html"
+echo -e "${GREEN}${PROMO_DIR}/index.html span → ${APP_VERSION}${NC}"
 
 echo ""
 echo -e "${GREEN}✅ Build complete!${NC}"
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo -e "  📦 INSTALLER:  $(pwd)/${FINAL_DMG}"
+echo -e "  📦 INSTALLER:  ${FINAL_DMG}"
 echo -e "  🔏 SIGNED APP: ${APP_PATH}"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo -e "${YELLOW}⚠️  Installer was delivered to the discocast repo. Commit + push it:${NC}"
+echo -e "     cd ${PROMO_REPO} && git add -A && git commit -m 'New macOS build' && git push"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 echo "  To install on this Mac:"
