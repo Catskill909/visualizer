@@ -35,43 +35,48 @@ And a preset's own strings reach it:
 4. **Stored XSS** — `name` / `description` rendered to other users in the gallery (admin already escapes; gallery must too).
 5. **Prototype pollution** — `__proto__` / `constructor` / `prototype` keys poisoning objects on merge.
 
-## Design principle: **distribute data, not code — reference the base, don't inline it**
+## Design principle (SIMPLIFIED after tracing the code): **legit editor presets carry NO code — so reject any that do**
 
 A DiscoCast editor preset is **structured params** (`motionEngine`, `motionReact`, `waveReact`,
-`flowStyle`, `imageWarp`, `baseVals`, colours, enums) built **on top of a base preset**. On load,
-the app **regenerates** the motion/react/warp equations from those params — it does **not** need
-the file's baked equation strings for that part. The only code that *must* travel is the **base
-preset's** eqs/shaders.
+`flowStyle`, `imageWarp`, `baseVals`, colours, enums). **Confirmed in code:** the equation strings
+are **generated at runtime from those params and NEVER stored** —
+[inspector.js:863](src/editor/inspector.js#L863) / [:9424](src/editor/inspector.js#L9424) say so
+outright, and the blank template ships `frame_eqs_str:''` etc. ([inspector.js:555](src/editor/inspector.js#L555)).
 
-So the architecture:
-- **Carry the base by reference, not by value.** The app already tags a base (`_bundledBase`,
-  `baseName` — [inspector.js](src/editor/inspector.js)). If the export stores a stable base id/name
-  and the importer re-resolves it from the **local trusted bundled library (1,144 presets)**, then
-  the untrusted file carries **only structured params + a base reference** — zero executable strings.
-  *(Open item: confirm the export retains a resolvable base reference for every shareable preset.)*
-- **Anything that still arrives as a code string is dropped or validated**, never trusted.
+Therefore a genuinely-exported editor preset has **empty `*_eqs_str`** (and warp/comp regenerated
+from `flowStyle`/`imageWarp`). This makes the core rule trivial and airtight:
 
-## Validation architecture (defense in depth)
+> **Reject any submission whose `*_eqs_str` / `warp` / `comp` (or shape/wave eqs) are non-empty.**
 
-### Gate 1 — server, at upload (the security boundary; can't be bypassed)
-1. **Schema allowlist.** Define the canonical export schema (version `schemaVersion: 1`). Validate
-   types / ranges / enums. **Drop every key not on the allowlist.**
-2. **Strip executable strings.** Remove `frame_eqs_str`, `init_eqs_str`, `pixel_eqs_str`, `warp`,
-   `comp`, and the `*_eqs_str` on every shape/wave. Rely on local regeneration + base reference.
-   - If a submission *needs* raw eqs (a custom MilkDrop preset not in the bundled set), either (a)
-     **disallow it from the public gallery in v1**, or (b) validate the strings against the **EEL
-     grammar only** (Milkdrop expression language) and reject anything with JS constructs
-     (`fetch`, `=>`, backticks, `window.`, `document.`, `import`, `[`-indexing into globals, etc.).
-     Never accept pre-transpiled JS.
+A legit editor preset passes (its code fields are empty). Anything carrying actual code is either a
+raw MilkDrop preset (not allowed — decision #2) or a tampered file → rejected. **No "base by
+reference", no EEL grammar parsing, no transpile-and-keep needed.** The importer regenerates all
+motion/warp from the structured params, exactly as it does today.
+*(Build-time confirm: that `warp`/`comp` are likewise empty/regenerated on saved editor presets, so
+"reject non-empty" doesn't reject valid presets. Eqs are confirmed; warp/comp to verify.)*
+
+## Where it runs (resolves the "standalone repos" confusion)
+
+There are **two** apps/repos, each its own Coolify deploy:
+- **discocast** — the promo + admin + upload server. **This is where uploads arrive and the gallery
+  is served, so this is the security boundary.** Validation lives HERE. One repo, one Coolify push.
+- **winamp-screen** — the visualizer app. It only needs validation as *defense-in-depth on disk
+  imports*, which is a **separate, optional, later** hardening in that repo.
+
+**So for the gallery to be safe, validation only needs to live in the discocast server.** No
+cross-repo "shared module" on day one. (If we later add the app-side check, we revisit sharing the
+logic; not now.)
+
+## Validation — server-side in discocast, at upload (`/api/submit`)
+1. **Schema allowlist.** Canonical export schema (`schemaVersion: 1`). Validate types / ranges /
+   enums. **Drop every key not on the allowlist.**
+2. **Reject non-empty code.** If `frame_eqs_str` / `init_eqs_str` / `pixel_eqs_str` / `warp` / `comp`
+   (or any `shapes[].*_eqs_str` / `waves[].*_eqs_str`) is non-empty → **reject the submission.** Legit
+   editor presets have these empty (see principle above). No EEL validator, no stripping-and-keeping.
 3. **Sanitize keys** — strip `__proto__` / `constructor` / `prototype`.
 4. **Media** — cap each image + total payload; decode-verify it's a real image; re-encode to strip
    anything smuggled in the bytes.
 5. **Text** — length-cap and store raw; escape on render (never trust at display time).
-
-### Gate 2 — client, at import (defense in depth — presets also arrive from disk)
-The app's own `importPreset` should run the **same** validation/sanitization before anything reaches
-the engine. Worth doing **regardless of the gallery** — it closes the present (small) disk-import hole.
-Best as a **shared validation module** imported by both the app and the discocast server.
 
 ### "Is it a valid DiscoCast import?" — the validity test (two layers)
 1. **Static schema validation** — structure / version / types / required fields (fast, deterministic).
@@ -95,14 +100,16 @@ colours/enums, `images[]` (type, texName, transform params, constrained `_inline
 **Stripped/validated (code):** `frame_eqs_str`, `init_eqs_str`, `pixel_eqs_str`, `warp`, `comp`,
 `shapes[].*_eqs_str`, `waves[].*_eqs_str`, legacy `*_eqs`.
 
-## Open decisions
-1. **Does every shareable preset retain a resolvable base reference?** (If yes → reference-not-inline
-   eliminates code entirely for the common case. If some don't → need the EEL validator path.)
-2. **Allow raw/custom MilkDrop presets in the public gallery at all in v1?** (Recommend: no — gallery
-   accepts only structured editor presets; raw MilkDrop import stays a local-only, own-risk feature.)
-3. **Shared validation module** location so app + server use identical logic (npm workspace? copied
-   file? small published package?).
-4. **EEL grammar validator** — build vs. reuse `milkdrop-eel-parser`'s parse-only mode to accept/reject.
+## Decisions — RESOLVED 2026-06-17
+1. **Base reference?** → **Moot.** Editor presets store empty eqs (regenerated at runtime), so there's
+   no code to carry and nothing to reference. The rule is simply "reject non-empty code." *(One build-time
+   check left: confirm `warp`/`comp` are also empty/regenerated on saved editor presets — eqs are confirmed.)*
+2. **Raw MilkDrop in the gallery?** → **No.** Gallery accepts only structured editor presets. Raw MilkDrop
+   import stays a local-only, own-risk feature, never distributed.
+3. **Where validation lives?** → **discocast server only** (where uploads + gallery live). One repo, one
+   Coolify push. App-side disk-import check is a separate, optional later hardening — no shared module now.
+4. **EEL grammar validator?** → **Not needed.** With #1 + #2, no code strings are ever kept, so there's
+   nothing to grammar-check. Dropped.
 
 ## Then: front-facing submission page + gallery (the user's next ask)
 Once validation exists and is wired into `/api/submit`: build the public **gallery** (browse approved
