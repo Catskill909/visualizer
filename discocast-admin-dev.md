@@ -21,9 +21,13 @@ Clean dark UI (Inter + Space Grotesk, matches the promo). Password modal on load
 held in `sessionStorage`, sent as `x-admin-key` header on every API call.
 - **Stats tab:** page views, downloads mac/win/total, "counting since / last update",
   **Reset stats** button (this is how you zero the bot-inflated counter post-deploy).
-- **Submissions tab:** filter Pending/Approved/Rejected/All; each card shows thumbnail,
-  name, description, email, date, status badge; **Approve / Reject / Delete**; link to
-  download the raw `preset.json`. Pending count shows as a badge on the tab.
+- **Submissions tab:** filter Pending/Approved/Rejected/All; each card shows a large
+  thumbnail (190px), name, description, email, date, status badge; **View / Approve /
+  Reject / Delete**; link to download the raw preset. Pending count shows as a badge.
+- **Detail modal:** click a thumbnail, name, or **View** → lightbox with a large contained
+  image, full description, and approve/reject/delete/download actions (Esc / backdrop closes).
+  This is the "larger view" of a submission (there is no separate public view page yet).
+- **Preset download** uses the sanitized **preset name** as the filename (not the random id).
 
 ## Public upload wizard (`promo/submit.html`)
 5 steps, each validated before advancing:
