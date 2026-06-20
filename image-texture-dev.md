@@ -476,6 +476,14 @@ Drive panel. Verified: all three cranked STILL render bright (luma > 20) — no 
   **skips the driving card** (`imageWarp.texName`) — it stays open when a layer is added; (2) a **sole
   layer is forced open** in `_updateLayerIndices` ("a layer stays open unless there's another one") —
   catches a last survivor left collapsed by a prior accordion (add 2nd → delete 2nd).
+- **Meld panel destroyed by Random/Remix (user bug 2026-06-19, FIXED):** the single shared Meld panel
+  (`#image-warp-controls`) is relocated INTO the driving card by `_syncImageWarpSection`. `_remountLayerCards`
+  (Remix + Random-locked-look) did `layersEl.innerHTML=''` to rebuild cards — which **destroyed the panel**
+  living inside one, so after a roll the Meld controls were gone (rebuilt cards re-applied `.drive-mode`,
+  hiding `.layer-controls`, but had no panel to reveal). It claimed to mirror `_clearForLoad` but skipped
+  that path's `_homeDrivePanel()` call. Fix: `_remountLayerCards` now homes the panel BEFORE the wipe and
+  calls `_syncImageWarpSection()` after the remount to relocate it back into the rebuilt driving card. Same
+  invariant the delete path guards (`_performDeleteLayer` homes before `card.remove()`).
 
 **Verified — [scripts/verify-image-warp-editor.mjs](scripts/verify-image-warp-editor.mjs): 14/14** incl.
 per-card toggle, panel-moves-into-card, **radio releases the previous driver**, overlay drop-out + restore

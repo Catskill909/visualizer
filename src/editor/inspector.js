@@ -2566,11 +2566,16 @@ export class EditorInspector {
     _remountLayerCards() {
         const layersEl = document.getElementById('image-layers');
         if (!layersEl) return;
+        // The shared Meld panel may be relocated INTO the driving card right now; park it back
+        // home FIRST so innerHTML='' doesn't destroy it (mirrors _clearForLoad / _performDeleteLayer).
+        this._homeDrivePanel();
         layersEl.innerHTML = '';
         for (const entry of (this.currentState.images || [])) {
             const texObj = this._imageTextures[entry.texName];
             if (texObj) this._mountLayerCard(entry, texObj);
         }
+        // Relocate the Meld panel back into the rebuilt driving card + re-apply drive-mode state.
+        this._syncImageWarpSection();
     }
 
     /** Add one randomised, audio-reactive editor shape for a Remix roll — a blob or
