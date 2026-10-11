@@ -9,6 +9,7 @@ use tauri::api::dialog::FileDialogBuilder;
 use tauri::api::process::{Command as TauriCommand, CommandChild, CommandEvent};
 use tauri::async_runtime::channel;
 use base64::{engine::general_purpose, Engine as _};
+use tauri::Manager;
 
 struct CaffeinateState(Mutex<Option<Child>>);
 
@@ -16,6 +17,21 @@ struct CaffeinateState(Mutex<Option<Child>>);
 // frames to its stdin; libndi lives ONLY in the sidecar, never in the app binary
 // (native-output-dev.md N0b, Rust-relay).
 struct NdiState(Mutex<Option<CommandChild>>);
+
+// ── Desktop output window (output-dev.md Phase B2) ───────────────────────────
+// The main window copies each finished canvas frame (JPEG) into this slot via
+// `output_push_frame`; the clean output window pulls the latest one over the
+// `dcframe` protocol (raw bytes, no base64 on the receiving side). The output
+// window never renders (no second engine — §13); it only shows copied pixels.
+// Any future consumer (NDI, Syphon) can read the same slot.
+#[derive(Default)]
+struct OutputFrameInner {
+    jpeg: Vec<u8>,
+    seq: u64,     // increments per pushed frame
+    ts: f64,      // Date.now() in the main window when the frame was captured
+    enc_ms: f64,  // capture + JPEG encode time in the main window
+}
+struct OutputFrame(Mutex<OutputFrameInner>);
 
 #[tauri::command]
 fn ndi_start(window: tauri::Window, state: tauri::State<NdiState>, name: Option<String>) -> Result<(), String> {
@@ -443,11 +459,99 @@ async fn convert_to_stacked_alpha_b64(window: tauri::Window, input_b64: String) 
     result
 }
 
+// ── Desktop output window commands (output-dev.md Phase B2) ──────────────────
+// window.open is unsupported in Tauri 1's webview, so the output window is
+// created here. Positions are PHYSICAL pixels from list_monitors.
+#[tauri::command]
+async fn output_open(app: tauri::AppHandle, x: i32, y: i32, fullscreen: bool) -> Result<(), String> {
+    let w = match app.get_window("output") {
+        Some(w) => {
+            let _ = w.set_fullscreen(false);
+            w
+        }
+        None => {
+            let w = tauri::WindowBuilder::new(&app, "output", tauri::WindowUrl::App("output.html".into()))
+                .title("DiscoCast Output")
+                .inner_size(960.0, 540.0)
+                .visible(false)
+                .build()
+                .map_err(|e| e.to_string())?;
+            let app2 = app.clone();
+            w.on_window_event(move |e| {
+                if let tauri::WindowEvent::Destroyed = e {
+                    let _ = app2.emit_all("dc-output-closed", ());
+                }
+            });
+            w
+        }
+    };
+    w.set_position(tauri::PhysicalPosition::new(x + 60, y + 60)).map_err(|e| e.to_string())?;
+    w.show().map_err(|e| e.to_string())?;
+    if fullscreen {
+        // macOS: fullscreen right after a move can race (Tauri #6394) — let the move settle.
+        std::thread::sleep(std::time::Duration::from_millis(300));
+        w.set_fullscreen(true).map_err(|e| e.to_string())?;
+    }
+    let _ = w.set_focus();
+    Ok(())
+}
+
+#[tauri::command]
+fn output_close(app: tauri::AppHandle) {
+    if let Some(w) = app.get_window("output") {
+        let _ = w.close();
+    }
+}
+
+#[tauri::command]
+fn output_is_open(app: tauri::AppHandle) -> bool {
+    app.get_window("output").is_some()
+}
+
+#[tauri::command]
+fn output_push_frame(state: tauri::State<OutputFrame>, frame_b64: String, ts: f64, enc_ms: f64) -> Result<u64, String> {
+    let bytes = general_purpose::STANDARD.decode(&frame_b64).map_err(|e| e.to_string())?;
+    let mut f = state.0.lock().unwrap();
+    f.jpeg = bytes;
+    f.seq += 1;
+    f.ts = ts;
+    f.enc_ms = enc_ms;
+    Ok(f.seq)
+}
+
+/// `dcframe://localhost/latest?since=N` → the newest frame as image/jpeg, or 204
+/// when nothing newer than N exists (so the output window never redraws a frame).
+fn dcframe_protocol(app: &tauri::AppHandle, req: &tauri::http::Request) -> Result<tauri::http::Response, Box<dyn std::error::Error>> {
+    let since: u64 = req
+        .uri()
+        .split("since=")
+        .nth(1)
+        .and_then(|v| v.split('&').next())
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
+    let state = app.state::<OutputFrame>();
+    let f = state.0.lock().unwrap();
+    let rb = tauri::http::ResponseBuilder::new()
+        .header("Access-Control-Allow-Origin", "*")
+        .header("Access-Control-Expose-Headers", "x-seq, x-ts, x-enc")
+        .header("Cache-Control", "no-store");
+    if f.seq == 0 || f.seq <= since {
+        return rb.status(204).body(Vec::new());
+    }
+    rb.mimetype("image/jpeg")
+        .header("x-seq", f.seq.to_string())
+        .header("x-ts", f.ts.to_string())
+        .header("x-enc", f.enc_ms.to_string())
+        .body(f.jpeg.clone())
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(CaffeinateState(Mutex::new(None)))
         .manage(NdiState(Mutex::new(None)))
-        .invoke_handler(tauri::generate_handler![caffeinate_start, caffeinate_stop, toggle_fullscreen, get_fullscreen, list_monitors, fullscreen_on_monitor, pick_audio_file, pick_image_file, save_file, store_blob, get_blob, get_blob_path, delete_blob, store_preset, get_all_presets, delete_preset, convert_to_stacked_alpha, convert_to_stacked_alpha_b64, ndi_start, ndi_send_frame, ndi_stop])
+        .manage(OutputFrame(Mutex::new(OutputFrameInner::default())))
+        .register_uri_scheme_protocol("dcframe", dcframe_protocol)
+        .invoke_handler(tauri::generate_handler![output_open, output_close, output_is_open, output_push_frame, caffeinate_start, caffeinate_stop, toggle_fullscreen, get_fullscreen, list_monitors, fullscreen_on_monitor, pick_audio_file, pick_image_file, save_file, store_blob, get_blob, get_blob_path, delete_blob, store_preset, get_all_presets, delete_preset, convert_to_stacked_alpha, convert_to_stacked_alpha_b64, ndi_start, ndi_send_frame, ndi_stop])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -22,6 +22,18 @@ export function initOutputUI({ engine, root }) {
 
   let displays = [];
 
+  // Inline status line — alert() is ignored in the desktop app's webview, so
+  // errors must show in the panel itself.
+  let statusEl = root.querySelector('.output-status-line');
+  if (!statusEl) {
+    statusEl = document.createElement('p');
+    statusEl.className = 'output-status-line popover-hint';
+    statusEl.style.cssText = 'margin-top:6px;color:#f3a0a0;';
+    statusEl.hidden = true;
+    openBtn.insertAdjacentElement('afterend', statusEl);
+  }
+  const setStatus = (msg) => { statusEl.textContent = msg || ''; statusEl.hidden = !msg; };
+
   const syncBtn = () => {
     openBtn.textContent = outputManager.isActive() ? 'Close output window' : 'Open output window';
     openBtn.classList.toggle('is-active', outputManager.isActive());
@@ -56,13 +68,17 @@ export function initOutputUI({ engine, root }) {
     try {
       const canvas = engine.canvas; // the live source we mirror
       if (!canvas) { console.warn('[output] engine has no canvas'); return; }
-      await outputManager.openOutput({ display, fullscreen: !!fsChk?.checked, canvas });
+      setStatus('');
+      // tap = copy frames right after each render (desktop pipe needs it for WebGL).
+      const tap = typeof engine.addFrameTap === 'function' ? (fn) => engine.addFrameTap(fn) : undefined;
+      await outputManager.openOutput({ display, fullscreen: !!fsChk?.checked, canvas, tap });
       syncBtn();
     } catch (e) {
       if (e.message === 'popup-blocked') {
-        alert('Allow pop-ups for this site, then click "Open output window" again.');
+        setStatus('Allow pop-ups for this site, then click "Open output window" again.');
       } else {
         console.warn('[output] open failed', e);
+        setStatus('Could not open the output window: ' + (e?.message || e));
       }
     }
   });

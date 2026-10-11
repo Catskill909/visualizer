@@ -118,6 +118,9 @@ export class VisualizerEngine {
     this._loadToken = 0;          // bumps per loadPreset; a stale await bails out
     this._queuedRandom = null;    // next random pick, chosen early so it can be preloaded
     this.lookahead = false;       // player sets true: preload the next cycle preset
+    // Frame taps: callbacks run right after each render(), while the WebGL
+    // buffer is still valid — the desktop output pipe copies frames here.
+    this._frameTaps = new Set();
     this._audioConfirmed = false;
 
     // Output: resolution lock + virtual camera
@@ -1007,6 +1010,11 @@ export class VisualizerEngine {
 
       this.visualizer.render();
 
+      // Frame taps (desktop output pipe): same "right after render" rule as below.
+      if (this._frameTaps.size) {
+        for (const tap of this._frameTaps) { try { tap(this.canvas); } catch { /* a tap must never break rendering */ } }
+      }
+
       // Capture hook: resolve immediately after render() while buffer is live
       if (this._pendingCapture) {
         const cb = this._pendingCapture;
@@ -1032,6 +1040,15 @@ export class VisualizerEngine {
       document.body.appendChild(t);
       setTimeout(() => t.remove(), 15000);
     } catch {}
+  }
+
+  /**
+   * Run `fn(canvas)` right after every rendered frame (WebGL buffer still valid).
+   * Returns an unsubscribe function. Used by the desktop output pipe.
+   */
+  addFrameTap(fn) {
+    this._frameTaps.add(fn);
+    return () => this._frameTaps.delete(fn);
   }
 
   stopRenderLoop() {

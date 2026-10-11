@@ -12,6 +12,16 @@
  */
 import { getLayers } from './outputPipe.js';
 
+// Desktop app: this page is a Rust-created window fed over dcframe:// (no
+// window.opener / MediaStream in Tauri 1) — see nativeOutputWindow.js.
+if (window.__TAURI__) {
+  import('./nativeOutputWindow.js').then((m) => m.run());
+} else {
+  runWeb();
+}
+
+function runWeb() {
+
 const outId    = new URLSearchParams(location.search).get('out') || 'main';
 const stage    = document.getElementById('out-stage');
 const fsBtn    = document.getElementById('out-fs');
@@ -118,3 +128,4 @@ function showChrome() {
 }
 window.addEventListener('mousemove', showChrome);
 showChrome();
+}

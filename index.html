@@ -369,12 +369,7 @@
               </select>
             </div>
 
-            <div class="tuning-group" data-desktop-only style="border-top: 1px solid var(--border-subtle); padding-top: 10px; margin-top: 4px;">
-              <label>Projector / second display</label>
-              <p class="popover-hint">Desktop app: drag this window onto the projector (wired, set to <strong>Extended</strong> in Displays), press <kbd>F</kbd> for fullscreen and <kbd>H</kbd> to hide the controls, or use the Timeline's <strong>⊟ Outputs → Fullscreen here</strong>. A separate clean projector output (controls stay on your laptop) is in development.</p>
-            </div>
-
-            <div class="tuning-group" data-web-only style="border-top: 1px solid var(--border-subtle); padding-top: 10px; margin-top: 4px;">
+            <div class="tuning-group" style="border-top: 1px solid var(--border-subtle); padding-top: 10px; margin-top: 4px;">
               <label>Send to display</label>
               <div class="output-display-row" style="display:flex; gap:6px; align-items:center;">
                 <select id="output-display" class="ctrl-select output-select" style="flex:1;"></select>
@@ -385,7 +380,8 @@
                 <span>Fullscreen on open</span>
               </label>
               <button id="btn-output-open" class="output-apply-btn" type="button" style="width:100%; margin-top:8px;">Open output window</button>
-              <p class="popover-hint">Sends the visualizer to a 2nd display/projector <strong>attached to this computer</strong>. Drag it to that screen, then ⛶ Fullscreen. <strong>Keep this window visible</strong> — if it's hidden the output stops reacting. (A separate computer needs network output, coming later.)</p>
+              <p class="popover-hint">Opens a clean, visuals-only window on a display/projector <strong>attached to this computer</strong> (wired, set to <em>Extended</em>). ⛶ or <kbd>F</kbd> in that window = fullscreen. <strong>Keep this window visible</strong>; if it's hidden the output stops updating.</p>
+              <p class="popover-hint" data-desktop-only>Desktop beta: the output is a copied feed (~30 fps). Press <kbd>D</kbd> in the output window for its stats. Fallback: drag this window onto the projector, <kbd>F</kbd> + <kbd>H</kbd>.</p>
             </div>
 
             <div class="switch-row" data-web-only style="border-top: 1px solid var(--border-subtle); padding-top: 10px; margin-top: 4px;">

@@ -4,10 +4,15 @@
  * mirror, a zone id in the timeline (output-dev.md §4). Each output mirrors one
  * source canvas to one display via the pixel pipe (§5).
  *
- * Web path = window.open positioned via the Window Management API. The Tauri
- * native window (set_position → set_fullscreen) + native pixel pipe are Phase B/C.
+ * Web path = window.open positioned via the Window Management API.
+ * Desktop path (Tauri) = a Rust-created output window (`output_open`) fed by
+ * nativeFeed (frame copy → Rust → `dcframe://`), since window.open and
+ * MediaStream hand-off don't exist in Tauri 1 (output-dev.md Phase B2).
+ * Desktop supports ONE source per output for now (player/editor); timeline
+ * stacking feeds its composer canvas here later.
  */
 import { setLayers as pipeSetLayers, clearLayers } from './outputPipe.js';
+import { startNativeFeed } from './nativeFeed.js';
 
 class OutputManager {
   constructor() {
@@ -25,16 +30,19 @@ class OutputManager {
   async listDisplays({ prompt = false } = {}) {
     if (this.platform === 'tauri') {
       try {
-        const { availableMonitors } = window.__TAURI__.window;
-        const mons = await availableMonitors();
-        return mons.map((m, i) => ({
-          id: String(i), label: m.name || `Monitor ${i + 1}`,
-          x: m.position.x, y: m.position.y, w: m.size.width, h: m.size.height,
-          isPrimary: i === 0,
-        }));
-      } catch {
-        return [this._thisScreen()];
-      }
+        // Rust list_monitors (B1): PHYSICAL positions, which output_open expects.
+        // macOS gives numeric names, so label by index + size (+ "this screen").
+        const mons = await window.__TAURI__.invoke('list_monitors');
+        if (mons && mons.length) {
+          return mons.map((m, i) => ({
+            id: String(i),
+            label: `Display ${i + 1}${m.current ? ' (this screen)' : ''}`,
+            x: m.x, y: m.y, w: m.w, h: m.h,
+            isPrimary: !!m.current,
+          }));
+        }
+      } catch { /* fall through */ }
+      return [this._thisScreen()];
     }
     if (prompt && 'getScreenDetails' in window) {
       try {
@@ -61,13 +69,14 @@ class OutputManager {
 
   isActive(outId = 'main') {
     const o = this._outputs.get(outId);
+    if (o && o.native) return true;
     return !!(o && o.win && !o.win.closed);
   }
 
   /** Live outputs: [{ id, displayId, active }]. */
   getOutputs() {
     return [...this._outputs.entries()].map(([id, o]) => ({
-      id, displayId: o.displayId, active: !!(o.win && !o.win.closed),
+      id, displayId: o.displayId, active: o.native ? true : !!(o.win && !o.win.closed),
     }));
   }
 
@@ -76,13 +85,16 @@ class OutputManager {
    *   layers — [{ id, canvas, opacity?, blendMode?, zIndex? }] composited full-frame
    *            (overlay) in the output window (timeline stacking, A3).
    *   canvas — convenience single-source shorthand (player/editor 'main').
+   *   tap    — desktop only: subscribe to "right after render" for a WebGL
+   *            source (engine.addFrameTap); see nativeFeed.js.
    */
-  async openOutput({ outId = 'main', display, fullscreen, layers, canvas }) {
+  async openOutput({ outId = 'main', display, fullscreen, layers, canvas, tap }) {
     this.closeOutput(outId);
     const list = Array.isArray(layers)
       ? layers
-      : (canvas ? [{ id: 'main', canvas }] : null);
+      : (canvas ? [{ id: 'main', canvas, tap }] : null);
     if (!list) throw new Error('no-source-canvas');
+    if (this.platform === 'tauri') return this._openNative(outId, display, fullscreen, list);
     // Mirror model (output-dev.md §5): start the pixel pipe BEFORE opening the
     // window so the popup can read its layers from its opener on first load.
     pipeSetLayers(outId, list);
@@ -123,9 +135,46 @@ class OutputManager {
     pipeSetLayers(outId, layers);
   }
 
+  /** Desktop: Rust-created output window + frame feed (one source for now). */
+  async _openNative(outId, display, fullscreen, list) {
+    if (list.length !== 1) throw new Error('desktop-single-source-only');
+    const tauri = window.__TAURI__;
+    // A just-closed output window may still be tearing down; wait until it's
+    // gone so its 'closed' event can't hit the new output (quick reopen race).
+    for (let i = 0; i < 30; i++) {
+      try { if (!(await tauri.invoke('output_is_open'))) break; } catch { break; }
+      if (i === 0) tauri.invoke('output_close').catch(() => {});
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    const stop = startNativeFeed(list[0]);
+    try {
+      await tauri.invoke('output_open', { x: display.x, y: display.y, fullscreen: !!fullscreen });
+    } catch (e) {
+      stop();
+      throw new Error('output-open-failed: ' + (e?.message || e));
+    }
+    // The user can close the output window itself — tidy up when Rust says so.
+    let unlisten = null;
+    tauri.event?.listen('dc-output-closed', () => {
+      const o = this._outputs.get(outId);
+      if (o && o.native) { o.closedByUser = true; this.closeOutput(outId); }
+    }).then((fn) => { unlisten = fn; }).catch(() => { /* ignore */ });
+    this._outputs.set(outId, { native: true, stop, displayId: display.id, unlisten: () => unlisten && unlisten() });
+    this._emitChange();
+    return { close: () => this.closeOutput(outId) };
+  }
+
   closeOutput(outId = 'main') {
     const o = this._outputs.get(outId);
     if (!o) return;
+    if (o.native) {
+      o.stop();
+      o.unlisten();
+      if (!o.closedByUser) window.__TAURI__?.invoke('output_close').catch(() => { /* already gone */ });
+      this._outputs.delete(outId);
+      this._emitChange();
+      return;
+    }
     if (o.poll) clearInterval(o.poll);
     clearLayers(outId);
     if (o.win && !o.win.closed) { try { o.win.close(); } catch { /* ignore */ } }
