@@ -1707,7 +1707,21 @@ in the player (and in the timeline, where fade transitions mostly hid it).
   (`_queuedRandom`) so it can be preloaded. Timeline calls `prepareMedia` for
   each block `PRELOAD_LEAD_MS` (4s) before it loads.
 
-**Measured** (web player, real GPU, 14 MB 720p clips): video on first frame
-after every switch (was: missing); Next/auto-cycle swaps instantly; direct picks
-wait ~40ms for prep; video elements stay at 1–2 (was: +1 per switch, forever).
-The desktop asset-protocol path needs a check in `npm run tauri-dev`.
+**WKWebView gotcha (found running the desktop app):** the *first*
+`drawImage(video)` on a `<video>` blocks the main thread until AVFoundation's
+video output delivers a frame — measured at **exactly 1000 ms** (a timeout) when
+it happens right after `play()`. Our per-frame upload hit it on every switch:
+a 1-second freeze. Chromium doesn't do this, so web tests never showed it.
+`_prepareVideo` now plays until a frame is presented (`requestVideoFrameCallback`,
+`timeupdate` fallback), draws once to a 1×1 throwaway canvas (0 ms while frames
+flow), then pauses. Later draws stay fast across pause/play. **Don't rewind to 0
+after the warm-up** — the seek drops `readyState` and undoes it.
+
+**Measured** (14 MB 720p clips, max frame gap during a switch):
+
+| | Desktop app (WKWebView) | Web (Chromium, real GPU) |
+| --- | --- | --- |
+| Read stored video | 6–10 ms asset protocol (was 1,124 ms IPC) | IndexedDB ~1 ms |
+| Direct pick, before → after | ~1,020 ms → 23–42 ms (~170 ms prep wait) | video missing → 20–30 ms (~35 ms prep wait) |
+| Next / auto-cycle (lookahead) | 0 ms swap, 21–43 ms gap | 0 ms swap, 21 ms gap |
+| Video elements alive | 1–2 (was +1 per switch, forever) | 1–2 |

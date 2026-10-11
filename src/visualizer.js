@@ -498,19 +498,31 @@ export class VisualizerEngine {
         video.src = url;
       });
 
-      // Get the first frame decoded so the very first rendered frame after the
-      // swap has real pixels. WebKit may not buffer frames for a paused
-      // preload=auto video, so kick playback until data arrives, then pause.
-      if (video.readyState < 2) {
-        await new Promise((resolve) => {
-          const timer = setTimeout(resolve, 5000);
-          video.addEventListener('loadeddata', () => { clearTimeout(timer); resolve(); }, { once: true });
-          video.play().catch(() => { /* bind's play() reports real failures */ });
-        });
-        // No rewind to 0: a seek drops readyState back below HAVE_CURRENT_DATA,
-        // undoing the decode right when the swap needs it. A few ms in is invisible.
-        video.pause();
-      }
+      // Warm the video up so the swap is instant. Play until frames are actually
+      // being presented, then draw one frame to a throwaway canvas, then pause.
+      // Why: in WKWebView the FIRST drawImage(video) creates the AVPlayer video
+      // output and blocks the main thread until it delivers a frame — measured
+      // at exactly 1000ms (a timeout) when done right after play(), freezing
+      // the whole visualizer. Done here while frames flow, it returns at once,
+      // and later draws (our per-frame upload) are fast even after pause/play.
+      // No rewind to 0 afterwards: a seek drops readyState and undoes the warm-up.
+      await new Promise((resolve) => {
+        const timer = setTimeout(resolve, 3000);
+        const done = () => { clearTimeout(timer); resolve(); };
+        if (typeof video.requestVideoFrameCallback === 'function') {
+          video.requestVideoFrameCallback(() => done());
+        } else {
+          const onTime = () => { if (video.currentTime > 0) { video.removeEventListener('timeupdate', onTime); done(); } };
+          video.addEventListener('timeupdate', onTime);
+        }
+        video.play().catch(() => done());  // bind's play() reports real failures
+      });
+      try {
+        const warm = document.createElement('canvas');
+        warm.width = warm.height = 1;
+        warm.getContext('2d').drawImage(video, 0, 0, 1, 1);
+      } catch { /* warm-up only */ }
+      video.pause();
 
       if (img.speed && img.speed !== 1.0) {
         video.playbackRate = img.speed;
