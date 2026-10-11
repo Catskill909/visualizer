@@ -3,6 +3,7 @@
  * Mirrors the boot pattern from src/editor/main.js
  */
 
+import '../platform.js'; // sets html.is-desktop → hides web-only UI in the desktop app
 import { VisualizerEngine } from '../visualizer.js';
 import { TimelineEditor }   from './timelineEditor.js';
 import { initAuthGate }     from '../auth-gate.js';

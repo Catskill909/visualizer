@@ -429,12 +429,13 @@
                     <div class="tl-output-section-label">Desktop — fullscreen this app on a display</div>
                     <div id="tl-output-monitors" class="tl-output-displays"></div>
                 </div>
-                <div class="tl-output-section-label">Displays</div>
-                <div id="tl-output-displays" class="tl-output-displays"></div>
-                <div class="tl-output-section-label">Routing — send a zone to a display</div>
-                <div id="tl-output-routes" class="tl-output-routes"></div>
-                <div class="tl-output-section-label">Composed program — the whole timeline as one layered feed</div>
-                <div class="tl-output-program">
+                <p class="tl-output-empty" data-desktop-only>Pick a display above to fullscreen the whole app on it (e.g. the projector). Per-zone routing and the composed-program window work in the browser build only for now; a separate clean projector output for the desktop app is in development.</p>
+                <div class="tl-output-section-label" data-web-only>Displays</div>
+                <div id="tl-output-displays" class="tl-output-displays" data-web-only></div>
+                <div class="tl-output-section-label" data-web-only>Routing — send a zone to a display</div>
+                <div id="tl-output-routes" class="tl-output-routes" data-web-only></div>
+                <div class="tl-output-section-label" data-web-only>Composed program — the whole timeline as one layered feed</div>
+                <div class="tl-output-program" data-web-only>
                     <button id="tl-output-program-btn" class="tl-output-detect" type="button">▦ Open composed program</button>
                     <span id="tl-output-ndi-row" class="tl-output-ndi-row" hidden>
                         <button id="tl-output-ndi-btn" class="tl-output-detect" type="button">📡 Send program to NDI</button>

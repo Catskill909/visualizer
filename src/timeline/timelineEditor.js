@@ -1031,6 +1031,7 @@ export class TimelineEditor {
         this._displays = await outputManager.listDisplays({ prompt });
         this._renderOutputDisplays();
         this._renderOutputRoutes();
+        this._renderMonitorList();   // desktop: ↻ Detect also refreshes the fullscreen-on-a-display list
     }
 
     _renderOutputDisplays() {

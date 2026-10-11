@@ -369,7 +369,12 @@
               </select>
             </div>
 
-            <div class="tuning-group" style="border-top: 1px solid var(--border-subtle); padding-top: 10px; margin-top: 4px;">
+            <div class="tuning-group" data-desktop-only style="border-top: 1px solid var(--border-subtle); padding-top: 10px; margin-top: 4px;">
+              <label>Projector / second display</label>
+              <p class="popover-hint">Desktop app: drag this window onto the projector (wired, set to <strong>Extended</strong> in Displays), press <kbd>F</kbd> for fullscreen and <kbd>H</kbd> to hide the controls, or use the Timeline's <strong>⊟ Outputs → Fullscreen here</strong>. A separate clean projector output (controls stay on your laptop) is in development.</p>
+            </div>
+
+            <div class="tuning-group" data-web-only style="border-top: 1px solid var(--border-subtle); padding-top: 10px; margin-top: 4px;">
               <label>Send to display</label>
               <div class="output-display-row" style="display:flex; gap:6px; align-items:center;">
                 <select id="output-display" class="ctrl-select output-select" style="flex:1;"></select>
@@ -383,14 +388,14 @@
               <p class="popover-hint">Sends the visualizer to a 2nd display/projector <strong>attached to this computer</strong>. Drag it to that screen, then ⛶ Fullscreen. <strong>Keep this window visible</strong> — if it's hidden the output stops reacting. (A separate computer needs network output, coming later.)</p>
             </div>
 
-            <div class="switch-row" style="border-top: 1px solid var(--border-subtle); padding-top: 10px; margin-top: 4px;">
+            <div class="switch-row" data-web-only style="border-top: 1px solid var(--border-subtle); padding-top: 10px; margin-top: 4px;">
               <label class="switch-label" for="toggle-virtual-camera">Virtual Camera</label>
               <label class="switch">
                 <input type="checkbox" id="toggle-virtual-camera" />
                 <span class="switch-track"></span>
               </label>
             </div>
-            <p id="virtual-camera-hint" class="popover-hint">Use canvas as camera in Zoom / Meet</p>
+            <p id="virtual-camera-hint" class="popover-hint" data-web-only>Experimental: starts a canvas stream inside this page only. It does not appear as a camera in Zoom or OBS yet.</p>
 
           </div>
         </div>
@@ -960,17 +965,14 @@
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Virtual Camera</div>
-              <p>Toggle the <strong>Virtual Camera</strong> switch to stream the visualizer canvas as a live video
-                source. Once active, open OBS, Zoom, Teams, or any video software and select the app window
-                as a camera input &mdash; the visualizer appears as a live feed.</p>
+              <p><strong>Experimental, browser only.</strong> The <strong>Virtual Camera</strong> switch starts a canvas
+                stream inside the page, but it does <strong>not</strong> show up as a camera in Zoom, Teams, or OBS yet,
+                and it isn't available in the desktop app.</p>
               <ul class="welcome-list">
-                <li><strong>Status hint</strong> &mdash; turns <em>LIVE &mdash; select this window in OBS / Zoom</em>
-                  while active; the monitor button dot turns green.</li>
-                <li><strong>macOS app note</strong> &mdash; the stream is available in the WKWebView, but routing it to
-                  a system-level virtual camera requires the OBS Virtual Camera driver to be installed separately.</li>
+                <li><strong>To get the visuals into OBS today</strong> &mdash; add a <em>macOS Screen Capture</em> (or
+                  <em>Window Capture</em>) source in OBS, pick the DiscoCast window, and press <kbd>H</kbd> to hide the
+                  controls. OBS's own Virtual Camera can then feed Zoom / Teams.</li>
               </ul>
-              <p class="welcome-hint">The virtual camera stream runs at 60 fps and matches the current render
-                resolution. Stopping it releases all tracks automatically.</p>
             </div>
 
             <div class="welcome-feature">

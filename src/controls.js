@@ -1,6 +1,7 @@
 /**
  * ControlPanel — UI bindings, auto-hide, keyboard shortcuts, preset drawer
  */
+import './platform.js'; // sets html.is-desktop → hides web-only UI in the desktop app
 import { downloadFile, showAudioLoadingModal, hideAudioLoadingModal } from './fileUtils.js';
 import { isSupportedAudioFile, showUnsupportedAudioModal } from './audioFormat.js';
 import {
@@ -550,12 +551,12 @@ export class ControlPanel {
       els.toggleVirtualCamera.addEventListener('change', (e) => {
         if (e.target.checked) {
           this.engine.startVirtualCamera(60);
-          els.virtualCameraHint.textContent = 'Active — canvas available as camera in Zoom / Meet';
+          els.virtualCameraHint.textContent = 'Active: canvas stream running in this page (not a system camera yet)';
           els.outputStatusDot.classList.add('active');
-          this.showToast('📷 Virtual Camera ON — available in Zoom / Meet');
+          this.showToast('📷 Virtual Camera ON (experimental: in-page stream only)');
         } else {
           this.engine.stopVirtualCamera();
-          els.virtualCameraHint.textContent = 'Use canvas as camera in Zoom / Meet';
+          els.virtualCameraHint.textContent = 'Experimental: starts a canvas stream inside this page only. It does not appear as a camera in Zoom or OBS yet.';
           this._updateOutputDot();
           this.showToast('📷 Virtual Camera OFF');
         }

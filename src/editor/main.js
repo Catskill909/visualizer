@@ -5,6 +5,7 @@
  */
 
 import '../assets/fonts/fonts.css';
+import '../platform.js'; // sets html.is-desktop → hides web-only UI in the desktop app
 import { VisualizerEngine } from '../visualizer.js';
 import { EditorInspector, showToast } from './inspector.js';
 import { PresetLibrary } from './presetLibrary.js';

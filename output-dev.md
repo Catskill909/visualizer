@@ -20,6 +20,25 @@
 >   Options weighed 2026-10-11: (A) Rust-created second window fed by frame readback (transport proven by NDI N0), or
 >   (B) render fullscreen on the projector + a small control window. OBS window capture is an optional external route.
 > - Platform matrix for the whole app: README → **Platform support**.
+>
+> **✅ Done 2026-10-11:** in the desktop app the dead output-window controls (player/editor *Send to display*, Timeline
+> routing + Composed Program, zone output chips) and the Virtual Camera toggle are **hidden** and replaced with projector
+> instructions (`src/platform.js` sets `html.is-desktop`; markup uses `data-web-only` / `data-desktop-only`). The web build
+> is unchanged. The Timeline's working *Fullscreen here* stays, and ↻ Detect now refreshes it too.
+
+### 🎯 macOS projector checklist (the reliable setup today)
+Condensed from the 2026-06-09 field test below. Do these in order:
+1. **One machine.** The projector is wired to the **same Mac that runs the app.** Universal Control can fake this; check
+   `system_profiler SPDisplaysDataType` lists the projector.
+2. **Wired, not wireless.** HDMI (a video-capable USB-C adapter, plugged directly in). Turn the **projector's** Wi-Fi/AirPlay
+   **off** and set its input to HDMI. AirPlay lags 100–300 ms and wedges.
+3. **Extended, not mirrored.** System Settings → Displays → select the **built-in/operator screen** → *Use as:
+   Main display*. The projector becomes a separate extended screen. If the "Mirror or Extend" prompt keeps nagging, see the
+   Sequoia "TV" bug fix below (BetterDisplay EDID override).
+4. **Put the app on the projector.** Timeline → `⊟ Outputs` → *Fullscreen here* on the projector; or drag the window
+   there and press **F**. Press **H** to hide the controls.
+5. **Lock the render resolution** to the projector's (Output panel `O` → Resolution, e.g. 1920×1080) for a sharp,
+   consistent image.
 
 Legend: ✅ done · ⬅ **next** · 📋 planned. Shipping product = the **desktop app** (web is the dev/proving ground). Per-step *detail* is in §9; this board is the authority for *status & order*.
 
