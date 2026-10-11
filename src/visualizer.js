@@ -20,6 +20,11 @@ import { parseGIF, decompressFrames } from 'gifuct-js';
 import { scheduleLayerAnimations, killLayerSchedule } from './editor/animation.js';
 import { gsap } from 'gsap';
 
+// Video preloading — see VisualizerEngine.prepareMedia.
+const PREPARE_TIMEOUT_MS = 1500;          // never hold a preset swap longer than this
+const PREPARE_TIMED_OUT = Symbol('prepare-timed-out');
+const MAX_PREPARED_PRESETS = 3;           // preloaded-but-unplayed presets kept at once
+
 // Baron pack: bypass the package's runtime `await import()` loop (which would cause
 // 762 sequential network requests). Vite inlines every JSON into a single static chunk.
 const baronModules = import.meta.glob(
@@ -101,6 +106,18 @@ export class VisualizerEngine {
     this._gifAnimations = new Map();
     // Video animation state: texName → { videoElement, uploadCanvas, uploadCtx, width, height }
     this._videoAnimations = new Map();
+    // Video preloading (custom presets with video layers):
+    //   _preparedMedia  presetName → Promise<[{ texName, videoId, video, url }]> — decoded
+    //                   to the first frame and waiting, so the swap is instant
+    //   _videoSources   texName → { videoId, video, url } for videos this engine bound
+    //                   (owned here so they can be released after a preset change)
+    //   _activeVideoTex texNames the current preset uses — never released
+    this._preparedMedia = new Map();
+    this._videoSources = new Map();
+    this._activeVideoTex = new Set();
+    this._loadToken = 0;          // bumps per loadPreset; a stale await bails out
+    this._queuedRandom = null;    // next random pick, chosen early so it can be preloaded
+    this.lookahead = false;       // player sets true: preload the next cycle preset
     this._audioConfirmed = false;
 
     // Output: resolution lock + virtual camera
@@ -338,6 +355,7 @@ export class VisualizerEngine {
   async loadPreset(name, blendTime = 2.0) {
     const preset = this.presets[name];
     if (!preset) return false;
+    const token = ++this._loadToken;
 
     // Store current preset name for reliable lookup (index can become stale after
     // refreshCustomPresets() rebuilds the presetNames array)
@@ -348,17 +366,50 @@ export class VisualizerEngine {
     // at blendTime=0, keeping it stuck in a permanent-blend state.
     if (blendTime < 0.001) blendTime = 0.001;
 
+    // Prepare-before-swap: get this preset's videos decoded to their first frame
+    // while the OLD preset keeps rendering, then swap. Swapping first left the
+    // layer sampling butterchurn's clouds2 fallback until the video loaded — the
+    // visible hitch. Already preloaded (lookahead) → resolves immediately.
+    // Capped so a slow video can never hold the swap hostage.
+    const isCustom = name.startsWith(CUSTOM_PREFIX);
+    const mediaPromise = isCustom ? this._takePrepared(name) : null;
+    let media = null;
+    if (mediaPromise) {
+      media = await Promise.race([
+        mediaPromise,
+        new Promise((r) => setTimeout(() => r(PREPARE_TIMED_OUT), PREPARE_TIMEOUT_MS)),
+      ]);
+      if (token !== this._loadToken) {
+        // Superseded by a newer loadPreset while waiting — drop these videos.
+        mediaPromise.then((list) => (list || []).forEach((m) => this._disposeVideo(m)));
+        return false;
+      }
+    }
+
     try {
       this.visualizer.loadPreset(JSON.parse(JSON.stringify(preset)), blendTime);
     } catch (e) {
       console.warn('[DiscoCast Visualizer] loadPreset failed:', e.message, e);
+      if (mediaPromise) mediaPromise.then((list) => (list || []).forEach((m) => this._disposeVideo(m)));
       return false;
     }
 
-    // Bind custom preset images AFTER butterchurn loadPreset — butterchurn resets
-    // its internal sampler state on loadPreset, wiping any textures bound before it.
-    // The editor works correctly because _applyToEngine() always re-binds after loading.
-    if (name.startsWith(CUSTOM_PREFIX)) {
+    // Swap the active video set; the outgoing preset's videos keep playing through
+    // the blend, then are released (they used to play + upload every frame forever).
+    const prevActive = this._activeVideoTex;
+    this._activeVideoTex = new Set(isCustom ? this._presetVideoLayers(preset).map((img) => img.texName) : []);
+    if (media === PREPARE_TIMED_OUT) {
+      mediaPromise.then((list) => {
+        if (token === this._loadToken) this._bindPreparedVideos(list);
+        else (list || []).forEach((m) => this._disposeVideo(m));
+      });
+    } else if (media) {
+      this._bindPreparedVideos(media);
+    }
+    this._scheduleVideoRelease(prevActive, blendTime);
+
+    // Bind custom preset images (static/GIF) after butterchurn loadPreset.
+    if (isCustom) {
       await this._bindCustomPresetImages(preset);
     }
 
@@ -374,7 +425,202 @@ export class VisualizerEngine {
       }
     }
 
+    if (this.lookahead && token === this._loadToken) this._prepareUpcoming();
     return true;
+  }
+
+  // ─── Video preloading ──────────────────────────────────────────────────────
+
+  _presetVideoLayers(preset) {
+    return (preset?.images || []).filter((img) => img.type === 'video' && img.videoId && img.texName);
+  }
+
+  /**
+   * Preload a custom preset's video layers (fetch → <video> → first frame
+   * decoded, paused) so a later loadPreset(name) swaps instantly. Safe to call
+   * repeatedly — cached per preset name. Used for lookahead by the player's
+   * cycle and by the timeline ahead of each block.
+   */
+  prepareMedia(name) {
+    if (this._preparedMedia.has(name)) return this._preparedMedia.get(name);
+    const layers = name && name.startsWith(CUSTOM_PREFIX) ? this._presetVideoLayers(this.presets[name]) : [];
+    if (layers.length === 0) return Promise.resolve(null);
+    const p = Promise.all(layers.map((img) => this._prepareVideo(img))).then((list) => list.filter(Boolean));
+    this._preparedMedia.set(name, p);
+    while (this._preparedMedia.size > MAX_PREPARED_PRESETS) {
+      this._disposePrepared(this._preparedMedia.keys().next().value);  // oldest first
+    }
+    return p;
+  }
+
+  /** Hand a preset's prepared videos to loadPreset (preparing now if not preloaded). */
+  _takePrepared(name) {
+    const p = this.prepareMedia(name);
+    this._preparedMedia.delete(name);
+    return p;
+  }
+
+  _disposePrepared(name) {
+    const p = this._preparedMedia.get(name);
+    this._preparedMedia.delete(name);
+    if (p) p.then((list) => (list || []).forEach((m) => this._disposeVideo(m)));
+  }
+
+  async _prepareVideo(img) {
+    let video = null;
+    let url = null;
+    try {
+      const blob = await getImage(img.videoId);
+      if (!blob) {
+        console.warn('[DiscoCast Visualizer] Video not found in storage:', img.videoId, '(texName:', img.texName + ')');
+        return null;
+      }
+      url = URL.createObjectURL(blob);
+      video = document.createElement('video');
+      video.playsInline = true;  // Required for WKWebView inline playback
+      video.muted = true;        // WKWebView autoplay requires muted initially
+      video.loop = img.loop !== false;  // Default to looping
+      video.preload = 'auto';
+
+      // WKWebView CRITICAL: append to DOM BEFORE setting src
+      video.style.position = 'fixed';
+      video.style.left = '-9999px';
+      video.style.width = '1px';
+      video.style.height = '1px';
+      video.style.opacity = '0';
+      video.style.pointerEvents = 'none';
+      document.body.appendChild(video);
+
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('video metadata never loaded (10s timeout)')), 10000);
+        video.onloadedmetadata = () => { clearTimeout(timer); resolve(); };
+        video.onerror = () => { clearTimeout(timer); reject(new Error('Could not load video')); };
+        video.src = url;
+      });
+
+      // Get the first frame decoded so the very first rendered frame after the
+      // swap has real pixels. WebKit may not buffer frames for a paused
+      // preload=auto video, so kick playback until data arrives, then pause.
+      if (video.readyState < 2) {
+        await new Promise((resolve) => {
+          const timer = setTimeout(resolve, 5000);
+          video.addEventListener('loadeddata', () => { clearTimeout(timer); resolve(); }, { once: true });
+          video.play().catch(() => { /* bind's play() reports real failures */ });
+        });
+        // No rewind to 0: a seek drops readyState back below HAVE_CURRENT_DATA,
+        // undoing the decode right when the swap needs it. A few ms in is invisible.
+        video.pause();
+      }
+
+      if (img.speed && img.speed !== 1.0) {
+        video.playbackRate = img.speed;
+      }
+      return { texName: img.texName, videoId: img.videoId, video, url };
+    } catch (e) {
+      console.warn('[DiscoCast Visualizer] Failed to prepare video for', img.texName, e.message);
+      this._disposeVideo({ video, url });
+      return null;
+    }
+  }
+
+  /** Bind prepared videos as textures (sync — call right after butterchurn loadPreset). */
+  _bindPreparedVideos(list) {
+    for (const m of list || []) {
+      const current = this._videoSources.get(m.texName);
+      if (current && current.videoId === m.videoId && this._videoAnimations.get(m.texName)?.videoElement === current.video) {
+        // Same video already playing (reloaded preset / quick A→B→A) — keep it
+        // running uninterrupted and drop the duplicate.
+        this._disposeVideo(m);
+        continue;
+      }
+      if (current) this._releaseVideoTex(m.texName);
+      this.setUserTexture(m.texName, {
+        data: m.url,
+        width: m.video.videoWidth,
+        height: m.video.videoHeight,
+        isVideo: true,
+        videoElement: m.video,
+        videoId: m.videoId,
+        _videoUrl: m.url,
+      });
+      this._videoSources.set(m.texName, { videoId: m.videoId, video: m.video, url: m.url });
+      console.log('[DiscoCast Visualizer] Video bound:', m.texName, m.video.videoWidth + 'x' + m.video.videoHeight);
+    }
+  }
+
+  /** After the blend finishes, release videos the new preset no longer uses. */
+  _scheduleVideoRelease(prevActive, blendTime) {
+    const stale = [...prevActive].filter((n) => !this._activeVideoTex.has(n));
+    if (stale.length === 0) return;
+    setTimeout(() => {
+      for (const n of stale) {
+        if (!this._activeVideoTex.has(n)) this._releaseVideoTex(n);  // back in use? keep it
+      }
+    }, blendTime * 1000 + 250);
+  }
+
+  /** Stop + free a video this engine bound: animation, GL texture, element, blob URL. */
+  _releaseVideoTex(name) {
+    const src = this._videoSources.get(name);
+    if (!src) return;
+    this._videoSources.delete(name);
+    const anim = this._videoAnimations.get(name);
+    // Only tear down the texture if it's still ours (the editor may have rebound the name).
+    if (anim && anim.videoElement === src.video) {
+      this._videoAnimations.delete(name);
+      const imgTextures = this.visualizer?.renderer?.image;
+      if (imgTextures && imgTextures.samplers[name] === anim.texture) {
+        delete imgTextures.samplers[name];
+        anim.gl.deleteTexture(anim.texture);
+      }
+    }
+    this._disposeVideo(src);
+  }
+
+  _disposeVideo(m) {
+    if (!m) return;
+    if (m.video) {
+      m.video.pause();
+      m.video.removeAttribute('src');
+      m.video.load();  // drop the decoder + buffered data now, not at GC
+      m.video.remove();
+    }
+    if (m.url) URL.revokeObjectURL(m.url);
+  }
+
+  /** Player lookahead: preload whatever the cycle / Next will play next. */
+  _prepareUpcoming() {
+    const pool = this._cyclePool();
+    if (pool.length < 2) return;
+    const current = this.getCurrentPresetName();
+    let next;
+    if (this.randomCycleOrder) {
+      next = this._queuedRandom = this._randomPick(pool, current);
+    } else {
+      this._queuedRandom = null;
+      const idx = pool.indexOf(current);
+      next = pool[(idx + 1) % pool.length];
+    }
+    // Only the upcoming preset stays preloaded — free anything else.
+    for (const k of [...this._preparedMedia.keys()]) {
+      if (k !== next) this._disposePrepared(k);
+    }
+    if (next) this.prepareMedia(next);
+  }
+
+  _randomPick(pool, current) {
+    let pick;
+    do { pick = pool[Math.floor(Math.random() * pool.length)]; }
+    while (pick === current && pool.length > 1);
+    return pick;
+  }
+
+  /** Next random preset: the one queued (and preloaded) by lookahead if still valid. */
+  _nextRandom(pool, current) {
+    const queued = this._queuedRandom;
+    this._queuedRandom = null;
+    if (queued && queued !== current && pool.includes(queued)) return queued;
+    return this._randomPick(pool, current);
   }
 
   /**
@@ -449,9 +695,7 @@ export class VisualizerEngine {
     const pool = this._cyclePool();
     if (pool.length === 0) return '';
     const current = this.getCurrentPresetName();
-    let pick;
-    do { pick = pool[Math.floor(Math.random() * pool.length)]; }
-    while (pick === current && pool.length > 1);
+    const pick = this._nextRandom(pool, current);
     this.loadPreset(pick, blendTime);
     this.resetAutoCycle();
     return pick;
@@ -474,7 +718,7 @@ export class VisualizerEngine {
     return name;
   }
 
-  /** Async: fetch image/video blobs from IndexedDB and bind them as user textures. */
+  /** Async: fetch image blobs from storage and bind them as user textures (videos: see prepareMedia). */
   async _bindCustomPresetImages(presetRecord) {
     const images = presetRecord.images || [];
     if (images.length === 0) return;
@@ -510,67 +754,8 @@ export class VisualizerEngine {
         console.warn('[DiscoCast Visualizer] Failed to bind image for', img.texName, e.message);
       }
     }
-
-    // ── Handle video layers ──────────────────────────────────────────────────
-    for (const img of images) {
-      if (img.type !== 'video' || !img.videoId || !img.texName) continue;
-      try {
-        const blob = await getImage(img.videoId);
-        if (!blob) {
-          console.warn('[DiscoCast Visualizer] Video not found in IndexedDB:', img.videoId, '(texName:', img.texName + ')');
-          continue;
-        }
-
-        // Create blob URL and video element (keep URL valid for entire lifecycle)
-        const videoUrl = URL.createObjectURL(blob);
-        const video = document.createElement('video');
-        video.playsInline = true;  // Required for WKWebView inline playback
-        video.muted = true;        // WKWebView autoplay requires muted initially
-        video.loop = img.loop !== false;  // Default to looping
-        video.preload = 'auto';
-
-        // WKWebView CRITICAL: append to DOM BEFORE setting src
-        video.style.position = 'fixed';
-        video.style.left = '-9999px';
-        video.style.width = '1px';
-        video.style.height = '1px';
-        video.style.opacity = '0';
-        video.style.pointerEvents = 'none';
-        document.body.appendChild(video);
-
-        // Wait for metadata to get dimensions
-        await new Promise((resolve, reject) => {
-          video.onloadedmetadata = resolve;
-          video.onerror = () => reject(new Error('Could not load video'));
-          video.src = videoUrl;
-        });
-
-        // Set playback speed if specified
-        if (img.speed && img.speed !== 1.0) {
-          video.playbackRate = img.speed;
-        }
-
-        // Bind to texture system
-        this.setUserTexture(img.texName, {
-          data: videoUrl,
-          width: video.videoWidth,
-          height: video.videoHeight,
-          isVideo: true,
-          videoElement: video,
-          videoId: img.videoId,
-          _videoUrl: videoUrl,  // Keep reference for cleanup
-        });
-
-        // Start playback
-        video.play().catch(err => {
-          console.warn('[DiscoCast Visualizer] Video autoplay failed:', err.message);
-        });
-
-        console.log('[DiscoCast Visualizer] Video bound:', img.texName, video.videoWidth + 'x' + video.videoHeight);
-      } catch (e) {
-        console.warn('[DiscoCast Visualizer] Failed to bind video for', img.texName, e.message);
-      }
-    }
+    // Video layers are prepared + bound by loadPreset (prepareMedia /
+    // _bindPreparedVideos) so they can be preloaded before the swap.
   }
 
   /**
@@ -882,9 +1067,7 @@ export class VisualizerEngine {
     const pool = this._cyclePool();
     if (pool.length === 0) return '';
     const current = this.getCurrentPresetName();
-    let pick;
-    do { pick = pool[Math.floor(Math.random() * pool.length)]; }
-    while (pick === current && pool.length > 1);
+    const pick = this._nextRandom(pool, current);
     this.loadPreset(pick, blendTime);
     this.resetAutoCycle();
     return pick;

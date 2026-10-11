@@ -1672,3 +1672,42 @@ AI cutout tool → WebM with alpha → DiscoCast (any platform) → transparent 
 ```
 
 No other VJ tool supports this end-to-end. See `apng-dev.md` for the validated research, phased implementation checklist, and handoff details.
+
+## 28. Preset-Switch Video Preloading — ✅ SHIPPED (Oct 11, 2026)
+
+**Problem:** switching to a preset with a video layer froze/stuttered for ~0.5s
+in the player (and in the timeline, where fade transitions mostly hid it).
+
+**Causes found (audit 2026-10-11):**
+1. *Desktop freeze:* `getImage` on Tauri read the whole video as base64 over
+   IPC and decoded it byte-by-byte on the JS main thread — rendering stopped
+   while it ran, longer for bigger clips.
+2. *Late layer:* `loadPreset` swapped the preset **first**, then fetched the
+   video, waited for metadata, and started playback. Until then the layer
+   sampled butterchurn's `clouds2` fallback texture (missing samplers fall back
+   to it — `ImageTextures.getTexture`).
+3. *Leak:* each video layer has a unique `texName` (`uservid<ts>`) and nothing
+   released the previous preset's videos — every one kept decoding and
+   uploading a frame per tick for the whole session. Stutter grew over time.
+
+**Fix:**
+- `customPresets.js` `_getImageTauri` → `get_blob_path` (Rust) +
+  `fetch(convertFileSrc(path))` via the asset protocol (`$APPDATA/images/*` in
+  `assetScope`). Native, off the main thread. Old IPC read kept as fallback.
+- `VisualizerEngine.prepareMedia(name)` preloads a preset's videos to a decoded
+  first frame (paused), cached per preset. `loadPreset` now **prepares, then
+  swaps**, binding the videos synchronously right after butterchurn's
+  `loadPreset` — real pixels on the first frame. Capped at 1.5s
+  (`PREPARE_TIMEOUT_MS`) so a slow video never blocks the swap; stale awaits
+  bail out via `_loadToken`.
+- Outgoing preset's videos keep playing through the blend, then
+  `_releaseVideoTex` frees animation, GL texture, element and blob URL.
+- **Lookahead:** player (`engine.lookahead = true` in `src/main.js`) preloads
+  the next cycle preset after each swap; random order pre-picks the next random
+  (`_queuedRandom`) so it can be preloaded. Timeline calls `prepareMedia` for
+  each block `PRELOAD_LEAD_MS` (4s) before it loads.
+
+**Measured** (web player, real GPU, 14 MB 720p clips): video on first frame
+after every switch (was: missing); Next/auto-cycle swaps instantly; direct picks
+wait ~40ms for prep; video elements stay at 1–2 (was: +1 per switch, forever).
+The desktop asset-protocol path needs a check in `npm run tauri-dev`.

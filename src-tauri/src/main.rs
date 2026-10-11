@@ -193,6 +193,33 @@ async fn get_blob(app: tauri::AppHandle, image_id: String) -> Result<Option<Blob
     Ok(Some(BlobResult { data, mime }))
 }
 
+#[derive(serde::Serialize)]
+struct BlobPathResult {
+    path: String,  // absolute path, for convertFileSrc → asset protocol
+    mime: String,
+}
+
+/// Locate a stored blob on disk without reading it. The webview then fetches
+/// it through the asset protocol (native, off the JS main thread) instead of
+/// get_blob's base64-over-IPC + per-byte decode, which froze rendering for
+/// hundreds of ms on large videos. get_blob stays as the fallback.
+#[tauri::command]
+async fn get_blob_path(app: tauri::AppHandle, image_id: String) -> Result<Option<BlobPathResult>, String> {
+    if image_id.contains('/') || image_id.contains('\\') || image_id.contains("..") {
+        return Err("invalid image id".to_string());
+    }
+    let data_dir = app.path_resolver().app_data_dir()
+        .ok_or_else(|| "Could not resolve app data dir".to_string())?;
+    let images_dir = data_dir.join("images");
+    let blob_path = images_dir.join(&image_id);
+    if !blob_path.exists() {
+        return Ok(None);
+    }
+    let mime_path = images_dir.join(format!("{}.mime", &image_id));
+    let mime = std::fs::read_to_string(&mime_path).unwrap_or_default();
+    Ok(Some(BlobPathResult { path: blob_path.to_string_lossy().into_owned(), mime }))
+}
+
 #[tauri::command]
 async fn delete_blob(app: tauri::AppHandle, image_id: String) -> Result<(), String> {
     let data_dir = app.path_resolver().app_data_dir()
@@ -420,7 +447,7 @@ fn main() {
     tauri::Builder::default()
         .manage(CaffeinateState(Mutex::new(None)))
         .manage(NdiState(Mutex::new(None)))
-        .invoke_handler(tauri::generate_handler![caffeinate_start, caffeinate_stop, toggle_fullscreen, get_fullscreen, list_monitors, fullscreen_on_monitor, pick_audio_file, pick_image_file, save_file, store_blob, get_blob, delete_blob, store_preset, get_all_presets, delete_preset, convert_to_stacked_alpha, convert_to_stacked_alpha_b64, ndi_start, ndi_send_frame, ndi_stop])
+        .invoke_handler(tauri::generate_handler![caffeinate_start, caffeinate_stop, toggle_fullscreen, get_fullscreen, list_monitors, fullscreen_on_monitor, pick_audio_file, pick_image_file, save_file, store_blob, get_blob, get_blob_path, delete_blob, store_preset, get_all_presets, delete_preset, convert_to_stacked_alpha, convert_to_stacked_alpha_b64, ndi_start, ndi_send_frame, ndi_stop])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

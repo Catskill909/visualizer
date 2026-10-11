@@ -45,6 +45,9 @@ function colorFor(name) {
     return BLOCK_COLORS[Math.abs(h) % BLOCK_COLORS.length];
 }
 
+// How far ahead of a block's load the timeline preloads its videos.
+const PRELOAD_LEAD_MS = 4000;
+
 // Transition style for an entry — how the block enters. Legacy entries (pre-4.14)
 // have no `transition` field; fall back to the old `hardCut` boolean so old sets
 // still play correctly until they are resaved.
@@ -2970,6 +2973,14 @@ export class TimelineEditor {
             const fadeDurIn = hasGapBefore ? (tr === 'cut' ? 0 : d) : 0;
             const fadeInDelay = Math.max(0, (st - fadeDurIn - fromTime) * 1000);
             const delay       = (st - fromTime) * 1000;
+
+            // Preload this block's videos a few seconds before it loads, so the
+            // swap is instant instead of stalling on video decode at the cut.
+            const loadAt = hasGapBefore ? fadeInDelay : delay;
+            timers.push(setTimeout(() => {
+                if (!this._playing) return;
+                zd.engine.prepareMedia(entry.presetName);
+            }, Math.max(0, loadAt - PRELOAD_LEAD_MS)));
 
             if (hasGapBefore) {
                 // Load preset first with blend=0 (instant GPU write — previous preset

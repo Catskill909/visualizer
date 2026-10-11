@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Initialize the visualizer engine
     const engine = new VisualizerEngine();
     engine.init(canvas);
+    engine.lookahead = true;  // preload the next cycle preset's videos (no stall on switch)
 
     // Initialize the control panel (binds all UI events)
     const controls = new ControlPanel(engine);

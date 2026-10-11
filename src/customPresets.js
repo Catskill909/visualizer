@@ -146,6 +146,24 @@ async function _storeImageTauri(imageId, blob) {
 }
 
 async function _getImageTauri(imageId) {
+    // Fast path: fetch the file through the asset protocol. The webview reads it
+    // natively off the main thread — no base64 over IPC, no per-byte JS decode
+    // loop, which froze rendering for hundreds of ms on large videos.
+    try {
+        const info = await window.__TAURI__.invoke('get_blob_path', { imageId });
+        if (!info) return null;
+        const res = await fetch(window.__TAURI__.tauri.convertFileSrc(info.path));
+        if (!res.ok) throw new Error(`asset fetch ${res.status}`);
+        const blob = await res.blob();
+        // Keep the stored mime (callers branch on blob.type); slice() relabels without copying.
+        return info.mime && blob.type !== info.mime ? blob.slice(0, blob.size, info.mime) : blob;
+    } catch (err) {
+        console.warn('[customPresets] Asset fetch failed, falling back to IPC read:', err?.message || err);
+    }
+    return _getImageTauriIPC(imageId);
+}
+
+async function _getImageTauriIPC(imageId) {
     const result = await window.__TAURI__.invoke('get_blob', { imageId });
     if (!result) return null;
     const binary = atob(result.data);
