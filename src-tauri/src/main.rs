@@ -150,7 +150,11 @@ fn fullscreen_on_monitor(window: tauri::Window, x: i32, y: i32) -> Result<(), St
 fn caffeinate_start(state: tauri::State<CaffeinateState>) {
     let mut guard = state.0.lock().unwrap();
     if guard.is_none() {
-        match Command::new("caffeinate").arg("-d").spawn() {
+        // -w <our pid>: caffeinate exits by itself when DiscoCast exits (quit or crash).
+        // Without it the helper was orphaned on quit: the display never slept again and
+        // macOS showed "App Running in Background" for DiscoCast.
+        let pid = std::process::id().to_string();
+        match Command::new("caffeinate").args(["-d", "-w", &pid]).spawn() {
             Ok(child) => { *guard = Some(child); }
             Err(e) => { eprintln!("[DiscoCast] caffeinate spawn failed: {}", e); }
         }
