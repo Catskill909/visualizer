@@ -56,3 +56,14 @@ The user hates doc sprawl and stale/contradictory docs. For any feature area, th
 - Keep status in ONE place (the truth doc's top status block) — don't duplicate status across docs.
 
 **Output / multi-monitor / projector → the single source of truth is [`output-dev.md`](output-dev.md).** `app-output-dev.md`, `native-output-dev.md`, and `visualizer-output-dev.md` are **archive/reference only** (their tops say so). Do not create a new output doc.
+
+---
+
+## The ship target is the desktop app: check platform before claiming anything works
+
+The macOS `.dmg` / Windows `.exe` (Tauri 1) are the product; the browser is only the proving ground. Many browser features
+silently do nothing in WKWebView (`window.open`, Fullscreen API, `<a download>`, Wake Lock, `alert`).
+
+- Before saying a feature "works", check **README → Platform support** and the topic's truth doc status block.
+- Verify desktop behaviour in `npm run tauri-dev` (or the DMG), not only in Chrome.
+- When you learn a new platform limit, add a row to **README → Platform support**, not just to the feature doc.

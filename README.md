@@ -2,6 +2,41 @@
 
 A modern browser-based MilkDrop music visualizer powered by [Butterchurn](https://github.com/jberg/butterchurn) (WebGL). Built with vanilla HTML/CSS/JS and bundled via Vite. Previously known as MilkScreen.
 
+> **The shipping product is the desktop app** (macOS `.dmg`, Windows `.exe`, both Tauri 1). The web build is
+> the dev/proving ground. **A feature that works in the browser may not work in the desktop app.** Check the table
+> below before you assume, promise, or test anything on desktop.
+
+## ⚠️ Platform support — what actually works where
+
+Last verified **2026-10-11**. "Web" = Chrome dev/web build · "macOS" = the signed DMG (WKWebView) · "Windows" = the `.exe` (WebView2).
+
+| Feature | Web | macOS app | Windows app | Source / why |
+|---|---|---|---|---|
+| **Fullscreen the whole app** on a display (player `F`, Timeline `⊟ Outputs` → *Fullscreen here*) | ✅ | ✅ via Rust command | ✅ | [`docs/bugs/fullscreen-macos.md`](docs/bugs/fullscreen-macos.md), [`output-dev.md`](output-dev.md) B1 |
+| **Output windows**: player/editor `O` → *Open output window*, Timeline per-zone routing, stacking, *Composed Program* | ✅ | ❌ **button does nothing.** They use `window.open`, which Tauri 1's webview never supports (wry has no create-window hook). Nothing on the Rust side creates a second window. | ❓ **untested.** WebView2 handles `window.open` differently; verify before relying on it | [`output-dev.md`](output-dev.md) Phase Board (B2 not built), [`native-output-dev.md`](native-output-dev.md) §0 |
+| **Clean projector output + separate operator screen** | ✅ (via output windows) | ❌ not built. Only "whole app fullscreen on the projector" | ❓ untested (see row above) | [`output-dev.md`](output-dev.md) Phase B2 |
+| **NDI out** | ❌ (browsers can't) | ❌ disabled in builds (`NDI_ENABLED=false`); a working prototype exists | ❌ | [`native-output-dev.md`](native-output-dev.md) (parked 2026-05-24) |
+| **"Virtual Camera" toggle** | ⚠️ creates an in-page stream only; no system camera | ⚠️ same; nothing appears in Zoom/OBS | ⚠️ same | [`native-output-dev.md`](native-output-dev.md) ("dead sink") |
+| Screen **Wake Lock** | ✅ | ✅ via `caffeinate` (WKWebView ignores Wake Lock) | ✅ | [`app-output-dev.md`](app-output-dev.md) |
+| [`visualizer-output-dev.md`](visualizer-output-dev.md) | 📦 Archive. Early output research + Syphon/Spout/NDI reference tables. Status lives in `output-dev.md`. |
+| **File export / download** (`<a download>`) | ✅ | ✅ via Rust `save_file` (WKWebView swallows downloads) | ✅ | [`docs/bugs/export-tauri.md`](docs/bugs/export-tauri.md) |
+| **Transparent WebM (VP9 alpha)** | ✅ native | ✅ converted on import to stacked-alpha H.264 (WKWebView drops VP9 alpha) | ✅ native | [`apng-dev.md`](apng-dev.md), [`video-dev.md`](video-dev.md) §27 |
+| **Reading VP9 video pixels** (WebGL upload) | ✅ | ❌ `SecurityError` in the signed DMG → videos must be H.264 | ✅ | [`video-dev.md`](video-dev.md) §14, [`apng-dev.md`](apng-dev.md) |
+| **Media storage** | IndexedDB | native files (WKWebView can silently wipe IndexedDB); read via the asset protocol | native files | [`storage-audit-dev.md`](storage-audit-dev.md), [`video-dev.md`](video-dev.md) §28 |
+| **Video import offline** (FFmpeg.wasm) | ✅ (since 2026-10-11) | ✅ | ✅ | [`video-dev.md`](video-dev.md) §5.2 |
+| **Live audio device picker** on first connect | ✅ | ⚠️ main page can't use the picker for the first connect (AudioContext created without a user gesture hangs) | ✅ | [`live-input-dev.md`](live-input-dev.md) |
+| **Community preset packs** | ❌ (not bundled on web) | ✅ | ✅ | [`milkdrop-pack-import.md`](milkdrop-pack-import.md) |
+| **Projector over AirPlay / wireless** | n/a | ❌ ruled out (100–300 ms lag, unstable). Use a **wired, Extended** display | n/a | [`output-dev.md`](output-dev.md) "Projector field setup" |
+
+### macOS app (WKWebView) rules: learned the hard way
+
+- **No `window.open`, no Fullscreen API, no `<a download>`, no Wake Lock, `alert()` is ignored.** Anything like
+  that needs a Rust command. Test on desktop, not just in the browser.
+- **No devtools in the signed DMG.** Add on-screen error reporting before you debug there ([`apng-dev.md`](apng-dev.md) lessons).
+- **Video must be H.264** for anything that reads its pixels; VP9 throws `SecurityError` in production.
+- **The first `drawImage(video)` can block for 1 s** unless frames are already flowing ([`video-dev.md`](video-dev.md) §28).
+- **Measure inside the real app** (`npm run tauri-dev`). Chromium results don't carry over to WKWebView.
+
 ## Features
 
 ### Visualizer & Presets
@@ -30,8 +65,8 @@ A modern browser-based MilkDrop music visualizer powered by [Butterchurn](https:
 - **Fullscreen & Zen Mode** — native browser fullscreen plus a zero-UI "Zen Mode" (`H` key) for clean projection
 - **Projector Optimized** — automatic Screen Wake Lock prevents sleep (macOS app uses a `caffeinate` fallback since WKWebView drops Wake Lock); the mouse cursor auto-hides with the UI
 - **Output Settings** (`O` key or monitor icon) — lock render resolution (HD / Full HD / QHD / 4K / Custom), constrain aspect ratio (16:9, 4:3, 21:9, 1:1, 9:16 portrait), and choose fill mode (Letterbox / Stretch / Crop); settings persist across reloads
-- **Virtual Camera** — stream the canvas as a system webcam source; pick it in OBS, Zoom, or any capture app with no extra driver install
-- **Multi-display output** *(in active development)* — push the live visualizer to a second monitor or projector as a **pixel-perfect mirror**. In the player & editor, `O` → **Send to display** opens a synced output window; in the Timeline, the `⊟ Outputs` modal routes each zone to a display, and **multiple zones routed to one display stack as overlaid layers** (per-layer blend + opacity) that follow the timeline — when a clip ends, its layer reveals the one beneath. Built as a copy-the-pixels mirror (`canvas.captureStream()` → `<video>` layers), so output is frame-identical to what you see — no drift, no second engine, no audio path. The desktop app (macOS/Windows) is the shipping target, with a native output pipe (**NDI**, then Syphon/Spout) as the next track. See [`output-dev.md`](output-dev.md) and [`native-output-dev.md`](native-output-dev.md)
+- **Virtual Camera** *(placeholder; not a real camera yet)* — the toggle starts an in-page canvas stream, but no system camera appears in OBS/Zoom on any platform. To get the visuals into OBS today, use OBS window capture of the app. See *Platform support* above
+- **Multi-display output** *(⚠️ web build only. In the macOS/Windows app the output windows do not open; only "fullscreen the whole app on a display" works. See *Platform support* above)* — push the live visualizer to a second monitor or projector as a **pixel-perfect mirror**. In the player & editor, `O` → **Send to display** opens a synced output window; in the Timeline, the `⊟ Outputs` modal routes each zone to a display, and **multiple zones routed to one display stack as overlaid layers** (per-layer blend + opacity) that follow the timeline — when a clip ends, its layer reveals the one beneath. Built as a copy-the-pixels mirror (`canvas.captureStream()` → `<video>` layers), so output is frame-identical to what you see — no drift, no second engine, no audio path. The desktop app (macOS/Windows) is the shipping target, with a native output pipe (**NDI**, then Syphon/Spout) as the next track. See [`output-dev.md`](output-dev.md) and [`native-output-dev.md`](native-output-dev.md)
 - **Responsive design** — works on desktop and mobile viewports
 
 ### Preset Studio (`E` or `/editor.html`)
@@ -493,6 +528,10 @@ is the most common cause of startup failures — `dev:safe` removes it automatic
 
 All planning, research, and implementation notes live as `.md` files in the repo. This index is the starting point.
 
+**Rules for this index:** every `.md` in the repo is listed here, and each Status matches the doc's own status line.
+When you add or finish a doc, update its row. Platform-specific limits go in **Platform support** at the top, not just
+in the feature doc. *(Full audit 2026-10-11: 25 docs were missing and some statuses were stale; fixed.)*
+
 ### Hub Docs
 
 These are the entry points. Each one references its focused subdocs in `docs/`.
@@ -504,6 +543,9 @@ These are the entry points. Each one references its focused subdocs in `docs/`.
 | [`macos-app-generate.md`](macos-app-generate.md) | macOS app packaging guide — Tauri build, code signing, notarization, DMG creation. |
 | [`windows-dev.md`](windows-dev.md) | Windows build & compatibility reference — GitHub Actions workflow, bringup bugs. |
 | [`output-dev.md`](output-dev.md) | **Output & multi-monitor hub (truth doc) — START HERE.** The **§0 status block is the single source of truth** for where the output feature is and what's next. Pixel-mirror architecture (never a re-render, §13); Source/Output/Route model; one swappable per-platform pixel pipe. **Status: web A1–A3 + composed program ✅, N0 NDI proof ✅; next = Phase B (desktop local display). Shipping product = the desktop app.** |
+| [`video-dev.md`](video-dev.md) | **Video layers truth doc.** Import + 720p transcode, audio strip, **FFmpeg self-hosted for offline (§5.2)**, WKWebView implementation notes (§14), seamless loop ❌ blocked (§26), transparent WebM on macOS (§27), **preset-switch video preloading + the WKWebView 1-second first-draw freeze (§28)**. |
+| [`animation-dev.md`](animation-dev.md) | **Layer animation truth doc** (status dashboard at top). Entrance/Exit/Idle, Enter-at/Exit-at times; plays live in player + timeline. ✅ A1–A6 shipped 2026-05-28. |
+| [`milkdrop-dev.md`](milkdrop-dev.md) | MilkDrop preset editor dev notes: vendored Butterchurn fork (Phases A–C), Remix Family. Shipped phases listed at top (2026-05-20). |
 | [`native-output-dev.md`](native-output-dev.md) | **Native output pipe — NDI / Syphon / Spout. REFERENCE DETAIL ONLY (no status — that lives in `output-dev.md` §0).** Open only when coding the native pipe: the NDI binding recipe, the frame compositor, JS→native transport options + throughput math, video-taint + A/V-sync resolutions. |
 | [`app-output-dev.md`](app-output-dev.md) | Shipped single-canvas output settings — resolution lock, aspect ratio, virtual camera. (Multi-monitor planning now lives in `output-dev.md`.) |
 
@@ -536,9 +578,32 @@ These are the entry points. Each one references its focused subdocs in `docs/`.
 | [`milkdrop-tools-archive.md`](milkdrop-tools-archive.md) | 📦 Archive | Shipped execution detail (Phases 1–3 + Color Studio: audit → design → what landed → post-review fixes) + the original brainstorm/direction survey, split out of `milkdrop-tools-dev.md` to keep the live plan lean. Section numbers §2–§11 preserved. |
 | [`milkdrop-import-dev.md`](milkdrop-import-dev.md) | 📋 Research complete (awaiting sign-off) | `.milk` file import — client-side EEL→JS + HLSL→GLSL via the MIT `milkdrop-preset-converter`; a converted `.milk` becomes an ordinary custom preset. Feasibility verified; phased plan in doc. |
 | [`image-texture-dev.md`](image-texture-dev.md) | ✅ Shipped + cross-platform verified | **Meld (image-as-texture)** — feed an image/video/GIF layer INTO the preset's feedback loop so the preset *processes* it (melts/tunnels/kaleidoscopes, audio-reactive) instead of overlaying it. Per-card **Meld** button; one-knob melding tools — Size/Position/Luma-Key/**Mask** (crisp logo stencil)/Mirror/Colour-Grade/log-Speed/**Blend mode**/**Displacement** (image shape ripples the melt)/**Flow Map** (image edges steer the melt's motion along its contours)/**Palette Tint** (the melt wears the image's own dominant colours)/**Edge Feather** (softens a transparent-video cutout's matte so it stops sparkling in the melt — small/low-res cutouts now clean); 🎲 Remix rolls the whole melt. Pure WebGL (web/macOS/Windows). Plus the **🌙 Club / Dark Mode** final-output knob (§18). No engine fork (reuses `setUserTexture` + warp injection). |
-| [`milkdrop-control-dev.md`](milkdrop-control-dev.md) | 📋 Planning (handoff-ready) | **MilkDrop Control & Remix convergence.** Make the 1,144 bundled presets first-class: bring Remix into sync with the Random button + expose curated control over a loaded preset (eventually Meld-into-any-preset). Design rule: **no slider-stacking; the dice is the discovery instrument.** Phased B-lite → A → B-full → C; **▶️ NEXT SESSION** = B-lite spike (roll the existing colour/reactivity/Scene-FX/Club axes on a loaded preset, zero new sliders). Meld-on-bundled is blocked with a friendly modal (`_bundledBase`). |
+| [`apng-dev.md`](apng-dev.md) | ✅ Shipped (DMG #11, 2026-05-14) | **Transparent WebM on macOS** + the hard-won macOS-app lessons (VP9 pixels unreadable in the signed DMG → H.264; WKWebView drops VP9 alpha; no devtools in the DMG → build on-screen errors first). Read before any desktop video work. |
+| [`aspect-ratio.md`](aspect-ratio.md) | ✅ Shipped 2026-05-25 | Per-layer Aspect Lock / Fluid (Lock default). |
+| [`text-layer-dev.md`](text-layer-dev.md) | ✅ Phase 1 + 2 complete (2026-05-08) | Text layers: WYSIWYG editing, bundled fonts, effects, all image-layer transforms. |
+| [`color-pallette-dev.md`](color-pallette-dev.md) | ✅ Current truth (2026-05-05) | Palette tab spec: triads, saturation, hue rotate. |
+| [`solarize-dev.md`](solarize-dev.md) | ✅ Implemented 2026-05-15 (in-app verification §7 pending) | Per-layer Solarize slider. |
+| [`kaleidoscope-speed.md`](kaleidoscope-speed.md) | ✅ Shipped (commit `2fa16fe`; the doc has no status line) | Kaleido spin-speed control for Canvas Mirror + per-layer mirror. |
+| [`video-width-height-plan.md`](video-width-height-plan.md) | ✅ Complete (2026-05-11) | Independent Width/Height sliders for video layers. |
+| [`3d-dev.md`](3d-dev.md) | 📋 Planning (not started) | Three.js 3D object layer + volumetric grid, fed into the 2D layer pipeline. |
+| [`live-video-dev.md`](live-video-dev.md) | ⏸ Shelved (not approved, 2026-05-19) | Live camera input layer. Too many unfixable browser/WKWebView caveats. |
+| [`meyda-audio-dev.md`](meyda-audio-dev.md) | ⏸ Shelved (2026-05-15) | Meyda audio features. Not adopted; Spectral Flux shipped instead. |
+| [`docs/performance-control-roadmap.md`](docs/performance-control-roadmap.md) | 🔄 Active tracking (from 2026-05-05) | Performance + input-control roadmap for the Preset Studio. |
+| [`docs/preset-editor/gif-audit-may2026.md`](docs/preset-editor/gif-audit-may2026.md) | 📚 Audit (2026-05-04) | GIF feature audit + brainstorm (no code). |
+| [`milkdrop-control-dev.md`](milkdrop-control-dev.md) | ✅ Core arc complete + layer↔preset interaction shipped (2026-06-13; see doc status) | **MilkDrop Control & Remix convergence.** Make the 1,144 bundled presets first-class: bring Remix into sync with the Random button + expose curated control over a loaded preset (eventually Meld-into-any-preset). Design rule: **no slider-stacking; the dice is the discovery instrument.** Phased B-lite → A → B-full → C; **▶️ NEXT SESSION** = B-lite spike (roll the existing colour/reactivity/Scene-FX/Club axes on a loaded preset, zero new sliders). Meld-on-bundled is blocked with a friendly modal (`_bundledBase`). |
 | [`milkdrop-pack-import.md`](milkdrop-pack-import.md) | ✅ Phases 0–3 shipped + polished | **Community Packs + the IndexedDB storage upgrade.** Custom presets → IndexedDB (no more ~200 wall) + Tauri-FS mirror; browse/install/uninstall community packs (Extras Vol. 1–3 = 750 shader presets, MIT, desktop-bundled); pack zips gitignored (not on web). §16 explains the "shader gap" (why we avoid raw `.milk`) + the future **image-as-preset-texture** idea. |
 | [`docs/user-guide-redesign.md`](docs/user-guide-redesign.md) | 📋 Planning | In-app user guide redesign — searchable help centre, contextual `?` deep links. |
+
+### Promo site + preset sharing (the `discocast` repo)
+
+The download site and community presets live in the sibling **`discocast`** repo. **Start there with
+`discocast/handoff.md`** for the whole system map. These specs live here for history.
+
+| Doc | Status | What it covers |
+|-----|--------|---------------|
+| [`promo-page-split.md`](promo-page-split.md) | ✅ Done + deployed 2026-06-17 | Promo page split into its own repo/container + self-hosted download/view counting. |
+| [`discocast-admin-dev.md`](discocast-admin-dev.md) | ✅ Built + deployed | Admin console + preset submission/sharing flow. |
+| [`discocast-preset-validation-dev.md`](discocast-preset-validation-dev.md) | ⚠️ **PLANNED — not built, but the public gallery already shipped.** The spec says validation must land *before* the gallery. Today the only gate is manual admin approval. | Preset upload validation / code-injection safety. |
 
 ### Handoff Docs ([`docs/`](docs/))
 
@@ -562,6 +627,11 @@ All fixed — kept for reference.
 | [`docs/bugs/white-flash.md`](docs/bugs/white-flash.md) | White flash on startup — inline critical CSS + Tauri `visible:false`. |
 | [`docs/bugs/fullscreen-macos.md`](docs/bugs/fullscreen-macos.md) | Fullscreen button no-op in Tauri macOS — Rust-side window toggle. |
 | [`video-cutout-edge-noise-dev.md`](video-cutout-edge-noise-dev.md) | ✅ SOLVED post-mortem — white edge speckle on melded transparent-video cutouts. Root cause: the web/native-alpha meld path ignored the matte entirely (alpha handling was macOS-stacked-only); unified the alpha gate + soft-feather **Edge Feather** matte blur. Lesson: a control that does *nothing* → check it's on the active code path first. |
+| [`macos-import-bug.md`](macos-import-bug.md) | ✅ Fixed 2026-05-09. macOS video import showed a card but no video. |
+| [`preset-player-audit.md`](preset-player-audit.md) | ✅ All fixed 2026-05-09. Random/order + "edit wrong preset" bugs. |
+| [`preset-save-bug.md`](preset-save-bug.md) | ✅ Fixed 2026-05-12. First save of a new preset. |
+| [`user-guide-bug.md`](user-guide-bug.md) | ✅ Resolved 2026-05-06. Three competing help files (ghost file deleted). |
+| [`width-height-video-bug.md`](width-height-video-bug.md) | ✅ Bug log for the video Width/Height sliders (see `video-width-height-plan.md`). |
 
 ### Legacy / Archive Docs (`docs/`)
 
@@ -574,6 +644,7 @@ Older research kept for context. Not actively maintained.
 | [`docs/favorites.md`](docs/favorites.md) | Favorites feature brainstorm — shipped. |
 | [`docs/more-presets.md`](docs/more-presets.md) | Baron pack + multi-pack preset loading research. Phase 1 shipped (1,144 presets). |
 | [`docs/controls-styling.md`](docs/controls-styling.md) | Museum dark aesthetic specification for control bar. |
+| [`timeline-editor-archive.md`](timeline-editor-archive.md) | Shipped Timeline phase detail (append-only history for `timeline-editor.md`). |
 
 ---
 

@@ -7,7 +7,7 @@
 ## Status
 - **State:** ✅ **BUILT + PUSHED 2026-06-17** to `github.com/Catskill909/discocast` (`main`).
   Full flow tested locally (admin auth, stats, submit, honeypot, bot-block, moderation,
-  image/preset serving, reset). **Awaiting Coolify redeploy to go live.**
+  image/preset serving, reset). **Deployed and live** (redeployed after 2026-06-17; preset gallery `/presets` added since).
 - **Where:** all in the discocast repo (`server.js`, `promo/admin.html`, `promo/submit.html`).
 - **Auth:** reuses the existing **`STATS_KEY`** env var — no new secret to add in Coolify.
 

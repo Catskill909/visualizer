@@ -8,9 +8,22 @@
 
 ## 📋 Phase Board — START HERE (the single status + order tracker)
 
+> 🚨 **What the macOS DMG actually does today (verified 2026-10-11): read this before anything else.**
+> - ✅ **Fullscreen the whole app on a display** (player `F`; Timeline `⊟ Outputs` → *Fullscreen here*). This is the **only**
+>   projector path in the desktop app. The projector shows the app itself, and controls appear on mouse move (`H` hides them).
+> - ❌ **Every output window (A1–A3, Composed Program) does nothing in the desktop app.** They all open via `window.open('/output.html')`.
+>   Tauri 1's macOS webview (wry 0.24) has no create-window hook, so `window.open` returns `null` and the button silently fails
+>   (its "allow pop-ups" `alert()` is ignored too). Nothing on the Rust side creates a second window. **"WEB ✅ complete" below means
+>   the browser only.**
+> - ❌ NDI is disabled in builds (`NDI_ENABLED=false`, parked 2026-05-24). ⚠️ The "Virtual Camera" toggle produces no system camera.
+> - So a **separate operator screen + clean projector output does not exist on macOS.** That is Phase B2 below, still unbuilt.
+>   Options weighed 2026-10-11: (A) Rust-created second window fed by frame readback (transport proven by NDI N0), or
+>   (B) render fullscreen on the projector + a small control window. OBS window capture is an optional external route.
+> - Platform matrix for the whole app: README → **Platform support**.
+
 Legend: ✅ done · ⬅ **next** · 📋 planned. Shipping product = the **desktop app** (web is the dev/proving ground). Per-step *detail* is in §9; this board is the authority for *status & order*.
 
-**WEB — ✅ complete** (whole feature works in-browser)
+**WEB — ✅ complete** (whole feature works **in the browser only**; none of it runs in the desktop app; see 🚨 above)
 - ✅ **A1** — player/editor mirror → a display
 - ✅ **A2** — timeline per-zone → display routing (+ persistence / offline re-resolve)
 - ✅ **A3** — stacking/layering: overlaid layers that follow the timeline (per-layer blend/opacity)
