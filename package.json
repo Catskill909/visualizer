@@ -20,6 +20,7 @@
     "vite": "^8.0.4"
   },
   "dependencies": {
+    "@ffmpeg/core": "0.12.9",
     "@ffmpeg/ffmpeg": "^0.12.10",
     "@ffmpeg/util": "^0.12.1",
     "butterchurn": "^2.6.7",

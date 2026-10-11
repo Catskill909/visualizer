@@ -1,12 +1,19 @@
 /**
  * Video Transcoder — Lazy-loaded FFmpeg.wasm for auto-downscaling oversized videos
- * 
+ *
  * Automatically converts 1080p/4K videos to 720p on upload.
- * Lazy-loads FFmpeg only when needed (~25MB fetch on first use).
+ * Lazy-loads FFmpeg only when needed (~32MB wasm, loaded on first use).
+ *
+ * The FFmpeg core is self-hosted: Vite emits @ffmpeg/core's JS + wasm into the
+ * build and we pass their local URLs to load(). Without this, @ffmpeg/ffmpeg
+ * fetches the core from unpkg.com at runtime — which fails offline (video
+ * import impossible) and is blocked outright by the web build's CSP.
  */
 
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
+import coreURL from '@ffmpeg/core?url';
+import wasmURL from '@ffmpeg/core/wasm?url';
 
 // Singleton instance — loaded on first use
 let ffmpegInstance = null;
@@ -22,19 +29,25 @@ export async function getFFmpeg() {
 
   isLoading = true;
   loadPromise = (async () => {
-    console.log('[VideoTranscoder] Loading FFmpeg.wasm (~25MB)...');
+    console.log('[VideoTranscoder] Loading FFmpeg.wasm (~32MB)...');
     const ffmpeg = new FFmpeg();
-    
+
     // Progress callback for loading (can be wired to UI)
     ffmpeg.on('log', ({ message }) => {
       // console.log('[FFmpeg]', message);
     });
 
-    await ffmpeg.load();
+    await ffmpeg.load({ coreURL, wasmURL });
     ffmpegInstance = ffmpeg;
     console.log('[VideoTranscoder] FFmpeg.wasm loaded');
     return ffmpeg;
-  })();
+  })().catch((err) => {
+    // Don't cache a failed load — let the next video import retry it instead
+    // of failing until the page reloads.
+    isLoading = false;
+    loadPromise = null;
+    throw err;
+  });
 
   return loadPromise;
 }
@@ -55,32 +68,36 @@ export async function transcodeTo720p(file, onProgress = null) {
   console.log('[VideoTranscoder] Writing input file...');
   await ffmpeg.writeFile(inputName, await fetchFile(file));
 
-  // Set up progress tracking
-  if (onProgress) {
-    ffmpeg.on('progress', (progress) => {
-      // progress.time is in seconds (processed duration)
-      // Estimate total based on file or just report time processed
-      onProgress({
-        percent: Math.min(progress.progress * 100, 99), // FFmpeg progress can be flaky
-        time: progress.time,
-        ratio: progress.progress
-      });
+  // Set up progress tracking (removed after the run so listeners don't pile up
+  // on the shared singleton across imports)
+  const progressHandler = onProgress && ((progress) => {
+    // progress.time is in seconds (processed duration)
+    // Estimate total based on file or just report time processed
+    onProgress({
+      percent: Math.min(progress.progress * 100, 99), // FFmpeg progress can be flaky
+      time: progress.time,
+      ratio: progress.progress
     });
-  }
+  });
+  if (progressHandler) ffmpeg.on('progress', progressHandler);
 
   // Run transcode: scale to 720p, fast preset, good quality
   console.log('[VideoTranscoder] Transcoding to 720p...');
-  await ffmpeg.exec([
-    '-i', inputName,
-    '-vf', 'scale=-2:720:flags=lanczos',  // Scale to 720p height, auto width to maintain aspect
-    '-c:v', 'libx264',
-    '-preset', 'fast',      // Balance of speed vs quality
-    '-crf', '23',           // High quality (18-23 is visually lossless)
-    '-movflags', '+faststart', // Web-optimized for streaming
-    '-an',                  // No audio — we don't need it for VJ visuals
-    '-y',                   // Overwrite output
-    outputName
-  ]);
+  try {
+    await ffmpeg.exec([
+      '-i', inputName,
+      '-vf', 'scale=-2:720:flags=lanczos',  // Scale to 720p height, auto width to maintain aspect
+      '-c:v', 'libx264',
+      '-preset', 'fast',      // Balance of speed vs quality
+      '-crf', '23',           // High quality (18-23 is visually lossless)
+      '-movflags', '+faststart', // Web-optimized for streaming
+      '-an',                  // No audio — we don't need it for VJ visuals
+      '-y',                   // Overwrite output
+      outputName
+    ]);
+  } finally {
+    if (progressHandler) ffmpeg.off('progress', progressHandler);
+  }
 
   // Read output file
   console.log('[VideoTranscoder] Reading output file...');

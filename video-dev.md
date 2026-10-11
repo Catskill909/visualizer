@@ -254,7 +254,16 @@ if (!isWebM && (videoWidth > MAX_VIDEO_WIDTH || videoHeight > MAX_VIDEO_HEIGHT))
 
 ### 5.2 FFmpeg.wasm Implementation Details
 
-**Dependencies:** `@ffmpeg/ffmpeg` + `@ffmpeg/util` (~25MB lazy-loaded)
+**Dependencies:** `@ffmpeg/ffmpeg` + `@ffmpeg/util` + `@ffmpeg/core@0.12.9` (~32MB wasm, lazy-loaded)
+
+> **Self-hosted core — works offline (fixed 2026-10-11).** `load()` is passed
+> local `coreURL`/`wasmURL` (Vite `?url` imports of `@ffmpeg/core`), so the core
+> ships in the build. Before this, `@ffmpeg/ffmpeg` fetched it from unpkg.com at
+> runtime: with no internet, every video import failed with *"Could not strip
+> audio from video"* (and stayed failed until a page reload), and the web build's
+> CSP blocked it outright. Keep `@ffmpeg/core`'s version matched to
+> `CORE_VERSION` in `@ffmpeg/ffmpeg` if you bump either. A failed load is no
+> longer cached — the next import retries.
 
 **Module:** `@/src/videoTranscoder.js`
 
