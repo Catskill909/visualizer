@@ -9,7 +9,7 @@
 #   - Icons generated in src-tauri/icons/
 #   - Rust/Cargo installed
 #
-# Last successful build: April 24, 2026
+# Last successful build: October 11, 2026
 
 set -e
 
