@@ -283,6 +283,8 @@ export async function importPreset(json) {
     // See apng-dev.md DMG #11 and video-dev.md §14.10.
     const isMacTauri = !!(typeof window !== 'undefined' && window.__TAURI__ && navigator.userAgent.includes('Mac'));
 
+    const storedIds = []; // blobs saved so far — removed if a later layer fails
+
     for (const img of data.images || []) {
         if (img._inlinedDataUrl) {
             let blob = dataUrlToBlob(img._inlinedDataUrl);
@@ -336,12 +338,18 @@ export async function importPreset(json) {
                     const stripped = await stripAudio(tmpFile);
                     blob = stripped;
                 } catch (stripErr) {
-                    console.warn('[Import] Audio strip failed; storing original blob:', stripErr);
+                    // Same rule as _addVideoLayer: never store a video that still
+                    // has audio. Fail this preset (callers list it as failed) and
+                    // drop the layers already stored for it so nothing is orphaned.
+                    console.error('[Import] Audio strip failed:', stripErr);
+                    await Promise.all(storedIds.map((sid) => deleteImage(sid).catch(() => {})));
+                    throw new Error(`Could not strip audio from video layer "${imgClean.name || imgClean.fileName || 'video'}"`);
                 }
             }
 
             const newId = generateId();
             await storeImage(newId, blob);
+            storedIds.push(newId);
             // Video layers use videoId, image layers use imageId
             if (img.type === 'video') {
                 images.push({ ...imgClean, videoId: newId });

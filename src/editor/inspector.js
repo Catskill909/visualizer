@@ -5966,8 +5966,8 @@ export class EditorInspector {
     // Invariant: every video stored in this app MUST be audio-free. Oversized
     // videos lose audio via `-an` in `transcodeTo720p`; all other videos pass
     // through `stripAudio` below. Audio-laden video elements grabbed the
-    // MediaSession in WKWebView and broke the main audio player — see
-    // milkdrop-dev.md "Video audio strip" entry.
+    // MediaSession in WKWebView and broke the main audio player. FFmpeg core is
+    // self-hosted so this works offline — see video-dev.md §5.2.
 
     async _addVideoLayer(file, opts = {}) {
         const isStackedAlpha = !!opts.isStackedAlpha;
