@@ -15,6 +15,11 @@ The Windows build runs on a GitHub-hosted Windows machine. No Windows PC require
 
 Workflow file: `.github/workflows/build-windows.yml` — manual trigger only (`workflow_dispatch`), never runs automatically.
 
+**From the terminal (preferred), in parallel with the macOS build:** push `main` first (the Action builds what's on GitHub), then run
+`gh workflow run "Build Windows Installer" -R Catskill909/visualizer --ref main` at the same time as `./build-and-sign.sh`.
+When it finishes: `gh run download <run-id> -R Catskill909/visualizer` → save the `.exe` into `../discocast/promo/` as `DiscoCast Visualizer_0.1.0_x64-setup.exe`.
+Full release checklist: `discocast/README.md` → Release checklist. (GitHub repo name is `visualizer`; it's public, so Actions are free.)
+
 ---
 
 ## Bugs Fixed During Windows Bringup
