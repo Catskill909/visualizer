@@ -53,6 +53,12 @@ per output (Timeline routing/composed program still web-only — it'll feed its 
 pixel-read `SecurityError` risk, video-dev.md §14).
 
 ### 🎯 macOS projector checklist (the reliable setup today)
+> ⚠️ **HARDWARE FINDING (2026-10-11): the cheap USB-C hub (GenesysLogic, "USB C Video Adaptor") does NOT carry video
+> on the Mac mini M2.** macOS sees the hub, but its video chip reports itself as a USB **Billboard** device
+> (`bInterfaceClass` 17 = "alt-mode video did not start") and no display appears. It never worked on the mini in June
+> either; it **does** work on the MacBook Air. Don't troubleshoot it again. **Mac mini → use a single-purpose
+> USB-C→HDMI cable** in a back port. Quick check: `system_profiler SPDisplaysDataType` must list the projector.
+> If the projector shows the desktop but isn't listed, it's **AirPlay**, not the cable.
 Condensed from the 2026-06-09 field test below. Do these in order:
 1. **One machine.** The projector is wired to the **same Mac that runs the app.** Universal Control can fake this; check
    `system_profiler SPDisplaysDataType` lists the projector.
