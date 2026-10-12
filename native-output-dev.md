@@ -11,11 +11,12 @@
 ## 0. TL;DR for whoever picks this up
 
 - **The web output path is dead on desktop.** It uses `window.open` + `canvas.captureStream()` → a popup `<video>` ([outputManager.js](src/output/outputManager.js), [outputPipe.js](src/output/outputPipe.js)). A second Tauri WebviewWindow can't take a `MediaStream`, and `captureStream` only feeds in-browser consumers. So multi-output currently produces **nothing** in the Mac/Win app — native is the whole feature there, **beta-critical**, not polish.
+  - **Update 2026-10-11:** a desktop pipe now exists for the player/editor (Phase B2): Rust-created output window + JPEG frame copy → `dcframe://`. See the 🟢 B2 block in `output-dev.md`. Its `OutputFrame` slot in Rust is where a future NDI/Syphon sender should read frames.
 - **NDI leads** (decision in output-dev.md §intro #4): cross-platform (one build → Mac + Windows), native-only (browsers can't emit NDI), widest reach (OBS / streaming / Resolume / other machines / hardware in one shot). Syphon (Mac) / Spout (Win) follow for directly-attached displays.
 - **Three real sub-problems:** (A) a frame **compositor** (N layers → 1 frame — web today composites in the popup via CSS, which NDI can't use), (B) frame **transport** JS→native (the throughput unknown), (C) the native **NDI sender** (SDK/licensing/bundling). See §3.
 - **Video is NOT a blocker** (§5) — the WKWebView taint issue is already solved by the H.264 import pipeline; NDI readback inherits an already-clean canvas.
 - **A/V sync** (§6.1) — the NDI feed has a small *constant* transport delay (not a reactivity bug; operator screen is real-time). For OBS, align with an audio Sync Offset (set once) + NDI Latency:Low; the clean fix is sending audio over NDI (planned, N1/N2). Live rooms use the low-latency local-display path, not NDI.
-- **Built:** Step 0 web compositor ✅ (`src/output/composer.js` + "Composed program") and N0 NDI proof ✅ (composed program live in OBS + NDI Monitor). **For the running order / what's next, see [`output-dev.md`](output-dev.md) §0** (next = Phase B). The §7 write-ups below are per-phase detail.
+- **Built:** Step 0 web compositor ✅ (`src/output/composer.js` + "Composed program") and N0 NDI proof ✅ (composed program live in OBS + NDI Monitor). **For the running order / what's next, see [`output-dev.md`](output-dev.md) Phase Board** (as of 2026-10-11: B2 built for player/editor; projector test, then Timeline). The §7 write-ups below are per-phase detail.
 
 ---
 

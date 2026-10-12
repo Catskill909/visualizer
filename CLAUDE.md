@@ -1,5 +1,7 @@
 # Winamp Screen — Claude Instructions
 
+> **New session? Start with [`../discocast/handoff.md`](../discocast/handoff.md)**: the system map, current state, open items, and the next step. Then README → *Platform support* and the topic's truth doc.
+
 ## Before writing any code
 
 For any bug fix or feature, state in plain English:
