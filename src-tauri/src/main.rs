@@ -480,6 +480,8 @@ async fn output_open(app: tauri::AppHandle, x: i32, y: i32, fullscreen: bool) ->
                 .visible(false)
                 .build()
                 .map_err(|e| e.to_string())?;
+            #[cfg(target_os = "macos")]
+            keep_rendering_when_covered(&w);
             let app2 = app.clone();
             w.on_window_event(move |e| {
                 if let tauri::WindowEvent::Destroyed = e {
@@ -549,8 +551,52 @@ fn dcframe_protocol(app: &tauri::AppHandle, req: &tauri::http::Request) -> Resul
         .body(f.jpeg.clone())
 }
 
+// ── macOS: keep rendering when covered (2026-10-12) ──────────────────────────
+// WKWebView pauses requestAnimationFrame for a window macOS reports as fully
+// covered, so switching to another app (VS Code, DJ software) over the
+// DiscoCast window froze the visuals AND the projector output. Turn that
+// occlusion detection off (private WKWebView API, guarded by respondsToSelector)
+// and opt the app out of App Nap for its lifetime.
+#[cfg(target_os = "macos")]
+fn keep_rendering_when_covered(window: &tauri::Window) {
+    use objc::runtime::{Object, BOOL, NO};
+    use objc::{msg_send, sel, sel_impl};
+    let _ = window.with_webview(|wv| unsafe {
+        let wk = wv.inner() as *mut Object;
+        let responds: BOOL = msg_send![wk, respondsToSelector: sel!(_setWindowOcclusionDetectionEnabled:)];
+        if responds != NO {
+            let () = msg_send![wk, _setWindowOcclusionDetectionEnabled: NO];
+        }
+    });
+}
+
+#[cfg(target_os = "macos")]
+fn disable_app_nap() {
+    use objc::runtime::Object;
+    use objc::{class, msg_send, sel, sel_impl};
+    unsafe {
+        let info: *mut Object = msg_send![class!(NSProcessInfo), processInfo];
+        let reason = std::ffi::CString::new("DiscoCast is rendering live visuals").unwrap();
+        let ns_reason: *mut Object = msg_send![class!(NSString), stringWithUTF8String: reason.as_ptr()];
+        // NSActivityUserInitiatedAllowingIdleSystemSleep | NSActivityLatencyCritical
+        let opts: u64 = 0x00EF_FFFF | 0xFF_0000_0000;
+        let token: *mut Object = msg_send![info, beginActivityWithOptions: opts reason: ns_reason];
+        let _: *mut Object = msg_send![token, retain]; // held for the app's lifetime
+    }
+}
+
 fn main() {
     tauri::Builder::default()
+        .setup(|_app| {
+            #[cfg(target_os = "macos")]
+            {
+                if let Some(w) = _app.get_window("main") {
+                    keep_rendering_when_covered(&w);
+                }
+                disable_app_nap();
+            }
+            Ok(())
+        })
         .manage(CaffeinateState(Mutex::new(None)))
         .manage(NdiState(Mutex::new(None)))
         .manage(OutputFrame(Mutex::new(OutputFrameInner::default())))

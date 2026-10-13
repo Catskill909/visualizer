@@ -18,6 +18,7 @@ Last verified **2026-10-11**. "Web" = Chrome dev/web build · "macOS" = the sign
 | **Clean projector output + separate operator screen** | ✅ (via output windows) | 🟢 beta from the **player/editor** (see row above). Fallback: whole app fullscreen on the projector; follow the **macOS projector checklist** in `output-dev.md` | ❓ untested (see row above) | [`output-dev.md`](output-dev.md) Phase B2 |
 | **NDI out** | ❌ (browsers can't) | ❌ disabled in builds (`NDI_ENABLED=false`); a working prototype exists | ❌ | [`native-output-dev.md`](native-output-dev.md) (parked 2026-05-24) |
 | **"Virtual Camera" toggle** | ⚠️ experimental: in-page stream only, labelled as such | hidden in code (next build) | hidden in code | [`native-output-dev.md`](native-output-dev.md) ("dead sink") |
+| **Keeps drawing when the window is fully covered** (another app on top) | ❌ browsers pause hidden tabs/windows | ✅ in code (next build): WKWebView occlusion detection off + App Nap opt-out (`main.rs`); before, covering DiscoCast froze the visuals + projector | ❓ untested | `output-dev.md` B2 block |
 | Screen **Wake Lock** | ✅ | ✅ via `caffeinate` (WKWebView ignores Wake Lock) | ✅ | [`app-output-dev.md`](app-output-dev.md) |
 | [`visualizer-output-dev.md`](visualizer-output-dev.md) | 📦 Archive. Early output research + Syphon/Spout/NDI reference tables. Status lives in `output-dev.md`. |
 | **File export / download** (`<a download>`) | ✅ | ✅ via Rust `save_file` (WKWebView swallows downloads) | ✅ | [`docs/bugs/export-tauri.md`](docs/bugs/export-tauri.md) |

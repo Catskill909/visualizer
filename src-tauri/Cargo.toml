@@ -14,3 +14,11 @@ serde = { version = "1", features = ["derive"] }
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# keep_rendering_when_covered / disable_app_nap (main.rs)
+objc = "0.2"
+
+[lints.rust]
+# objc 0.2's macros test cfg(feature = "cargo-clippy"); declare it so rustc doesn't warn.
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("cargo-clippy"))'] }

@@ -42,8 +42,9 @@ slot; NDI/Syphon can read the same slot later). CSP `connect-src` allows `dcfram
 | 720p / 60 | 50 | 22 ms | 100 fps |
 | 1080p / 60 | 40 ❌ | 31 ms | drops to 90 fps (too heavy) |
 
-Feed size / fps / quality can be switched live from the output window's readout (**D**). **Limits:** keep the main
-window visible (macOS pauses hidden windows); don't fullscreen the output on the *same* screen as the app; one source
+Feed size / fps / quality can be switched live from the output window's readout (**D**). **Limits:** ~~keep the main
+window visible~~ **fixed 2026-10-12:** the desktop app now keeps rendering when its window is fully covered
+(WKWebView occlusion detection off + App Nap opt-out, `main.rs`; measured covered: 0 fps before → 100 fps after). Don't fullscreen the output on the *same* screen as the app; one source
 per output (Timeline routing/composed program still web-only — it'll feed its composer canvas into this pipe next).
 **✅ PROJECTOR-VERIFIED 2026-10-12** (signed test DMG, Mac mini M2 → onn USB-C→HDMI cable → Vankyo X3 1080p, extended,
 LG as main): **30 fps, ~40–53 ms delay** (readout avg; higher than dev's 25 ms: 60 Hz projector + release build),
