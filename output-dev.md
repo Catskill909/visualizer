@@ -13,7 +13,7 @@
 > | | Released app (**Beta Oct 11, 2026**, built at `9fe567c`) | In code on `main` (ships in the **next** build) |
 > |---|---|---|
 > | Fullscreen the whole app on a display (player `F`; Timeline `⊟ Outputs` → *Fullscreen here*) | ✅ works | ✅ works (Timeline ↻ Detect also refreshes it) |
-> | Player/editor **Open output window** (clean visuals-only window, controls stay on the laptop) | ❌ button silently does nothing (`window.open` is unsupported in Tauri 1) | 🟢 **works (beta), B2** below; projector + signed-DMG test pending |
+> | Player/editor **Open output window** (clean visuals-only window, controls stay on the laptop) | ❌ button silently does nothing (`window.open` is unsupported in Tauri 1) | ✅ **works, B2** below: **projector-verified 2026-10-12** (30 fps, ~40–53 ms) |
 > | Timeline routing / stacking / *Composed Program* windows | ❌ do nothing | ❌ **hidden** on desktop (still web-only; next: feed the composer canvas into B2) |
 > | "Virtual Camera" toggle | ⚠️ shown, produces no system camera | **hidden** on desktop; labelled "experimental" on web |
 > | NDI | ❌ disabled (`NDI_ENABLED=false`) | ❌ disabled (N2 not done) |
@@ -45,8 +45,10 @@ slot; NDI/Syphon can read the same slot later). CSP `connect-src` allows `dcfram
 Feed size / fps / quality can be switched live from the output window's readout (**D**). **Limits:** keep the main
 window visible (macOS pauses hidden windows); don't fullscreen the output on the *same* screen as the app; one source
 per output (Timeline routing/composed program still web-only — it'll feed its composer canvas into this pipe next).
-**Still to verify:** the real projector (wired to the Mac mini) and a **signed DMG** with a **video preset** (VP9
-pixel-read `SecurityError` risk, video-dev.md §14).
+**✅ PROJECTOR-VERIFIED 2026-10-12** (signed test DMG, Mac mini M2 → onn USB-C→HDMI cable → Vankyo X3 1080p, extended,
+LG as main): **30 fps, ~40–53 ms delay** (readout avg; higher than dev's 25 ms: 60 Hz projector + release build),
+**in time with the music** by the user's eye; video presets play on the projector. **Next:** hide the `D` readout by
+default before release, then Timeline routing/Composed Program on this pipe.
 
 ### 🎯 macOS projector checklist (the reliable setup today)
 > ⚠️ **HARDWARE FINDING (2026-10-11): the cheap USB-C hub (GenesysLogic, "USB C Video Adaptor") does NOT carry video
@@ -83,9 +85,9 @@ Legend: ✅ done · ⬅ **next** · 📋 planned. Shipping product = the **deskt
 
 **NATIVE — in progress** (the shipping path)
 - ✅ **N0** — NDI proof: composed program live in OBS + NDI Video Monitor
-- ⬅ **Phase B — desktop local display (projector/monitor)  ◀ WE ARE HERE: B2 projector test (one machine: Mac mini + USB-C→HDMI cable), then Timeline on the B2 pipe**  · 🔌 **first real projector (Vankyo X3) field-tested 2026-06-09 — see the "Projector field setup" section below: wireless RULED OUT (lag + AirPlay instability); ✅ root cause found — the projector's hub was wired to the **MacBook Air**, not the Mac mini (where the app/dev/terminal run); Universal Control hid that. RULE: **one machine hosts app + operator monitor + projector** (wired EXTENDED, its WiFi OFF — wired+wireless conflict = blackouts). Canvas-only output already works via A1 once the rig is one-machine + wired. See "Projector field setup" → RESOLUTION.**
+- ⬅ **Phase B — desktop local display (projector/monitor)  ◀ WE ARE HERE: B2 ✅ projector-verified for player/editor; next = Timeline on the B2 pipe**  · 🔌 **first real projector (Vankyo X3) field-tested 2026-06-09 — see the "Projector field setup" section below: wireless RULED OUT (lag + AirPlay instability); ✅ root cause found — the projector's hub was wired to the **MacBook Air**, not the Mac mini (where the app/dev/terminal run); Universal Control hid that. RULE: **one machine hosts app + operator monitor + projector** (wired EXTENDED, its WiFi OFF — wired+wireless conflict = blackouts). Canvas-only output already works via A1 once the rig is one-machine + wired. See "Projector field setup" → RESOLUTION.**
   - ✅ **B1** — fullscreen the app on a chosen monitor · **Approach A** (one projector, whole show, ~zero latency) · **verified in tauri-dev 2026-05-23** (app went fullscreen on the chosen display)
-  - 🟢 **B2** — separate operator + output · **BUILT 2026-10-11 for player/editor** via pixel-readback → Rust → `dcframe://` (see 🟢 block above; projector + signed-DMG test pending; Timeline not yet) · *was: Approach B spike (Syphon vs pixel-readback)*
+  - 🟢 **B2** — separate operator + output · **BUILT 2026-10-11 for player/editor** via pixel-readback → Rust → `dcframe://` (see 🟢 block above; ✅ projector-verified 2026-10-12; Timeline not yet) · *was: Approach B spike (Syphon vs pixel-readback)*
   - 📋 **B3** — placement polish: wake-lock on output, clean teardown, multi-output
 - ✅ **N1** — NDI named source + persists (on/off + name) · **verified in tauri-dev 2026-05-23** (custom name shows in OBS; survives relaunch) *(the `output.target` model refactor is deferred — not needed while NDI = the single composed-program output)*
 - 📋 **N2** — ship-enable NDI (bundle `libndi` + licensing; x86_64 slice) · ⚠ **blocks any NDI release**
