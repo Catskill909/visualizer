@@ -20,10 +20,14 @@ set -e
 APP_NAME="DiscoCast Visualizer"
 DISPLAY_NAME="DiscoCast Visualizer"
 BUNDLE_ID="app.discocast.visualizer"
-VERSION="1.0.$(date +%Y%m%d.%H%M)"
-
-# Human-readable release version — bump this before each build
-APP_VERSION="Beta $(date +"%b %d, %Y")"
+# ONE version number for the whole release: Mac app, Windows installer, site, and
+# download filenames. It lives in src-tauri/tauri.conf.json → package.version.
+# BUMP IT BEFORE EACH RELEASE: 0.9.0 → 0.9.1 → 0.9.2 … → 1.0.0 (shown as 0.9, 0.9.1, … 1.0).
+APP_SEMVER="$(python3 -c "import json;print(json.load(open('src-tauri/tauri.conf.json'))['package']['version'])")"
+APP_VERSION_SHORT="${APP_SEMVER%.0}"            # 0.9.0 → 0.9 · 0.9.1 stays 0.9.1
+RELEASE_DATE="$(date +"%b %d, %Y")"
+VERSION="${APP_VERSION_SHORT}"                   # versioned DMG copy: "DiscoCast Visualizer-0.9.dmg"
+APP_VERSION="${APP_VERSION_SHORT} (Beta) · ${RELEASE_DATE}"   # what the site shows
 
 # Load signing credentials from local file (never committed to git)
 CREDS_FILE="$(dirname "$0")/.build-credentials"
@@ -333,13 +337,14 @@ echo -e "${GREEN}Stable copy: ${STABLE_DMG}${NC}"
 
 # Step 9: Write version.json — promo page fetches this when served over HTTP
 echo -e "${YELLOW}Step 9: Writing version.json (${APP_VERSION})...${NC}"
-printf '{"version": "%s"}\n' "${APP_VERSION}" > "${PROMO_DIR}/version.json"
+printf '{"version": "%s", "channel": "Beta", "date": "%s"}\n' "${APP_VERSION_SHORT}" "${RELEASE_DATE}" > "${PROMO_DIR}/version.json"
 echo -e "${GREEN}${PROMO_DIR}/version.json → ${APP_VERSION}${NC}"
 
 # Step 9b: Patch the inline span fallback in the promo index.html so the version
 # shows correctly even when the file is opened locally (file:// blocks fetch).
 echo -e "${YELLOW}Step 9b: Patching version span in promo index.html...${NC}"
 sed -i '' "s|<span id=\"app-version\">[^<]*</span>|<span id=\"app-version\">${APP_VERSION}</span>|" "${PROMO_DIR}/index.html"
+sed -i '' "s|<span data-app-version>[^<]*</span>|<span data-app-version>${APP_VERSION}</span>|" "${PROMO_DIR}/index.html"
 echo -e "${GREEN}${PROMO_DIR}/index.html span → ${APP_VERSION}${NC}"
 
 echo ""
