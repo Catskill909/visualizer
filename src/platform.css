@@ -1,0 +1,7 @@
+/* Platform-specific visibility (see platform.js). A real stylesheet, not an
+   injected <style>: Tauri hashes the player's inline <style> into the CSP,
+   which makes WebKit ignore 'unsafe-inline' and block runtime-injected styles. */
+.is-desktop [data-web-only] { display: none !important; }
+html:not(.is-desktop) [data-desktop-only] { display: none !important; }
+/* Timeline per-zone output chips route zones to output windows (web only). */
+.is-desktop .tl-zone-out-chip { display: none !important; }

@@ -1,0 +1,65 @@
+/* "Send to display" section — shared by the player Output popover and the
+   editor's Output panel (outputUI.js renders into it). */
+.out-ui-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.out-ui-title { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #ccc; }
+.out-ui-refresh {
+  background: none; border: 1px solid rgba(255,255,255,0.14); color: #ccc; border-radius: 6px;
+  font: 500 0.68rem/1 var(--font, system-ui); padding: 4px 7px; cursor: pointer;
+}
+.out-ui-refresh:hover { color: #fff; border-color: rgba(255,255,255,0.3); }
+
+.out-ui-displays { display: flex; flex-direction: column; gap: 5px; }
+.out-ui-display {
+  display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;
+  color: #ddd; padding: 7px 9px; cursor: pointer; font: 500 0.76rem/1.2 var(--font, system-ui);
+  transition: background 150ms ease, border-color 150ms ease;
+}
+.out-ui-display:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.24); }
+.out-ui-display.is-selected { background: rgba(255,255,255,0.14); border-color: #fff; color: #fff; }
+.out-ui-display-icon { font-size: 1rem; width: 1.2em; text-align: center; }
+.out-ui-display-text { display: flex; flex-direction: column; min-width: 0; }
+.out-ui-display-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.out-ui-display-sub { font-size: 0.66rem; color: #999; margin-top: 2px; }
+.out-ui-display-check { margin-left: auto; font-size: 0.8rem; opacity: 0; }
+.out-ui-display.is-selected .out-ui-display-check { opacity: 1; }
+.out-ui-note { font-size: 0.68rem; color: #999; margin: 6px 0 0; line-height: 1.4; }
+
+/* .out-ui prefix: outranks the player's `.tuning-group label { display:block }` */
+.out-ui .out-ui-fs { display: flex; align-items: center; justify-content: space-between; margin-top: 9px; font-size: 0.76rem; color: #ddd; cursor: pointer; text-transform: none; letter-spacing: normal; }
+.out-ui-fs .switch { flex-shrink: 0; }
+
+.out-ui-send {
+  width: 100%; margin-top: 9px; padding: 9px 10px; border-radius: 8px; cursor: pointer;
+  background: #fff; color: #000; border: 1px solid #fff;
+  font: 600 0.8rem/1 var(--font, system-ui); display: flex; align-items: center; justify-content: center; gap: 7px;
+}
+.out-ui-send:hover { background: #e6e6e6; }
+.out-ui-send.is-active { background: rgba(255,255,255,0.08); color: #fff; border-color: rgba(255,255,255,0.3); }
+.out-ui-send.is-active:hover { background: rgba(255,255,255,0.14); }
+.out-ui-live { width: 8px; height: 8px; border-radius: 50%; background: #3ddc84; box-shadow: 0 0 8px #3ddc84; display: none; }
+.out-ui-send.is-active .out-ui-live { display: inline-block; }
+
+.out-ui-hint { font-size: 0.68rem; color: #999; margin: 7px 0 0; line-height: 1.4; }
+.out-ui-error { font-size: 0.7rem; color: #f3a0a0; margin: 6px 0 0; }
+.out-ui-tips { margin-top: 6px; font-size: 0.68rem; color: #999; line-height: 1.45; }
+.out-ui-tips summary { cursor: pointer; color: #bbb; }
+.out-ui-tips summary:hover { color: #fff; }
+.out-ui-tips p { margin: 5px 0 0; }
+.out-ui-tips kbd {
+  font: 600 0.62rem/1 ui-monospace, Menlo, monospace; padding: 2px 4px; border-radius: 3px;
+  border: 1px solid rgba(255,255,255,0.25); color: #ddd;
+}
+
+/* Fullscreen on/off switch (self-contained so the editor doesn't need the player's .switch) */
+.out-ui-switch {
+  appearance: none; -webkit-appearance: none; position: relative; cursor: pointer; flex-shrink: 0;
+  width: 32px; height: 18px; border-radius: 9px; margin: 0;
+  background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); transition: background 150ms ease;
+}
+.out-ui-switch::before {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%;
+  background: #bbb; transition: transform 150ms ease, background 150ms ease;
+}
+.out-ui-switch:checked { background: #fff; border-color: #fff; }
+.out-ui-switch:checked::before { transform: translateX(14px); background: #000; }

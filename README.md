@@ -38,6 +38,9 @@ Last verified **2026-10-11**. "Web" = Chrome dev/web build · "macOS" = the sign
 - **Video must be H.264** for anything that reads its pixels; VP9 throws `SecurityError` in production.
 - **The first `drawImage(video)` can block for 1 s** unless frames are already flowing ([`video-dev.md`](video-dev.md) §28).
 - **Measure inside the real app** (`npm run tauri-dev`). Chromium results don't carry over to WKWebView.
+- **Don't inject `<style>` at runtime.** The player page has an inline `<style>`; Tauri hashes it into the CSP, and WebKit
+  then ignores `'unsafe-inline'`, so runtime-injected styles are silently blocked. Put CSS in real stylesheets
+  (imported `.css` files). Setting `element.style` from JS is fine.
 
 ## Features
 

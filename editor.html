@@ -124,18 +124,8 @@
 
         <!-- Output panel (output-dev.md Phase 1 — Send to display) -->
         <div id="editor-output-panel" class="editor-output-panel" hidden>
-            <div class="eop-title">Send to display</div>
-            <p class="eop-hint" data-desktop-only>Desktop beta: the output is a copied feed (~30 fps). Press <kbd>D</kbd> in the output window for its stats.</p>
-            <div class="eop-row">
-                <select id="output-display" class="eop-select"></select>
-                <button id="btn-output-detect" class="eop-btn" type="button" title="Detect connected displays">↻</button>
-            </div>
-            <label class="eop-check">
-                <input type="checkbox" id="output-fullscreen-toggle" />
-                <span>Fullscreen on open</span>
-            </label>
-            <button id="btn-output-open" class="eop-btn eop-btn--full" type="button">Open output window</button>
-            <p class="eop-hint">Sends the preview to a 2nd display/projector <strong>attached to this computer</strong>. Drag it there, then ⛶ Fullscreen. <span data-web-only><strong>Keep this window visible</strong> — if it's hidden the output stops reacting.</span></p>
+            <!-- Send to display: rendered by src/output/outputUI.js -->
+            <div data-output-ui></div>
         </div>
 
         <div class="editor-body">

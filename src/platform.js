@@ -9,15 +9,11 @@
  *
  * The desktop app is the shipping product: see README → Platform support.
  */
+import './platform.css'; // the rules live in a real stylesheet (CSP-safe in the desktop app)
+
 export const IS_DESKTOP = typeof window !== 'undefined' && !!window.__TAURI__;
 
-if (typeof document !== 'undefined') {
-  if (IS_DESKTOP) document.documentElement.classList.add('is-desktop');
-  const style = document.createElement('style');
-  style.textContent =
-    '.is-desktop [data-web-only]{display:none!important}' +
-    'html:not(.is-desktop) [data-desktop-only]{display:none!important}' +
-    // Timeline per-zone output chips route zones to output windows (web only).
-    '.is-desktop .tl-zone-out-chip{display:none!important}';
-  document.head.appendChild(style);
+
+if (IS_DESKTOP && typeof document !== 'undefined') {
+  document.documentElement.classList.add('is-desktop');
 }

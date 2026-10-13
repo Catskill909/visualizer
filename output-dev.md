@@ -42,6 +42,10 @@ slot; NDI/Syphon can read the same slot later). CSP `connect-src` allows `dcfram
 | 720p / 60 | 50 | 22 ms | 100 fps |
 | 1080p / 60 | 40 ❌ | 31 ms | drops to 90 fps (too heavy) |
 
+**UI (redesigned 2026-10-12):** *Send to display* is rendered by `src/output/outputUI.js` into a `[data-output-ui]`
+placeholder (same in player + editor): one button per screen ("This screen" / "Display N"), a Fullscreen switch, one
+main **▶ Send to … / ■ Stop output** button with a live dot, and a collapsible Tips block. The last display + Fullscreen
+choice are remembered (`dc_output_prefs`). Styles: `src/output/output-ui.css`.
 Feed size / fps / quality can be switched live from the output window's readout (**D**). **Limits:** ~~keep the main
 window visible~~ **fixed 2026-10-12:** the desktop app now keeps rendering when its window is fully covered
 (WKWebView occlusion detection off + App Nap opt-out, `main.rs`; measured covered: 0 fps before → 100 fps after). Don't fullscreen the output on the *same* screen as the app; one source
