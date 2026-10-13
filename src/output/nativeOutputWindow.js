@@ -121,7 +121,7 @@ export function run() {
     'font:12px/1.5 ui-monospace,Menlo,monospace;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.15);min-width:250px;';
   let hudPref = null;
   try { hudPref = localStorage.getItem(HUD_KEY); } catch { /* ignore */ }
-  hud.hidden = hudPref === '0';
+  hud.hidden = hudPref !== '1';   // hidden by default; D toggles (and is remembered)
   const stats = document.createElement('div');
   hud.appendChild(stats);
   const opts = document.createElement('div');
