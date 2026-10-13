@@ -2,7 +2,7 @@
  * ControlPanel — UI bindings, auto-hide, keyboard shortcuts, preset drawer
  */
 import './platform.js'; // sets html.is-desktop → hides web-only UI in the desktop app
-import { downloadFile, showAudioLoadingModal, hideAudioLoadingModal } from './fileUtils.js';
+import { downloadFile, pickAudioFileDesktop } from './fileUtils.js';
 import { isSupportedAudioFile, showUnsupportedAudioModal } from './audioFormat.js';
 import {
   getCustomPreset,
@@ -153,18 +153,8 @@ export class ControlPanel {
 
     const triggerFilePicker = async () => {
       if (window.__TAURI__) {
-        showAudioLoadingModal();
-        try {
-          const result = await window.__TAURI__.invoke('pick_audio_file');
-          if (!result) { hideAudioLoadingModal(); return; }
-          const bytes = Uint8Array.from(atob(result.data), c => c.charCodeAt(0));
-          const file = new File([bytes], result.name, { type: 'audio/mpeg' });
-          hideAudioLoadingModal();
-          this.handleFileSelection(file);
-        } catch (err) {
-          hideAudioLoadingModal();
-          throw err;
-        }
+        const file = await pickAudioFileDesktop();   // streams from disk; no full read
+        if (file) this.handleFileSelection(file);
       } else {
         els.fileInput.click();
       }

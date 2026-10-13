@@ -307,7 +307,16 @@ export class VisualizerEngine {
       if (this.audioContext.state === 'suspended') await this.audioContext.resume();
       this.disconnectSource();
       this.audioElement = new Audio();
-      this.audioElement.src = URL.createObjectURL(file);
+      if (file.streamUrl) {
+        // Desktop: stream from disk (asset protocol). crossOrigin so Web Audio can
+        // analyse it — the asset protocol sends CORS headers; without this the
+        // MediaElementSource would output silence.
+        this.audioElement.crossOrigin = 'anonymous';
+        this.audioElement.preload = 'auto';
+        this.audioElement.src = file.streamUrl;
+      } else {
+        this.audioElement.src = URL.createObjectURL(file);
+      }
       const source = this.audioContext.createMediaElementSource(this.audioElement);
       // Path for Hearing: Source -> VolumeGain -> Destination
       this.volumeGainNode = this.audioContext.createGain();

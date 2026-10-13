@@ -12,7 +12,7 @@ import { PresetLibrary } from './presetLibrary.js';
 import { getCustomPreset, loadAllCustomPresets, hydratePresets, CUSTOM_PREFIX } from '../customPresets.js';
 import { initAuthGate } from '../auth-gate.js';
 import { pickAndConnect } from '../devicePicker.js';
-import { showAudioLoadingModal, hideAudioLoadingModal } from '../fileUtils.js';
+import { pickAudioFileDesktop } from '../fileUtils.js';
 import { isSupportedAudioFile, showUnsupportedAudioModal } from '../audioFormat.js';
 import { initOutputUI } from '../output/outputUI.js';
 
@@ -675,22 +675,8 @@ btnMic.addEventListener('click', () => {
     });
 });
 
-const pickAudioFile = async () => {
-    if (window.__TAURI__) {
-        showAudioLoadingModal();
-        try {
-            const result = await window.__TAURI__.invoke('pick_audio_file');
-            if (!result) { hideAudioLoadingModal(); return null; }
-            const bytes = Uint8Array.from(atob(result.data), c => c.charCodeAt(0));
-            hideAudioLoadingModal();
-            return new File([bytes], result.name, { type: 'audio/mpeg' });
-        } catch (err) {
-            hideAudioLoadingModal();
-            throw err;
-        }
-    }
-    return null;
-};
+// Desktop: stream the picked file from disk (see fileUtils.pickAudioFileDesktop).
+const pickAudioFile = async () => (window.__TAURI__ ? pickAudioFileDesktop() : null);
 
 btnFile.addEventListener('click', async () => {
     if (window.__TAURI__) {

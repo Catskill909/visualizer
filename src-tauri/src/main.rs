@@ -338,6 +338,34 @@ async fn pick_audio_file() -> Option<AudioFileResult> {
     Some(AudioFileResult { name, data })
 }
 
+#[derive(serde::Serialize)]
+struct AudioPathResult {
+    name: String,
+    path: String,
+}
+
+/// Pick an audio file and return its PATH (not its bytes). The file is allowed in
+/// the asset protocol scope so the webview can stream it with `convertFileSrc`
+/// (range requests: starts instantly, low memory, even for multi-hour files).
+/// `pick_audio_file` (base64 over IPC) remains as the fallback.
+#[tauri::command]
+async fn pick_audio_path(app: tauri::AppHandle) -> Result<Option<AudioPathResult>, String> {
+    let (tx, mut rx) = channel::<Option<std::path::PathBuf>>(1);
+    FileDialogBuilder::new()
+        .set_title("Open Audio File")
+        .add_filter("Audio", &["mp3", "wav", "flac", "ogg", "aac", "m4a", "opus", "aiff", "aif"])
+        .pick_file(move |path| {
+            let _ = tx.blocking_send(path);
+        });
+    let path = match rx.recv().await.unwrap_or(None) {
+        Some(p) => p,
+        None => return Ok(None),
+    };
+    app.asset_protocol_scope().allow_file(&path).map_err(|e| e.to_string())?;
+    let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    Ok(Some(AudioPathResult { name, path: path.to_string_lossy().into_owned() }))
+}
+
 #[tauri::command]
 async fn pick_image_file() -> Option<AudioFileResult> {
     let (tx, mut rx) = channel::<Option<std::path::PathBuf>>(1);
@@ -601,7 +629,7 @@ fn main() {
         .manage(NdiState(Mutex::new(None)))
         .manage(OutputFrame(Mutex::new(OutputFrameInner::default())))
         .register_uri_scheme_protocol("dcframe", dcframe_protocol)
-        .invoke_handler(tauri::generate_handler![output_open, output_close, output_is_open, output_push_frame, caffeinate_start, caffeinate_stop, toggle_fullscreen, get_fullscreen, list_monitors, fullscreen_on_monitor, pick_audio_file, pick_image_file, save_file, store_blob, get_blob, get_blob_path, delete_blob, store_preset, get_all_presets, delete_preset, convert_to_stacked_alpha, convert_to_stacked_alpha_b64, ndi_start, ndi_send_frame, ndi_stop])
+        .invoke_handler(tauri::generate_handler![output_open, output_close, output_is_open, output_push_frame, caffeinate_start, caffeinate_stop, toggle_fullscreen, get_fullscreen, list_monitors, fullscreen_on_monitor, pick_audio_file, pick_audio_path, pick_image_file, save_file, store_blob, get_blob, get_blob_path, delete_blob, store_preset, get_all_presets, delete_preset, convert_to_stacked_alpha, convert_to_stacked_alpha_b64, ndi_start, ndi_send_frame, ndi_stop])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

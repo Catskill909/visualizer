@@ -25,6 +25,7 @@ Last verified **2026-10-11**. "Web" = Chrome dev/web build · "macOS" = the sign
 | **Transparent WebM (VP9 alpha)** | ✅ native | ✅ converted on import to stacked-alpha H.264 (WKWebView drops VP9 alpha) | ✅ native | [`apng-dev.md`](apng-dev.md), [`video-dev.md`](video-dev.md) §27 |
 | **Reading VP9 video pixels** (WebGL upload) | ✅ | ❌ `SecurityError` in the signed DMG → videos must be H.264 | ✅ | [`video-dev.md`](video-dev.md) §14, [`apng-dev.md`](apng-dev.md) |
 | **Media storage** | IndexedDB | native files (WKWebView can silently wipe IndexedDB); read via the asset protocol | native files | [`storage-audit-dev.md`](storage-audit-dev.md), [`video-dev.md`](video-dev.md) §28 |
+| **Long audio files** (pick a file to play) | ✅ browser streams it | ✅ in code (next build): **streamed from disk** (`pick_audio_path` + asset protocol): a 245 MB / 1 h 47 min MP3 plays in 0.4 s (was 25 s of spinner: whole file base64'd over IPC), seeking ~0.06 s | ❓ untested | `src/fileUtils.js pickAudioFileDesktop` |
 | **Video import offline** (FFmpeg.wasm) | ✅ (since 2026-10-11) | ✅ | ✅ | [`video-dev.md`](video-dev.md) §5.2 |
 | **Live audio device picker** on first connect | ✅ | ⚠️ main page can't use the picker for the first connect (AudioContext created without a user gesture hangs) | ✅ | [`live-input-dev.md`](live-input-dev.md) |
 | **Community preset packs** | ❌ (not bundled on web) | ✅ | ✅ | [`milkdrop-pack-import.md`](milkdrop-pack-import.md) |
