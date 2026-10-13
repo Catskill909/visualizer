@@ -851,7 +851,14 @@ export class VisualizerEngine {
         preset.shapes = [
           ...preset.shapes.filter(isEditorShape),
           ...preset.shapes.filter(s => !isEditorShape(s)),
-        ];
+        ].slice(0, 4);
+        // The engine draws 4 shape slots and indexes preset.shapes[i]; a custom
+        // preset saved with 1–3 shapes left the rest undefined → drawCustomShape
+        // threw every frame and (before the loop guard) froze the player for good.
+        // Pad with disabled stubs exactly like the editor's _buildRuntimePreset.
+        while (preset.shapes.length > 0 && preset.shapes.length < 4) {
+          preset.shapes.push({ baseVals: { enabled: 0 }, init_eqs_str: '', frame_eqs_str: '' });
+        }
       }
       this.presets[key] = preset;
     }
@@ -950,86 +957,107 @@ export class VisualizerEngine {
     this.isRunning = true;
     const render = () => {
       if (!this.isRunning) return;
-
-      // --- Performance Logic (primary engine only) ---
-      if (!this._isSlaveEngine) {
-        if (this.agcEnabled) {
-          this.updateAGC();
-        } else {
-          // Reset to manual energy + base
-          const targetGain = this.baseSensitivity * this.energyMultiplier * (this.boostActive ? 2.0 : 1.0);
-          // Smoothly transition gain
-          this.visualizerGainNode.gain.setTargetAtTime(targetGain, this.audioContext.currentTime, 0.1);
-
-          // Update hype level for UI
-          this.analyser.getByteTimeDomainData(this.agcDataArray);
-          let max = 0;
-          for (let i = 0; i < this.agcDataArray.length; i++) {
-            const val = Math.abs(this.agcDataArray[i] - 128);
-            if (val > max) max = val;
-          }
-          const peak = max / 128;
-          // Map 0-1 to a more visible 0-1 range for the UI meter
-          this.hypeLevel = Math.min((peak * targetGain) / 5.0, 1.2);
-        }
+      // One bad frame must never stop the show: a throw anywhere in the frame
+      // used to skip the rAF below and freeze the visuals for good (seen live
+      // 2026-10-12 on a video preset). Catch, report once, always schedule.
+      try {
+        this._renderFrame();
+      } catch (err) {
+        this._reportFrameError(err);
+      } finally {
+        if (this.isRunning) this.animFrameId = requestAnimationFrame(render);
       }
-
-      // Spectral flux — onset detection from existing analyser (primary engine only)
-      if (!this._isSlaveEngine) {
-        this.analyser.getByteFrequencyData(this._fluxFftBuf);
-        let _flux = 0;
-        for (let i = 0; i < this._fluxFftBuf.length; i++) {
-          const diff = this._fluxFftBuf[i] - this._fluxPrevFrame[i];
-          if (diff > 0) _flux += diff;
-        }
-        this._spectralFlux = Math.min(1.0, _flux / (this._fluxFftBuf.length * 10));
-        this._fluxPrevFrame.set(this._fluxFftBuf);
-        window.__dcFlux = this._spectralFlux;
-      }
-
-      this._tickGifAnimations();
-      this._tickVideoAnimations();
-
-      // animation-dev.md P0-C: publish per-layer _anim state to window.__dcAnim
-      // each frame. Read by the per-frame eq line, which pulls each layer's slot
-      // into its q-register tuple (q{i*5+1..i*5+5}).
-      // Prefer this engine's own animated layers (player & timeline, set by
-      // _startPresetAnimations); fall back to the editor inspector for live
-      // editing. One global, but each engine writes it immediately before its own
-      // render() below — publish+render is synchronous, so the multi-engine
-      // timeline stays correct.
-      const _insp = (typeof window !== 'undefined') ? window.__editorInspector : null;
-      const _imgs = this._animLayers || _insp?.currentState?.images;
-      if (_imgs) {
-        const out = [];
-        for (let i = 0; i < _imgs.length; i++) {
-          out[i] = _imgs[i]?._anim || null;
-        }
-        window.__dcAnim = out;
-      }
-
-      this.visualizer.render();
-
-      // Frame taps (desktop output pipe): same "right after render" rule as below.
-      if (this._frameTaps.size) {
-        for (const tap of this._frameTaps) { try { tap(this.canvas); } catch { /* a tap must never break rendering */ } }
-      }
-
-      // Capture hook: resolve immediately after render() while buffer is live
-      if (this._pendingCapture) {
-        const cb = this._pendingCapture;
-        this._pendingCapture = null;
-        try {
-          const off = document.createElement('canvas');
-          off.width = 320; off.height = 180;
-          off.getContext('2d').drawImage(this.canvas, 0, 0, 320, 180);
-          cb(off.toDataURL('image/jpeg', 0.7));
-        } catch { cb(null); }
-      }
-
-      this.animFrameId = requestAnimationFrame(render);
     };
     render();
+  }
+
+  /** One frame: audio analysis, layer ticks, butterchurn render, frame taps. */
+  _renderFrame() {
+    // --- Performance Logic (primary engine only) ---
+    if (!this._isSlaveEngine) {
+      if (this.agcEnabled) {
+        this.updateAGC();
+      } else {
+        // Reset to manual energy + base
+        const targetGain = this.baseSensitivity * this.energyMultiplier * (this.boostActive ? 2.0 : 1.0);
+        // Smoothly transition gain
+        this.visualizerGainNode.gain.setTargetAtTime(targetGain, this.audioContext.currentTime, 0.1);
+
+        // Update hype level for UI
+        this.analyser.getByteTimeDomainData(this.agcDataArray);
+        let max = 0;
+        for (let i = 0; i < this.agcDataArray.length; i++) {
+          const val = Math.abs(this.agcDataArray[i] - 128);
+          if (val > max) max = val;
+        }
+        const peak = max / 128;
+        // Map 0-1 to a more visible 0-1 range for the UI meter
+        this.hypeLevel = Math.min((peak * targetGain) / 5.0, 1.2);
+      }
+    }
+
+    // Spectral flux — onset detection from existing analyser (primary engine only)
+    if (!this._isSlaveEngine) {
+      this.analyser.getByteFrequencyData(this._fluxFftBuf);
+      let _flux = 0;
+      for (let i = 0; i < this._fluxFftBuf.length; i++) {
+        const diff = this._fluxFftBuf[i] - this._fluxPrevFrame[i];
+        if (diff > 0) _flux += diff;
+      }
+      this._spectralFlux = Math.min(1.0, _flux / (this._fluxFftBuf.length * 10));
+      this._fluxPrevFrame.set(this._fluxFftBuf);
+      window.__dcFlux = this._spectralFlux;
+    }
+
+    this._tickGifAnimations();
+    this._tickVideoAnimations();
+
+    // animation-dev.md P0-C: publish per-layer _anim state to window.__dcAnim
+    // each frame. Read by the per-frame eq line, which pulls each layer's slot
+    // into its q-register tuple (q{i*5+1..i*5+5}).
+    // Prefer this engine's own animated layers (player & timeline, set by
+    // _startPresetAnimations); fall back to the editor inspector for live
+    // editing. One global, but each engine writes it immediately before its own
+    // render() below — publish+render is synchronous, so the multi-engine
+    // timeline stays correct.
+    const _insp = (typeof window !== 'undefined') ? window.__editorInspector : null;
+    const _imgs = this._animLayers || _insp?.currentState?.images;
+    if (_imgs) {
+      const out = [];
+      for (let i = 0; i < _imgs.length; i++) {
+        out[i] = _imgs[i]?._anim || null;
+      }
+      window.__dcAnim = out;
+    }
+
+    this.visualizer.render();
+
+    // Frame taps (desktop output pipe): same "right after render" rule as below.
+    if (this._frameTaps.size) {
+      for (const tap of this._frameTaps) { try { tap(this.canvas); } catch { /* a tap must never break rendering */ } }
+    }
+
+    // Capture hook: resolve immediately after render() while buffer is live
+    if (this._pendingCapture) {
+      const cb = this._pendingCapture;
+      this._pendingCapture = null;
+      try {
+        const off = document.createElement('canvas');
+        off.width = 320; off.height = 180;
+        off.getContext('2d').drawImage(this.canvas, 0, 0, 320, 180);
+        cb(off.toDataURL('image/jpeg', 0.7));
+      } catch { cb(null); }
+    }
+  }
+
+  /** Surface a frame error once per distinct message (no devtools in the DMG). */
+  _reportFrameError(err) {
+    const msg = (err && (err.name ? err.name + ': ' : '') + (err.message || err)) || String(err);
+    this._frameErrorsSeen = this._frameErrorsSeen || new Set();
+    if (this._frameErrorsSeen.has(msg)) return;   // once per distinct error, not every frame
+    this._frameErrorsSeen.add(msg);
+    console.error('[DiscoCast Visualizer] frame error (loop continues):', msg, err);
+    this._showRenderError(msg + (err && err.stack ? '\n' + String(err.stack).split('\n').slice(0, 4).join('\n') : ''));
   }
 
   _showRenderError(msg) {

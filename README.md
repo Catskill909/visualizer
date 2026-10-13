@@ -627,6 +627,7 @@ All fixed — kept for reference.
 | [`docs/bugs/export-tauri.md`](docs/bugs/export-tauri.md) | Tauri WKWebView swallowing `<a download>` — Rust `save_file` command + `downloadFile` JS helper. Requires `./build-and-sign.sh` rebuild to ship in macOS app. |
 | [`docs/bugs/white-flash.md`](docs/bugs/white-flash.md) | White flash on startup — inline critical CSS + Tauri `visible:false`. |
 | [`docs/bugs/fullscreen-macos.md`](docs/bugs/fullscreen-macos.md) | Fullscreen button no-op in Tauri macOS — Rust-side window toggle. |
+| [`docs/bugs/player-freeze-custom-shapes.md`](docs/bugs/player-freeze-custom-shapes.md) | ✅ Fixed 2026-10-12. Player froze for good on custom presets with 1–3 shapes; the render loop now survives frame errors. |
 | [`video-cutout-edge-noise-dev.md`](video-cutout-edge-noise-dev.md) | ✅ SOLVED post-mortem — white edge speckle on melded transparent-video cutouts. Root cause: the web/native-alpha meld path ignored the matte entirely (alpha handling was macOS-stacked-only); unified the alpha gate + soft-feather **Edge Feather** matte blur. Lesson: a control that does *nothing* → check it's on the active code path first. |
 | [`macos-import-bug.md`](macos-import-bug.md) | ✅ Fixed 2026-05-09. macOS video import showed a card but no video. |
 | [`preset-player-audit.md`](preset-player-audit.md) | ✅ All fixed 2026-05-09. Random/order + "edit wrong preset" bugs. |

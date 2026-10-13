@@ -4708,7 +4708,9 @@ function () {
   }, {
     key: "drawCustomShape",
     value: function drawCustomShape(blendProgress, globalVars, presetEquationRunner, shapeEqs, prevTexture) {
-      if (shapeEqs.baseVals.enabled !== 0) {
+      // DiscoCast fork: a preset with fewer than 4 shapes leaves slots undefined —
+      // skip them instead of throwing every frame (drawCustomWaveform already guards).
+      if (shapeEqs && shapeEqs.baseVals && shapeEqs.baseVals.enabled !== 0) {
         this.setupShapeBuffers(presetEquationRunner.mdVSFrame);
         var mdVSShape = Object.assign({}, presetEquationRunner.mdVSShapes[this.index], presetEquationRunner.mdVSFrameMapShapes[this.index], presetEquationRunner.mdVSQAfterFrame, presetEquationRunner.mdVSTShapeInits[this.index], globalVars);
         var mdVSShapeBaseVals = _utils__WEBPACK_IMPORTED_MODULE_0__["default"].cloneVars(mdVSShape);
