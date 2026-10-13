@@ -13,7 +13,7 @@
 > | | Before (Beta Oct 11, `9fe567c`) | **Released Beta Oct 12, 2026** (`f1fc2cc`) |
 > |---|---|---|
 > | Fullscreen the whole app on a display (player `F`; Timeline `⊟ Outputs` → *Fullscreen here*) | ✅ works | ✅ works (Timeline ↻ Detect also refreshes it) |
-> | Player/editor **Open output window** (clean visuals-only window, controls stay on the laptop) | ❌ button silently does nothing (`window.open` is unsupported in Tauri 1) | ✅ **works, B2** below: **projector-verified 2026-10-12** (30 fps, ~40–53 ms) |
+> | Player/editor **Send to display** (clean visuals-only window, controls stay on the laptop) | ❌ button silently does nothing (`window.open` is unsupported in Tauri 1) | ✅ **works, B2** below: **projector-verified 2026-10-12** (30 fps, ~40–53 ms) |
 > | Timeline routing / stacking / *Composed Program* windows | ❌ do nothing | ❌ **hidden** on desktop (still web-only; next: feed the composer canvas into B2) |
 > | "Virtual Camera" toggle | ⚠️ shown, produces no system camera | **hidden** on desktop; labelled "experimental" on web |
 > | NDI | ❌ disabled (`NDI_ENABLED=false`) | ❌ disabled (N2 not done) |
@@ -24,8 +24,8 @@
 > - **OBS:** an optional external route (window-capture the clean output window). Not the in-room path.
 > - Platform matrix for the whole app: README → **Platform support**.
 
-### 🟢 B2 desktop output window — BUILT for player + editor (2026-10-11, beta, awaiting projector test)
-**How it works:** *Send to display → Open output window* now works in the desktop app. Rust creates a second window
+### 🟢 B2 desktop output window — player + editor (built 2026-10-11 · projector-verified 2026-10-12 · released Beta Oct 12, 2026)
+**How it works:** *Send to display → ▶ Send to…* now works in the desktop app. Rust creates a second window
 (`output_open`, placed on the chosen monitor by physical position, optional fullscreen). The main window copies each
 finished frame right after `render()` (`engine.addFrameTap`), compresses it to JPEG, and pushes it to Rust
 (`output_push_frame`). The output window pulls the newest frame over a custom `dcframe://` protocol (raw bytes) and
@@ -46,7 +46,7 @@ slot; NDI/Syphon can read the same slot later). CSP `connect-src` allows `dcfram
 placeholder (same in player + editor): one button per screen ("This screen" / "Display N"), a Fullscreen switch, one
 main **▶ Send to … / ■ Stop output** button with a live dot, and a collapsible Tips block. The last display + Fullscreen
 choice are remembered (`dc_output_prefs`). Styles: `src/output/output-ui.css`.
-Feed size / fps / quality can be switched live from the output window's readout (**D**). **Limits:** ~~keep the main
+Feed size / fps / quality can be switched live from the output window's readout (**D**; hidden by default since Beta Oct 12). **Limits:** ~~keep the main
 window visible~~ **fixed 2026-10-12:** the desktop app now keeps rendering when its window is fully covered
 (WKWebView occlusion detection off + App Nap opt-out, `main.rs`; measured covered: 0 fps before → 100 fps after). Don't fullscreen the output on the *same* screen as the app; one source
 per output (Timeline routing/composed program still web-only — it'll feed its composer canvas into this pipe next).
@@ -74,8 +74,8 @@ Condensed from the 2026-06-09 field test below. Do these in order:
 3. **Extended, not mirrored.** System Settings → Displays → select the **built-in/operator screen** → *Use as:
    Main display*. The projector becomes a separate extended screen. If the "Mirror or Extend" prompt keeps nagging, see the
    Sequoia "TV" bug fix below (BetterDisplay EDID override).
-4. **Put the visuals on the projector.** *Next build:* player `O` → *Send to display* → pick the projector → *Fullscreen
-   on open* → **Open output window** (clean output, controls stay on the operator screen). *Released build / fallback:*
+4. **Put the visuals on the projector.** *Since Beta Oct 12:* player `O` → *Send to display* → click the projector → Fullscreen on →
+   **▶ Send to Display 2** (clean output, controls stay on the operator screen). *Fallback:*
    Timeline → `⊟ Outputs` → *Fullscreen here*, or drag the window there and press **F**, then **H** to hide the controls.
 5. **Lock the render resolution** to the projector's (Output panel `O` → Resolution, e.g. 1920×1080) for a sharp,
    consistent image.
@@ -227,7 +227,7 @@ The original plan picked **Option A — re-render in the output window** (the se
 | `timeline.html` / `src/timeline/timelineEditor.js` | Timeline `⊟ Outputs` modal + per-zone routing + stacking. Outputs keyed by display (`'disp:'+id`). | `#tl-btn-outputs`, `#tl-output-mgr`; `_openOutputMgr`/`_assignZoneOutput`/`_syncOutputs`/`_displayKey`/`_zoneOutputLive`/`_buildStackControls`/`_applyZoneStyle`/`_renderOutputRoutes`/`_updateOutputChips`/`_zoneOutTag`; `mkZone().output`; chip `.tl-zone-out-chip` |
 | `src/timeline/style.css` | Timeline output modal + chip styles; `--zone-col-w` **must equal** JS `ZONE_COL_W` in `timelineEditor.js`. | — |
 
-**How to run & verify (web — a single screen is enough to prove sync):** `npm run dev:safe` → open the player → press `O` → **↻ Detect** (grant the window-management prompt) → pick a display → **Open output window**. A popup mirrors the canvas in perfect sync. Timeline: open `/timeline.html` → **`⊟ Outputs`** → route a zone to a display. *Keep the operator window visible — a hidden/occluded window throttles its rAF and the mirror freezes (known limit, §5).* Output windows spawn at half-display size, centred + cascaded; fullscreen each with the ⛶ button.
+**How to run & verify (web — a single screen is enough to prove sync):** `npm run dev:safe` → open the player → press `O` → **↻ Refresh** (grant the window-management prompt) → click a display → **▶ Send to…**. A popup mirrors the canvas in perfect sync. Timeline: open `/timeline.html` → **`⊟ Outputs`** → route a zone to a display. *Keep the operator window visible — a hidden/occluded window throttles its rAF and the mirror freezes (known limit, §5).* Output windows spawn at half-display size, centred + cascaded; fullscreen each with the ⛶ button.
 
 **Where to start next:** the **📋 Phase Board at the top of the doc** is the tracker. (Short version: Phase B → B1, fullscreen-on-monitor.)
 

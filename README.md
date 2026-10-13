@@ -13,7 +13,7 @@ Last verified **2026-10-11**. "Web" = Chrome dev/web build · "macOS" = the sign
 | Feature | Web | macOS app | Windows app | Source / why |
 |---|---|---|---|---|
 | **Fullscreen the whole app** on a display (player `F`, Timeline `⊟ Outputs` → *Fullscreen here*) | ✅ | ✅ via Rust command | ✅ | [`docs/bugs/fullscreen-macos.md`](docs/bugs/fullscreen-macos.md), [`output-dev.md`](output-dev.md) B1 |
-| **Output window, player/editor** (`O` → *Open output window*) | ✅ | 🟢 **released Beta Oct 12, 2026:** Rust-created window fed by copied frames, 1080p/30. ✅ projector-verified 2026-10-12 (~40–53 ms on a Vankyo X3) | ❓ untested | [`output-dev.md`](output-dev.md) 🟢 B2 block |
+| **Output window, player/editor** (`O` → *Send to display* → **▶ Send to…**) | ✅ | 🟢 **released Beta Oct 12, 2026:** Rust-created window fed by copied frames, 1080p/30. ✅ projector-verified 2026-10-12 (~40–53 ms on a Vankyo X3) | ❓ untested | [`output-dev.md`](output-dev.md) 🟢 B2 block |
 | **Output windows, Timeline** (per-zone routing, stacking, *Composed Program*) | ✅ | ❌ hidden: still needs `window.open`; next it'll feed the composer canvas into the B2 pipe | ❓ untested | [`output-dev.md`](output-dev.md) |
 | **Clean projector output + separate operator screen** | ✅ (via output windows) | 🟢 beta from the **player/editor** (see row above). Fallback: whole app fullscreen on the projector; follow the **macOS projector checklist** in `output-dev.md` | ❓ untested (see row above) | [`output-dev.md`](output-dev.md) Phase B2 |
 | **NDI out** | ❌ (browsers can't) | ❌ disabled in builds (`NDI_ENABLED=false`); a working prototype exists | ❌ | [`native-output-dev.md`](native-output-dev.md) (parked 2026-05-24) |
