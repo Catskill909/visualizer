@@ -134,3 +134,8 @@ node scripts/capture-guide-shots.mjs "<some-song.mp3>" "<some-image.png>"
 ```
 It plays the song, loads a bright preset, and saves close-ups of each panel (player, drawer, cycle, audio tuning, output, Studio tabs, layers, animate, timeline). To add a shot, add a `shotEl(...)` line there, then a `<figure>` here.
 Images ship with the next app build (bump the version).
+
+## The website copy (/help)
+
+The site `discocast.supersoul.top/help` is generated from this Help. After any Help edit, run from the
+`discocast` repo: `node scripts/build-help.mjs`, then commit + push `discocast` and deploy in Coolify.
