@@ -55,6 +55,10 @@ pixel-read `SecurityError` risk, video-dev.md §14).
 > either; it **does** work on the MacBook Air. Don't troubleshoot it again. **Mac mini → use a single-purpose
 > USB-C→HDMI cable** in a back port. Quick check: `system_profiler SPDisplaysDataType` must list the projector.
 > If the projector shows the desktop but isn't listed, it's **AirPlay**, not the cable.
+> **2026-10-12, with a proper USB-C→HDMI cable:** the link works (EDID read), but macOS treats the projector as a "TV" and
+> leaves it **off** until *Screen Mirroring → S2-TEK TV → Choose Content → Extend*. Extend makes the projector the **main**
+> display, so the operator screen goes black. Run `scripts/keep-lg-main.swift` first: it puts the operator screen back as main
+> automatically. Or set Displays → *When connected to TV* → Extend.
 Condensed from the 2026-06-09 field test below. Do these in order:
 1. **One machine.** The projector is wired to the **same Mac that runs the app.** Universal Control can fake this; check
    `system_profiler SPDisplaysDataType` lists the projector.
