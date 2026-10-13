@@ -10,7 +10,7 @@
 
 > 🚨 **Current truth for the desktop app (2026-10-11). Read this first.**
 >
-> | | Released app (**Beta Oct 11, 2026**, built at `9fe567c`) | In code on `main` (ships in the **next** build) |
+> | | Before (Beta Oct 11, `9fe567c`) | **Released Beta Oct 12, 2026** (`f1fc2cc`) |
 > |---|---|---|
 > | Fullscreen the whole app on a display (player `F`; Timeline `⊟ Outputs` → *Fullscreen here*) | ✅ works | ✅ works (Timeline ↻ Detect also refreshes it) |
 > | Player/editor **Open output window** (clean visuals-only window, controls stay on the laptop) | ❌ button silently does nothing (`window.open` is unsupported in Tauri 1) | ✅ **works, B2** below: **projector-verified 2026-10-12** (30 fps, ~40–53 ms) |
