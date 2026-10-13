@@ -516,6 +516,8 @@ There are **two help systems** — edit the right one:
 
 **There is no help modal in `editor.html`.** The Preset Studio has no in-app user guide.
 
+**Screenshots** in the User Guide live in `public/guide/*.webp`. Regenerate them after UI changes with `node scripts/capture-guide-shots.mjs <song> <image.png>`. See `.devin/workflows/update-in-app-help.md`.
+
 ### Dev Server Troubleshooting
 
 If `npm run dev` fails, hangs, or gives a port conflict:

@@ -115,3 +115,22 @@ Use the quick grid for main entry points:
 
 - `promo/index.html` — add a feature card in the features grid
 - Relevant `*-dev.md` files — dev notes and status
+
+## Screenshots in the guide (added 2026-10-13)
+
+Help sections show real app screenshots: `public/guide/*.webp`, served at `/guide/…`.
+
+```html
+<figure class="guide-shot guide-shot--narrow">   <!-- --narrow = small panels (max 280px) -->
+  <img src="/guide/cycle-panel.webp" alt="…" loading="lazy" />
+  <figcaption>…</figcaption>
+</figure>
+```
+Three side by side: wrap figures in `<div class="guide-shot-row">`. Styles: `src/style.css` (`.guide-shot`).
+
+**Regenerate after any UI change** (opens a visible Chromium window, ~2 min):
+```
+node scripts/capture-guide-shots.mjs "<some-song.mp3>" "<some-image.png>"
+```
+It plays the song, loads a bright preset, and saves close-ups of each panel (player, drawer, cycle, audio tuning, output, Studio tabs, layers, animate, timeline). To add a shot, add a `shotEl(...)` line there, then a `<figure>` here.
+Images ship with the next app build (bump the version).

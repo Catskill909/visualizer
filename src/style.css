@@ -937,6 +937,18 @@ kbd {
   color: var(--accent);
 }
 
+/* Screenshots in the in-app guide (public/guide/*.webp, made by scripts/capture-guide-shots.mjs) */
+.guide-shot { margin: 10px 0 14px; }
+.guide-shot img {
+  display: block; max-width: 100%; height: auto;
+  border-radius: 8px; border: 1px solid var(--border-subtle); background: #000;
+}
+.guide-shot--narrow img { max-width: 280px; }
+.guide-shot figcaption { font-size: 0.72rem; color: var(--text-muted); margin-top: 6px; line-height: 1.4; }
+.guide-shot-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; align-items: start; margin: 10px 0 14px; }
+.guide-shot-row .guide-shot { margin: 0; }
+.guide-shot-row figcaption { text-align: center; }
+
 .welcome-list {
   list-style: none;
   padding: 0;

@@ -721,6 +721,7 @@
           <!-- Welcome -->
           <section class="welcome-section active" data-section="welcome" role="tabpanel">
             <h4>Welcome to DiscoCast</h4>
+            <figure class="guide-shot"><img src="/guide/player-main.webp" alt="The DiscoCast player with live visuals and the control bar" loading="lazy" /><figcaption>The player: visuals fill the window; the control bar appears when you move the mouse.</figcaption></figure>
             <p>A live visuals platform for DJs, VJs, and performers. Powered by the Winamp MilkDrop engine, it gives you 1,144 reactive presets out of the box — plus a full studio to build your own by mixing images, video, GIFs, and text, a timeline sequencer to script complete shows, and live performance tools built for the stage.</p>
             <ul class="welcome-list">
               <li><strong>1,144 bundled presets</strong> — from subtle ambient washes to peak-hour chaos.</li>
@@ -738,6 +739,7 @@
           <!-- Audio Sources -->
           <section class="welcome-section" data-section="sources" role="tabpanel">
             <h4>Audio Sources</h4>
+            <figure class="guide-shot"><img src="/guide/control-bar.webp" alt="The control bar and audio player" loading="lazy" /><figcaption>The control bar: presets, favourite / hide, previous / next, auto-cycle, <strong>Live</strong> (mic) and <strong>File</strong> sources, then tuning, output, Studio, home and fullscreen.</figcaption></figure>
             <p>Three ways to feed the visualizer:</p>
 
             <div class="welcome-feature">
@@ -786,6 +788,7 @@
           <!-- Browsing Presets -->
           <section class="welcome-section" data-section="presets" role="tabpanel">
             <h4>Browsing the Preset Library</h4>
+            <figure class="guide-shot guide-shot--narrow"><img src="/guide/preset-drawer.webp" alt="The preset drawer" loading="lazy" /><figcaption>Press <kbd>P</kbd> for the preset drawer: search, tabs, and per-preset favourite / hide / cycle buttons.</figcaption></figure>
             <p>Open the drawer with the list icon in the bottom bar or press <kbd>P</kbd>. Everything about the library
               lives here.</p>
 
@@ -830,6 +833,7 @@
           <!-- Auto-Cycling -->
           <section class="welcome-section" data-section="cycling" role="tabpanel">
             <h4>Auto-Cycling</h4>
+            <figure class="guide-shot guide-shot--narrow"><img src="/guide/cycle-panel.webp" alt="The Preset Cycling panel" loading="lazy" /><figcaption>The cycle panel (<kbd>R</kbd>): auto-cycle, random order, favourites only, and the interval.</figcaption></figure>
             <p>Let the app rotate through presets automatically. Click the cycle icon in the control bar (or press
               <kbd>C</kbd>) to open the Cycling popover.</p>
 
@@ -847,6 +851,7 @@
           <!-- Live Performance -->
           <section class="welcome-section" data-section="performance" role="tabpanel">
             <h4>Live Performance Tools</h4>
+            <figure class="guide-shot guide-shot--narrow"><img src="/guide/audio-tuning.webp" alt="The Audio Performance panel" loading="lazy" /><figcaption>The Audio Performance panel (<kbd>T</kbd>): live level meter, Visual Energy, Auto-Gain, Kick Lock and Noise Gate.</figcaption></figure>
             <p>Designed for DJs and VJs — quick access to everything you need mid-set.</p>
 
             <div class="welcome-feature">
@@ -896,9 +901,24 @@
                 <li><strong>Resolution</strong> &mdash; Match window. Canvas always fills whatever size the app window is.</li>
                 <li><strong>Aspect Ratio</strong> &mdash; Free. No constraint; proportions follow the window.</li>
                 <li><strong>Fill Mode</strong> &mdash; Letterbox. If a resolution is locked, black bars appear rather than stretching or cropping.</li>
-                <li><strong>Virtual Camera</strong> &mdash; Off. No stream is started until you turn it on.</li>
+                <li data-web-only><strong>Virtual Camera</strong> &mdash; Off. No stream is started until you turn it on.</li>
               </ul>
               <p class="welcome-hint" style="margin-top: 8px;">Nothing to configure for normal use &mdash; defaults give you a clean full-window visualizer. Only open Output Settings when you need a specific projector resolution or want to feed the canvas into OBS.</p>
+            </div>
+
+            <div class="welcome-feature">
+              <div class="welcome-feature-title">Send to a projector or second screen</div>
+            <figure class="guide-shot guide-shot--narrow"><img src="/guide/output-panel.webp" alt="The Output panel with Send to display" loading="lazy" /><figcaption>The Output panel (<kbd>O</kbd>): pick a screen, then <strong>▶ Send to Display 2</strong>.</figcaption></figure>
+              <p>Shows the visuals <strong>alone</strong> (no controls) on another screen, while every control stays on
+                this one. Your screens appear as buttons; the one you pick is remembered.</p>
+              <ul class="welcome-list">
+                <li><strong>Connect the projector with a cable</strong> and set it to <em>Extend</em> (not Mirror) in
+                  System Settings &rarr; Displays. Wireless AirPlay lags too much for live visuals.</li>
+                <li>Click the projector's button, keep <strong>Fullscreen</strong> on, then <strong>▶ Send to &hellip;</strong>.
+                  The button becomes <strong>■ Stop output</strong> with a green dot while it runs.</li>
+                <li>In the output window: <kbd>F</kbd> toggles fullscreen, <kbd>D</kbd> shows stats (fps / delay).</li>
+                <li>Not listed? Plug it in, set it to Extend, then <strong>↻ Refresh</strong>.</li>
+              </ul>
             </div>
 
             <div class="welcome-feature">
@@ -947,7 +967,7 @@
               </ul>
             </div>
 
-            <div class="welcome-feature">
+            <div class="welcome-feature" data-web-only>
               <div class="welcome-feature-title">Virtual Camera</div>
               <p><strong>Experimental, browser only.</strong> The <strong>Virtual Camera</strong> switch starts a canvas
                 stream inside the page, but it does <strong>not</strong> show up as a camera in Zoom, Teams, or OBS yet,
@@ -961,10 +981,10 @@
 
             <div class="welcome-feature">
               <div class="welcome-feature-title">Projector workflow tip</div>
-              <p>For a live show: set <strong>Resolution to 1920&times;1080</strong>, <strong>Aspect to
-                  16:9</strong>, <strong>Fill Mode to Letterbox</strong>, then press <kbd>H</kbd> to hide the UI and
-                <kbd>F</kbd> for fullscreen. The canvas renders at the exact projector native resolution regardless of
-                what your laptop screen does.</p>
+              <p>For a live show: set <strong>Resolution to 1920&times;1080</strong>, <strong>Aspect to 16:9</strong> and
+                <strong>Fill Mode to Letterbox</strong>, then use <strong>Send to a projector</strong> (above) so the
+                projector shows clean visuals while you keep your controls. No second screen? Press <kbd>H</kbd> to hide
+                the UI and <kbd>F</kbd> for fullscreen.</p>
             </div>
           </section>
 
@@ -975,6 +995,7 @@
 
             <div class="welcome-feature" data-subsection="overview">
               <div class="welcome-feature-title">Overview <span class="feature-badge feature-badge--pro">Creative</span></div>
+            <figure class="guide-shot"><img src="/guide/studio-main.webp" alt="The Preset Studio editing a bundled preset" loading="lazy" /><figcaption>The Preset Studio: the live canvas on the left, every control on the right (here: editing a bundled preset).</figcaption></figure>
               <p>The Preset Studio is a complete visual preset builder with 4 tabbed sections, undo/redo, A/B comparison, and a library of 1,144 bundled presets to use as starting points.</p>
               <ul class="welcome-list">
                 <li><strong>Palette</strong> — Color grading, palettes, the 🎨 Color Studio (harmony roll, tone, Base Hue, Color Roll), the 🌈 Color Field (moving multi-colour background), glow bloom, and scene effects</li>
@@ -986,6 +1007,11 @@
 
             <div class="welcome-feature" data-subsection="palette">
               <div class="welcome-feature-title">Color & Palette</div>
+            <div class="guide-shot-row">
+            <figure class="guide-shot"><img src="/guide/studio-palette.webp" alt="Palette tab" loading="lazy" /><figcaption>Palette</figcaption></figure>
+            <figure class="guide-shot"><img src="/guide/studio-motion.webp" alt="Motion tab" loading="lazy" /><figcaption>Motion</figcaption></figure>
+            <figure class="guide-shot"><img src="/guide/studio-wave.webp" alt="Wave tab" loading="lazy" /><figcaption>Wave</figcaption></figure>
+            </div>
               <ul class="welcome-list">
                 <li><strong>Palette</strong> — 12 one-click palettes with <strong>hover-to-preview</strong> (mouse over a chip to see the colors live on the canvas without committing), plus three independent color swatches (Wave / Glow / Accent) with <strong>per-channel 🔓/🔒 locks</strong> so a palette only writes the unlocked channels. <strong>"+ Save current mix"</strong> pins your active Wave/Glow/Accent triplet as a 13th "My Mix" chip. <strong>Glow Strength</strong> and <strong>Accent Strength ✨</strong> now add a colored <strong>bloom</strong> — a soft halo around the visuals tinted by your Glow / Accent colour, so all three palette colours show on the visualisation itself (not the old edge-border ring; the Outer/Inner Border sliders still give you true borders if you want them). Plus Saturation, Hue Rotate, and scene-level toggles (Brighten, Solarize, Invert, etc.). The <strong>Opacity slider</strong> at the top fades the MilkDrop background itself — drag it to zero and only your layers show over a black canvas.
                   <br><br><strong>🎨 Color Studio ✨</strong> (beside Quick Palettes) — <strong>🎲 Colors</strong> rolls a full harmony-aware random scheme; under it you can <em>steer</em> the roll: <strong>harmony-rule</strong> chips (Monochrome / Analogous / Complementary / Split-complement / Triadic), <strong>tone</strong> chips (Vivid / Neon / Pastel / Deep), and a <strong>Base Hue</strong> slider. Pick any to steer, leave them clear for pure random, or click an active chip again to clear it — and 🎲 lights up whatever it landed on. A <strong>Color Roll</strong> slider gently cycles the whole scheme's hue over time. Everything honours your per-channel 🔒 locks, so lock a colour you love and reroll the rest.
@@ -1029,6 +1055,8 @@
 
             <div class="welcome-feature" data-subsection="images">
               <div class="welcome-feature-title">Image &amp; Video Layers <span class="feature-badge feature-badge--pro">Pro</span></div>
+            <figure class="guide-shot"><img src="/guide/studio-layer-on-canvas.webp" alt="An image layer tiled over a preset" loading="lazy" /><figcaption>An image layer (here a tiled logo) composited over the preset.</figcaption></figure>
+            <figure class="guide-shot guide-shot--narrow"><img src="/guide/studio-layers.webp" alt="The Layers tab with a layer card" loading="lazy" /><figcaption>The Layers tab: drop zone, mirror, and a layer card with Solo / Mute / Dupe / ✦ Animate / Reset / Delete.</figcaption></figure>
               <p>Add up to 5 image, GIF, or video layers in a collapsible smart-accordion stack. Drag any card to reorder. Each
                 layer has:</p>
               <ul class="welcome-list">
@@ -1087,6 +1115,7 @@
 
             <div class="welcome-feature" data-subsection="animation">
               <div class="welcome-feature-title">Layer Animation ✨ <span class="feature-badge feature-badge--new">New</span></div>
+            <figure class="guide-shot guide-shot--narrow"><img src="/guide/studio-animate.webp" alt="The Animate window" loading="lazy" /><figcaption>The ✦ Animate window: Entrance / Exit / Idle tabs, timing, duration and easing.</figcaption></figure>
               <p>Every layer card now has a <strong>✦ Animate</strong> button in its header that opens a focused modal — a creative planning tool for how each layer arrives, leaves, and breathes on screen. The modal is a draggable floating panel so the canvas stays visible and live while you tune. Three tabs:</p>
               <ul class="welcome-list">
                 <li><strong>Entrance</strong> — how the layer arrives. Pick a chip: <strong>Fade</strong>, <strong>Scale Up</strong>, <strong>Scale Down</strong>, <strong>Slide Left / Right / Up / Down</strong>, <strong>Pop</strong> (overshoot), or <strong>Blur</strong> (focus-in). Each preset reveals one contextual parameter underneath — Slide has <em>Distance</em>, Scale has <em>Start size</em>, Pop has <em>Pop from</em>, Blur has <em>Start blur</em>. Auto-fires whenever a preset loads so it plays for real, not just in preview.</li>
@@ -1426,6 +1455,7 @@
 
             <div class="welcome-feature" data-subsection="overview">
               <div class="welcome-feature-title">Overview <span class="feature-badge feature-badge--pro">Pro</span></div>
+            <figure class="guide-shot"><img src="/guide/timeline-main.webp" alt="The Timeline editor playing a set" loading="lazy" /><figcaption>The Timeline: the show on top, transport + zoom in the middle, and preset blocks laid out over time below.</figcaption></figure>
               <p>The Timeline Editor is a complete show sequencer for scripted performances. Create timed blocks, arrange them on a horizontal strip, add transitions, and play back your show with VJ Mode — where stopping only pauses the timeline, not the visuals.</p>
               <ul class="welcome-list">
                 <li><strong>Blocks</strong> — preset containers with duration and transitions</li>
